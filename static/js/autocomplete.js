@@ -226,3 +226,93 @@ function classifyImage(img, container) {
         container.classList.add('tall');
     }
 }
+
+// Enhanced masonry layout calculation
+function setupMasonryLayout() {
+    const thumbnails = document.querySelectorAll('.thumbnail');
+    const rowHeight = 12; // Must match grid-auto-rows in CSS
+    
+    thumbnails.forEach((thumb, index) => {
+        thumb.style.animationDelay = `${(index % 6) * 0.02}s`;
+        
+        const img = thumb.querySelector('img');
+        if (!img) return;
+        
+        const processImage = () => {
+            if (img.naturalWidth && img.naturalHeight) {
+                const aspectRatio = img.naturalWidth / img.naturalHeight;
+                
+                // Calculate column span
+                let colSpan = 1;
+                if (aspectRatio > 2) {
+                    colSpan = 3;
+                    thumb.classList.add('ultra-wide');
+                } else if (aspectRatio > 1.3) {
+                    colSpan = 2;
+                    thumb.classList.add('wide');
+                } else if (aspectRatio < 0.6) {
+                    colSpan = 1;
+                    thumb.classList.add('ultra-tall');
+                } else if (aspectRatio < 0.8) {
+                    colSpan = 1;
+                    thumb.classList.add('tall');
+                } else {
+                    colSpan = 1;
+                    thumb.classList.add('square');
+                }
+                
+                // Get actual container width after it's been laid out
+                const containerWidth = thumb.offsetWidth || 300;
+                
+                // Calculate precise height based on aspect ratio to minimize cropping
+                const calculatedHeight = containerWidth / aspectRatio;
+                
+                // Convert height to row spans (more precise calculation)
+                const rowSpan = Math.round(calculatedHeight / rowHeight);
+                
+                // Apply the row span
+                thumb.style.gridRowEnd = `span ${Math.max(rowSpan, 10)}`; // Minimum 10 rows
+                thumb.style.gridColumnEnd = `span ${colSpan}`;
+            }
+        };
+        
+        // If image already loaded
+        if (img.complete && img.naturalWidth) {
+            processImage();
+        } else {
+            // Wait for image to load
+            img.addEventListener('load', processImage);
+        }
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize autocomplete
+    new Autocomplete('searchInput', 'autocompleteSuggestions');
+    
+    // Setup masonry layout
+    setupMasonryLayout();
+    
+    // Recalculate layout on window resize
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            setupMasonryLayout();
+        }, 250);
+    });
+    
+    // Add smooth scroll behavior
+    document.documentElement.style.scrollBehavior = 'smooth';
+    
+    // Add loading state to search form
+    const searchForm = document.getElementById('searchForm');
+    if (searchForm) {
+        searchForm.addEventListener('submit', (e) => {
+            const button = searchForm.querySelector('button[type="submit"]');
+            button.style.opacity = '0.7';
+            button.textContent = 'Searching...';
+        });
+    }
+});

@@ -350,32 +350,54 @@ body {
     font-weight: 500;
 }
 
-/* Gallery */
+/* Gallery - Masonry Layout */
 .gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-auto-rows: 12px; /* Small row height for fine-grained control */
     grid-auto-flow: dense;
+    gap: 10px;
 }
 
 .thumbnail {
     position: relative;
     overflow: hidden;
-    border-radius: 12px;
+    border-radius: 8px;
     background: rgba(30, 30, 45, 0.5);
     border: 1px solid rgba(135, 206, 235, 0.1);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     animation: scaleIn 0.3s ease-out backwards;
 }
 
-/* Wide images take more space */
+/* Base sizing - will be overridden by JS */
+.thumbnail {
+    grid-row: span 20;
+}
+
+/* Different aspect ratio classes */
+.thumbnail.square {
+    grid-row: span 20;
+    grid-column: span 1;
+}
+
 .thumbnail.wide {
+    grid-row: span 15;
     grid-column: span 2;
 }
 
-/* Tall images can take vertical space */
+.thumbnail.ultra-wide {
+    grid-row: span 12;
+    grid-column: span 3;
+}
+
 .thumbnail.tall {
-    grid-row: span 2;
+    grid-row: span 30;
+    grid-column: span 1;
+}
+
+.thumbnail.ultra-tall {
+    grid-row: span 40;
+    grid-column: span 1;
 }
 
 @keyframes scaleIn {
@@ -397,19 +419,23 @@ body {
 .thumbnail:nth-child(6) { animation-delay: 0.12s; }
 
 .thumbnail:hover {
-    transform: translateY(-8px) scale(1.02);
+    transform: scale(1.02);
     box-shadow: 0 16px 48px rgba(135, 206, 235, 0.3);
     border-color: rgba(135, 206, 235, 0.4);
+    z-index: 10;
 }
 
 .thumbnail a {
     display: block;
     position: relative;
+    height: 100%;
+    width: 100%;
 }
 
 .thumbnail img {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: cover; /* Fill the space */
     display: block;
     transition: transform 0.4s ease;
 }
@@ -418,85 +444,26 @@ body {
     transform: scale(1.05);
 }
 
-/* Pagination */
-.pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    margin-top: 40px;
-    flex-wrap: wrap;
-}
-
-.pagination a,
-.pagination span {
-    padding: 10px 16px;
-    background: rgba(30, 30, 45, 0.6);
-    border: 1px solid rgba(135, 206, 235, 0.2);
-    border-radius: 8px;
-    text-decoration: none;
-    color: #e8e8e8;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    min-width: 44px;
-    text-align: center;
-}
-
-.pagination a:hover {
-    background: rgba(74, 158, 255, 0.3);
-    border-color: rgba(135, 206, 235, 0.4);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
-}
-
-.pagination .current {
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
-    border-color: transparent;
-    font-weight: 700;
-    box-shadow: 0 4px 15px rgba(74, 158, 255, 0.4);
-}
-
-.pagination .disabled {
-    opacity: 0.3;
-    pointer-events: none;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-    width: 12px;
-}
-
-::-webkit-scrollbar-track {
-    background: rgba(20, 20, 30, 0.5);
-}
-
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
-    border-radius: 6px;
-    border: 2px solid rgba(20, 20, 30, 0.5);
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .header-content {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .search-bar {
-        max-width: 100%;
-    }
-    
+/* Responsive adjustments */
+@media (max-width: 1200px) {
     .gallery {
-        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-        gap: 15px;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .gallery {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        grid-auto-rows: 10px;
+        gap: 8px;
     }
     
-    .statistics {
-        flex-direction: column;
+    .thumbnail.wide,
+    .thumbnail.ultra-wide {
+        grid-column: span 2;
+    }
+    
+    .thumbnail.ultra-wide {
+        grid-row: span 15;
     }
 }
