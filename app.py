@@ -1,0 +1,564 @@
+import json
+import random
+import os
+import threading
+from flask import Flask, render_template, request, url_for, jsonify
+from utils import get_thumbnail_path, load_metadata, get_related_images
+
+app = Flask(__name__)
+
+# Global data structures
+raw_data = {}
+tag_counts = {}
+id_to_path = {}
+image_data = []
+data_lock = threading.Lock()
+
+# Optional: Set a reload secret key for security
+RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
+
+def looks_like_filename(query):
+    """Check if query looks like a filename"""
+    # Check for common image extensions
+    if any(query.lower().endswith(ext) for ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp']):
+        return True
+    # Check for typical booru filename patterns (numbers with underscores)
+    import re
+    if re.match(r'^\d+_p\d+', query):  # Pixiv pattern
+        return True
+    if re.match(r'^[a-f0-9]{32}', query):  # MD5 pattern
+        return True
+    return False
+
+def load_data():
+    """Load or reload tags.json data"""
+    global raw_data, tag_counts, id_to_path, image_data
+    
+    with data_lock:
+        raw_data = {}
+        tag_counts = {}
+        id_to_path = {}
+        image_data = []
+        
+        try:
+            with open('tags.json', 'r') as f:
+                raw_data = json.load(f)
+                
+                for path, data in raw_data.items():
+                    if data == "not_found":
+                        continue
+                    
+                    # Handle both old and new format
+                    if isinstance(data, str):
+                        tags = data
+                        post_id = None
+                        sources = []
+                    else:
+                        tags = data.get("tags", "")
+                        post_id = data.get("id")
+                        sources = data.get("sources", [])
+                        
+                        # Build ID to path mapping
+                        if post_id:
+                            id_to_path[post_id] = path
+                    
+                    image_data.append({
+                        "path": f"images/{path}",
+                        "tags": tags,
+                        "sources": sources
+                    })
+                    
+                    # Build tag counts
+                    for tag in tags.split():
+                        tag_counts[tag] = tag_counts.get(tag, 0) + 1
+                        
+            print(f"Loaded {len(raw_data)} images, {len(tag_counts)} unique tags")
+            return True
+        except FileNotFoundError:
+            print("Error: tags.json not found!")
+            return False
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            return False
+
+
+# Load data on startup
+load_data()
+
+
+@app.route('/api/reload', methods=['POST'])
+def reload_data():
+    """Endpoint to trigger data reload"""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    success = load_data()
+    if success:
+        return jsonify({
+            "status": "success",
+            "images": len(raw_data),
+            "tags": len(tag_counts)
+        })
+    else:
+        return jsonify({"error": "Failed to reload data"}), 500
+
+
+@app.route('/api/edit_tags', methods=['POST'])
+def edit_tags():
+    """Update tags for an image"""
+    data = request.json
+    filepath = data.get('filepath', '').replace('images/', '', 1)
+    new_tags = data.get('tags', '').strip()
+    
+    if not filepath or filepath not in raw_data:
+        return jsonify({"error": "Image not found"}), 404
+    
+    try:
+        with data_lock:
+            # Update tags.json
+            if isinstance(raw_data[filepath], str):
+                raw_data[filepath] = new_tags
+            else:
+                raw_data[filepath]['tags'] = new_tags
+            
+            with open('tags.json', 'w') as f:
+                json.dump(raw_data, f, indent=4)
+            
+            # Reload data to update counts
+            load_data()
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/delete_image', methods=['POST'])
+def delete_image():
+    """Delete an image and its metadata"""
+    data = request.json
+    filepath = data.get('filepath', '').replace('images/', '', 1)
+    
+    if not filepath or filepath not in raw_data:
+        return jsonify({"error": "Image not found"}), 404
+    
+    try:
+        with data_lock:
+            # Get MD5 for metadata deletion
+            image_md5 = None
+            if isinstance(raw_data[filepath], dict):
+                image_md5 = raw_data[filepath].get('md5')
+            
+            # Delete from tags.json
+            del raw_data[filepath]
+            with open('tags.json', 'w') as f:
+                json.dump(raw_data, f, indent=4)
+            
+            # Delete image file
+            image_path = f"static/images/{filepath}"
+            if os.path.exists(image_path):
+                os.remove(image_path)
+            
+            # Delete thumbnail
+            thumb_path = get_thumbnail_path(f"images/{filepath}")
+            full_thumb = f"static/{thumb_path}"
+            if os.path.exists(full_thumb):
+                os.remove(full_thumb)
+            
+            # Delete metadata
+            if image_md5:
+                metadata_path = f"metadata/{image_md5}.json"
+                if os.path.exists(metadata_path):
+                    os.remove(metadata_path)
+            
+            # Reload data
+            load_data()
+        
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/autocomplete')
+def autocomplete():
+    query = request.args.get('q', '').strip().lower()
+    if not query or len(query) < 2:
+        return jsonify([])
+    
+    # Split query into tokens to handle multi-tag searches
+    tokens = query.split()
+    last_token = tokens[-1] if tokens else ""
+    
+    # Find matching tags
+    matches = []
+    for tag, count in tag_counts.items():
+        if tag.startswith(last_token):
+            matches.append({"tag": tag, "count": count})
+    
+    # Sort by count descending, then alphabetically
+    matches.sort(key=lambda x: (-x["count"], x["tag"]))
+    
+    # Return top 10 matches
+    return jsonify(matches[:10])
+
+
+def calculate_similarity(tags1, tags2):
+    """Calculate Jaccard similarity between two tag sets"""
+    set1 = set(tags1.split())
+    set2 = set(tags2.split())
+    
+    if not set1 or not set2:
+        return 0.0
+    
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    
+    return intersection / union if union > 0 else 0.0
+
+
+@app.route('/similar/<path:filepath>')
+def find_similar(filepath):
+    """Find images similar to the given one"""
+    lookup_path = filepath.replace("images/", "", 1)
+    
+    if lookup_path not in raw_data:
+        return "Image not found", 404
+    
+    # Get tags for the reference image
+    ref_data = raw_data[lookup_path]
+    ref_tags = ref_data.get("tags", "") if isinstance(ref_data, dict) else ref_data
+    
+    if ref_data == "not_found" or not ref_tags:
+        return render_template('index.html', 
+                             images=[], 
+                             query=f"similar:{filepath}",
+                             stats=get_stats())
+    
+    # Calculate similarity for all images
+    similarities = []
+    for img in image_data:
+        if img['path'] == f"images/{lookup_path}":
+            continue
+        
+        similarity = calculate_similarity(ref_tags, img['tags'])
+        if similarity > 0:
+            similarities.append((img, similarity))
+    
+    # Sort by similarity
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    
+    # Take top 50
+    similar_images = [
+        {
+            "path": img['path'],
+            "thumb": get_thumbnail_path(img['path']),
+            "tags": img['tags'],
+            "similarity": sim
+        }
+        for img, sim in similarities[:50]
+    ]
+    
+    return render_template('index.html', 
+                         images=similar_images, 
+                         query=f"similar:{filepath}",
+                         stats=get_stats(),
+                         show_similarity=True)
+
+
+def get_stats():
+    """Get statistics about the collection"""
+    total_images = len(raw_data)
+    images_with_metadata = sum(1 for data in raw_data.values() if data != "not_found")
+    images_without_metadata = total_images - images_with_metadata
+    
+    return {
+        'total': total_images,
+        'with_metadata': images_with_metadata,
+        'without_metadata': images_without_metadata
+    }
+
+
+@app.route('/')
+def home():
+    search_query = request.args.get('query', '').strip().lower()
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    per_page = max(10, min(per_page, 500))
+    stats = get_stats()
+    
+    # DEBUG: Always print what we're searching for
+    print(f"=== HOME ROUTE === Query: '{search_query}' | looks_like_filename: {looks_like_filename(search_query)}")
+    
+    # Handle special queries
+    if search_query == 'metadata:missing':
+        search_results = [
+            {"path": f"images/{path}", "tags": "", "sources": []}
+            for path, data in raw_data.items()
+            if data == "not_found"
+        ]
+        
+        total_results = len(search_results)
+        total_pages = (total_results + per_page - 1) // per_page
+        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[start_idx:end_idx]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             page=page,
+                             per_page=per_page,
+                             total_results=total_results,
+                             total_pages=total_pages,
+                             stats=stats)
+    elif looks_like_filename(search_query):
+        print(f"Searching for: {search_query}")
+        print(f"Total images in image_data: {len(image_data)}")
+        if image_data:
+            print(f"Sample paths: {[img['path'] for img in image_data[:5]]}")
+        
+        search_results = [
+            img for img in image_data
+            if search_query.lower() in img['path'].lower()
+        ]
+        print(f"Found {len(search_results)} results")
+        search_results = [
+            img for img in image_data
+            if search_query.lower() in img['path'].lower()
+        ]
+        
+        total_results = len(search_results)
+        total_pages = (total_results + per_page - 1) // per_page
+        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[start_idx:end_idx]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             page=page,
+                             per_page=per_page,
+                             total_results=total_results,
+                             total_pages=total_pages,
+                             stats=stats)
+    elif search_query == 'metadata:found':
+        search_results = image_data.copy()
+        
+        total_results = len(search_results)
+        total_pages = (total_results + per_page - 1) // per_page
+        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[start_idx:end_idx]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             page=page,
+                             per_page=per_page,
+                             total_results=total_results,
+                             total_pages=total_pages,
+                             stats=stats)
+    
+    # Handle filename search
+    elif search_query.startswith('filename:'):
+        filename_query = search_query.replace('filename:', '', 1).strip()
+        search_results = [
+            img for img in image_data
+            if filename_query in img['path'].lower()
+        ]
+        
+        total_results = len(search_results)
+        total_pages = (total_results + per_page - 1) // per_page
+        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[start_idx:end_idx]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             page=page,
+                             per_page=per_page,
+                             total_results=total_results,
+                             total_pages=total_pages,
+                             stats=stats)
+    
+    # Handle source search
+    elif search_query.startswith('source:'):
+        source_query = search_query.replace('source:', '', 1).strip()
+        search_results = [
+            img for img in image_data
+            if source_query in img.get('sources', [])
+        ]
+        
+        total_results = len(search_results)
+        total_pages = (total_results + per_page - 1) // per_page
+        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[start_idx:end_idx]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             page=page,
+                             per_page=per_page,
+                             total_results=total_results,
+                             total_pages=total_pages,
+                             stats=stats)
+    
+    elif search_query:
+        # Regular tag search
+        query_tags = search_query.split()
+        search_results = [
+            img for img in image_data 
+            if all(q_tag in img['tags'] for q_tag in query_tags)
+        ]
+        
+        total_results = len(search_results)
+        total_pages = (total_results + per_page - 1) // per_page
+        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+        
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[start_idx:end_idx]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             page=page,
+                             per_page=per_page,
+                             total_results=total_results,
+                             total_pages=total_pages,
+                             stats=stats)
+    else:
+        # No search - show random sample
+        sampled = random.sample(image_data, min(len(image_data), per_page))
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in sampled
+        ]
+        
+        random_tags = []
+        if tag_counts:
+            available_tags = list(tag_counts.items())
+            random_tags = random.sample(available_tags, min(len(available_tags), 30))
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             page=None,
+                             per_page=per_page,
+                             random_tags=random_tags,
+                             stats=stats)
+
+
+@app.route('/image/<path:filepath>')
+def show_image(filepath):
+    lookup_path = filepath.replace("images/", "", 1)
+    data = raw_data.get(lookup_path, "")
+    
+    # Handle both old and new format
+    if isinstance(data, str):
+        tag_list = sorted(data.split())
+        tags_with_counts = [(tag, tag_counts.get(tag, 0)) for tag in tag_list]
+        categorized_tags = None
+        post_id = None
+        parent_id = None
+    else:
+        # New format with categories
+        general_tags = sorted(data.get("tags_general", "").split())
+        
+        # FALLBACK: If tags_general is empty, use tags field
+        if not general_tags or all(not t for t in general_tags):
+            general_tags = sorted(data.get("tags", "").split())
+        
+        tags_with_counts = [(tag, tag_counts.get(tag, 0)) for tag in general_tags if tag]
+        
+        categorized_tags = {
+            "character": [(t, tag_counts.get(t, 0)) for t in sorted(data.get("tags_character", "").split()) if t],
+            "copyright": [(t, tag_counts.get(t, 0)) for t in sorted(data.get("tags_copyright", "").split()) if t],
+            "artist": [(t, tag_counts.get(t, 0)) for t in sorted(data.get("tags_artist", "").split()) if t],
+            "meta": [(t, tag_counts.get(t, 0)) for t in sorted(data.get("tags_meta", "").split()) if t]
+        }
+        
+        post_id = data.get("id")
+        parent_id = data.get("parent_id")
+    
+    # Load full metadata
+    metadata = load_metadata(filepath)
+    
+    # Find related images
+    related_images = get_related_images(post_id, parent_id, raw_data, id_to_path)
+    
+    return render_template('image.html', 
+                          filepath=filepath, 
+                          tags=tags_with_counts,
+                          categorized_tags=categorized_tags,
+                          metadata=metadata,
+                          related_images=related_images)
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

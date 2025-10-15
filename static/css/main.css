@@ -1,0 +1,286 @@
+body {
+    font-family: sans-serif;
+    background-color: #2e2e2e;
+    color: #f1f1f1;
+    margin: 0;
+}
+
+.header {
+    background-color: #1e1e1e;
+    padding: 15px 20px;
+    border-bottom: 2px solid #4a4a4a;
+    margin-bottom: 20px;
+}
+
+.header-content {
+    max-width: 1600px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+.header h1 a {
+    color: #f1f1f1;
+    text-decoration: none;
+}
+
+.header h1 a:hover {
+    color: #87ceeb;
+}
+
+.search-bar {
+    display: flex;
+    gap: 10px;
+    position: relative;
+}
+
+.search-bar input {
+    padding: 8px 12px;
+    width: 250px;
+    background-color: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    color: #f1f1f1;
+    border-radius: 4px;
+}
+
+.search-bar select {
+    padding: 8px 12px;
+    background-color: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    color: #f1f1f1;
+    border-radius: 4px;
+}
+
+.search-bar button {
+    padding: 8px 16px;
+    background-color: #4a4a4a;
+    border: none;
+    color: #f1f1f1;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.search-bar button:hover {
+    background-color: #5a5a5a;
+}
+
+.autocomplete-container {
+    position: relative;
+    display: inline-block;
+}
+
+.autocomplete-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: #1e1e1e;
+    border: 1px solid #4a4a4a;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.autocomplete-suggestions.active {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #2e2e2e;
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+    background-color: #3a3a3a;
+}
+
+.autocomplete-tag {
+    color: #f1f1f1;
+}
+
+.autocomplete-count {
+    color: #888;
+    font-size: 0.9em;
+    margin-left: 10px;
+}
+
+.container {
+    max-width: 1600px;
+    margin: auto;
+    padding: 20px;
+}
+
+.statistics {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #3a3a3a;
+    border-radius: 5px;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #4a4a4a;
+    border-radius: 4px;
+    text-decoration: none;
+    color: inherit;
+    transition: background-color 0.2s;
+}
+
+.stat-item:hover {
+    background-color: #5a5a5a;
+}
+
+.stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: #87ceeb;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: #aaa;
+    margin-top: 5px;
+}
+
+.stat-item.missing .stat-number {
+    color: #ff9966;
+}
+
+.stat-item.found .stat-number {
+    color: #90ee90;
+}
+
+.random-tags {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #3a3a3a;
+    border-radius: 5px;
+}
+
+.random-tags h3 {
+    margin: 0 0 10px 0;
+    font-size: 1em;
+    color: #aaa;
+}
+
+.random-tags .tag-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.random-tags .tag-link {
+    display: inline-block;
+    padding: 5px 10px;
+    background-color: #4a4a4a;
+    border-radius: 3px;
+    color: #87ceeb;
+    text-decoration: none;
+    font-size: 0.9em;
+}
+
+.random-tags .tag-link:hover {
+    background-color: #5a5a5a;
+    color: #b0e0f0;
+}
+
+.random-tags .tag-count {
+    color: #888;
+    margin-left: 4px;
+}
+
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+    grid-auto-flow: dense;
+}
+
+.thumbnail a {
+    display: block;
+}
+
+.thumbnail img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    display: block;
+    background-color: #3a3a3a;
+}
+
+.thumbnail {
+    position: relative;
+}
+
+.thumbnail a {
+    display: block;
+    position: relative;
+}
+
+.thumbnail img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    display: block;
+    background-color: #3a3a3a;
+}
+.results-info {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #aaa;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.pagination a,
+.pagination span {
+    padding: 8px 12px;
+    background-color: #3a3a3a;
+    border-radius: 4px;
+    text-decoration: none;
+    color: #f1f1f1;
+}
+
+.pagination a:hover {
+    background-color: #4a4a4a;
+}
+
+.pagination .current {
+    background-color: #5a5a5a;
+    font-weight: bold;
+}
+
+.pagination .disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Booru</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="{{ url_for('home') }}">My Booru</a></h1>
+            <div class="search-bar">
+                <form action="{{ url_for('home') }}" method="get" id="searchForm">
+                    <div class="autocomplete-container">
+                        <input type="text" name="query" id="searchInput" placeholder="Search tags..." value="{{ query or '' }}" autocomplete="off">
+                        <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
+                    </div>
+                    <select name="per_page" id="per_page">
+                        <option value="25" {% if per_page == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        <option value="200" {% if per_page == 200 %}selected{% endif %}>200</option>
+                    </select>
+                    <button type="submit">Search</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        {% if stats %}
+        <div class="statistics">
+            <a href="{{ url_for('home') }}" class="stat-item">
+                <div class="stat-number">{{ stats.total }}</div>
+                <div class="stat-label">Total Images</div>
+            </a>
+            <a href="{{ url_for('home', query='metadata:found') }}" class="stat-item found">
+                <div class="stat-number">{{ stats.with_metadata }}</div>
+                <div class="stat-label">With Metadata</div>
+            </a>
+            <a href="{{ url_for('home', query='metadata:missing') }}" class="stat-item missing">
+                <div class="stat-number">{{ stats.without_metadata }}</div>
+                <div class="stat-label">Missing Metadata</div>
+            </a>
+        </div>
+        {% endif %}
+
+        {% if random_tags and not query %}
+        <div class="random-tags">
+            <h3>Explore Tags</h3>
+            <div class="tag-cloud">
+                {% for tag, count in random_tags %}
+                <a href="{{ url_for('home', query=tag) }}" class="tag-link">
+                    {{ tag }}
+                    <span class="tag-count">
+                        ({% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %})
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if query and total_results is defined %}
+        <div class="results-info">
+            Found {{ total_results }} result{% if total_results != 1 %}s{% endif %} 
+            {% if total_pages > 1 %}(Page {{ page }} of {{ total_pages }}){% endif %}
+        </div>
+        {% endif %}
+
+        <div class="gallery">
+            {% for image in images %}
+            <div class="thumbnail">
+                <a href="{{ url_for('show_image', filepath=image.path) }}">
+                    <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy">
+                    {% if show_similarity and image.similarity %}
+                    <div style="position: absolute; top: 5px; right: 5px; background-color: rgba(0,0,0,0.8); color: #87ceeb; padding: 4px 8px; border-radius: 3px; font-size: 0.85em; font-weight: bold;">
+                        {{ "%.0f"|format(image.similarity * 100) }}%
+                    </div>
+                    {% endif %}
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if query and total_pages and total_pages > 1 %}
+        <div class="pagination">
+            {% if page > 1 %}
+            <a href="{{ url_for('home', query=query, page=1, per_page=per_page) }}">« First</a>
+            <a href="{{ url_for('home', query=query, page=page-1, per_page=per_page) }}">‹ Prev</a>
+            {% else %}
+            <span class="disabled">« First</span>
+            <span class="disabled">‹ Prev</span>
+            {% endif %}
+
+            {% for p in range([1, page-2]|max, [total_pages, page+2]|min + 1) %}
+                {% if p == page %}
+                <span class="current">{{ p }}</span>
+                {% else %}
+                <a href="{{ url_for('home', query=query, page=p, per_page=per_page) }}">{{ p }}</a>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <a href="{{ url_for('home', query=query, page=page+1, per_page=per_page) }}">Next ›</a>
+            <a href="{{ url_for('home', query=query, page=total_pages, per_page=per_page) }}">Last »</a>
+            {% else %}
+            <span class="disabled">Next ›</span>
+            <span class="disabled">Last »</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+</body>
+</html>

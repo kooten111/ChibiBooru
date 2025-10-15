@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Image</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/image.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/actions.css') }}">
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <h1><a href="{{ url_for('home') }}">My Booru</a></h1>
+            <div class="search-bar">
+                <form action="{{ url_for('home') }}" method="get">
+                    <div class="autocomplete-container">
+                        <input type="text" name="query" id="searchInput" placeholder="Search tags..." autocomplete="off">
+                        <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
+                    </div>
+                    <select name="per_page">
+                        <option value="25">25</option>
+                        <option value="50" selected>50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                    <button type="submit">Search</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar-left">
+            <div class="tags-list">
+                {% if categorized_tags %}
+                    {% if categorized_tags.artist %}
+                    <div class="tag-category artist">
+                        <div class="tag-category-title">Artist</div>
+                        {% for tag, count in categorized_tags.artist %}
+                        <div class="tag-item">
+                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <span class="tag-count">
+                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if categorized_tags.copyright %}
+                    <div class="tag-category copyright">
+                        <div class="tag-category-title">Copyright</div>
+                        {% for tag, count in categorized_tags.copyright %}
+                        <div class="tag-item">
+                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <span class="tag-count">
+                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if categorized_tags.character %}
+                    <div class="tag-category character">
+                        <div class="tag-category-title">Character</div>
+                        {% for tag, count in categorized_tags.character %}
+                        <div class="tag-item">
+                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <span class="tag-count">
+                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if categorized_tags.meta %}
+                    <div class="tag-category meta">
+                        <div class="tag-category-title">Meta</div>
+                        {% for tag, count in categorized_tags.meta %}
+                        <div class="tag-item">
+                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <span class="tag-count">
+                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
+                    {% if tags %}
+                    <div class="tag-category general">
+                        <div class="tag-category-title">Tags</div>
+                        {% for tag, count in tags %}
+                        <div class="tag-item">
+                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <span class="tag-count">
+                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <h3>Tags</h3>
+                    {% for tag, count in tags %}
+                    <div class="tag-item">
+                        <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                        <span class="tag-count">
+                            {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+            <div class="actions-bar">
+                <button class="btn btn-primary" onclick="toggleTagEditor()">
+                    📝 Edit Tags
+                </button>
+                <a href="{{ url_for('find_similar', filepath=filepath) }}" class="btn btn-secondary">
+                    🔍 Find Similar
+                </a>
+                <button class="btn btn-danger" onclick="confirmDelete()">
+                    🗑️ Delete Image
+                </button>
+            </div>
+            <div class="tag-editor" id="tagEditor">
+                <h3>Edit Tags</h3>
+                <div class="tag-chips-container" id="tagChips">
+                    <!-- Tag chips will be rendered here -->
+                </div>
+                <div class="tag-editor-input-area">
+                    <input type="text" 
+                           id="tagEditorInput" 
+                           class="tag-editor-input" 
+                           placeholder="Type to add tags..." 
+                           autocomplete="off">
+                    <div class="tag-editor-suggestions" id="tagEditorSuggestions"></div>
+                </div>
+                <div class="tag-editor-hint">
+                    Press Enter or Space to add • Backspace on empty input to remove last tag
+                </div>
+                <div class="tag-editor-actions">
+                    <button class="btn btn-success" onclick="saveTags()">Save Changes</button>
+                    <button class="btn btn-secondary" onclick="toggleTagEditor()">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="image-view">
+            <img src="{{ url_for('static', filename=filepath) }}" alt="Image">
+        </div>
+        
+        <div class="sidebar-right">
+            {% if related_images %}
+            <div class="related-images">
+                <h3>Related Images</h3>
+                <div class="related-grid">
+                    {% for related in related_images %}
+                    <a href="{{ url_for('show_image', filepath=related.path) }}" class="related-thumb">
+                        <img src="{{ url_for('static', filename=related.path) }}" alt="Related">
+                        <span class="label">{{ related.type }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if metadata %}
+            <div class="metadata-info">
+                <h3>Information</h3>
+                
+                {% if filepath %}
+                <div class="metadata-item">
+                    <div class="metadata-label">Filename</div>
+                    <div class="metadata-value">{{ filepath.split('/')[-1] }}</div>
+                </div>
+                {% endif %}
+                
+                {% if metadata.sources %}
+                <div class="metadata-item">
+                    <div class="metadata-label">Found On</div>
+                    <div class="metadata-value">
+                        {% for source_name, source_data in metadata.sources.items() %}
+                        {% if source_name == 'danbooru' %}
+                            <a href="https://danbooru.donmai.us/posts/{{ source_data.id }}" target="_blank" rel="noopener">Danbooru</a>
+                        {% elif source_name == 'e621' %}
+                            <a href="https://e621.net/posts/{{ source_data.id }}" target="_blank" rel="noopener">e621</a>
+                        {% elif source_name == 'gelbooru' %}
+                            <a href="https://gelbooru.com/index.php?page=post&s=view&id={{ source_data.id }}" target="_blank" rel="noopener">Gelbooru</a>
+                        {% elif source_name == 'yandere' %}
+                            <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank" rel="noopener">Yandere</a>
+                        {% elif source_name == 'camie_tagger' %}
+                            <span style="color: #90ee90;">AI Tagged (CamieTagger)</span>
+                        {% endif %}
+                            {% if not loop.last %} • {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if metadata.sources %}
+                    {% set first_source = metadata.sources.values()|list|first %}
+                    {% if first_source.source %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">Original Source</div>
+                        <div class="metadata-value">
+                            <a href="{{ first_source.source }}" target="_blank" rel="noopener">{{ first_source.source }}</a>
+                        </div>
+                    </div>
+                    {% elif first_source.sources and first_source.sources|length > 0 %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">Original Source</div>
+                        <div class="metadata-value">
+                            <a href="{{ first_source.sources[0] }}" target="_blank" rel="noopener">{{ first_source.sources[0] }}</a>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endif %}
+                
+                {% if metadata.sources %}
+                    {% set first_source = metadata.sources.values()|list|first %}
+                    {% set width = first_source.image_width or (first_source.file.width if first_source.file else none) %}
+                    {% set height = first_source.image_height or (first_source.file.height if first_source.file else none) %}
+                    {% if width and height %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">Dimensions</div>
+                        <div class="metadata-value">{{ width }} × {{ height }}</div>
+                    </div>
+                    {% endif %}
+                {% endif %}
+                
+                {% if metadata.sources %}
+                    {% set first_source = metadata.sources.values()|list|first %}
+                    {% set file_size = first_source.file_size or (first_source.file.size if first_source.file else none) %}
+                    {% if file_size %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">File Size</div>
+                        <div class="metadata-value">
+                            {% if file_size >= 1048576 %}
+                                {{ "%.2f"|format(file_size / 1048576.0) }} MB
+                            {% elif file_size >= 1024 %}
+                                {{ "%.2f"|format(file_size / 1024.0) }} KB
+                            {% else %}
+                                {{ file_size }} bytes
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endif %}
+                
+                {% if metadata.md5 %}
+                <div class="metadata-item">
+                    <div class="metadata-label">MD5</div>
+                    <div class="metadata-value">{{ metadata.md5 }}</div>
+                </div>
+                {% endif %}
+                
+                {% if metadata.sources %}
+                    {% set first_source = metadata.sources.values()|list|first %}
+                    {% if first_source.rating %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">Rating</div>
+                        <div class="metadata-value">{{ first_source.rating }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% set score = first_source.score.total if first_source.score and first_source.score.total is defined else (first_source.score if first_source.score is defined else none) %}
+                    {% if score is not none %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">Score</div>
+                        <div class="metadata-value">{{ score }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if first_source.fav_count %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">Favorites</div>
+                        <div class="metadata-value">{{ first_source.fav_count }}</div>
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <input type="hidden" id="imageFilepath" value="{{ filepath }}">
+    <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
+</body>
+</html>

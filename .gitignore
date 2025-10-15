@@ -1,0 +1,15 @@
+# Python cache
+__pycache__/
+
+# Folders to ignore
+metadata/
+models/
+static/images/
+static/thumbnails/
+static/logo/
+venv/
+.vscode/
+
+# Specific files to ignore
+tags.json
+todo.txt
