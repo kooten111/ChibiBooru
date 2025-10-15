@@ -82,6 +82,65 @@ def load_data():
             return False
 
 
+def get_enhanced_stats():
+    """Get detailed statistics about the collection"""
+    total_images = len(raw_data)
+    images_with_metadata = sum(1 for data in raw_data.values() if data != "not_found")
+    images_without_metadata = total_images - images_with_metadata
+    
+    # Source breakdown
+    source_counts = {}
+    for data in raw_data.values():
+        if isinstance(data, dict) and data != "not_found":
+            sources = data.get("sources", [])
+            for source in sources:
+                source_counts[source] = source_counts.get(source, 0) + 1
+    
+    # Tag statistics
+    total_tags = len(tag_counts)
+    tags_per_image = []
+    category_counts = {"character": 0, "copyright": 0, "artist": 0, "meta": 0, "general": 0}
+    
+    for data in raw_data.values():
+        if data == "not_found":
+            continue
+        if isinstance(data, dict):
+            tags = data.get("tags", "").split()
+            tags_per_image.append(len(tags))
+            
+            # Count categorized tags
+            for cat in category_counts:
+                cat_tags = data.get(f"tags_{cat}", "").split()
+                category_counts[cat] += len(cat_tags)
+        else:
+            tags = data.split()
+            tags_per_image.append(len(tags))
+    
+    avg_tags = sum(tags_per_image) / len(tags_per_image) if tags_per_image else 0
+    
+    # Top tags
+    top_tags = sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:20]
+    
+    # SauceNao/CamieTagger usage
+    saucenao_count = sum(1 for data in raw_data.values() 
+                         if isinstance(data, dict) and data.get("saucenao_lookup"))
+    camie_count = sum(1 for data in raw_data.values() 
+                      if isinstance(data, dict) and data.get("camie_tagger_lookup"))
+    
+    return {
+        'total': total_images,
+        'with_metadata': images_with_metadata,
+        'without_metadata': images_without_metadata,
+        'total_tags': total_tags,
+        'avg_tags_per_image': round(avg_tags, 1),
+        'source_breakdown': source_counts,
+        'top_tags': top_tags,
+        'category_counts': category_counts,
+        'saucenao_used': saucenao_count,
+        'camie_used': camie_count
+    }
+
+
 # Load data on startup
 load_data()
 
@@ -300,7 +359,7 @@ def find_similar(filepath):
         return render_template('index.html', 
                              images=[], 
                              query=f"similar:{filepath}",
-                             stats=get_stats())
+                             stats=get_enhanced_stats())
     
     # Calculate similarity for all images
     similarities = []
@@ -329,21 +388,8 @@ def find_similar(filepath):
     return render_template('index.html', 
                          images=similar_images, 
                          query=f"similar:{filepath}",
-                         stats=get_stats(),
+                         stats=get_enhanced_stats(),
                          show_similarity=True)
-
-
-def get_stats():
-    """Get statistics about the collection"""
-    total_images = len(raw_data)
-    images_with_metadata = sum(1 for data in raw_data.values() if data != "not_found")
-    images_without_metadata = total_images - images_with_metadata
-    
-    return {
-        'total': total_images,
-        'with_metadata': images_with_metadata,
-        'without_metadata': images_without_metadata
-    }
 
 
 @app.route('/')
@@ -352,7 +398,7 @@ def home():
     per_page = request.args.get('per_page', 50, type=int)
     
     per_page = max(10, min(per_page, 500))
-    stats = get_stats()
+    stats = get_enhanced_stats()
     
     # Handle special queries
     if search_query == 'metadata:missing':

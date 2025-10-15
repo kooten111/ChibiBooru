@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>HomeBooru</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/stats-tabs.css') }}">
 </head>
 <body>
     <div class="header">
@@ -27,40 +28,153 @@
         </div>
     </div>
 
-    <div class="container">
-        {% if stats %}
-        <div class="statistics">
-            <a href="{{ url_for('home') }}" class="stat-item">
-                <div class="stat-number">{{ stats.total }}</div>
-                <div class="stat-label">Total Images</div>
-            </a>
-            <a href="{{ url_for('home', query='metadata:found') }}" class="stat-item found">
-                <div class="stat-number">{{ stats.with_metadata }}</div>
-                <div class="stat-label">With Metadata</div>
-            </a>
-            <a href="{{ url_for('home', query='metadata:missing') }}" class="stat-item missing">
-                <div class="stat-number">{{ stats.without_metadata }}</div>
-                <div class="stat-label">Missing Metadata</div>
-            </a>
+    {% if stats and not query %}
+    <div class="stats-tabs-wrapper">
+        <div class="stats-tabs-bar">
+            <button class="stat-tab-button" data-tab="overview-panel">
+                <span class="icon">📊</span>
+                <span>Overview</span>
+            </button>
+            
+            {% if stats.source_breakdown %}
+            <button class="stat-tab-button" data-tab="sources-panel">
+                <span class="icon">🌐</span>
+                <span>Sources</span>
+            </button>
+            {% endif %}
+            
+            {% if stats.top_tags %}
+            <button class="stat-tab-button" data-tab="top-tags-panel">
+                <span class="icon">🏆</span>
+                <span>Top Tags</span>
+            </button>
+            {% endif %}
+            
+            {% if stats.category_counts %}
+            <button class="stat-tab-button" data-tab="categories-panel">
+                <span class="icon">🏷️</span>
+                <span>Categories</span>
+            </button>
+            {% endif %}
+            
+            {% if random_tags %}
+            <button class="stat-tab-button" data-tab="explore-panel">
+                <span class="icon">🎲</span>
+                <span>Explore</span>
+            </button>
+            {% endif %}
         </div>
-        {% endif %}
-
-        {% if random_tags and not query %}
-        <div class="random-tags">
-            <h3>Explore Tags</h3>
-            <div class="tag-cloud">
-                {% for tag, count in random_tags %}
-                <a href="{{ url_for('home', query=tag) }}" class="tag-link">
-                    {{ tag }}
-                    <span class="tag-count">
-                        ({% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %})
-                    </span>
-                </a>
-                {% endfor %}
+        
+        <div class="stats-panels-container" id="statsPanelsContainer">
+            <!-- Overview Panel -->
+            <div class="stat-panel" id="overview-panel">
+                <h3><span>📊</span> Collection Overview</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-card-number">{{ stats.total }}</div>
+                        <div class="stat-card-label">Total Images</div>
+                    </div>
+                    <div class="stat-card success">
+                        <div class="stat-card-number">{{ stats.with_metadata }}</div>
+                        <div class="stat-card-label">With Metadata</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <div class="stat-card-number">{{ stats.without_metadata }}</div>
+                        <div class="stat-card-label">Missing Metadata</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-number">{{ stats.total_tags }}</div>
+                        <div class="stat-card-label">Unique Tags</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-card-number">{{ stats.avg_tags_per_image }}</div>
+                        <div class="stat-card-label">Avg Tags/Image</div>
+                    </div>
+                    {% if stats.saucenao_used > 0 %}
+                    <div class="stat-card">
+                        <div class="stat-card-number">{{ stats.saucenao_used }}</div>
+                        <div class="stat-card-label">SauceNao Lookups</div>
+                    </div>
+                    {% endif %}
+                    {% if stats.camie_used > 0 %}
+                    <div class="stat-card">
+                        <div class="stat-card-number">{{ stats.camie_used }}</div>
+                        <div class="stat-card-label">AI Tagged</div>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
-        {% endif %}
 
+            <!-- Sources Panel -->
+            {% if stats.source_breakdown %}
+            <div class="stat-panel" id="sources-panel">
+                <h3><span>🌐</span> Source Breakdown</h3>
+                <div class="source-breakdown">
+                    {% for source, count in stats.source_breakdown.items() %}
+                    <div class="source-badge">
+                        <span class="source-name">{{ source }}</span>
+                        <span class="source-count">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Top Tags Panel -->
+            {% if stats.top_tags %}
+            <div class="stat-panel" id="top-tags-panel">
+                <h3><span>🏆</span> Most Popular Tags</h3>
+                <div class="top-tags-list">
+                    {% for tag, count in stats.top_tags %}
+                    <div class="top-tag-item">
+                        <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                        <span class="top-tag-count">
+                            {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Categories Panel -->
+            {% if stats.category_counts %}
+            <div class="stat-panel" id="categories-panel">
+                <h3><span>🏷️</span> Tag Categories</h3>
+                <div class="category-breakdown">
+                    {% for category, count in stats.category_counts.items() %}
+                    {% if count > 0 %}
+                    <div class="category-card {{ category }}">
+                        <div class="category-number">{{ count }}</div>
+                        <div class="category-label">{{ category }}</div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Explore Panel -->
+            {% if random_tags %}
+            <div class="stat-panel" id="explore-panel">
+                <h3><span>🎲</span> Explore Random Tags</h3>
+                <div class="source-breakdown">
+                    {% for tag, count in random_tags %}
+                    <a href="{{ url_for('home', query=tag) }}" class="source-badge" style="text-decoration: none;">
+                        <span class="source-name">{{ tag }}</span>
+                        <span class="source-count">
+                            {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="container">
         {% if query and total_results is defined %}
         <div class="results-info">
             Found {{ total_results }} result{% if total_results != 1 %}s{% endif %}
@@ -84,6 +198,7 @@
     </div>
 
     <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/stats-tabs.js') }}"></script>
     <script src="{{ url_for('static', filename='js/infinite-scroll.js') }}"></script>
 </body>
 </html>
