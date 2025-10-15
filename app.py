@@ -150,46 +150,55 @@ def get_images():
     search_query = request.args.get('query', '').strip().lower()
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
+    seed = request.args.get('seed', default=None, type=int)
     
     per_page = max(10, min(per_page, 500))
     
-    # Handle special queries
+    search_results = []
+    
+    # Handle special queries first
     if search_query == 'metadata:missing':
         search_results = [
             {"path": f"images/{path}", "tags": "", "sources": []}
             for path, data in raw_data.items()
             if data == "not_found"
         ]
-    elif looks_like_filename(search_query):
-        search_results = [
-            img for img in image_data
-            if search_query.lower() in img['path'].lower()
-        ]
-    elif search_query == 'metadata:found':
-        search_results = image_data.copy()
-    elif search_query.startswith('filename:'):
-        filename_query = search_query.replace('filename:', '', 1).strip()
-        search_results = [
-            img for img in image_data
-            if filename_query in img['path'].lower()
-        ]
-    elif search_query.startswith('source:'):
-        source_query = search_query.replace('source:', '', 1).strip()
-        search_results = [
-            img for img in image_data
-            if source_query in img.get('sources', [])
-        ]
-    elif search_query:
-        # Regular tag search
-        query_tags = search_query.split()
-        search_results = [
-            img for img in image_data 
-            if all(q_tag in img['tags'] for q_tag in query_tags)
-        ]
+    # Other queries that will be shuffled
     else:
-        # No search - return all images
-        search_results = image_data.copy()
-    
+        if looks_like_filename(search_query):
+            search_results = [
+                img for img in image_data
+                if search_query.lower() in img['path'].lower()
+            ]
+        elif search_query == 'metadata:found':
+            search_results = image_data.copy()
+        elif search_query.startswith('filename:'):
+            filename_query = search_query.replace('filename:', '', 1).strip()
+            search_results = [
+                img for img in image_data
+                if filename_query in img['path'].lower()
+            ]
+        elif search_query.startswith('source:'):
+            source_query = search_query.replace('source:', '', 1).strip()
+            search_results = [
+                img for img in image_data
+                if source_query in img.get('sources', [])
+            ]
+        elif search_query:
+            # Regular tag search
+            query_tags = search_query.split()
+            search_results = [
+                img for img in image_data 
+                if all(q_tag in img['tags'] for q_tag in query_tags)
+            ]
+        else:
+            # No search - return all images
+            search_results = image_data.copy()
+
+        # Apply seeded shuffle if a seed is provided
+        if seed is not None:
+            random.Random(seed).shuffle(search_results)
+
     total_results = len(search_results)
     total_pages = (total_results + per_page - 1) // per_page
     
@@ -200,7 +209,7 @@ def get_images():
         {
             "path": img['path'],
             "thumb": get_thumbnail_path(img['path']),
-            "tags": img['tags']
+            "tags": img.get('tags', '') # Use .get for safety
         }
         for img in search_results[start_idx:end_idx]
     ]
@@ -471,177 +480,78 @@ def find_similar(filepath):
 def home():
     search_query = request.args.get('query', '').strip().lower()
     per_page = request.args.get('per_page', 50, type=int)
-    
     per_page = max(10, min(per_page, 500))
     stats = get_enhanced_stats()
     
-    # Handle special queries
+    seed = random.randint(1, 1_000_000)
+    search_results = []
+
+    # Handle special case first that should not be shuffled
     if search_query == 'metadata:missing':
         search_results = [
             {"path": f"images/{path}", "tags": "", "sources": []}
             for path, data in raw_data.items()
             if data == "not_found"
         ]
-        
-        total_results = len(search_results)
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[:per_page]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             per_page=per_page,
-                             total_results=total_results,
-                             stats=stats)
-    
-    elif looks_like_filename(search_query):
-        search_results = [
-            img for img in image_data
-            if search_query.lower() in img['path'].lower()
-        ]
-        
-        total_results = len(search_results)
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[:per_page]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             per_page=per_page,
-                             total_results=total_results,
-                             stats=stats)
-    
-    elif search_query == 'metadata:found':
-        search_results = image_data.copy()
-        total_results = len(search_results)
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[:per_page]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             per_page=per_page,
-                             total_results=total_results,
-                             stats=stats)
-    
-    elif search_query.startswith('filename:'):
-        filename_query = search_query.replace('filename:', '', 1).strip()
-        search_results = [
-            img for img in image_data
-            if filename_query in img['path'].lower()
-        ]
-        
-        total_results = len(search_results)
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[:per_page]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             per_page=per_page,
-                             total_results=total_results,
-                             stats=stats)
-    
-    elif search_query.startswith('source:'):
-        source_query = search_query.replace('source:', '', 1).strip()
-        search_results = [
-            img for img in image_data
-            if source_query in img.get('sources', [])
-        ]
-        
-        total_results = len(search_results)
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[:per_page]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             per_page=per_page,
-                             total_results=total_results,
-                             stats=stats)
-    
-    elif search_query:
-        # Regular tag search
-        query_tags = search_query.split()
-        search_results = [
-            img for img in image_data 
-            if all(q_tag in img['tags'] for q_tag in query_tags)
-        ]
-        
-        total_results = len(search_results)
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[:per_page]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             per_page=per_page,
-                             total_results=total_results,
-                             stats=stats)
     else:
-        # No search - show initial batch
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in image_data[:per_page]
-        ]
+        # Determine the initial list of images based on the query
+        if looks_like_filename(search_query):
+            search_results = [
+                img for img in image_data
+                if search_query.lower() in img['path'].lower()
+            ]
+        elif search_query == 'metadata:found':
+            search_results = image_data.copy()
+        elif search_query.startswith('filename:'):
+            filename_query = search_query.replace('filename:', '', 1).strip()
+            search_results = [
+                img for img in image_data
+                if filename_query in img['path'].lower()
+            ]
+        elif search_query.startswith('source:'):
+            source_query = search_query.replace('source:', '', 1).strip()
+            search_results = [
+                img for img in image_data
+                if source_query in img.get('sources', [])
+            ]
+        elif search_query:
+            # Regular tag search
+            query_tags = search_query.split()
+            search_results = [
+                img for img in image_data 
+                if all(q_tag in img['tags'] for q_tag in query_tags)
+            ]
+        else:
+            # No search query, use all images
+            search_results = image_data.copy()
         
-        random_tags = []
-        if tag_counts:
-            available_tags = list(tag_counts.items())
-            random_tags = random.sample(available_tags, min(len(available_tags), 30))
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             per_page=per_page,
-                             random_tags=random_tags,
-                             stats=stats)
+        # Shuffle the results using the generated seed
+        random.Random(seed).shuffle(search_results)
+
+    total_results = len(search_results)
+    
+    images_to_show = [
+        {
+            "path": img['path'],
+            "thumb": get_thumbnail_path(img['path']),
+            "tags": img.get('tags', '')
+        }
+        for img in search_results[:per_page]
+    ]
+    
+    random_tags = []
+    if not search_query and tag_counts:
+        available_tags = list(tag_counts.items())
+        random_tags = random.sample(available_tags, min(len(available_tags), 30))
+    
+    return render_template('index.html', 
+                         images=images_to_show, 
+                         query=search_query,
+                         per_page=per_page,
+                         random_tags=random_tags,
+                         stats=stats,
+                         total_results=total_results,
+                         seed=seed)
 
 @app.route('/image/<path:filepath>')
 def show_image(filepath):
