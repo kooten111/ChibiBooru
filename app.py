@@ -85,6 +85,74 @@ def load_data():
 # Load data on startup
 load_data()
 
+@app.route('/api/images')
+def get_images():
+    """API endpoint for infinite scroll - returns JSON image data"""
+    search_query = request.args.get('query', '').strip().lower()
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    per_page = max(10, min(per_page, 500))
+    
+    # Handle special queries
+    if search_query == 'metadata:missing':
+        search_results = [
+            {"path": f"images/{path}", "tags": "", "sources": []}
+            for path, data in raw_data.items()
+            if data == "not_found"
+        ]
+    elif looks_like_filename(search_query):
+        search_results = [
+            img for img in image_data
+            if search_query.lower() in img['path'].lower()
+        ]
+    elif search_query == 'metadata:found':
+        search_results = image_data.copy()
+    elif search_query.startswith('filename:'):
+        filename_query = search_query.replace('filename:', '', 1).strip()
+        search_results = [
+            img for img in image_data
+            if filename_query in img['path'].lower()
+        ]
+    elif search_query.startswith('source:'):
+        source_query = search_query.replace('source:', '', 1).strip()
+        search_results = [
+            img for img in image_data
+            if source_query in img.get('sources', [])
+        ]
+    elif search_query:
+        # Regular tag search
+        query_tags = search_query.split()
+        search_results = [
+            img for img in image_data 
+            if all(q_tag in img['tags'] for q_tag in query_tags)
+        ]
+    else:
+        # No search - return all images
+        search_results = image_data.copy()
+    
+    total_results = len(search_results)
+    total_pages = (total_results + per_page - 1) // per_page
+    
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    
+    images_page = [
+        {
+            "path": img['path'],
+            "thumb": get_thumbnail_path(img['path']),
+            "tags": img['tags']
+        }
+        for img in search_results[start_idx:end_idx]
+    ]
+    
+    return jsonify({
+        "images": images_page,
+        "page": page,
+        "total_pages": total_pages,
+        "total_results": total_results,
+        "has_more": page < total_pages
+    })
 
 @app.route('/api/reload', methods=['POST'])
 def reload_data():
@@ -281,14 +349,10 @@ def get_stats():
 @app.route('/')
 def home():
     search_query = request.args.get('query', '').strip().lower()
-    page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 50, type=int)
     
     per_page = max(10, min(per_page, 500))
     stats = get_stats()
-    
-    # DEBUG: Always print what we're searching for
-    print(f"=== HOME ROUTE === Query: '{search_query}' | looks_like_filename: {looks_like_filename(search_query)}")
     
     # Handle special queries
     if search_query == 'metadata:missing':
@@ -299,11 +363,6 @@ def home():
         ]
         
         total_results = len(search_results)
-        total_pages = (total_results + per_page - 1) // per_page
-        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
-        
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
         
         images_to_show = [
             {
@@ -311,86 +370,60 @@ def home():
                 "thumb": get_thumbnail_path(img['path']),
                 "tags": img['tags']
             }
-            for img in search_results[start_idx:end_idx]
+            for img in search_results[:per_page]
         ]
         
         return render_template('index.html', 
                              images=images_to_show, 
                              query=search_query,
-                             page=page,
                              per_page=per_page,
                              total_results=total_results,
-                             total_pages=total_pages,
-                             stats=stats)
-    elif looks_like_filename(search_query):
-        print(f"Searching for: {search_query}")
-        print(f"Total images in image_data: {len(image_data)}")
-        if image_data:
-            print(f"Sample paths: {[img['path'] for img in image_data[:5]]}")
-        
-        search_results = [
-            img for img in image_data
-            if search_query.lower() in img['path'].lower()
-        ]
-        print(f"Found {len(search_results)} results")
-        search_results = [
-            img for img in image_data
-            if search_query.lower() in img['path'].lower()
-        ]
-        
-        total_results = len(search_results)
-        total_pages = (total_results + per_page - 1) // per_page
-        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
-        
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[start_idx:end_idx]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             page=page,
-                             per_page=per_page,
-                             total_results=total_results,
-                             total_pages=total_pages,
-                             stats=stats)
-    elif search_query == 'metadata:found':
-        search_results = image_data.copy()
-        
-        total_results = len(search_results)
-        total_pages = (total_results + per_page - 1) // per_page
-        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
-        
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
-        
-        images_to_show = [
-            {
-                "path": img['path'],
-                "thumb": get_thumbnail_path(img['path']),
-                "tags": img['tags']
-            }
-            for img in search_results[start_idx:end_idx]
-        ]
-        
-        return render_template('index.html', 
-                             images=images_to_show, 
-                             query=search_query,
-                             page=page,
-                             per_page=per_page,
-                             total_results=total_results,
-                             total_pages=total_pages,
                              stats=stats)
     
-    # Handle filename search
+    elif looks_like_filename(search_query):
+        search_results = [
+            img for img in image_data
+            if search_query.lower() in img['path'].lower()
+        ]
+        
+        total_results = len(search_results)
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[:per_page]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             per_page=per_page,
+                             total_results=total_results,
+                             stats=stats)
+    
+    elif search_query == 'metadata:found':
+        search_results = image_data.copy()
+        total_results = len(search_results)
+        
+        images_to_show = [
+            {
+                "path": img['path'],
+                "thumb": get_thumbnail_path(img['path']),
+                "tags": img['tags']
+            }
+            for img in search_results[:per_page]
+        ]
+        
+        return render_template('index.html', 
+                             images=images_to_show, 
+                             query=search_query,
+                             per_page=per_page,
+                             total_results=total_results,
+                             stats=stats)
+    
     elif search_query.startswith('filename:'):
         filename_query = search_query.replace('filename:', '', 1).strip()
         search_results = [
@@ -399,11 +432,6 @@ def home():
         ]
         
         total_results = len(search_results)
-        total_pages = (total_results + per_page - 1) // per_page
-        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
-        
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
         
         images_to_show = [
             {
@@ -411,19 +439,16 @@ def home():
                 "thumb": get_thumbnail_path(img['path']),
                 "tags": img['tags']
             }
-            for img in search_results[start_idx:end_idx]
+            for img in search_results[:per_page]
         ]
         
         return render_template('index.html', 
                              images=images_to_show, 
                              query=search_query,
-                             page=page,
                              per_page=per_page,
                              total_results=total_results,
-                             total_pages=total_pages,
                              stats=stats)
     
-    # Handle source search
     elif search_query.startswith('source:'):
         source_query = search_query.replace('source:', '', 1).strip()
         search_results = [
@@ -432,11 +457,6 @@ def home():
         ]
         
         total_results = len(search_results)
-        total_pages = (total_results + per_page - 1) // per_page
-        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
-        
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
         
         images_to_show = [
             {
@@ -444,16 +464,14 @@ def home():
                 "thumb": get_thumbnail_path(img['path']),
                 "tags": img['tags']
             }
-            for img in search_results[start_idx:end_idx]
+            for img in search_results[:per_page]
         ]
         
         return render_template('index.html', 
                              images=images_to_show, 
                              query=search_query,
-                             page=page,
                              per_page=per_page,
                              total_results=total_results,
-                             total_pages=total_pages,
                              stats=stats)
     
     elif search_query:
@@ -465,11 +483,6 @@ def home():
         ]
         
         total_results = len(search_results)
-        total_pages = (total_results + per_page - 1) // per_page
-        page = max(1, min(page, total_pages)) if total_pages > 0 else 1
-        
-        start_idx = (page - 1) * per_page
-        end_idx = start_idx + per_page
         
         images_to_show = [
             {
@@ -477,27 +490,24 @@ def home():
                 "thumb": get_thumbnail_path(img['path']),
                 "tags": img['tags']
             }
-            for img in search_results[start_idx:end_idx]
+            for img in search_results[:per_page]
         ]
         
         return render_template('index.html', 
                              images=images_to_show, 
                              query=search_query,
-                             page=page,
                              per_page=per_page,
                              total_results=total_results,
-                             total_pages=total_pages,
                              stats=stats)
     else:
-        # No search - show random sample
-        sampled = random.sample(image_data, min(len(image_data), per_page))
+        # No search - show initial batch
         images_to_show = [
             {
                 "path": img['path'],
                 "thumb": get_thumbnail_path(img['path']),
                 "tags": img['tags']
             }
-            for img in sampled
+            for img in image_data[:per_page]
         ]
         
         random_tags = []
@@ -508,11 +518,9 @@ def home():
         return render_template('index.html', 
                              images=images_to_show, 
                              query=search_query,
-                             page=None,
                              per_page=per_page,
                              random_tags=random_tags,
                              stats=stats)
-
 
 @app.route('/image/<path:filepath>')
 def show_image(filepath):

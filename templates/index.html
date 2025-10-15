@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>HomeBooru</title>
+    <title>My Booru</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
     <div class="header">
         <div class="header-content">
-            <h1><a href="{{ url_for('home') }}">HomeBooru</a></h1>
+            <h1><a href="{{ url_for('home') }}">My Booru</a></h1>
             <div class="search-bar">
                 <form action="{{ url_for('home') }}" method="get" id="searchForm">
                     <div class="autocomplete-container">
@@ -63,8 +63,7 @@
 
         {% if query and total_results is defined %}
         <div class="results-info">
-            Found {{ total_results }} result{% if total_results != 1 %}s{% endif %} 
-            {% if total_pages > 1 %}(Page {{ page }} of {{ total_pages }}){% endif %}
+            Found {{ total_results }} result{% if total_results != 1 %}s{% endif %}
         </div>
         {% endif %}
 
@@ -82,36 +81,9 @@
             </div>
             {% endfor %}
         </div>
-
-        {% if query and total_pages and total_pages > 1 %}
-        <div class="pagination">
-            {% if page > 1 %}
-            <a href="{{ url_for('home', query=query, page=1, per_page=per_page) }}">« First</a>
-            <a href="{{ url_for('home', query=query, page=page-1, per_page=per_page) }}">‹ Prev</a>
-            {% else %}
-            <span class="disabled">« First</span>
-            <span class="disabled">‹ Prev</span>
-            {% endif %}
-
-            {% for p in range([1, page-2]|max, [total_pages, page+2]|min + 1) %}
-                {% if p == page %}
-                <span class="current">{{ p }}</span>
-                {% else %}
-                <a href="{{ url_for('home', query=query, page=p, per_page=per_page) }}">{{ p }}</a>
-                {% endif %}
-            {% endfor %}
-
-            {% if page < total_pages %}
-            <a href="{{ url_for('home', query=query, page=page+1, per_page=per_page) }}">Next ›</a>
-            <a href="{{ url_for('home', query=query, page=total_pages, per_page=per_page) }}">Last »</a>
-            {% else %}
-            <span class="disabled">Next ›</span>
-            <span class="disabled">Last »</span>
-            {% endif %}
-        </div>
-        {% endif %}
     </div>
 
     <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/infinite-scroll.js') }}"></script>
 </body>
 </html>
