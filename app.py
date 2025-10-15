@@ -342,6 +342,81 @@ def calculate_similarity(tags1, tags2):
     
     return intersection / union if union > 0 else 0.0
 
+def find_related_by_tags(filepath, limit=20):
+    """Find related images weighted by character > copyright > artist > similar tags"""
+    lookup_path = filepath.replace("images/", "", 1)
+    
+    if lookup_path not in raw_data:
+        return []
+    
+    ref_data = raw_data[lookup_path]
+    if ref_data == "not_found":
+        return []
+    
+    # Extract reference tags
+    if isinstance(ref_data, dict):
+        ref_chars = set(ref_data.get("tags_character", "").split())
+        ref_copy = set(ref_data.get("tags_copyright", "").split())
+        ref_artist = set(ref_data.get("tags_artist", "").split())
+        ref_general = set(ref_data.get("tags_general", "").split())
+    else:
+        ref_chars = ref_copy = ref_artist = ref_general = set()
+    
+    # Score all images
+    scored_images = []
+    
+    for path, data in raw_data.items():
+        if path == lookup_path or data == "not_found":
+            continue
+        
+        if isinstance(data, dict):
+            img_chars = set(data.get("tags_character", "").split())
+            img_copy = set(data.get("tags_copyright", "").split())
+            img_artist = set(data.get("tags_artist", "").split())
+            img_general = set(data.get("tags_general", "").split())
+        else:
+            continue
+        
+        # Calculate weighted score
+        score = 0
+        match_type = "similar"
+        
+        # Character match (highest priority)
+        char_overlap = len(ref_chars & img_chars)
+        if char_overlap > 0:
+            score += char_overlap * 100
+            match_type = "character"
+        
+        # Copyright match
+        copy_overlap = len(ref_copy & img_copy)
+        if copy_overlap > 0:
+            score += copy_overlap * 50
+            if match_type == "similar":
+                match_type = "copyright"
+        
+        # Artist match
+        artist_overlap = len(ref_artist & img_artist)
+        if artist_overlap > 0:
+            score += artist_overlap * 30
+            if match_type == "similar":
+                match_type = "artist"
+        
+        # General tag similarity
+        if ref_general and img_general:
+            general_sim = len(ref_general & img_general) / len(ref_general | img_general)
+            score += general_sim * 10
+        
+        if score > 0:
+            scored_images.append({
+                "path": f"images/{path}",
+                "score": score,
+                "match_type": match_type
+            })
+    
+    # Sort by score
+    scored_images.sort(key=lambda x: x['score'], reverse=True)
+    
+    return scored_images[:limit]
 
 @app.route('/similar/<path:filepath>')
 def find_similar(filepath):
@@ -606,12 +681,25 @@ def show_image(filepath):
     # Find related images
     related_images = get_related_images(post_id, parent_id, raw_data, id_to_path)
     
+    # Find similar images by tags
+    similar_by_tags = find_related_by_tags(filepath, limit=20)
+    carousel_images = [
+        {
+            "path": img['path'],
+            "thumb": get_thumbnail_path(img['path']),
+            "match_type": img['match_type']
+        }
+        for img in similar_by_tags
+    ]
+
+
     return render_template('image.html', 
                           filepath=filepath, 
                           tags=tags_with_counts,
                           categorized_tags=categorized_tags,
                           metadata=metadata,
-                          related_images=related_images)
+                          related_images=related_images,
+                          carousel_images=carousel_images)
 
 
 if __name__ == '__main__':

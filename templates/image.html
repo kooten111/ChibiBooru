@@ -6,7 +6,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/image.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/actions.css') }}">
-    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/carousel.css') }}">
+
     <!-- Preload related images for instant navigation -->
     {% if related_images %}
         {% for related in related_images %}
@@ -159,6 +160,40 @@
             <img src="{{ url_for('static', filename=filepath) }}" alt="Image">
         </div>
         
+        <!-- Related Images Carousel -->
+        {% if carousel_images %}
+        <div class="related-carousel-section">
+            <h3>
+                <span>🔗</span>
+                Related Images
+                <span style="font-size: 0.7em; color: #b0b0b0; font-weight: 400; margin-left: 10px;">
+                    ({{ carousel_images|length }} similar)
+                </span>
+            </h3>
+            <div class="carousel-container" id="relatedCarousel">
+                <button class="carousel-nav prev" aria-label="Previous">‹</button>
+                <div class="carousel-track">
+                    {% for img in carousel_images %}
+                    <div class="carousel-item">
+                        <a href="{{ url_for('show_image', filepath=img.path) }}">
+                            <img src="{{ url_for('static', filename=img.thumb) }}" 
+                                 alt="Related image" 
+                                 loading="lazy">
+                            <span class="match-badge {{ img.match_type }}">
+                                {% if img.match_type == 'character' %}Character
+                                {% elif img.match_type == 'copyright' %}Copyright
+                                {% elif img.match_type == 'artist' %}Artist
+                                {% else %}Similar{% endif %}
+                            </span>
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                <button class="carousel-nav next" aria-label="Next">›</button>
+            </div>
+        </div>
+        {% endif %}
+        
         <div class="sidebar-right">
             {% if related_images %}
             <div class="related-images">
@@ -297,5 +332,6 @@
     <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
 </body>
 </html>
