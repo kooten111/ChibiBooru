@@ -25,12 +25,6 @@
                         <input type="text" name="query" id="searchInput" placeholder="Search tags..." autocomplete="off">
                         <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
                     </div>
-                    <select name="per_page">
-                        <option value="25">25</option>
-                        <option value="50" selected>50</option>
-                        <option value="100">100</option>
-                        <option value="200">200</option>
-                    </select>
                     <button type="submit">Search</button>
                 </form>
             </div>
@@ -328,10 +322,11 @@
         </div>
     </div>
 
-    <input type="hidden" id="imageFilepath" value="{{ filepath }}">
+<input type="hidden" id="imageFilepath" value="{{ filepath }}">
     <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/image-viewer.js') }}"></script> 
 </body>
 </html>
