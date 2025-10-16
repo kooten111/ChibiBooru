@@ -17,7 +17,7 @@ def extract_tags_from_metadata(metadata):
         return None
     
     # Get the first available source (prefer danbooru/e621 for categorized tags)
-    preferred_sources = ["danbooru", "e621", "gelbooru", "yandere"]
+    preferred_sources = ["e621", "danbooru", "gelbooru", "yandere"]
     primary_source = None
     primary_source_name = None
     
