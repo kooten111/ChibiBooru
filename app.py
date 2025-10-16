@@ -1,3 +1,9 @@
+from dotenv import load_dotenv
+load_dotenv()
+
+import onnxruntime
+onnxruntime.preload_dlls()
+
 import json
 import random
 import os

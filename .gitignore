@@ -13,3 +13,4 @@ venv/
 # Specific files to ignore
 tags.json
 todo.txt
+.env
