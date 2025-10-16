@@ -1,9 +1,11 @@
 # HomeBooru
 
-Self-hosted image gallery with automatic tag fetching from multiple booru sources (Danbooru, e621, Gelbooru, Yandere) and AI tagging fallback. Features infinite scroll, tag editing, similarity search, and real-time statistics.
+Self-hosted image gallery with automatic tag fetching from multiple booru sources (Danbooru, e621, Gelbooru, Yandere) and AI tagging fallback. Features built-in monitoring, infinite scroll, tag editing, similarity search, and real-time statistics.
 
 ## Features
 
+- **Built-in Monitoring**: Automatic background scanning for new images every 5 minutes
+- **System Control Panel**: Web-based controls for scan, rebuild, thumbnails, and monitor
 - **Automatic Tag Fetching**: MD5-based search across 4 booru APIs in parallel
 - **AI Tagging Fallback**: CamieTagger ONNX model for images not found on boorus
 - **Reverse Image Search**: SauceNao integration for finding booru sources
@@ -14,18 +16,16 @@ Self-hosted image gallery with automatic tag fetching from multiple booru source
 - **Tag Editing**: In-browser tag editor with autocomplete
 - **Statistics Dashboard**: Expandable tabs showing collection stats, top tags, sources, categories
 - **Image Relationships**: Parent/child linking
-- **Live Monitoring**: Background daemon processes new images automatically
 - **Hot Reload**: Update without restarting Flask
 
 ## Directory Structure
 
 ```
 .
-├── app.py                          # Flask application
+├── app.py                          # Flask application with built-in monitoring
 ├── fetch_metadata.py               # Fetch tags from boorus + AI tagging
 ├── rebuild_tags_from_metadata.py   # Regenerate tags.json from metadata
 ├── generate_thumbnails.py          # Batch thumbnail generation
-├── tag_watcher_daemon.py           # Background monitoring daemon
 ├── README.md
 ├── tags.json                       # Generated: Tag index
 ├── static/
@@ -34,14 +34,16 @@ Self-hosted image gallery with automatic tag fetching from multiple booru source
 │   │   ├── image.css
 │   │   ├── actions.css
 │   │   ├── stats-tabs.css
-│   │   └── carousel.css
+│   │   ├── carousel.css
+│   │   └── system-panel.css        # System control panel styles
 │   ├── js/
 │   │   ├── autocomplete.js
 │   │   ├── tag-editor.js
 │   │   ├── infinite-scroll.js
 │   │   ├── stats-tabs.js
 │   │   ├── carousel.js
-│   │   └── image-preloader.js
+│   │   ├── image-preloader.js
+│   │   └── system-panel.js         # System control panel logic
 │   ├── images/                     # Your images
 │   └── thumbnails/                 # Generated WebP thumbnails
 ├── metadata/                       # Generated: Full booru metadata by MD5
@@ -100,9 +102,6 @@ export SAUCENAO_API_KEY="your-api-key-here"
 
 # API reload secret (generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))")
 export RELOAD_SECRET="your-secure-random-string"
-
-# Flask app URL for daemon
-export FLASK_URL="http://localhost:5000"
 ```
 
 5. **Optional: Download CamieTagger model**
@@ -129,7 +128,20 @@ python3 app.py
 
 Visit http://localhost:5000
 
+The built-in monitor will automatically start and check for new images every 5 minutes.
+
 ## Configuration
+
+### app.py
+
+```python
+# Monitoring
+MONITOR_ENABLED = True
+MONITOR_INTERVAL = 300  # seconds (5 minutes)
+
+# Security
+RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
+```
 
 ### fetch_metadata.py
 
@@ -147,17 +159,81 @@ CAMIE_THRESHOLD = 0.5
 CAMIE_TARGET_SIZE = 512
 ```
 
-### tag_watcher_daemon.py
+## Built-in Monitoring
+
+The Flask app includes automatic background monitoring that:
+
+1. **Runs continuously** in a daemon thread
+2. **Checks every 5 minutes** for new images (configurable)
+3. **Compares against tags.json** to find unprocessed images
+4. **Automatically processes** new images using fetch_metadata.py
+5. **Reloads data** after processing completes
+6. **Tracks statistics** (total processed, last scan results)
+
+### Monitor Behavior
+
+- Starts automatically when Flask starts
+- Runs in background without blocking web requests
+- Sleeps between checks to minimize resource usage
+- Can be stopped/started via System Control Panel
+- Survives Flask debug reloads (daemon thread)
+
+### Disable Monitoring
+
+To run without automatic monitoring:
 
 ```python
-CHECK_INTERVAL = 300  # Check for new images every 5 minutes
+# In app.py
+MONITOR_ENABLED = False
 ```
 
-### app.py
+Or use the System Control Panel to stop it at runtime.
 
-```python
-RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
-```
+## System Control Panel
+
+Access via the **System** tab on the home page (requires RELOAD_SECRET).
+
+### Status Display (Auto-refreshes every 5 seconds)
+
+- **Monitor Status**: Running (green) or Stopped (red)
+- **Check Interval**: Time between automatic scans
+- **Last Check**: Timestamp of last scan
+- **Last Scan Found**: Number of images found in last scan
+- **Total Processed**: Total images processed by monitor
+- **Total Images**: Total images in collection
+- **With Metadata**: Images with tag data
+- **Unprocessed**: Images awaiting processing (orange if > 0)
+
+### Action Buttons
+
+**Scan & Process New Images**
+- Manually trigger immediate scan
+- Runs fetch_metadata.py on all unprocessed images
+- Automatically reloads data
+
+**Rebuild Tags from Metadata**
+- Regenerates tags.json from metadata/*.json files
+- Use if metadata files were modified externally
+
+**Generate Thumbnails**
+- Runs generate_thumbnails.py
+- Creates WebP thumbnails for all images
+
+**Reload Data**
+- Reloads tags.json into memory
+- Use after manual edits
+
+**Start/Stop Monitor**
+- Control background monitoring thread
+- Useful for manual processing workflows
+
+### First Time Setup
+
+When opening System tab for the first time:
+1. You'll be prompted for the system secret
+2. Enter your `RELOAD_SECRET` value
+3. Secret is saved to localStorage
+4. To reset: `localStorage.removeItem('system_secret')` in browser console
 
 ## Tag Fetching Process
 
@@ -175,53 +251,6 @@ RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
 4. **Yandere** - Tags only, no categories
 5. **CamieTagger** - AI predictions with confidence scoring
 
-## Running the Daemon
-
-### Manual (Foreground)
-
-```bash
-python3 tag_watcher_daemon.py
-# Ctrl+C to stop
-```
-
-### Background
-
-```bash
-nohup python3 tag_watcher_daemon.py > /dev/null 2>&1 &
-
-# Check status
-ps aux | grep tag_watcher
-
-# Stop
-pkill -f tag_watcher_daemon.py
-```
-
-### Systemd Service
-
-1. **Edit service file**
-
-```bash
-nano tag-watcher.service
-# Update paths and username
-```
-
-2. **Install**
-
-```bash
-sudo cp tag-watcher.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable tag-watcher
-sudo systemctl start tag-watcher
-```
-
-3. **Manage**
-
-```bash
-sudo systemctl status tag-watcher
-sudo systemctl restart tag-watcher
-sudo journalctl -u tag-watcher -f
-```
-
 ## Manual Operations
 
 ### Process New Images
@@ -230,7 +259,7 @@ sudo journalctl -u tag-watcher -f
 python3 fetch_metadata.py
 ```
 
-Processes images that don't have metadata yet or were marked "not_found".
+Processes images that don't have metadata yet or were marked "not_found". The built-in monitor does this automatically, but you can run it manually for immediate processing.
 
 ### Regenerate tags.json
 
@@ -238,7 +267,7 @@ Processes images that don't have metadata yet or were marked "not_found".
 python3 rebuild_tags_from_metadata.py
 ```
 
-Rebuilds the search index from existing metadata files.
+Rebuilds the search index from existing metadata files. Also available via System Control Panel.
 
 ### Generate Thumbnails
 
@@ -246,10 +275,22 @@ Rebuilds the search index from existing metadata files.
 python3 generate_thumbnails.py
 ```
 
+Creates WebP thumbnails for all images. Also available via System Control Panel.
+
 ### Reload Flask
 
+Via System Control Panel:
+- Click **Reload Data** button
+
+Via API:
 ```bash
 curl -X POST http://localhost:5000/api/reload -d "secret=YOUR_SECRET"
+```
+
+Via Python (for scripts):
+```python
+import requests
+requests.post('http://localhost:5000/api/reload', data={'secret': 'YOUR_SECRET'})
 ```
 
 ## API Endpoints
@@ -277,60 +318,54 @@ Find images similar to the given one (Jaccard similarity)
 ### GET `/api/images`
 JSON endpoint for infinite scroll
 
-**Parameters:**
-- `query`: Search query
-- `page`: Page number
-- `per_page`: Results per page
-- `seed`: Random seed for consistent shuffling
+### GET `/api/system/status`
+Get monitoring and collection status (no auth required)
 
 **Returns:**
 ```json
 {
-  "images": [...],
-  "page": 1,
-  "total_pages": 10,
-  "total_results": 500,
-  "has_more": true
+  "monitor": {
+    "enabled": true,
+    "running": true,
+    "last_check": "2025-01-15 14:30:00",
+    "last_scan_found": 5,
+    "total_processed": 123,
+    "interval_seconds": 300
+  },
+  "collection": {
+    "total_images": 1000,
+    "with_metadata": 950,
+    "unprocessed": 50
+  }
 }
 ```
 
-### POST `/api/reload`
-Reload tags.json without restarting Flask
+### POST `/api/system/scan`
+Manually trigger scan and processing (requires secret)
 
-**Parameters:**
-- `secret`: Reload secret
+### POST `/api/system/rebuild`
+Rebuild tags.json from metadata (requires secret)
+
+### POST `/api/system/thumbnails`
+Generate thumbnails (requires secret)
+
+### POST `/api/system/monitor/start`
+Start monitoring thread (requires secret)
+
+### POST `/api/system/monitor/stop`
+Stop monitoring thread (requires secret)
+
+### POST `/api/reload`
+Reload tags.json without restarting Flask (requires secret)
 
 ### POST `/api/edit_tags`
 Update tags for an image
 
-**Body:**
-```json
-{
-  "filepath": "images/path/to/image.jpg",
-  "tags": "tag1 tag2 tag3"
-}
-```
-
 ### POST `/api/delete_image`
 Delete image, thumbnail, and metadata
 
-**Body:**
-```json
-{
-  "filepath": "images/path/to/image.jpg"
-}
-```
-
 ### GET `/api/autocomplete?q=<query>`
 Tag suggestions for autocomplete
-
-**Returns:**
-```json
-[
-  {"tag": "tag_name", "count": 123},
-  ...
-]
-```
 
 ## Search Syntax
 
@@ -351,6 +386,7 @@ Click tabs to view:
 - **Top Tags**: 20 most used tags with counts
 - **Categories**: Character/Copyright/Artist/Meta/General tag counts
 - **Explore**: 30 random tags to browse
+- **System**: Monitoring status and manual controls
 
 ### Infinite Scroll
 
@@ -421,22 +457,6 @@ Image detail page shows:
 }
 ```
 
-## Known Issues
-
-### tag_watcher_daemon.py Import Bug
-
-The daemon currently imports `tag_finder_simple` which is empty. Fix:
-
-```python
-# Change line 93 from:
-import tag_finder_simple
-tag_finder_simple.main()
-
-# To:
-import fetch_metadata
-fetch_metadata.main()
-```
-
 ## Troubleshooting
 
 ### No tags found
@@ -454,21 +474,31 @@ pip install onnxruntime-gpu numpy  # or onnxruntime for CPU
 
 Download model files to `models/CamieTagger/`
 
-### Flask not showing new images
+### Monitor not running
 
-```bash
-# Trigger reload
-curl -X POST http://localhost:5000/api/reload -d "secret=YOUR_SECRET"
+- Check System Control Panel status
+- Click **Start Monitor** button
+- Verify `MONITOR_ENABLED = True` in app.py
+- Check Flask console for errors
 
-# Or restart Flask
-```
+### Monitor not finding new images
 
-### Daemon lock file error
+- Images must be in `static/images/` directory
+- Check that images have valid extensions (.jpg, .jpeg, .png, .gif, .webp)
+- Verify images aren't already in tags.json
+- Check Flask console logs during scan
 
-```bash
-rm tag_watcher.lock
-python3 tag_watcher_daemon.py
-```
+### System Control Panel shows "Unauthorized"
+
+- Ensure you entered the correct RELOAD_SECRET
+- Reset: `localStorage.removeItem('system_secret')` in browser console
+- Verify RELOAD_SECRET in environment or app.py
+
+### Flask not showing new images after processing
+
+- Monitor automatically reloads data after processing
+- Manual: Click **Reload Data** in System Control Panel
+- Or restart Flask
 
 ### Memory issues
 
@@ -476,12 +506,13 @@ python3 tag_watcher_daemon.py
 - Lower WebP quality in `generate_thumbnails.py`
 - Use smaller `per_page` values
 - Disable CamieTagger if not needed
+- Reduce `MONITOR_INTERVAL` to process smaller batches
 
 ### Performance issues
 
 - Use SSD for `static/images` and `metadata/`
 - Generate thumbnails in batch before processing
-- Increase `CHECK_INTERVAL` for daemon
+- Increase `MONITOR_INTERVAL` for less frequent checks
 - Consider Redis for tag caching with 100k+ images
 
 ## Production Deployment
@@ -493,6 +524,8 @@ pip install gunicorn
 
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
+
+The monitoring thread works with Gunicorn, but runs only in the master process.
 
 ### With Nginx
 
@@ -523,10 +556,10 @@ server {
    python3 -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-2. **Restrict /api/reload**
+2. **Restrict system endpoints**
    ```nginx
-   location /api/reload {
-       allow 127.0.0.1;
+   location /api/system/ {
+       allow 192.168.1.0/24;  # Your internal network
        deny all;
        proxy_pass http://localhost:5000;
    }
@@ -536,14 +569,80 @@ server {
 
 4. **Review content** before hosting (boorus contain NSFW)
 
+### Systemd Service
+
+Create `/etc/systemd/system/homebooru.service`:
+
+```ini
+[Unit]
+Description=HomeBooru Image Gallery
+After=network.target
+
+[Service]
+Type=simple
+User=your-username
+WorkingDirectory=/path/to/homebooru
+Environment="RELOAD_SECRET=your-secret-here"
+Environment="SAUCENAO_API_KEY=your-key-here"
+ExecStart=/usr/bin/python3 app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable homebooru
+sudo systemctl start homebooru
+sudo systemctl status homebooru
+```
+
+View logs:
+```bash
+sudo journalctl -u homebooru -f
+```
+
 ## Performance Tips
 
 - Use SSD for image storage
 - Generate thumbnails during off-peak hours
-- Prefetch is aggressive (2 pages ahead) - adjust if needed
+- Monitor interval can be adjusted based on how frequently you add images
 - Use CDN for static assets in production
 - Consider database (PostgreSQL) instead of tags.json for 100k+ images
 - Enable gzip compression in nginx
+- The built-in monitor is lightweight and won't impact normal operations
+
+## Migration from tag_watcher_daemon.py
+
+If you were using the old separate daemon:
+
+1. **Stop the old daemon**
+   ```bash
+   pkill -f tag_watcher_daemon.py
+   # or
+   sudo systemctl stop tag-watcher
+   sudo systemctl disable tag-watcher
+   ```
+
+2. **Remove systemd service** (if installed)
+   ```bash
+   sudo rm /etc/systemd/system/tag-watcher.service
+   sudo systemctl daemon-reload
+   ```
+
+3. **Update app.py** to the new version with built-in monitoring
+
+4. **Restart Flask** - monitoring starts automatically
+
+The new system is more efficient because:
+- No separate process to manage
+- Shares memory with Flask app
+- Can be controlled via web interface
+- Automatic data reload after processing
+- Real-time status display
 
 ## Credits
 
