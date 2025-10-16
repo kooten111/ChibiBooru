@@ -2,6 +2,9 @@ import json
 import random
 import os
 import threading
+import time
+import hashlib
+from pathlib import Path
 from flask import Flask, render_template, request, url_for, jsonify
 from utils import get_thumbnail_path, load_metadata, get_related_images
 
@@ -17,6 +20,17 @@ data_lock = threading.Lock()
 # Optional: Set a reload secret key for security
 RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
 
+# Monitoring configuration
+MONITOR_ENABLED = True
+MONITOR_INTERVAL = 300  # seconds (5 minutes)
+monitor_thread = None
+monitor_status = {
+    "running": False,
+    "last_check": None,
+    "last_scan_found": 0,
+    "total_processed": 0
+}
+
 def looks_like_filename(query):
     """Check if query looks like a filename"""
     # Check for common image extensions
@@ -29,6 +43,104 @@ def looks_like_filename(query):
     if re.match(r'^[a-f0-9]{32}', query):  # MD5 pattern
         return True
     return False
+
+def get_image_md5(filepath):
+    """Calculate MD5 hash of an image file"""
+    hash_md5 = hashlib.md5()
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+def find_unprocessed_images():
+    """Find images that don't have metadata yet"""
+    if not os.path.isdir("./static/images"):
+        return []
+    
+    unprocessed = []
+    image_extensions = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+    
+    for root, _, files in os.walk("./static/images"):
+        for file in files:
+            if not file.lower().endswith(image_extensions):
+                continue
+            
+            filepath = os.path.join(root, file)
+            rel_path = os.path.relpath(filepath, "./static/images")
+            
+            # Check if in tags.json
+            if rel_path not in raw_data:
+                unprocessed.append(filepath)
+            # Check if marked as not_found
+            elif raw_data[rel_path] == "not_found":
+                unprocessed.append(filepath)
+    
+    return unprocessed
+
+def process_new_images():
+    """Process new images by calling fetch_metadata"""
+    try:
+        import fetch_metadata
+        fetch_metadata.main()
+        return True
+    except Exception as e:
+        print(f"Error processing images: {e}")
+        return False
+
+def monitor_images():
+    """Background thread to monitor for new images"""
+    global monitor_status
+    
+    while monitor_status["running"]:
+        try:
+            print("Checking for new images...")
+            monitor_status["last_check"] = time.strftime("%Y-%m-%d %H:%M:%S")
+            
+            unprocessed = find_unprocessed_images()
+            
+            if unprocessed:
+                print(f"Found {len(unprocessed)} new images, processing...")
+                monitor_status["last_scan_found"] = len(unprocessed)
+                
+                if process_new_images():
+                    monitor_status["total_processed"] += len(unprocessed)
+                    print("Processing complete, reloading data...")
+                    load_data()
+            else:
+                print("No new images found")
+                monitor_status["last_scan_found"] = 0
+            
+        except Exception as e:
+            print(f"Monitor error: {e}")
+        
+        # Sleep in small intervals to allow stopping
+        for _ in range(MONITOR_INTERVAL):
+            if not monitor_status["running"]:
+                break
+            time.sleep(1)
+
+def start_monitor():
+    """Start the background monitoring thread"""
+    global monitor_thread, monitor_status
+    
+    if not MONITOR_ENABLED:
+        return
+    
+    if monitor_thread and monitor_thread.is_alive():
+        print("Monitor already running")
+        return
+    
+    monitor_status["running"] = True
+    monitor_thread = threading.Thread(target=monitor_images, daemon=True)
+    monitor_thread.start()
+    print("Image monitor started")
+
+def stop_monitor():
+    """Stop the background monitoring thread"""
+    global monitor_status
+    
+    monitor_status["running"] = False
+    print("Image monitor stopped")
 
 def load_data():
     """Load or reload tags.json data"""
@@ -144,6 +256,9 @@ def get_enhanced_stats():
 # Load data on startup
 load_data()
 
+# Start monitor on startup
+start_monitor()
+
 @app.route('/api/images')
 def get_images():
     """API endpoint for infinite scroll - returns JSON image data"""
@@ -238,6 +353,116 @@ def reload_data():
         })
     else:
         return jsonify({"error": "Failed to reload data"}), 500
+
+
+@app.route('/api/system/status')
+def system_status():
+    """Get system status"""
+    unprocessed = find_unprocessed_images()
+    
+    return jsonify({
+        "monitor": {
+            "enabled": MONITOR_ENABLED,
+            "running": monitor_status["running"],
+            "last_check": monitor_status["last_check"],
+            "last_scan_found": monitor_status["last_scan_found"],
+            "total_processed": monitor_status["total_processed"],
+            "interval_seconds": MONITOR_INTERVAL
+        },
+        "collection": {
+            "total_images": len(raw_data),
+            "with_metadata": sum(1 for d in raw_data.values() if d != "not_found"),
+            "unprocessed": len(unprocessed)
+        }
+    })
+
+@app.route('/api/system/scan', methods=['POST'])
+def trigger_scan():
+    """Manually trigger a scan for new images"""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    unprocessed = find_unprocessed_images()
+    
+    if not unprocessed:
+        return jsonify({
+            "status": "success",
+            "message": "No new images found",
+            "processed": 0
+        })
+    
+    try:
+        success = process_new_images()
+        if success:
+            load_data()
+            return jsonify({
+                "status": "success",
+                "message": f"Processed {len(unprocessed)} images",
+                "processed": len(unprocessed)
+            })
+        else:
+            return jsonify({"error": "Processing failed"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/system/rebuild', methods=['POST'])
+def trigger_rebuild():
+    """Manually trigger tags.json rebuild"""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        import rebuild_tags_from_metadata
+        success = rebuild_tags_from_metadata.rebuild_tags()
+        if success:
+            load_data()
+            return jsonify({
+                "status": "success",
+                "message": "Tags rebuilt successfully"
+            })
+        else:
+            return jsonify({"error": "Rebuild failed"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/system/thumbnails', methods=['POST'])
+def trigger_thumbnails():
+    """Manually trigger thumbnail generation"""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        import generate_thumbnails
+        generate_thumbnails.main()
+        return jsonify({
+            "status": "success",
+            "message": "Thumbnails generated"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/system/monitor/start', methods=['POST'])
+def start_monitor_endpoint():
+    """Start the monitoring thread"""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    start_monitor()
+    return jsonify({"status": "success", "message": "Monitor started"})
+
+@app.route('/api/system/monitor/stop', methods=['POST'])
+def stop_monitor_endpoint():
+    """Stop the monitoring thread"""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    stop_monitor()
+    return jsonify({"status": "success", "message": "Monitor stopped"})
 
 
 @app.route('/api/edit_tags', methods=['POST'])
