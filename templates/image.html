@@ -206,7 +206,28 @@
             {% if metadata %}
             <div class="metadata-info">
                 <h3>Information</h3>
-                
+                <div class="metadata-item" style="border-bottom: none; padding-bottom: 0;">
+                    <button onclick="showSauceNaoFetcher()" style="
+                        width: 100%;
+                        padding: 12px;
+                        background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+                        border: none;
+                        color: #fff;
+                        border-radius: 10px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 0.95em;
+                        transition: all 0.3s ease;
+                        box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 8px;
+                    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(74, 158, 255, 0.5)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(74, 158, 255, 0.3)';">
+                        <span style="font-size: 1.2em;">🔍</span>
+                        <span>Fetch from SauceNao</span>
+                    </button>
+                </div>
                 {% if filepath %}
                 <div class="metadata-item">
                     <div class="metadata-label">Filename</div>
@@ -328,5 +349,6 @@
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-viewer.js') }}"></script> 
+    <script src="{{ url_for('static', filename='js/saucenao-fetch.js') }}"></script>
 </body>
 </html>

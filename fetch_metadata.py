@@ -297,15 +297,10 @@ def fetch_by_post_id(source, post_id):
                 }
         
         elif source == 'gelbooru':
-            url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={post_id}"
-            response = requests.get(url, timeout=10)
-            if response.status_code == 200 and "post" in response.json():
-                data = response.json()["post"][0]
-                return {
-                    "tag_string": data.get("tags", ""),
-                    "full_data": data,
-                    "source": "gelbooru"
-                }
+            # Gelbooru API is unreliable - skip it for now
+            # Their API requires authentication and doesn't support direct post ID lookup
+            print(f"Skipping Gelbooru post {post_id} - API requires authentication")
+            return None
         
         elif source == 'yandere':
             url = f"https://yande.re/post.json?tags=id:{post_id}"
@@ -320,10 +315,12 @@ def fetch_by_post_id(source, post_id):
     
     except Exception as e:
         print(f"Error fetching {source} post {post_id}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
     
     return None
-
+    
 def merge_tag_data(all_results):
     """Merge tag data from multiple sources, preferring sources with categorized tags"""
     if not all_results:

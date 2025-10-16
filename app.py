@@ -4,6 +4,7 @@ load_dotenv()
 import onnxruntime
 onnxruntime.preload_dlls()
 
+import os
 import json
 import random
 import os
@@ -11,6 +12,7 @@ import threading
 import time
 import hashlib
 from pathlib import Path
+from urllib.parse import urlparse
 from flask import Flask, render_template, request, url_for, jsonify
 from utils import get_thumbnail_path, load_metadata, get_related_images
 
@@ -500,17 +502,18 @@ def edit_tags():
     
     try:
         with data_lock:
-            # Update tags.json
+            # Update tags.json in memory
             if isinstance(raw_data[filepath], str):
                 raw_data[filepath] = new_tags
             else:
                 raw_data[filepath]['tags'] = new_tags
             
+            # Write the updated data to the file
             with open('tags.json', 'w') as f:
                 json.dump(raw_data, f, indent=4)
-            
-            # Reload data to update counts
-            load_data()
+        
+        # Reload data from the file after the lock is released
+        load_data()
         
         return jsonify({"status": "success"})
     except Exception as e:
@@ -720,6 +723,334 @@ def find_similar(filepath):
                          stats=get_enhanced_stats(),
                          show_similarity=True)
 
+@app.route('/api/saucenao/search', methods=['POST'])
+def saucenao_search():
+    """Search SauceNao for an image"""
+    data = request.json
+    secret = data.get('secret', '')
+    
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    filepath = data.get('filepath', '').replace('images/', '', 1)
+    
+    if not filepath:
+        return jsonify({"error": "No filepath provided"}), 400
+    
+    full_path = f"static/images/{filepath}"
+    if not os.path.exists(full_path):
+        return jsonify({"error": "Image not found"}), 404
+    
+    try:
+        # Import the search functions
+        import fetch_metadata
+        
+        # Run SauceNao search
+        booru_posts, saucenao_response = fetch_metadata.search_saucenao(full_path)
+        
+        if not saucenao_response or 'results' not in saucenao_response:
+            return jsonify({
+                "status": "success",
+                "found": False,
+                "message": "No results found"
+            })
+        
+        # Parse results
+        results = []
+        for result in saucenao_response.get('results', [])[:10]:  # Check more results
+            similarity = float(result['header']['similarity'])
+            
+            if similarity < 60:  # Lower threshold to catch more
+                continue
+            
+            result_data = {
+                "similarity": similarity,
+                "thumbnail": result['header'].get('thumbnail'),
+                "sources": []
+            }
+            
+            # Extract booru sources
+            urls = result['data'].get('ext_urls', [])
+            
+            # Also check for index_id to determine source
+            index_id = result['header'].get('index_id')
+            index_name = result['header'].get('index_name', '')
+            
+            print(f"SauceNao result: similarity={similarity}, index_id={index_id}, index_name={index_name}, urls={urls}")
+            
+            for url in urls:
+                source_info = None
+                
+                # Danbooru - handle both /posts/ and /post/show/ formats
+                if 'danbooru.donmai.us' in url:
+                    if '/posts/' in url:
+                        post_id = url.split('/posts/')[-1].split('?')[0].split('/')[0]
+                    elif '/post/show/' in url:
+                        post_id = url.split('/post/show/')[-1].split('?')[0].split('/')[0]
+                    else:
+                        continue
+                    source_info = {
+                        "type": "danbooru",
+                        "url": url,
+                        "post_id": post_id
+                    }
+                    
+                # e621 - handle both /posts/ and /post/show/ formats
+                elif 'e621.net' in url:
+                    if '/posts/' in url:
+                        post_id = url.split('/posts/')[-1].split('?')[0].split('/')[0]
+                    elif '/post/show/' in url:
+                        post_id = url.split('/post/show/')[-1].split('?')[0].split('/')[0]
+                    else:
+                        continue
+                    source_info = {
+                        "type": "e621",
+                        "url": url,
+                        "post_id": post_id
+                    }
+                    
+                # Gelbooru - multiple formats
+                elif 'gelbooru.com' in url:
+                    if 'id=' in url:
+                        post_id = url.split('id=')[-1].split('&')[0].split('#')[0]
+                        source_info = {
+                            "type": "gelbooru",
+                            "url": url,
+                            "post_id": post_id
+                        }
+                        
+                # Yandere
+                elif 'yande.re' in url:
+                    if '/post/show/' in url:
+                        post_id = url.split('/post/show/')[-1].split('?')[0].split('/')[0]
+                    elif '/post/' in url:
+                        post_id = url.split('/post/')[-1].split('?')[0].split('/')[0]
+                    else:
+                        continue
+                    source_info = {
+                        "type": "yandere",
+                        "url": url,
+                        "post_id": post_id
+                    }
+                
+                if source_info:
+                    print(f"Extracted: {source_info}")
+                    result_data["sources"].append(source_info)
+            
+            # Deduplicate sources by type (keep first occurrence)
+            seen_types = set()
+            unique_sources = []
+            for source in result_data["sources"]:
+                if source["type"] not in seen_types:
+                    seen_types.add(source["type"])
+                    unique_sources.append(source)
+            result_data["sources"] = unique_sources
+            
+            if result_data["sources"]:
+                results.append(result_data)
+        
+        return jsonify({
+            "status": "success",
+            "found": len(results) > 0,
+            "results": results
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/saucenao/fetch_metadata', methods=['POST'])
+def saucenao_fetch_metadata():
+    """Fetch full metadata from a booru source"""
+    data = request.json
+    secret = data.get('secret', '')
+    
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    source = data.get('source')
+    post_id = data.get('post_id')
+    
+    if not source or not post_id:
+        return jsonify({"error": "Missing source or post_id"}), 400
+    
+    try:
+        import fetch_metadata
+        
+        print(f"Fetching metadata for {source} post {post_id}")  # DEBUG
+        result = fetch_metadata.fetch_by_post_id(source, post_id)
+        
+        if not result:
+            print(f"fetch_by_post_id returned None for {source} {post_id}")  # DEBUG
+            return jsonify({"error": f"Failed to fetch metadata from {source}"}), 404
+        
+        print(f"Successfully fetched from {source}, extracting tags...")  # DEBUG
+        # Extract tag data
+        tag_data = fetch_metadata.extract_tag_data(result)
+        
+        # Get image URL
+        full_data = result['full_data']
+        image_url = None
+        preview_url = None  # Smaller preview image
+        
+        if source == 'danbooru':
+            image_url = full_data.get('file_url') or full_data.get('large_file_url')
+            preview_url = full_data.get('preview_file_url') or full_data.get('preview_url')
+        elif source == 'e621':
+            image_url = full_data.get('file', {}).get('url')
+            preview_url = full_data.get('preview', {}).get('url') or full_data.get('sample', {}).get('url')
+        elif source == 'gelbooru':
+            image_url = full_data.get('file_url')
+            preview_url = full_data.get('preview_url')
+        elif source == 'yandere':
+            image_url = full_data.get('file_url')
+            preview_url = full_data.get('preview_url') or full_data.get('sample_url')
+        
+        print(f"Returning metadata for {source}")  # DEBUG
+        return jsonify({
+            "status": "success",
+            "tags": tag_data['tags'],
+            "image_url": image_url,
+            "preview_url": preview_url,
+            "file_size": full_data.get('file_size'),
+            "width": full_data.get('image_width') or full_data.get('width'),
+            "height": full_data.get('image_height') or full_data.get('height'),
+            "rating": full_data.get('rating'),
+            "score": full_data.get('score'),
+            "raw_data": full_data
+        })
+        
+    except Exception as e:
+        print(f"Error fetching metadata for {source} {post_id}: {e}")  # DEBUG
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/saucenao/apply', methods=['POST'])
+def saucenao_apply():
+    """Apply selected metadata and optionally download a new image, replacing the old one."""
+    data = request.json
+    secret = data.get('secret', '')
+    
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    original_filepath = data.get('filepath', '').replace('images/', '', 1)
+    source = data.get('source')
+    post_id = data.get('post_id')
+    selected_tags = data.get('tags', {})
+    download_image = data.get('download_image', False)
+    image_url = data.get('image_url')
+    
+    if not original_filepath or not source or not post_id:
+        return jsonify({"error": "Missing required parameters"}), 400
+    
+    try:
+        import fetch_metadata
+        
+        result = fetch_metadata.fetch_by_post_id(source, post_id)
+        if not result:
+            return jsonify({"error": "Failed to fetch metadata"}), 404
+            
+        redirect_url = None
+        final_filepath = original_filepath
+
+        if download_image and image_url:
+            import requests
+
+            # 1. Determine new filename from URL
+            parsed_url = urlparse(image_url)
+            new_filename = os.path.basename(parsed_url.path)
+            if not new_filename:
+                return jsonify({"error": "Could not determine filename from URL."}), 400
+
+            new_relative_path = new_filename
+            new_full_path = f"static/images/{new_relative_path}"
+
+            # 2. Check if a file with the new name already exists
+            if os.path.exists(new_full_path):
+                return jsonify({"error": f"File '{new_filename}' already exists."}), 409
+
+            # 3. Download the new image
+            response = requests.get(image_url, timeout=60)
+            response.raise_for_status()
+            with open(new_full_path, 'wb') as f:
+                f.write(response.content)
+
+            fetch_metadata.ensure_thumbnail(new_full_path)
+
+            # 4. Clean up old files (image, thumbnail, metadata)
+            old_full_path = f"static/images/{original_filepath}"
+            if os.path.exists(old_full_path):
+                old_md5 = raw_data.get(original_filepath, {}).get('md5') or fetch_metadata.get_md5(old_full_path)
+                os.remove(old_full_path)
+                
+                old_thumb_path = f"static/{get_thumbnail_path(f'images/{original_filepath}')}"
+                if os.path.exists(old_thumb_path):
+                    os.remove(old_thumb_path)
+                
+                if old_md5:
+                    old_metadata_path = f"metadata/{old_md5}.json"
+                    if os.path.exists(old_metadata_path):
+                        os.remove(old_metadata_path)
+
+            final_filepath = new_relative_path
+            redirect_url = url_for('show_image', filepath=f"images/{new_relative_path}")
+
+        # --- COMMON LOGIC FOR BOTH SCENARIOS ---
+        
+        # Calculate MD5 for the final image
+        md5 = fetch_metadata.get_md5(f"static/images/{final_filepath}")
+
+        # Save metadata to its own .json file
+        metadata_content = {
+            "md5": md5, "relative_path": final_filepath, "saucenao_lookup": True,
+            "camie_tagger_lookup": False, "sources": {source: result['full_data']}
+        }
+        with open(f"metadata/{md5}.json", 'w') as f:
+            json.dump(metadata_content, f, indent=2)
+        
+        # Build the new entry for tags.json
+        tag_data = fetch_metadata.extract_tag_data(result)
+        tags_entry = {
+            "tags": selected_tags.get('all', tag_data['tags']['all']),
+            "tags_character": selected_tags.get('character', tag_data['tags']['character']),
+            "tags_copyright": selected_tags.get('copyright', tag_data['tags']['copyright']),
+            "tags_artist": selected_tags.get('artist', tag_data['tags']['artist']),
+            "tags_meta": selected_tags.get('meta', tag_data['tags']['meta']),
+            "tags_general": selected_tags.get('general', tag_data['tags']['general']),
+            "id": tag_data['id'], "parent_id": tag_data['parent_id'], "has_children": tag_data['has_children'],
+            "md5": md5, "sources": [source], "saucenao_lookup": True, "camie_tagger_lookup": False
+        }
+
+        # Update tags.json safely
+        with data_lock:
+            # If we downloaded a new file, remove the old entry
+            if download_image and original_filepath in raw_data:
+                del raw_data[original_filepath]
+            
+            # Add or update the entry for the final file
+            raw_data[final_filepath] = tags_entry
+            
+            with open('tags.json', 'w') as f:
+                json.dump(raw_data, f, indent=4)
+        
+        load_data()
+        
+        # Construct the final response
+        response_data = { "status": "success", "message": "Metadata applied successfully.", "downloaded": download_image }
+        if redirect_url:
+            response_data["redirect_url"] = redirect_url
+        
+        return jsonify(response_data)
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Network error downloading image: {e}"}), 500
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/')
 def home():
