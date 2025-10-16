@@ -1,36 +1,61 @@
-# My Booru
+# HomeBooru
 
-A self-hosted image gallery with automatic tag fetching from multiple booru sources (Danbooru, e621, Gelbooru, Yandere). Features a clean dark-themed interface with tag-based search, autocomplete, and automatic metadata management.
+Self-hosted image gallery with automatic tag fetching from multiple booru sources (Danbooru, e621, Gelbooru, Yandere) and AI tagging fallback. Features infinite scroll, tag editing, similarity search, and real-time statistics.
 
 ## Features
 
-- **Automatic Tag Fetching**: Searches multiple booru APIs by MD5 hash
-- **Categorized Tags**: Character, Copyright, Artist, Meta, and General tags
+- **Automatic Tag Fetching**: MD5-based search across 4 booru APIs in parallel
+- **AI Tagging Fallback**: CamieTagger ONNX model for images not found on boorus
+- **Reverse Image Search**: SauceNao integration for finding booru sources
+- **Categorized Tags**: Character, Copyright, Artist, Meta, General
 - **Smart Search**: Multi-tag search with autocomplete
-- **Image Relationships**: Parent/child image linking
-- **Thumbnails**: Automatic WebP thumbnail generation
-- **Metadata Storage**: Complete metadata from all sources saved locally
-- **Live Monitoring**: Daemon automatically processes new images
-- **Hot Reload**: Web interface updates without restart
+- **Infinite Scroll**: Smooth pagination with prefetching
+- **Related Images**: Weighted similarity by character/copyright/artist/general tags
+- **Tag Editing**: In-browser tag editor with autocomplete
+- **Statistics Dashboard**: Expandable tabs showing collection stats, top tags, sources, categories
+- **Image Relationships**: Parent/child linking
+- **Live Monitoring**: Background daemon processes new images automatically
+- **Hot Reload**: Update without restarting Flask
 
 ## Directory Structure
 
 ```
 .
-├── app.py                          # Flask web application
-├── tag_finder_simple.py            # Fetch tags from booru APIs
+├── app.py                          # Flask application
+├── fetch_metadata.py               # Fetch tags from boorus + AI tagging
 ├── rebuild_tags_from_metadata.py   # Regenerate tags.json from metadata
-├── generate_thumbnails.py          # Generate all thumbnails at once
-├── tag_watcher_daemon.py           # Background daemon for monitoring
-├── README.md                       # This file
-├── tags.json                       # Generated: Tag index for fast search
+├── generate_thumbnails.py          # Batch thumbnail generation
+├── tag_watcher_daemon.py           # Background monitoring daemon
+├── README.md
+├── tags.json                       # Generated: Tag index
 ├── static/
-│   ├── images/                     # Your image collection
+│   ├── css/
+│   │   ├── main.css
+│   │   ├── image.css
+│   │   ├── actions.css
+│   │   ├── stats-tabs.css
+│   │   └── carousel.css
+│   ├── js/
+│   │   ├── autocomplete.js
+│   │   ├── tag-editor.js
+│   │   ├── infinite-scroll.js
+│   │   ├── stats-tabs.js
+│   │   ├── carousel.js
+│   │   └── image-preloader.js
+│   ├── images/                     # Your images
 │   └── thumbnails/                 # Generated WebP thumbnails
 ├── metadata/                       # Generated: Full booru metadata by MD5
-└── templates/
-    ├── index.html                  # Gallery view
-    └── image.html                  # Image detail view
+├── models/
+│   └── CamieTagger/                # Optional: AI tagging model
+│       ├── camie-tagger-v2.onnx
+│       └── metadata.json
+├── templates/
+│   ├── index.html
+│   └── image.html
+└── utils/
+    ├── __init__.py
+    ├── file_utils.py
+    └── metadata_utils.py
 ```
 
 ## Installation
@@ -38,40 +63,66 @@ A self-hosted image gallery with automatic tag fetching from multiple booru sour
 ### Requirements
 
 - Python 3.7+
-- pip
+- 4GB+ RAM (8GB recommended with CamieTagger)
 
 ### Setup
 
-1. **Clone or download this project**
+1. **Install dependencies**
 
-2. **Install dependencies**
 ```bash
+# Basic requirements
 pip install flask pillow requests tqdm
+
+# Optional: AI tagging (GPU recommended)
+pip install onnxruntime-gpu numpy  # or onnxruntime for CPU
+
+# Optional: Advanced file processing
+pip install openpyxl pandas
 ```
 
-3. **Create directories**
+2. **Create directories**
+
 ```bash
-mkdir -p static/images static/thumbnails metadata
+mkdir -p static/images static/thumbnails metadata models/CamieTagger
 ```
 
-4. **Add your images**
+3. **Add your images**
+
 ```bash
-# Place images in static/images/
-# Subdirectories are supported
 cp -r ~/my-images/* static/images/
 ```
 
-5. **Initial processing**
-```bash
-# Fetch tags and generate thumbnails
-python3 tag_finder_simple.py
+4. **Configure environment variables**
 
-# Or generate thumbnails separately first
-python3 generate_thumbnails.py
-python3 tag_finder_simple.py
+```bash
+# Optional: SauceNao reverse image search
+export SAUCENAO_API_KEY="your-api-key-here"
+
+# API reload secret (generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+export RELOAD_SECRET="your-secure-random-string"
+
+# Flask app URL for daemon
+export FLASK_URL="http://localhost:5000"
 ```
 
-6. **Run the web interface**
+5. **Optional: Download CamieTagger model**
+
+Download from [CamieTagger releases](https://huggingface.co/KBlueLeaf/CamieTagger/tree/main) and place in `models/CamieTagger/`:
+- `camie-tagger-v2.onnx`
+- `metadata.json`
+
+6. **Process images**
+
+```bash
+# Generate thumbnails first (optional, fetch_metadata.py does this too)
+python3 generate_thumbnails.py
+
+# Fetch tags from boorus and AI tag
+python3 fetch_metadata.py
+```
+
+7. **Run the web interface**
+
 ```bash
 python3 app.py
 ```
@@ -80,63 +131,82 @@ Visit http://localhost:5000
 
 ## Configuration
 
-### Environment Variables
+### fetch_metadata.py
 
-```bash
-# Reload secret for API endpoint (generate with: python3 -c "import secrets; print(secrets.token_urlsafe(32))")
-export RELOAD_SECRET="your-secure-random-string"
-
-# Flask app URL for daemon to trigger reloads
-export FLASK_URL="http://localhost:5000"
-```
-
-### Script Settings
-
-**tag_finder_simple.py:**
 ```python
+IMAGE_DIRECTORY = "./static/images"
+METADATA_DIR = "./metadata"
+TAGS_FILE = "./tags.json"
 THUMB_DIR = "./static/thumbnails"
 THUMB_SIZE = 1000
-IMAGE_DIRECTORY = "./static/images"
-TAGS_FILE = "./tags.json"
-METADATA_DIR = "./metadata"
+
+# CamieTagger
+CAMIE_MODEL_PATH = "./models/CamieTagger/camie-tagger-v2.onnx"
+CAMIE_METADATA_PATH = "./models/CamieTagger/metadata.json"
+CAMIE_THRESHOLD = 0.5
+CAMIE_TARGET_SIZE = 512
 ```
 
-**tag_watcher_daemon.py:**
+### tag_watcher_daemon.py
+
 ```python
 CHECK_INTERVAL = 300  # Check for new images every 5 minutes
 ```
+
+### app.py
+
+```python
+RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
+```
+
+## Tag Fetching Process
+
+1. **MD5 Search**: Calculates MD5 hash and searches all boorus in parallel
+2. **SauceNao Fallback**: If no MD5 match, uses reverse image search (requires API key)
+3. **CamieTagger Fallback**: If still no match, uses AI tagging (requires model)
+4. **Metadata Storage**: Saves complete metadata from all sources to `metadata/{md5}.json`
+5. **Tag Merging**: Combines tags from all sources, prefers Danbooru/e621 for categories
+
+### Source Priority
+
+1. **Danbooru** - Full categorization, best quality
+2. **e621** - Full categorization, good for furry content
+3. **Gelbooru** - Tags only, no categories
+4. **Yandere** - Tags only, no categories
+5. **CamieTagger** - AI predictions with confidence scoring
 
 ## Running the Daemon
 
 ### Manual (Foreground)
 
 ```bash
-# Run with Ctrl+C to stop
 python3 tag_watcher_daemon.py
+# Ctrl+C to stop
 ```
 
 ### Background
 
 ```bash
-# Run in background
 nohup python3 tag_watcher_daemon.py > /dev/null 2>&1 &
 
-# Check if running
+# Check status
 ps aux | grep tag_watcher
 
 # Stop
 pkill -f tag_watcher_daemon.py
 ```
 
-### Systemd Service (Production)
+### Systemd Service
 
 1. **Edit service file**
+
 ```bash
 nano tag-watcher.service
 # Update paths and username
 ```
 
-2. **Install service**
+2. **Install**
+
 ```bash
 sudo cp tag-watcher.service /etc/systemd/system/
 sudo systemctl daemon-reload
@@ -144,156 +214,275 @@ sudo systemctl enable tag-watcher
 sudo systemctl start tag-watcher
 ```
 
-3. **Manage service**
+3. **Manage**
+
 ```bash
-sudo systemctl status tag-watcher    # Check status
-sudo systemctl restart tag-watcher   # Restart
-sudo systemctl stop tag-watcher      # Stop
-sudo journalctl -u tag-watcher -f    # View logs
+sudo systemctl status tag-watcher
+sudo systemctl restart tag-watcher
+sudo journalctl -u tag-watcher -f
 ```
 
 ## Manual Operations
 
-### Process New Images Only
+### Process New Images
+
 ```bash
-python3 tag_finder_simple.py
+python3 fetch_metadata.py
 ```
 
-### Regenerate tags.json from Existing Metadata
+Processes images that don't have metadata yet or were marked "not_found".
+
+### Regenerate tags.json
+
 ```bash
 python3 rebuild_tags_from_metadata.py
 ```
 
-### Generate All Thumbnails
+Rebuilds the search index from existing metadata files.
+
+### Generate Thumbnails
+
 ```bash
 python3 generate_thumbnails.py
 ```
 
-### Reload Flask Without Restart
+### Reload Flask
+
 ```bash
-curl -X POST http://localhost:5000/api/reload \
-  -d "secret=your-secure-random-string"
-```
-
-## Data Flow
-
-### Initial Setup
-```
-1. Add images to static/images/
-2. Run tag_finder_simple.py
-   ├─> Calculates MD5 for each image
-   ├─> Searches Danbooru, e621, Gelbooru, Yandere
-   ├─> Saves full metadata to metadata/{md5}.json
-   ├─> Generates WebP thumbnails
-   └─> Builds tags.json index
-3. Run app.py
-   └─> Loads tags.json into memory
-```
-
-### Adding New Images
-```
-1. Copy images to static/images/
-2. Daemon detects new images (or run tag_finder_simple.py manually)
-3. Fetches metadata for new images only
-4. Rebuilds tags.json from all metadata
-5. Triggers Flask reload via /api/reload
-6. New images appear immediately
-```
-
-### Changing Code Logic
-```
-1. Modify rebuild_tags_from_metadata.py
-2. Run: python3 rebuild_tags_from_metadata.py
-3. Reload Flask (automatic if daemon is running)
+curl -X POST http://localhost:5000/api/reload -d "secret=YOUR_SECRET"
 ```
 
 ## API Endpoints
 
-### `GET /`
-Gallery view with search and pagination
+### GET `/`
+Gallery with search, infinite scroll, stats dashboard
 
 **Parameters:**
-- `query`: Space-separated tags (e.g., `character_name blue_eyes`)
+- `query`: Space-separated tags or special queries
 - `page`: Page number (default: 1)
 - `per_page`: Results per page (25, 50, 100, 200)
 
-### `GET /image/<path:filepath>`
-Individual image view with tags and metadata
+**Special Queries:**
+- `metadata:missing` - Images without metadata
+- `metadata:found` - Images with metadata
+- `filename:term` - Search by filename
+- `source:danbooru` - Filter by source
 
-### `GET /api/autocomplete?q=<query>`
-Tag autocomplete suggestions
+### GET `/image/<path:filepath>`
+Image detail view with tags, metadata, related images carousel
 
-**Returns:** JSON array of `{tag, count}` objects
+### GET `/similar/<path:filepath>`
+Find images similar to the given one (Jaccard similarity)
 
-### `POST /api/reload`
+### GET `/api/images`
+JSON endpoint for infinite scroll
+
+**Parameters:**
+- `query`: Search query
+- `page`: Page number
+- `per_page`: Results per page
+- `seed`: Random seed for consistent shuffling
+
+**Returns:**
+```json
+{
+  "images": [...],
+  "page": 1,
+  "total_pages": 10,
+  "total_results": 500,
+  "has_more": true
+}
+```
+
+### POST `/api/reload`
 Reload tags.json without restarting Flask
 
 **Parameters:**
-- `secret`: Reload secret from environment
+- `secret`: Reload secret
 
-**Returns:** `{status, images, tags}` or `{error}`
+### POST `/api/edit_tags`
+Update tags for an image
+
+**Body:**
+```json
+{
+  "filepath": "images/path/to/image.jpg",
+  "tags": "tag1 tag2 tag3"
+}
+```
+
+### POST `/api/delete_image`
+Delete image, thumbnail, and metadata
+
+**Body:**
+```json
+{
+  "filepath": "images/path/to/image.jpg"
+}
+```
+
+### GET `/api/autocomplete?q=<query>`
+Tag suggestions for autocomplete
+
+**Returns:**
+```json
+[
+  {"tag": "tag_name", "count": 123},
+  ...
+]
+```
 
 ## Search Syntax
 
 - **Single tag**: `solo`
 - **Multiple tags (AND)**: `1girl blue_eyes long_hair`
-- **Autocomplete**: Start typing, press Tab or click suggestion
-- **Arrow keys**: Navigate suggestions
-- **Enter**: Insert selected tag
+- **Filename search**: `filename:abc123` or just type the filename
+- **Source filter**: `source:danbooru`
+- **Missing metadata**: `metadata:missing`
+- **Found metadata**: `metadata:found`
 
-## Metadata Sources
+## Features Detail
 
-Images are searched across multiple boorus by MD5:
+### Statistics Dashboard
 
-| Source | Tags | Categorization | Parent/Child |
-|--------|------|----------------|--------------|
-| Danbooru | ✅ | ✅ Full | ✅ |
-| e621 | ✅ | ✅ Full | ✅ |
-| Gelbooru | ✅ | ❌ | ✅ |
-| Yandere | ✅ | ❌ | ✅ |
+Click tabs to view:
+- **Overview**: Total images, metadata coverage, unique tags, AI usage
+- **Sources**: Breakdown by Danbooru/e621/Gelbooru/Yandere
+- **Top Tags**: 20 most used tags with counts
+- **Categories**: Character/Copyright/Artist/Meta/General tag counts
+- **Explore**: 30 random tags to browse
 
-The system:
-- Searches all sources in parallel
-- Prefers Danbooru/e621 for categorized tags
-- Merges tags from all found sources
-- Saves complete metadata from every source
+### Infinite Scroll
+
+- Automatically loads more images as you scroll
+- Prefetches next 2 pages for instant display
+- Seeded random shuffle for consistent order
+- Works with all search queries
+
+### Related Images
+
+Image detail page shows:
+- **Carousel**: Similar images weighted by character > copyright > artist > general tags
+- **Parent/Child**: Booru-defined relationships
+- **Match Types**: Color-coded badges (Character/Copyright/Artist/Similar)
+
+### Tag Editing
+
+- Click "Edit Tags" on image page
+- Chip-based interface
+- Autocomplete with counts
+- Add: Type and press Enter/Space
+- Remove: Click X or Backspace on empty input
+- Saves to tags.json and triggers reload
+
+## Metadata Structure
+
+### tags.json
+
+```json
+{
+  "path/to/image.jpg": {
+    "tags": "tag1 tag2 tag3",
+    "tags_character": "character_name",
+    "tags_copyright": "series_name",
+    "tags_artist": "artist_name",
+    "tags_meta": "meta_tag",
+    "tags_general": "general_tags",
+    "id": 12345,
+    "parent_id": null,
+    "has_children": false,
+    "md5": "abc123...",
+    "sources": ["danbooru", "e621"],
+    "saucenao_lookup": false,
+    "camie_tagger_lookup": false
+  }
+}
+```
+
+### metadata/{md5}.json
+
+```json
+{
+  "md5": "abc123...",
+  "relative_path": "path/to/image.jpg",
+  "saucenao_lookup": false,
+  "saucenao_response": null,
+  "camie_tagger_lookup": false,
+  "sources": {
+    "danbooru": {
+      "id": 12345,
+      "tag_string": "...",
+      "tag_string_character": "...",
+      "rating": "s",
+      "score": 100,
+      ...
+    }
+  }
+}
+```
+
+## Known Issues
+
+### tag_watcher_daemon.py Import Bug
+
+The daemon currently imports `tag_finder_simple` which is empty. Fix:
+
+```python
+# Change line 93 from:
+import tag_finder_simple
+tag_finder_simple.main()
+
+# To:
+import fetch_metadata
+fetch_metadata.main()
+```
 
 ## Troubleshooting
 
-### No tags found for images
-- Check if images are from booru sources
-- Verify MD5 hasn't changed (re-encoding changes hash)
-- Check API rate limits in logs
+### No tags found
+
+- Verify images are from booru sources (original uploads won't match)
+- Check MD5 hasn't changed (re-encoding changes hash)
+- Try SauceNao with API key
+- Use CamieTagger as fallback
+
+### CamieTagger not working
+
+```bash
+pip install onnxruntime-gpu numpy  # or onnxruntime for CPU
+```
+
+Download model files to `models/CamieTagger/`
 
 ### Flask not showing new images
+
 ```bash
-# Manually trigger reload
+# Trigger reload
 curl -X POST http://localhost:5000/api/reload -d "secret=YOUR_SECRET"
 
 # Or restart Flask
-sudo systemctl restart your-flask-service
 ```
 
 ### Daemon lock file error
-```bash
-# Remove stale lock file
-rm tag_watcher.lock
 
-# Restart daemon
+```bash
+rm tag_watcher.lock
 python3 tag_watcher_daemon.py
 ```
 
-### Thumbnails not loading
-```bash
-# Regenerate all thumbnails
-python3 generate_thumbnails.py
-```
+### Memory issues
 
-### Memory issues with large collections
-- Reduce `THUMB_SIZE` in scripts
-- Lower WebP quality setting
-- Use pagination with smaller `per_page` values
-- Consider splitting into multiple instances
+- Reduce `THUMB_SIZE` (default: 1000)
+- Lower WebP quality in `generate_thumbnails.py`
+- Use smaller `per_page` values
+- Disable CamieTagger if not needed
+
+### Performance issues
+
+- Use SSD for `static/images` and `metadata/`
+- Generate thumbnails in batch before processing
+- Increase `CHECK_INTERVAL` for daemon
+- Consider Redis for tag caching with 100k+ images
 
 ## Production Deployment
 
@@ -302,17 +491,15 @@ python3 generate_thumbnails.py
 ```bash
 pip install gunicorn
 
-# Run with 4 workers
 gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
-### With Nginx Reverse Proxy
+### With Nginx
 
 ```nginx
 server {
     listen 80;
     server_name your-domain.com;
-
     client_max_body_size 100M;
 
     location / {
@@ -324,41 +511,47 @@ server {
     location /static/ {
         alias /path/to/your/booru/static/;
         expires 30d;
+        add_header Cache-Control "public, immutable";
     }
 }
 ```
 
-### Security Considerations
+### Security
 
-1. **Change default reload secret**
+1. **Change reload secret**
    ```bash
    python3 -c "import secrets; print(secrets.token_urlsafe(32))"
    ```
 
-2. **Restrict access to /api/reload**
-   - Use strong secret
-   - Consider IP whitelist in nginx
+2. **Restrict /api/reload**
+   ```nginx
+   location /api/reload {
+       allow 127.0.0.1;
+       deny all;
+       proxy_pass http://localhost:5000;
+   }
+   ```
 
-3. **Content warnings**
-   - Review booru content before hosting
-   - Implement authentication if needed
-   - Add content rating filters
+3. **Add authentication** if hosting publicly
+
+4. **Review content** before hosting (boorus contain NSFW)
 
 ## Performance Tips
 
-- Use SSD for `static/images` and `metadata/`
-- Increase `CHECK_INTERVAL` for large collections
+- Use SSD for image storage
 - Generate thumbnails during off-peak hours
+- Prefetch is aggressive (2 pages ahead) - adjust if needed
 - Use CDN for static assets in production
-- Consider database instead of tags.json for 100k+ images
-
-## License
-
-This project is provided as-is for personal use.
-
-Metadata is fetched from public booru APIs. Respect their terms of service and rate limits.
+- Consider database (PostgreSQL) instead of tags.json for 100k+ images
+- Enable gzip compression in nginx
 
 ## Credits
 
 - Booru APIs: Danbooru, e621, Gelbooru, Yandere
-- Built with Flask, Pillow, and requests
+- AI Model: CamieTagger by KBlueLeaf
+- Reverse Search: SauceNao
+- Built with Flask, Pillow, ONNX Runtime
+
+## License
+
+Personal use. Respect booru API rate limits and terms of service.
