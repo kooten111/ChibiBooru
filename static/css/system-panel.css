@@ -1,0 +1,202 @@
+/* System Panel Styles */
+.system-status {
+    background: rgba(30, 30, 45, 0.5);
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    border: 1px solid rgba(135, 206, 235, 0.2);
+}
+
+.status-loading {
+    text-align: center;
+    color: #87ceeb;
+    padding: 20px;
+}
+
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.status-item {
+    padding: 15px;
+    background: rgba(40, 40, 60, 0.5);
+    border-radius: 10px;
+    border: 1px solid rgba(135, 206, 235, 0.1);
+    transition: all 0.3s ease;
+}
+
+.status-item:hover {
+    background: rgba(50, 50, 70, 0.6);
+    transform: translateY(-2px);
+}
+
+.status-item.active {
+    border-color: rgba(144, 238, 144, 0.5);
+    background: rgba(144, 238, 144, 0.1);
+}
+
+.status-item.inactive {
+    border-color: rgba(255, 107, 107, 0.5);
+    background: rgba(255, 107, 107, 0.1);
+}
+
+.status-label {
+    font-size: 0.85em;
+    color: #b0b0b0;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.status-value {
+    font-size: 1.3em;
+    font-weight: 700;
+    color: #e8e8e8;
+}
+
+.status-value.highlight {
+    background: linear-gradient(135deg, #87ceeb 0%, #4a9eff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.system-actions h4 {
+    margin: 20px 0 15px 0;
+    color: #87ceeb;
+    font-size: 1em;
+    font-weight: 600;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(135, 206, 235, 0.2);
+}
+
+.system-buttons {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.system-btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.95em;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #fff;
+}
+
+.system-btn.btn-primary {
+    background: linear-gradient(135deg, #4a7c9e 0%, #357096 100%);
+}
+
+.system-btn.btn-primary:hover {
+    background: linear-gradient(135deg, #5a8cae 0%, #4580a6 100%);
+    box-shadow: 0 8px 25px rgba(74, 124, 158, 0.4);
+}
+
+.system-btn.btn-success {
+    background: linear-gradient(135deg, #4a9e6f 0%, #358a5f 100%);
+}
+
+.system-btn.btn-success:hover {
+    background: linear-gradient(135deg, #5aae7f 0%, #459a6f 100%);
+    box-shadow: 0 8px 25px rgba(74, 158, 111, 0.4);
+}
+
+.system-btn.btn-danger {
+    background: linear-gradient(135deg, #9e4a4a 0%, #8a3535 100%);
+}
+
+.system-btn.btn-danger:hover {
+    background: linear-gradient(135deg, #ae5a5a 0%, #9a4545 100%);
+    box-shadow: 0 8px 25px rgba(158, 74, 74, 0.4);
+}
+
+.system-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.system-btn:active {
+    transform: translateY(-1px);
+}
+
+.system-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+.system-logs {
+    background: rgba(20, 20, 30, 0.8);
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 20px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+}
+
+.log-entry {
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(135, 206, 235, 0.1);
+    color: #d0d0d0;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry.success {
+    color: #90ee90;
+}
+
+.log-entry.error {
+    color: #ff6b6b;
+}
+
+.log-entry.info {
+    color: #87ceeb;
+}
+
+/* Scrollbar for system logs */
+.system-logs::-webkit-scrollbar {
+    width: 8px;
+}
+
+.system-logs::-webkit-scrollbar-track {
+    background: rgba(20, 20, 30, 0.3);
+    border-radius: 4px;
+}
+
+.system-logs::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    border-radius: 4px;
+}
+
+.system-logs::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .system-buttons {
+        grid-template-columns: 1fr;
+    }
+}
