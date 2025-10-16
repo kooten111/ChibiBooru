@@ -181,35 +181,40 @@
             <div class="stat-panel" id="system-panel">
                 <h3><span>⚙️</span> System Control</h3>
                 
+                <!-- Secret input section -->
+                <div id="secretSection"></div>
+                
                 <div class="system-status" id="systemStatus">
                     <div class="status-loading">Loading status...</div>
                 </div>
                 
-                <div class="system-actions">
+                <div class="system-actions" id="systemActionsSection">
                     <h4>Actions</h4>
                     <div class="system-buttons">
-                        <button class="system-btn btn-primary" onclick="systemScanImages()">
+                        <button class="system-btn btn-primary" onclick="systemScanImages(event)">
                             🔍 Scan & Process New Images
                         </button>
-                        <button class="system-btn btn-primary" onclick="systemRebuildTags()">
+                        <button class="system-btn btn-primary" onclick="systemRebuildTags(event)">
                             🔄 Rebuild Tags from Metadata
                         </button>
-                        <button class="system-btn btn-primary" onclick="systemGenerateThumbnails()">
+                        <button class="system-btn btn-primary" onclick="systemGenerateThumbnails(event)">
                             🖼️ Generate Thumbnails
                         </button>
-                        <button class="system-btn btn-success" onclick="systemReloadData()">
+                        <button class="system-btn btn-success" onclick="systemReloadData(event)">
                             ↻ Reload Data
                         </button>
                     </div>
                     
                     <h4>Monitor Control</h4>
                     <div class="system-buttons">
-                        <button class="system-btn btn-success" onclick="systemStartMonitor()">
+                        <button id="monitorToggleBtn" class="system-btn btn-success">
                             ▶️ Start Monitor
                         </button>
-                        <button class="system-btn btn-danger" onclick="systemStopMonitor()">
-                            ⏸️ Stop Monitor
-                        </button>
+                    </div>
+                    
+                    <h4>Activity Log</h4>
+                    <div class="system-logs" id="systemLogs">
+                        <div class="log-entry info">No recent activity</div>
                     </div>
                 </div>
             </div>

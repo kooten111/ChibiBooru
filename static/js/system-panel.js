@@ -1,11 +1,108 @@
 let systemStatusInterval = null;
-const SYSTEM_SECRET = localStorage.getItem('system_secret') || prompt('Enter system secret:');
+let SYSTEM_SECRET = localStorage.getItem('system_secret');
+let processingLogs = [];
 
-if (SYSTEM_SECRET) {
-    localStorage.setItem('system_secret', SYSTEM_SECRET);
+function updateSecretUI() {
+    const secretSection = document.getElementById('secretSection');
+    const actionsSection = document.getElementById('systemActionsSection');
+    
+    if (!secretSection || !actionsSection) return;
+    
+    if (SYSTEM_SECRET) {
+        secretSection.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(74, 158, 111, 0.2); border-radius: 10px; border: 1px solid rgba(144, 238, 144, 0.3);">
+                <span style="color: #90ee90; font-weight: 600;">✓ System secret configured</span>
+                <button class="system-btn btn-danger" onclick="clearSystemSecret()" style="margin-left: auto; padding: 8px 16px;">
+                    Change Secret
+                </button>
+            </div>
+        `;
+        actionsSection.style.display = 'block';
+    } else {
+        secretSection.innerHTML = `
+            <div style="padding: 20px; background: rgba(255, 107, 107, 0.2); border-radius: 10px; border: 1px solid rgba(255, 107, 107, 0.3);">
+                <h4 style="margin: 0 0 15px 0; color: #ff6b6b; font-size: 1em;">System Secret Required</h4>
+                <p style="margin: 0 0 15px 0; color: #d0d0d0; font-size: 0.9em;">
+                    Enter the RELOAD_SECRET from your app.py or environment variables.
+                </p>
+                <div style="display: flex; gap: 10px;">
+                    <input type="password" id="secretInput" placeholder="Enter system secret..." 
+                           style="flex: 1; padding: 12px; background: rgba(20, 20, 30, 0.8); border: 2px solid rgba(135, 206, 235, 0.3); border-radius: 10px; color: #e8e8e8; font-size: 0.95em;"
+                           onkeypress="if(event.key==='Enter') saveSystemSecret()">
+                    <button class="system-btn btn-success" onclick="saveSystemSecret()" style="padding: 12px 24px;">
+                        Save Secret
+                    </button>
+                </div>
+            </div>
+        `;
+        actionsSection.style.display = 'none';
+    }
+}
+
+function saveSystemSecret() {
+    const input = document.getElementById('secretInput');
+    if (!input) return;
+    
+    const secret = input.value.trim();
+    if (!secret) {
+        showNotification('Please enter a secret', 'error');
+        return;
+    }
+    
+    SYSTEM_SECRET = secret;
+    localStorage.setItem('system_secret', secret);
+    showNotification('Secret saved successfully', 'success');
+    updateSecretUI();
+    loadSystemStatus();
+}
+
+function clearSystemSecret() {
+    if (!confirm('Are you sure you want to change the system secret?')) {
+        return;
+    }
+    
+    SYSTEM_SECRET = null;
+    localStorage.removeItem('system_secret');
+    updateSecretUI();
+    
+    if (systemStatusInterval) {
+        clearInterval(systemStatusInterval);
+        systemStatusInterval = null;
+    }
+}
+
+function addLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    processingLogs.unshift({ timestamp, message, type });
+    
+    // Keep only last 20 logs
+    if (processingLogs.length > 20) {
+        processingLogs = processingLogs.slice(0, 20);
+    }
+    
+    updateLogsDisplay();
+}
+
+function updateLogsDisplay() {
+    const logsDiv = document.getElementById('systemLogs');
+    if (!logsDiv) return;
+    
+    if (processingLogs.length === 0) {
+        logsDiv.innerHTML = '<div class="log-entry info">No recent activity</div>';
+        return;
+    }
+    
+    logsDiv.innerHTML = processingLogs.map(log => `
+        <div class="log-entry ${log.type}">
+            <span style="color: #87ceeb; margin-right: 10px;">[${log.timestamp}]</span>
+            ${log.message}
+        </div>
+    `).join('');
 }
 
 function loadSystemStatus() {
+    if (!SYSTEM_SECRET) return;
+    
     fetch('/api/system/status')
         .then(res => res.json())
         .then(data => {
@@ -58,21 +155,44 @@ function loadSystemStatus() {
                     </div>
                 </div>
             `;
+            
+            // Update monitor toggle button
+            updateMonitorButton(monitor.running);
         })
         .catch(err => {
             console.error('Error loading system status:', err);
+            addLog('Failed to load system status', 'error');
         });
 }
 
-function systemAction(endpoint, buttonElement, successMessage) {
+function updateMonitorButton(isRunning) {
+    const btn = document.getElementById('monitorToggleBtn');
+    if (!btn) return;
+    
+    if (isRunning) {
+        btn.className = 'system-btn btn-danger';
+        btn.innerHTML = '⏸️ Stop Monitor';
+        btn.onclick = (e) => systemStopMonitor(e);
+    } else {
+        btn.className = 'system-btn btn-success';
+        btn.innerHTML = '▶️ Start Monitor';
+        btn.onclick = (e) => systemStartMonitor(e);
+    }
+}
+
+function systemAction(endpoint, buttonElement, actionName) {
     if (!SYSTEM_SECRET) {
-        alert('No system secret configured');
+        showNotification('System secret not configured', 'error');
         return;
     }
     
     const originalText = buttonElement.textContent;
-    buttonElement.textContent = 'Processing...';
+    const originalDisabled = buttonElement.disabled;
+    
+    buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">⚙️</span> Processing...`;
     buttonElement.disabled = true;
+    
+    addLog(`Starting: ${actionName}...`, 'info');
     
     fetch(endpoint, {
         method: 'POST',
@@ -82,43 +202,58 @@ function systemAction(endpoint, buttonElement, successMessage) {
     .then(res => res.json())
     .then(data => {
         if (data.status === 'success') {
-            showNotification(data.message || successMessage, 'success');
+            const msg = data.message || `${actionName} completed`;
+            showNotification(msg, 'success');
+            addLog(msg, 'success');
+            
+            if (data.processed !== undefined) {
+                addLog(`Processed ${data.processed} items`, 'success');
+            }
+            
             loadSystemStatus();
+        } else if (data.error === 'Unauthorized') {
+            localStorage.removeItem('system_secret');
+            SYSTEM_SECRET = null;
+            showNotification('Invalid system secret. Please enter the correct secret.', 'error');
+            addLog('Authentication failed - invalid secret', 'error');
+            updateSecretUI();
         } else {
             throw new Error(data.error || 'Unknown error');
         }
     })
     .catch(err => {
-        showNotification('Error: ' + err.message, 'error');
+        const errMsg = `${actionName} failed: ${err.message}`;
+        showNotification(errMsg, 'error');
+        addLog(errMsg, 'error');
     })
     .finally(() => {
         buttonElement.textContent = originalText;
-        buttonElement.disabled = false;
+        buttonElement.disabled = originalDisabled;
     });
 }
 
-function systemScanImages() {
-    systemAction('/api/system/scan', event.target, 'Scan completed');
+function systemScanImages(event) {
+    systemAction('/api/system/scan', event.target, 'Scan & Process');
 }
 
-function systemRebuildTags() {
-    systemAction('/api/system/rebuild', event.target, 'Tags rebuilt');
+function systemRebuildTags(event) {
+    systemAction('/api/system/rebuild', event.target, 'Rebuild Tags');
 }
 
-function systemGenerateThumbnails() {
-    systemAction('/api/system/thumbnails', event.target, 'Thumbnails generated');
+function systemGenerateThumbnails(event) {
+    systemAction('/api/system/thumbnails', event.target, 'Generate Thumbnails');
 }
 
-function systemReloadData() {
-    systemAction('/api/reload', event.target, 'Data reloaded');
+function systemReloadData(event) {
+    systemAction('/api/reload', event.target, 'Reload Data');
 }
 
-function systemStartMonitor() {
-    systemAction('/api/system/monitor/start', event.target, 'Monitor started');
+function systemStartMonitor(event) {
+    systemAction('/api/system/monitor/start', event.target, 'Start Monitor');
 }
 
-function systemStopMonitor() {
-    systemAction('/api/system/monitor/stop', event.target, 'Monitor stopped');
+function systemStopMonitor(event) {
+    systemAction('/api/system/monitor/stop', event.target, 'Stop Monitor');
 }
 
 function showNotification(message, type = 'info') {
@@ -149,9 +284,9 @@ function showNotification(message, type = 'info') {
     }, 4000);
 }
 
-// Add notification animations
-const style = document.createElement('style');
-style.textContent = `
+// Add animations
+const systemPanelStyle = document.createElement('style');
+systemPanelStyle.textContent = `
     @keyframes slideInRight {
         from {
             opacity: 0;
@@ -173,15 +308,22 @@ style.textContent = `
             transform: translateX(100px);
         }
     }
+    
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
 `;
-document.head.appendChild(style);
+document.head.appendChild(systemPanelStyle);
 
 // Auto-refresh status when system panel is open
 document.addEventListener('DOMContentLoaded', () => {
     const observer = new MutationObserver((mutations) => {
         const systemPanel = document.getElementById('system-panel');
         if (systemPanel && systemPanel.classList.contains('active')) {
-            if (!systemStatusInterval) {
+            updateSecretUI();
+            updateLogsDisplay();
+            if (!systemStatusInterval && SYSTEM_SECRET) {
                 loadSystemStatus();
                 systemStatusInterval = setInterval(loadSystemStatus, 5000);
             }
