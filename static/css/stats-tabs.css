@@ -222,22 +222,15 @@
     border-radius: 10px;
     border: 1px solid rgba(135, 206, 235, 0.1);
     transition: all 0.2s ease;
+    color: #d0d0d0;
+    text-decoration: none;
+    font-weight: 500;
 }
 
 .top-tag-item:hover {
     background: rgba(74, 158, 255, 0.15);
     border-color: rgba(135, 206, 235, 0.3);
     transform: translateX(5px);
-}
-
-.top-tag-item a {
-    color: #d0d0d0;
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 0.2s ease;
-}
-
-.top-tag-item:hover a {
     color: #fff;
 }
 

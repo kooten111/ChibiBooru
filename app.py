@@ -212,7 +212,11 @@ def get_enhanced_stats():
         if isinstance(data, dict) and data != "not_found":
             sources = data.get("sources", [])
             for source in sources:
-                source_counts[source] = source_counts.get(source, 0) + 1
+                source_name = source.split('.')[0] if '.' in source else source
+                if source_name == "camie_tagger_lookup":
+                    source_name = "camie_tagger"
+                source_counts[source_name] = source_counts.get(source_name, 0) + 1
+
     
     # Tag statistics
     total_tags = len(tag_counts)
@@ -258,6 +262,60 @@ def get_enhanced_stats():
         'camie_used': camie_count
     }
 
+def _perform_search(search_query):
+    """Helper function to perform a search and return results."""
+    # Handle special queries that should not be shuffled
+    if search_query == 'metadata:missing':
+        search_results = [
+            {"path": f"images/{path}", "tags": "", "sources": []}
+            for path, data in raw_data.items()
+            if data == "not_found"
+        ]
+        return search_results, False
+
+    search_results = []
+    if looks_like_filename(search_query):
+        search_results = [
+            img for img in image_data
+            if search_query.lower() in img['path'].lower()
+        ]
+    elif search_query == 'metadata:found':
+        search_results = image_data.copy()
+    elif search_query.startswith('filename:'):
+        filename_query = search_query.replace('filename:', '', 1).strip()
+        search_results = [
+            img for img in image_data
+            if filename_query in img['path'].lower()
+        ]
+    elif search_query.startswith('source:'):
+        source_query = search_query.replace('source:', '', 1).strip()
+        search_results = [
+            img for img in image_data
+            if any(source_query in s for s in img.get('sources', []))
+        ]
+    elif search_query.startswith('category:'):
+        category_query = search_query.replace('category:', '', 1).strip()
+        valid_categories = ["character", "copyright", "artist", "meta", "general"]
+        if category_query in valid_categories:
+            tag_field = f"tags_{category_query}"
+            for img in image_data:
+                rel_path = img['path'].replace('images/', '', 1)
+                img_metadata = raw_data.get(rel_path)
+                if isinstance(img_metadata, dict) and img_metadata.get(tag_field):
+                    search_results.append(img)
+    elif search_query:
+        # Regular tag search
+        query_tags = search_query.split()
+        search_results = [
+            img for img in image_data 
+            if all(q_tag in img['tags'] for q_tag in query_tags)
+        ]
+    else:
+        # No search - return all images
+        search_results = image_data.copy()
+
+    return search_results, True
+
 
 # Load data on startup
 load_data()
@@ -270,55 +328,14 @@ def get_images():
     """API endpoint for infinite scroll - returns JSON image data"""
     search_query = request.args.get('query', '').strip().lower()
     page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 50, type=int)
+    per_page = 50  # Hardcoded per_page
     seed = request.args.get('seed', default=None, type=int)
     
-    per_page = max(10, min(per_page, 500))
-    
-    search_results = []
-    
-    # Handle special queries first
-    if search_query == 'metadata:missing':
-        search_results = [
-            {"path": f"images/{path}", "tags": "", "sources": []}
-            for path, data in raw_data.items()
-            if data == "not_found"
-        ]
-    # Other queries that will be shuffled
-    else:
-        if looks_like_filename(search_query):
-            search_results = [
-                img for img in image_data
-                if search_query.lower() in img['path'].lower()
-            ]
-        elif search_query == 'metadata:found':
-            search_results = image_data.copy()
-        elif search_query.startswith('filename:'):
-            filename_query = search_query.replace('filename:', '', 1).strip()
-            search_results = [
-                img for img in image_data
-                if filename_query in img['path'].lower()
-            ]
-        elif search_query.startswith('source:'):
-            source_query = search_query.replace('source:', '', 1).strip()
-            search_results = [
-                img for img in image_data
-                if source_query in img.get('sources', [])
-            ]
-        elif search_query:
-            # Regular tag search
-            query_tags = search_query.split()
-            search_results = [
-                img for img in image_data 
-                if all(q_tag in img['tags'] for q_tag in query_tags)
-            ]
-        else:
-            # No search - return all images
-            search_results = image_data.copy()
+    search_results, should_shuffle = _perform_search(search_query)
 
-        # Apply seeded shuffle if a seed is provided
-        if seed is not None:
-            random.Random(seed).shuffle(search_results)
+    # Apply seeded shuffle if a seed is provided and shuffling is enabled
+    if should_shuffle and seed is not None:
+        random.Random(seed).shuffle(search_results)
 
     total_results = len(search_results)
     total_pages = (total_results + per_page - 1) // per_page
@@ -707,53 +724,15 @@ def find_similar(filepath):
 @app.route('/')
 def home():
     search_query = request.args.get('query', '').strip().lower()
-    per_page = request.args.get('per_page', 50, type=int)
-    per_page = max(10, min(per_page, 500))
+    per_page = 50 # Hardcoded per_page
     stats = get_enhanced_stats()
     
     seed = random.randint(1, 1_000_000)
-    search_results = []
+    
+    search_results, should_shuffle = _perform_search(search_query)
 
-    # Handle special case first that should not be shuffled
-    if search_query == 'metadata:missing':
-        search_results = [
-            {"path": f"images/{path}", "tags": "", "sources": []}
-            for path, data in raw_data.items()
-            if data == "not_found"
-        ]
-    else:
-        # Determine the initial list of images based on the query
-        if looks_like_filename(search_query):
-            search_results = [
-                img for img in image_data
-                if search_query.lower() in img['path'].lower()
-            ]
-        elif search_query == 'metadata:found':
-            search_results = image_data.copy()
-        elif search_query.startswith('filename:'):
-            filename_query = search_query.replace('filename:', '', 1).strip()
-            search_results = [
-                img for img in image_data
-                if filename_query in img['path'].lower()
-            ]
-        elif search_query.startswith('source:'):
-            source_query = search_query.replace('source:', '', 1).strip()
-            search_results = [
-                img for img in image_data
-                if source_query in img.get('sources', [])
-            ]
-        elif search_query:
-            # Regular tag search
-            query_tags = search_query.split()
-            search_results = [
-                img for img in image_data 
-                if all(q_tag in img['tags'] for q_tag in query_tags)
-            ]
-        else:
-            # No search query, use all images
-            search_results = image_data.copy()
-        
-        # Shuffle the results using the generated seed
+    # Shuffle the results using the generated seed if shuffling is enabled
+    if should_shuffle:
         random.Random(seed).shuffle(search_results)
 
     total_results = len(search_results)
