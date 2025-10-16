@@ -537,9 +537,6 @@ def delete_image():
                 metadata_path = f"metadata/{image_md5}.json"
                 if os.path.exists(metadata_path):
                     os.remove(metadata_path)
-            
-            # Reload data
-            load_data()
         
         return jsonify({"status": "success"})
     except Exception as e:

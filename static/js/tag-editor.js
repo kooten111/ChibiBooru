@@ -291,7 +291,6 @@ function confirmDelete() {
 
     const filepath = document.getElementById('imageFilepath').value;
     
-    // Show loading overlay
     const overlay = document.createElement('div');
     overlay.style.cssText = `
         position: fixed;
@@ -321,6 +320,12 @@ function confirmDelete() {
     `;
     document.body.appendChild(overlay);
 
+    // Add timeout to force redirect if server doesn't respond
+    const timeoutId = setTimeout(() => {
+        console.log('Delete timeout - forcing redirect');
+        window.location.replace('/');
+    }, 5000);
+
     fetch('/api/delete_image', {
         method: 'POST',
         headers: {
@@ -331,21 +336,36 @@ function confirmDelete() {
         })
     })
     .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
+        console.log('Delete response status:', response.status);
+        if (!response.ok) {
+            return response.text().then(text => {
+                console.error('Delete error response:', text);
+                throw new Error(text || 'Delete failed');
+            });
+        }
         return response.json();
     })
     .then(data => {
+        console.log('Delete response data:', data);
+        clearTimeout(timeoutId);
+        
         if (data.status === 'success') {
-            overlay.querySelector('div').textContent = 'Image deleted successfully!';
+            overlay.querySelector('div').textContent = 'Deleted! Redirecting...';
+            // Force redirect immediately
             setTimeout(() => {
-                window.location.href = '/';
-            }, 1000);
+                window.location.replace('/');
+            }, 500);
         } else {
-            throw new Error(data.error || 'Unknown error');
+            throw new Error(data.error || 'Delete returned unsuccessful status');
         }
     })
     .catch(error => {
+        console.error('Delete error:', error);
+        clearTimeout(timeoutId);
         overlay.remove();
-        tagEditor.showNotification('Error: ' + error.message, 'error');
+        
+        // Show detailed error
+        const errorMsg = error.message || error.toString();
+        tagEditor.showNotification('Delete failed: ' + errorMsg, 'error');
     });
 }
