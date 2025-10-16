@@ -5,6 +5,7 @@
     <title>HomeBooru</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/stats-tabs.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
 </head>
 <body>
     <div class="header">
@@ -63,6 +64,11 @@
                 <span>Explore</span>
             </button>
             {% endif %}
+            
+            <button class="stat-tab-button" data-tab="system-panel">
+                <span class="icon">⚙️</span>
+                <span>System</span>
+            </button>
         </div>
         
         <div class="stats-panels-container" id="statsPanelsContainer">
@@ -170,6 +176,43 @@
                 </div>
             </div>
             {% endif %}
+            
+            <!-- System Panel -->
+            <div class="stat-panel" id="system-panel">
+                <h3><span>⚙️</span> System Control</h3>
+                
+                <div class="system-status" id="systemStatus">
+                    <div class="status-loading">Loading status...</div>
+                </div>
+                
+                <div class="system-actions">
+                    <h4>Actions</h4>
+                    <div class="system-buttons">
+                        <button class="system-btn btn-primary" onclick="systemScanImages()">
+                            🔍 Scan & Process New Images
+                        </button>
+                        <button class="system-btn btn-primary" onclick="systemRebuildTags()">
+                            🔄 Rebuild Tags from Metadata
+                        </button>
+                        <button class="system-btn btn-primary" onclick="systemGenerateThumbnails()">
+                            🖼️ Generate Thumbnails
+                        </button>
+                        <button class="system-btn btn-success" onclick="systemReloadData()">
+                            ↻ Reload Data
+                        </button>
+                    </div>
+                    
+                    <h4>Monitor Control</h4>
+                    <div class="system-buttons">
+                        <button class="system-btn btn-success" onclick="systemStartMonitor()">
+                            ▶️ Start Monitor
+                        </button>
+                        <button class="system-btn btn-danger" onclick="systemStopMonitor()">
+                            ⏸️ Stop Monitor
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     {% endif %}
@@ -200,5 +243,6 @@
     <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
     <script src="{{ url_for('static', filename='js/stats-tabs.js') }}"></script>
     <script src="{{ url_for('static', filename='js/infinite-scroll.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
 </body>
 </html>
