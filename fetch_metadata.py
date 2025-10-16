@@ -643,8 +643,6 @@ def main():
         if len(all_tags) % 10 == 0:
             with open(TAGS_FILE, "w") as f:
                 json.dump(all_tags, f, indent=4)
-        
-        rebuild_tags()
 
         time.sleep(0.5)
 
