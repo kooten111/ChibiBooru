@@ -10,6 +10,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image
 from rebuild_tags_from_metadata import rebuild_tags
+from utils.deduplication import build_md5_index, is_duplicate, remove_duplicate
 import numpy as np
 
 # Try to import onnxruntime (optional dependency)
@@ -256,20 +257,20 @@ def search_saucenao(filepath):
                     elif 'gelbooru.com' in url and 'id=' in url:
                         post_id = url.split('id=')[-1].split('&')[0]
                         booru_posts.append(('gelbooru', post_id))
-                    elif 'yande.re/post/show/' in url:
-                        post_id = url.split('/show/')[-1].split('/')[0]
+                    elif 'yande.re' in url and '/post/show/' in url:
+                        post_id = url.split('/post/show/')[-1].split('?')[0]
                         booru_posts.append(('yandere', post_id))
             
-            return (booru_posts if booru_posts else None), data
+            return booru_posts, data
             
     except Exception as e:
         print(f"SauceNao error: {e}")
         return None, None
 
 def fetch_by_post_id(source, post_id):
-    """Fetch metadata directly by post ID"""
+    """Fetch metadata for a specific post ID from a booru"""
     try:
-        if source == 'danbooru':
+        if source == "danbooru":
             url = f"https://danbooru.donmai.us/posts/{post_id}.json"
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
@@ -279,13 +280,12 @@ def fetch_by_post_id(source, post_id):
                     "full_data": data,
                     "source": "danbooru"
                 }
-        
-        elif source == 'e621':
+        elif source == "e621":
             headers = {"User-Agent": "TagFetcher/1.0 (by YourUsername on e621)"}
             url = f"https://e621.net/posts/{post_id}.json"
             response = requests.get(url, headers=headers, timeout=10)
             if response.status_code == 200:
-                data = response.json()['post']
+                data = response.json()["post"]
                 tags_data = data["tags"]
                 all_tags = []
                 for category in tags_data.values():
@@ -295,21 +295,17 @@ def fetch_by_post_id(source, post_id):
                     "full_data": data,
                     "source": "e621"
                 }
-        
-        elif source == 'gelbooru':
-            url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&tags=id:{post_id}"
+        elif source == "gelbooru":
+            url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={post_id}"
             response = requests.get(url, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                if "post" in data and data["post"]:
-                    post_data = data["post"][0]
-                    return {
-                        "tag_string": post_data.get("tags", ""),
-                        "full_data": post_data,
-                        "source": "gelbooru"
-                    }
-        
-        elif source == 'yandere':
+            if response.status_code == 200 and "post" in response.json():
+                data = response.json()["post"][0]
+                return {
+                    "tag_string": data.get("tags", ""),
+                    "full_data": data,
+                    "source": "gelbooru"
+                }
+        elif source == "yandere":
             url = f"https://yande.re/post.json?tags=id:{post_id}"
             response = requests.get(url, timeout=10)
             if response.status_code == 200 and response.json():
@@ -319,195 +315,196 @@ def fetch_by_post_id(source, post_id):
                     "full_data": data,
                     "source": "yandere"
                 }
-    
     except Exception as e:
         print(f"Error fetching {source} post {post_id}: {e}")
-        import traceback
-        traceback.print_exc()
         return None
     
     return None
 
 def merge_tag_data(all_results):
-    """Merge tag data from multiple sources, preferring sources with categorized tags"""
-    if not all_results:
-        return None
+    """Merge tag data from multiple sources, prioritizing Danbooru/e621 for categories"""
+    # Priority: danbooru > e621 > gelbooru > yandere > camie_tagger
+    priority_order = ["danbooru", "e621", "gelbooru", "yandere", "camie_tagger"]
     
-    preferred_sources = ["e621", "danbooru", "gelbooru", "yandere", "camie_tagger"]
-    primary_result = None
-    
-    for source in preferred_sources:
-        if source in all_results:
-            primary_result = all_results[source]
+    # Find the highest priority source
+    primary_source = None
+    primary_source_name = None
+    for source_name in priority_order:
+        if source_name in all_results:
+            primary_source = all_results[source_name]["full_data"]
+            primary_source_name = source_name
             break
     
-    if not primary_result:
-        primary_result = list(all_results.values())[0]
+    if not primary_source:
+        return None
     
+    # Combine all tags
     all_tags = set()
     for result in all_results.values():
         all_tags.update(result["tag_string"].split())
     
-    extracted = extract_tag_data(primary_result)
-    extracted["tags"]["all"] = " ".join(sorted(all_tags))
+    # Extract categorized tags from primary source
+    tags_dict = {
+        "character": "",
+        "copyright": "",
+        "artist": "",
+        "meta": "",
+        "general": ""
+    }
     
-    return extracted
+    parent_id = None
+    has_children = False
+    post_id = primary_source.get("id")
+    
+    if primary_source_name == "danbooru":
+        tags_dict["character"] = primary_source.get("tag_string_character", "")
+        tags_dict["copyright"] = primary_source.get("tag_string_copyright", "")
+        tags_dict["artist"] = primary_source.get("tag_string_artist", "")
+        tags_dict["meta"] = primary_source.get("tag_string_meta", "")
+        tags_dict["general"] = primary_source.get("tag_string_general", "")
+        parent_id = primary_source.get("parent_id")
+        has_children = primary_source.get("has_children", False)
+    elif primary_source_name == "e621":
+        tag_data = primary_source.get("tags", {})
+        tags_dict["character"] = " ".join(tag_data.get("character", []))
+        tags_dict["copyright"] = " ".join(tag_data.get("copyright", []))
+        tags_dict["artist"] = " ".join(tag_data.get("artist", []))
+        tags_dict["meta"] = " ".join(tag_data.get("meta", []))
+        tags_dict["general"] = " ".join(tag_data.get("general", []))
+        relationships = primary_source.get("relationships", {})
+        parent_id = relationships.get("parent_id")
+        has_children = relationships.get("has_children", False)
+    elif primary_source_name == "camie_tagger":
+        tags_dict["character"] = primary_source.get("tag_string_character", "")
+        tags_dict["copyright"] = primary_source.get("tag_string_copyright", "")
+        tags_dict["artist"] = primary_source.get("tag_string_artist", "")
+        tags_dict["meta"] = primary_source.get("tag_string_meta", "")
+        tags_dict["general"] = primary_source.get("tag_string_general", "")
+    else:
+        # Gelbooru/Yandere don't have categorized tags
+        parent_id = primary_source.get("parent_id")
+        has_children = primary_source.get("has_children", False)
+    
+    return {
+        "tags": " ".join(sorted(all_tags)),
+        "tags_character": tags_dict["character"],
+        "tags_copyright": tags_dict["copyright"],
+        "tags_artist": tags_dict["artist"],
+        "tags_meta": tags_dict["meta"],
+        "tags_general": tags_dict["general"],
+        "id": post_id,
+        "parent_id": parent_id,
+        "has_children": has_children
+    }
 
-# CamieTagger functions
 def load_camie_tagger():
-    """Initialize CamieTagger model (call once at startup)"""
+    """Load CamieTagger model and metadata"""
     if not ONNX_AVAILABLE:
         return None, None
     
     if not os.path.exists(CAMIE_MODEL_PATH) or not os.path.exists(CAMIE_METADATA_PATH):
-        print(f"CamieTagger files not found at {CAMIE_MODEL_PATH}")
+        print("CamieTagger model files not found. Skipping AI tagging.")
         return None, None
     
     try:
+        # Load ONNX session
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
         session = ort.InferenceSession(CAMIE_MODEL_PATH, providers=providers)
         
+        # Load metadata (tag mappings)
         with open(CAMIE_METADATA_PATH, 'r') as f:
             metadata = json.load(f)
         
-        provider = session.get_providers()[0]
-        print(f"CamieTagger loaded successfully. Using: {provider}")
+        print(f"CamieTagger loaded with {len(metadata['tags'])} tags")
         return session, metadata
     except Exception as e:
-        print(f"Warning: Could not load CamieTagger: {e}")
+        print(f"Failed to load CamieTagger: {e}")
         return None, None
 
-def preprocess_image_for_camie(filepath, image_size=512):
-    """Preprocess image for CamieTagger with proper aspect ratio handling"""
-    try:
-        with Image.open(filepath) as img:
-            # Convert to RGB if necessary
-            if img.mode in ('RGBA', 'P', 'LA'):
-                if img.mode == 'P':
-                    img = img.convert('RGBA')
-                background = Image.new('RGB', img.size, (255, 255, 255))
-                if img.mode in ('RGBA', 'LA'):
-                    background.paste(img, mask=img.split()[-1])
-                else:
-                    background.paste(img)
-                img = background
-            elif img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Get dimensions and calculate aspect ratio
-            width, height = img.size
-            aspect_ratio = width / height
-            
-            # Resize maintaining aspect ratio
-            if aspect_ratio > 1:
-                new_width = image_size
-                new_height = int(new_width / aspect_ratio)
-            else:
-                new_height = image_size
-                new_width = int(new_height * aspect_ratio)
-            
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            
-            # Create padded image (white background)
-            padded = Image.new('RGB', (image_size, image_size), (255, 255, 255))
-            paste_x = (image_size - new_width) // 2
-            paste_y = (image_size - new_height) // 2
-            padded.paste(img, (paste_x, paste_y))
-            
-            # Convert to numpy array and normalize
-            img_array = np.array(padded).astype(np.float32) / 255.0
-            img_array = np.transpose(img_array, (2, 0, 1))  # HWC to CHW
-            img_array = np.expand_dims(img_array, axis=0)   # Add batch dimension
-            
-            return img_array
-            
-    except Exception as e:
-        raise Exception(f"Error preprocessing {filepath}: {e}")
+def preprocess_image_for_camie(image_path, target_size=512):
+    """Preprocess image for CamieTagger inference"""
+    img = Image.open(image_path).convert('RGB')
+    
+    # Resize maintaining aspect ratio
+    img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+    
+    # Pad to square
+    new_img = Image.new('RGB', (target_size, target_size), (255, 255, 255))
+    paste_x = (target_size - img.width) // 2
+    paste_y = (target_size - img.height) // 2
+    new_img.paste(img, (paste_x, paste_y))
+    
+    # Convert to numpy array and normalize
+    img_array = np.array(new_img).astype(np.float32) / 255.0
+    
+    # Transpose to (C, H, W) and add batch dimension
+    img_array = np.transpose(img_array, (2, 0, 1))
+    img_array = np.expand_dims(img_array, axis=0)
+    
+    return img_array
 
 def tag_with_camie(session, metadata, filepath):
-    """Run CamieTagger inference on an image"""
+    """Tag an image using CamieTagger"""
+    if not session or not metadata:
+        return None
+    
     try:
-        img_array = preprocess_image_for_camie(filepath, CAMIE_TARGET_SIZE)
+        # Preprocess image
+        img_tensor = preprocess_image_for_camie(filepath, CAMIE_TARGET_SIZE)
         
+        # Run inference
         input_name = session.get_inputs()[0].name
-        output = session.run(None, {input_name: img_array})[0][0]
+        outputs = session.run(None, {input_name: img_tensor})
         
-        # Extract metadata structure properly
-        try:
-            dataset_info = metadata['dataset_info']
-            tag_mapping = dataset_info['tag_mapping']
-            idx_to_tag = tag_mapping['idx_to_tag']
-            tag_to_category = tag_mapping['tag_to_category']
-        except KeyError:
-            # Fallback to old structure
-            idx_to_tag = metadata.get("tags", {})
-            tag_to_category = metadata.get("tag_type", {})
+        # Process predictions
+        predictions = outputs[0][0]  # Remove batch dimension
         
-        # Parse results
+        # Apply sigmoid to get probabilities
+        probs = 1 / (1 + np.exp(-predictions))
+        
+        # Get tags above threshold
         tags_by_category = {
-            "rating": [],
-            "copyright": [],
-            "character": [],
-            "artist": [],
             "general": [],
-            "meta": []
+            "character": [],
+            "copyright": [],
+            "artist": [],
+            "meta": [],
+            "rating": []
         }
         
-        for idx, prob in enumerate(output):
-            if prob >= CAMIE_THRESHOLD:
-                idx_str = str(idx)
-                tag_name = idx_to_tag.get(idx_str)
-                
-                if not tag_name:
-                    continue
-                
-                # Determine category
-                if isinstance(tag_to_category, dict):
-                    if idx_str in tag_to_category:
-                        tag_type = tag_to_category[idx_str]
-                    else:
-                        # Try using tag_name as key
-                        category_name = tag_to_category.get(tag_name, "general")
-                        # Map string category to number if needed
-                        category_map_reverse = {
-                            "general": 0,
-                            "character": 1,
-                            "copyright": 2,
-                            "artist": 3,
-                            "meta": 4,
-                            "rating": 5
-                        }
-                        tag_type = category_map_reverse.get(category_name, 0)
-                else:
-                    tag_type = 0
-                
-                category_map = {
-                    0: "general",
-                    1: "character", 
-                    2: "copyright",
-                    3: "artist",
-                    4: "meta",
-                    5: "rating"
-                }
-                
-                category = category_map.get(tag_type, "general")
-                
-                if category == "rating":
-                    # Extract rating from tag_name (e.g., "rating explicit" -> "explicit")
-                    rating = tag_name.replace("rating ", "").replace("rating:", "").strip()
-                    tags_by_category["rating"].append(rating)
-                else:
-                    tags_by_category[category].append(tag_name)
+        tag_list = metadata['tags']
         
-        # Build result structure matching booru format
-        all_tags = []
-        for category in ["character", "copyright", "artist", "general", "meta"]:
-            all_tags.extend(tags_by_category[category])
+        for idx, prob in enumerate(probs):
+            if prob >= CAMIE_THRESHOLD:
+                tag_info = tag_list[idx]
+                tag_name = tag_info['name']
+                category = tag_info['category']
+                
+                if category == 0:
+                    tags_by_category["general"].append(tag_name)
+                elif category == 1:
+                    tags_by_category["artist"].append(tag_name)
+                elif category == 3:
+                    tags_by_category["copyright"].append(tag_name)
+                elif category == 4:
+                    tags_by_category["character"].append(tag_name)
+                elif category == 5:
+                    tags_by_category["meta"].append(tag_name)
+                elif category == 9:
+                    tags_by_category["rating"].append(tag_name)
+        
+        # Combine all tags
+        all_tags = (
+            tags_by_category["general"] +
+            tags_by_category["character"] +
+            tags_by_category["copyright"] +
+            tags_by_category["artist"] +
+            tags_by_category["meta"]
+        )
         
         return {
             "tag_string": " ".join(all_tags),
             "full_data": {
-                "id": None,
                 "tags": " ".join(all_tags),
                 "tag_string_character": " ".join(tags_by_category["character"]),
                 "tag_string_copyright": " ".join(tags_by_category["copyright"]),
@@ -560,6 +557,35 @@ def main():
         print("All images have already been processed.")
         return
 
+    # NEW: Build MD5 index once for batch checking
+    print("Building MD5 index for deduplication...")
+    md5_index = build_md5_index()
+    
+    # NEW: Check each image for duplicates before processing
+    filtered_images = []
+    duplicates_removed = 0
+    
+    for img_path in images_to_process:
+        is_dup, existing_path, md5 = is_duplicate(img_path, md5_index)
+        
+        if is_dup:
+            print(f"Duplicate detected: {img_path}")
+            print(f"  → matches {existing_path} (MD5: {md5})")
+            remove_duplicate(img_path)
+            duplicates_removed += 1
+        else:
+            filtered_images.append(img_path)
+    
+    if duplicates_removed > 0:
+        print(f"Removed {duplicates_removed} duplicate images")
+    
+    # Replace unprocessed with filtered_images
+    images_to_process = filtered_images
+    
+    if not images_to_process:
+        print("No new images to process.")
+        return
+
     saucenao_count = 0
     camie_count = 0
     
@@ -605,12 +631,12 @@ def main():
             merged_data = merge_tag_data(all_results)
             
             all_tags[relative_path] = {
-                "tags": merged_data["tags"]["all"],
-                "tags_character": merged_data["tags"]["character"],
-                "tags_copyright": merged_data["tags"]["copyright"],
-                "tags_artist": merged_data["tags"]["artist"],
-                "tags_meta": merged_data["tags"]["meta"],
-                "tags_general": merged_data["tags"]["general"],
+                "tags": merged_data["tags"],
+                "tags_character": merged_data["tags_character"],
+                "tags_copyright": merged_data["tags_copyright"],
+                "tags_artist": merged_data["tags_artist"],
+                "tags_meta": merged_data["tags_meta"],
+                "tags_general": merged_data["tags_general"],
                 "id": merged_data["id"],
                 "parent_id": merged_data["parent_id"],
                 "has_children": merged_data["has_children"],

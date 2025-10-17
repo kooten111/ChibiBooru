@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(override=True)
 
 import onnxruntime
 onnxruntime.preload_dlls()
@@ -7,7 +7,6 @@ onnxruntime.preload_dlls()
 import os
 import json
 import random
-import os
 import threading
 import time
 import hashlib
@@ -15,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from flask import Flask, render_template, request, url_for, jsonify
 from utils import get_thumbnail_path, load_metadata, get_related_images
+from utils.deduplication import is_duplicate, remove_duplicate
 
 app = Flask(__name__)
 
@@ -403,6 +403,13 @@ def system_status():
 
 @app.route('/api/system/scan', methods=['POST'])
 def trigger_scan():
+    print(f"Args: {dict(request.args)}")
+    print(f"Form: {dict(request.form)}")
+    print(f"Expected: {repr(RELOAD_SECRET)}")
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    print(f"Got: {repr(secret)}")
+    print(f"Match: {secret == RELOAD_SECRET}")
+    
     """Manually trigger a scan for new images"""
     secret = request.args.get('secret', '') or request.form.get('secret', '')
     if secret != RELOAD_SECRET:
@@ -465,6 +472,32 @@ def trigger_thumbnails():
         return jsonify({
             "status": "success",
             "message": "Thumbnails generated"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/system/deduplicate', methods=['POST'])
+def deduplicate():
+    """Run MD5 deduplication scan"""
+    data = request.json or {}
+    secret = data.get('secret', '')
+    
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    dry_run = data.get('dry_run', True)
+    
+    try:
+        from utils.deduplication import scan_and_remove_duplicates
+        results = scan_and_remove_duplicates(dry_run=dry_run)
+        
+        # Reload data if we actually removed files
+        if not dry_run and results['removed'] > 0:
+            load_data()
+        
+        return jsonify({
+            "status": "success",
+            "results": results
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -794,8 +827,8 @@ def saucenao_search():
                         "url": url,
                         "post_id": post_id
                     }
-                    
-                # e621 - handle both /posts/ and /post/show/ formats
+                
+                # e621
                 elif 'e621.net' in url:
                     if '/posts/' in url:
                         post_id = url.split('/posts/')[-1].split('?')[0].split('/')[0]
@@ -808,17 +841,19 @@ def saucenao_search():
                         "url": url,
                         "post_id": post_id
                     }
-                    
-                # Gelbooru - multiple formats
+                
+                # Gelbooru
                 elif 'gelbooru.com' in url:
                     if 'id=' in url:
-                        post_id = url.split('id=')[-1].split('&')[0].split('#')[0]
-                        source_info = {
-                            "type": "gelbooru",
-                            "url": url,
-                            "post_id": post_id
-                        }
-                        
+                        post_id = url.split('id=')[-1].split('&')[0]
+                    else:
+                        continue
+                    source_info = {
+                        "type": "gelbooru",
+                        "url": url,
+                        "post_id": post_id
+                    }
+                
                 # Yandere
                 elif 'yande.re' in url:
                     if '/post/show/' in url:
@@ -977,6 +1012,17 @@ def saucenao_apply():
             response.raise_for_status()
             with open(new_full_path, 'wb') as f:
                 f.write(response.content)
+
+            # NEW: Check for duplicate BEFORE creating thumbnail and metadata
+            is_dup, existing_path, md5 = is_duplicate(new_full_path)
+            if is_dup:
+                # Remove the just-downloaded duplicate
+                os.remove(new_full_path)
+                return jsonify({
+                    "error": f"Duplicate image detected. MD5 matches existing file: {existing_path}",
+                    "duplicate_of": existing_path,
+                    "md5": md5
+                }), 409
 
             fetch_metadata.ensure_thumbnail(new_full_path)
 

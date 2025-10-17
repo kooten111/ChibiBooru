@@ -12,7 +12,7 @@ function updateSecretUI() {
         secretSection.innerHTML = `
             <div style="display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(74, 158, 111, 0.2); border-radius: 10px; border: 1px solid rgba(144, 238, 144, 0.3);">
                 <span style="color: #90ee90; font-weight: 600;">✓ System secret configured</span>
-                <button class="system-btn btn-danger" onclick="clearSystemSecret()" style="margin-left: auto; padding: 8px 16px;">
+                <button class="system-btn btn-danger" onclick="clearSystemSecret(event)" style="margin-left: auto; padding: 8px 16px;">
                     Change Secret
                 </button>
             </div>
@@ -56,7 +56,13 @@ function saveSystemSecret() {
     loadSystemStatus();
 }
 
-function clearSystemSecret() {
+function clearSystemSecret(event) {
+    // FIXED: Stop event bubbling
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    
     if (!confirm('Are you sure you want to change the system secret?')) {
         return;
     }
@@ -116,40 +122,33 @@ function loadSystemStatus() {
                 <div class="status-grid">
                     <div class="status-item ${monitor.running ? 'active' : 'inactive'}">
                         <div class="status-label">Monitor Status</div>
-                        <div class="status-value">${monitor.running ? '▶️ Running' : '⏸️ Stopped'}</div>
+                        <div class="status-value">${monitor.running ? '🟢 Running' : '🔴 Stopped'}</div>
                     </div>
-                    
                     <div class="status-item">
                         <div class="status-label">Check Interval</div>
                         <div class="status-value">${monitor.interval_seconds}s</div>
                     </div>
-                    
                     <div class="status-item">
                         <div class="status-label">Last Check</div>
                         <div class="status-value">${monitor.last_check || 'Never'}</div>
                     </div>
-                    
                     <div class="status-item">
                         <div class="status-label">Last Scan Found</div>
-                        <div class="status-value highlight">${monitor.last_scan_found}</div>
+                        <div class="status-value">${monitor.last_scan_found}</div>
                     </div>
-                    
                     <div class="status-item">
                         <div class="status-label">Total Processed</div>
-                        <div class="status-value highlight">${monitor.total_processed}</div>
+                        <div class="status-value">${monitor.total_processed}</div>
                     </div>
-                    
                     <div class="status-item">
                         <div class="status-label">Total Images</div>
-                        <div class="status-value highlight">${collection.total_images}</div>
+                        <div class="status-value">${collection.total_images}</div>
                     </div>
-                    
-                    <div class="status-item">
+                    <div class="status-item ${collection.with_metadata > 0 ? 'active' : 'inactive'}">
                         <div class="status-label">With Metadata</div>
-                        <div class="status-value highlight">${collection.with_metadata}</div>
+                        <div class="status-value">${collection.with_metadata}</div>
                     </div>
-                    
-                    <div class="status-item ${collection.unprocessed > 0 ? 'inactive' : ''}">
+                    <div class="status-item ${collection.unprocessed > 0 ? 'warning' : 'inactive'}">
                         <div class="status-label">Unprocessed</div>
                         <div class="status-value">${collection.unprocessed}</div>
                     </div>
@@ -194,10 +193,11 @@ function systemAction(endpoint, buttonElement, actionName) {
     
     addLog(`Starting: ${actionName}...`, 'info');
     
-    fetch(endpoint, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `secret=${encodeURIComponent(SYSTEM_SECRET)}`
+    // FIXED: Send secret as URL parameter instead of form data
+    const url = `${endpoint}?secret=${encodeURIComponent(SYSTEM_SECRET)}`;
+    
+    fetch(url, {
+        method: 'POST'
     })
     .then(res => res.json())
     .then(data => {
@@ -233,26 +233,56 @@ function systemAction(endpoint, buttonElement, actionName) {
 }
 
 function systemScanImages(event) {
+    // FIXED: Stop event bubbling
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     systemAction('/api/system/scan', event.target, 'Scan & Process');
 }
 
 function systemRebuildTags(event) {
+    // FIXED: Stop event bubbling
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     systemAction('/api/system/rebuild', event.target, 'Rebuild Tags');
 }
 
 function systemGenerateThumbnails(event) {
+    // FIXED: Stop event bubbling
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     systemAction('/api/system/thumbnails', event.target, 'Generate Thumbnails');
 }
 
 function systemReloadData(event) {
+    // FIXED: Stop event bubbling
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     systemAction('/api/reload', event.target, 'Reload Data');
 }
 
 function systemStartMonitor(event) {
+    // FIXED: Stop event bubbling
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     systemAction('/api/system/monitor/start', event.target, 'Start Monitor');
 }
 
 function systemStopMonitor(event) {
+    // FIXED: Stop event bubbling
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     systemAction('/api/system/monitor/stop', event.target, 'Stop Monitor');
 }
 
