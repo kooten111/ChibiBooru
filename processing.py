@@ -28,6 +28,8 @@ except ImportError:
 
 # --- Configuration ---
 SAUCENAO_API_KEY = os.environ.get('SAUCENAO_API_KEY', '')
+GELBOORU_API_KEY = os.environ.get('GELBOORU_API_KEY', '')
+GELBOORU_USER_ID = os.environ.get('GELBOORU_USER_ID', '')
 THUMB_DIR = "./static/thumbnails"
 THUMB_SIZE = 1000
 
@@ -152,7 +154,47 @@ def tag_with_local_tagger(filepath):
         print(f"[Local Tagger] ERROR during analysis for {filepath}: {e}")
         return None
 
-# --- Helper Functions, Booru Search, etc. (No changes needed below this line) ---
+def extract_tag_data(data, source):
+    """Extract categorized tags and metadata from a raw API response."""
+    tags_dict = { "character": "", "copyright": "", "artist": "", "meta": "", "general": "" }
+    image_url, preview_url = None, None
+    width, height, file_size = None, None, None
+
+    if source == 'danbooru':
+        tags_dict["character"] = data.get("tag_string_character", "")
+        tags_dict["copyright"] = data.get("tag_string_copyright", "")
+        tags_dict["artist"] = data.get("tag_string_artist", "")
+        tags_dict["meta"] = data.get("tag_string_meta", "")
+        tags_dict["general"] = data.get("tag_string_general", "")
+        image_url = data.get('file_url')
+        preview_url = data.get('large_file_url') or data.get('preview_file_url')
+        width, height, file_size = data.get('image_width'), data.get('image_height'), data.get('file_size')
+    
+    elif source == 'e621':
+        tag_data = data.get("tags", {})
+        tags_dict["character"] = " ".join(tag_data.get("character", []))
+        tags_dict["copyright"] = " ".join(tag_data.get("copyright", []))
+        tags_dict["artist"] = " ".join(tag_data.get("artist", []))
+        tags_dict["meta"] = " ".join(tag_data.get("meta", []))
+        tags_dict["general"] = " ".join(tag_data.get("general", []))
+        image_url = data.get('file', {}).get('url')
+        preview_url = data.get('preview', {}).get('url')
+        width, height, file_size = data.get('file', {}).get('width'), data.get('file', {}).get('height'), data.get('file', {}).get('size')
+        
+    elif source in ['gelbooru', 'yandere']:
+        tags_dict["general"] = data.get("tags", "")
+        image_url = data.get('file_url')
+        preview_url = data.get('preview_url') if source == 'yandere' else data.get('sample_url')
+        width, height, file_size = data.get('width'), data.get('height'), data.get('file_size')
+
+    return {
+        "tags": tags_dict,
+        "image_url": image_url,
+        "preview_url": preview_url,
+        "width": width, "height": height, "file_size": file_size
+    }
+
+# --- Helper Functions, Booru Search, etc. ---
 def get_md5(filepath):
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:
@@ -231,17 +273,42 @@ def fetch_by_post_id(source, post_id):
     try:
         if "http" in str(post_id):
             post_id = os.path.basename(post_id).split('?')[0]
+
         if source == "danbooru":
             url = f"https://danbooru.donmai.us/posts/{post_id}.json"
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             return {"source": "danbooru", "data": response.json()}
+        
         elif source == "e621":
             headers = {"User-Agent": "HomeBooru/1.0"}
             url = f"https://e621.net/posts/{post_id}.json"
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             return {"source": "e621", "data": response.json()["post"]}
+            
+        elif source == "gelbooru":
+            if not GELBOORU_API_KEY or not GELBOORU_USER_ID:
+                print("Warning: GELBOORU_API_KEY or GELBOORU_USER_ID not set. Gelbooru search may fail.")
+            
+            url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&id={post_id}&api_key={GELBOORU_API_KEY}&user_id={GELBOORU_USER_ID}"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            if "post" in data and data["post"]:
+                return {"source": "gelbooru", "data": data["post"][0]}
+            elif isinstance(data, list) and data:
+                 return {"source": "gelbooru", "data": data[0]}
+
+        elif source == "yandere":
+            url = f"https://yande.re/post.json?tags=id:{post_id}"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            if data:
+                return {"source": "yandere", "data": data[0]}
+                
     except Exception as e:
         print(f"Error fetching {source} post {post_id}: {e}")
     return None

@@ -171,27 +171,28 @@ def saucenao_fetch_metadata_service():
         return jsonify({"error": "Missing source or post_id"}), 400
 
     try:
-        full_data = processing.fetch_by_post_id(source, post_id)
-        if not full_data:
+        result = processing.fetch_by_post_id(source, post_id)
+        if not result or 'data' not in result:
             return jsonify({"error": f"Failed to fetch metadata from {source}"}), 404
-        
-        image_url, preview_url, tags_str = None, None, ""
-        if source == 'danbooru':
-            image_url = full_data.get('file_url') or full_data.get('large_file_url')
-            preview_url = full_data.get('preview_file_url')
-            tags_str = full_data.get("tag_string", "")
-        elif source == 'e621':
-            image_url = full_data.get('file', {}).get('url')
-            preview_url = full_data.get('preview', {}).get('url')
-            tags = full_data.get("tags", {})
-            tags_str = " ".join([tag for cat in tags.values() for tag in cat])
-        
+
+        full_data = result['data']
+        tags_data = processing.extract_tag_data(full_data, source)
+
         return jsonify({
-            "status": "success", "tags": {"all": tags_str},
-            "image_url": image_url, "preview_url": preview_url
+            "status": "success",
+            "source": source,
+            "tags": tags_data['tags'],
+            "image_url": tags_data.get('image_url'),
+            "preview_url": tags_data.get('preview_url'),
+            "width": tags_data.get('width'),
+            "height": tags_data.get('height'),
+            "file_size": tags_data.get('file_size'),
         })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 def saucenao_apply_service():
     """Service to apply selected metadata and download the new image."""
@@ -200,54 +201,64 @@ def saucenao_apply_service():
         return jsonify({"error": "Unauthorized"}), 401
 
     original_filepath = data.get('filepath', '').replace('images/', '', 1)
-    source, post_id = data.get('source'), data.get('post_id')
+    source = data.get('source')
+    post_id = data.get('post_id')
+    download_image = data.get('download_image', False)
+    image_url = data.get('image_url')
 
     if not all([original_filepath, source, post_id]):
         return jsonify({"error": "Missing required parameters"}), 400
 
+    new_full_path = None
+    redirect_url = None
+    
     try:
-        # Step 1: Delete the old placeholder entry and files directly
+        # Step 1: Delete the old database entry
         models.delete_image(original_filepath)
-        old_full_path = os.path.join("static/images", original_filepath)
-        if os.path.exists(old_full_path):
-            os.remove(old_full_path)
-        old_thumb_path = os.path.join("static", get_thumbnail_path(f"images/{original_filepath}"))
-        if os.path.exists(old_thumb_path):
-            os.remove(old_thumb_path)
-
-        # Step 2: Fetch the new metadata
-        full_data = processing.fetch_by_post_id(source, post_id)
-        if not full_data:
-            raise Exception("Failed to fetch metadata for the new image.")
-
-        # Step 3: Download the new image file
-        image_url = (full_data.get('file_url') or 
-                     full_data.get('large_file_url') or 
-                     full_data.get('file', {}).get('url'))
-        if not image_url:
-            raise Exception("Could not find a valid image URL in the metadata.")
-
-        new_filename = os.path.basename(urlparse(image_url).path)
-        new_full_path = os.path.join("static/images", new_filename)
         
-        response = requests.get(image_url, timeout=60)
-        response.raise_for_status()
-        with open(new_full_path, 'wb') as f:
-            f.write(response.content)
+        # Step 2: Handle the image file
+        old_full_path = os.path.join("static/images", original_filepath)
+        
+        if download_image and image_url:
+            # Download new image to a new path
+            new_filename = os.path.basename(urlparse(image_url).path)
+            new_full_path = os.path.join("static/images", new_filename)
+            
+            response = requests.get(image_url, timeout=60)
+            response.raise_for_status()
+            with open(new_full_path, 'wb') as f:
+                f.write(response.content)
 
-        # Step 4: Process the new file directly
-        if processing.process_image_file(new_full_path):
+            # If download is successful, remove the old file and its thumbnail
+            if os.path.exists(old_full_path):
+                os.remove(old_full_path)
+            old_thumb_path = os.path.join("static", get_thumbnail_path(f"images/{original_filepath}"))
+            if os.path.exists(old_thumb_path):
+                os.remove(old_thumb_path)
+            
+            # Set the path to be processed to the new file
+            path_to_process = new_full_path
+            redirect_url = url_for('main.show_image', filepath=os.path.join("images", new_filename))
+
+        else:
+            # Use the existing file
+            path_to_process = old_full_path
+            redirect_url = url_for('main.show_image', filepath=os.path.join("images", original_filepath))
+
+        # Step 3: Process the image file (either the new one or the old one)
+        if processing.process_image_file(path_to_process):
             models.load_data_from_db()
             return jsonify({
                 "status": "success",
-                "redirect_url": url_for('main.show_image', filepath=f"images/{new_filename}")
+                "redirect_url": redirect_url
             })
         else:
             raise Exception("Failed to process and save the new image to the database.")
 
     except Exception as e:
-        if 'new_full_path' in locals() and os.path.exists(new_full_path):
+        import traceback
+        traceback.print_exc()
+        # Clean up downloaded file on failure
+        if new_full_path and os.path.exists(new_full_path):
             os.remove(new_full_path)
         return jsonify({"error": str(e)}), 500
-
-# --- END OF SAUCENAO BLOCK ---
