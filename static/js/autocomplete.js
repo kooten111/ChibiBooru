@@ -1,65 +1,57 @@
+// static/js/autocomplete.js
 class Autocomplete {
     constructor(inputId, suggestionsId) {
         this.searchInput = document.getElementById(inputId);
         this.suggestions = document.getElementById(suggestionsId);
+        this.debounceTimer = null;
         this.selectedIndex = -1;
         this.currentSuggestions = [];
-        this.debounceTimer = null;
-        
-        this.init();
+
+        if (!this.searchInput || !this.suggestions) {
+            console.error('Autocomplete: Required elements not found');
+            return;
+        }
+
+        this.searchInput.addEventListener('input', this.handleInput.bind(this));
+        this.searchInput.addEventListener('keydown', this.handleKeydown.bind(this));
+        this.searchInput.addEventListener('focus', this.handleFocus.bind(this));
+        document.addEventListener('click', this.handleClickOutside.bind(this));
     }
-    
-    init() {
-        this.searchInput.addEventListener('input', (e) => this.handleInput(e));
-        this.searchInput.addEventListener('keydown', (e) => this.handleKeydown(e));
-        this.searchInput.addEventListener('focus', () => this.handleFocus());
-        document.addEventListener('click', (e) => this.handleClickOutside(e));
-        
-        // Add smooth focus effect
-        this.searchInput.addEventListener('focus', () => {
-            this.searchInput.style.transform = 'translateY(-2px)';
-        });
-        
-        this.searchInput.addEventListener('blur', () => {
-            setTimeout(() => {
-                this.searchInput.style.transform = 'translateY(0)';
-            }, 200);
-        });
-    }
-    
-    formatCount(count) {
-        if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
-        if (count >= 1000) return (count / 1000).toFixed(1) + 'k';
-        return count.toString();
-    }
-    
+
     showSuggestions(data) {
-        this.currentSuggestions = data;
-        this.selectedIndex = -1;
-        
         if (data.length === 0) {
             this.suggestions.classList.remove('active');
             return;
         }
 
-        this.suggestions.innerHTML = data.map((item, idx) => `
-            <div class="autocomplete-item" data-index="${idx}">
-                <span class="autocomplete-tag">${this.escapeHtml(item.tag)}</span>
-                <span class="autocomplete-count">${this.formatCount(item.count)}</span>
-            </div>
-        `).join('');
-        
+        this.currentSuggestions = data;
+        this.selectedIndex = -1;
+
+        this.suggestions.innerHTML = data.map((item, idx) => {
+            const displayText = item.display || item.tag;
+            const countText = item.count ? this.formatCount(item.count) : '';
+            const icon = item.icon || '🏷️';
+            const typeClass = item.type || 'tag';
+            
+            return `
+                <div class="autocomplete-item ${typeClass}" data-tag="${this.escapeHtml(item.tag)}" style="animation-delay: ${idx * 0.01}s">
+                    <div class="autocomplete-left">
+                        <span class="autocomplete-icon">${icon}</span>
+                        <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
+                    </div>
+                    ${countText ? `<span class="autocomplete-count">${countText}</span>` : ''}
+                </div>
+            `;
+        }).join('');
+
         this.suggestions.classList.add('active');
 
-        // Add click handlers with animation delay
-        this.suggestions.querySelectorAll('.autocomplete-item').forEach((item, idx) => {
-            item.style.animationDelay = `${idx * 0.01}s`;
+        this.suggestions.querySelectorAll('.autocomplete-item').forEach(item => {
             item.addEventListener('click', () => {
-                const tag = item.querySelector('.autocomplete-tag').textContent;
+                const tag = item.getAttribute('data-tag');
                 this.insertTag(tag);
             });
             
-            // Add hover sound effect (optional, can be removed)
             item.addEventListener('mouseenter', () => {
                 item.style.transform = 'translateX(5px)';
             });
@@ -71,13 +63,19 @@ class Autocomplete {
             });
         });
     }
-    
+
+    formatCount(count) {
+        if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
+        if (count >= 1000) return (count / 1000).toFixed(1) + 'k';
+        return count.toString();
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
-    
+
     insertTag(tag) {
         const tokens = this.searchInput.value.trim().split(/\s+/);
         tokens.pop();
@@ -86,13 +84,12 @@ class Autocomplete {
         this.suggestions.classList.remove('active');
         this.searchInput.focus();
         
-        // Add subtle flash effect
         this.searchInput.style.borderColor = 'rgba(135, 206, 235, 0.8)';
         setTimeout(() => {
             this.searchInput.style.borderColor = '';
         }, 200);
     }
-    
+
     updateSelection(direction) {
         const items = this.suggestions.querySelectorAll('.autocomplete-item');
         if (items.length === 0) return;
@@ -110,15 +107,14 @@ class Autocomplete {
         items[this.selectedIndex].style.transform = 'translateX(5px)';
         items[this.selectedIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
-    
+
     handleFocus() {
-        // Re-trigger search if there's already input
         const query = this.searchInput.value.trim();
         if (query.length >= 2) {
             this.performSearch(query);
         }
     }
-    
+
     handleInput(e) {
         clearTimeout(this.debounceTimer);
         const query = e.target.value;
@@ -132,7 +128,7 @@ class Autocomplete {
             this.performSearch(query);
         }, 200);
     }
-    
+
     performSearch(query) {
         fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`)
             .then(res => {
@@ -145,7 +141,7 @@ class Autocomplete {
                 this.suggestions.classList.remove('active');
             });
     }
-    
+
     handleKeydown(e) {
         if (!this.suggestions.classList.contains('active')) return;
 
@@ -170,7 +166,7 @@ class Autocomplete {
             }
         }
     }
-    
+
     handleClickOutside(e) {
         if (!e.target.closest('.autocomplete-container')) {
             this.suggestions.classList.remove('active');
@@ -178,141 +174,6 @@ class Autocomplete {
     }
 }
 
-// Add smooth page transitions on load
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize autocomplete
     new Autocomplete('searchInput', 'autocompleteSuggestions');
-    
-    // Detect image aspect ratios and add classes
-    const thumbnails = document.querySelectorAll('.thumbnail');
-    thumbnails.forEach((thumb, index) => {
-        thumb.style.animationDelay = `${(index % 6) * 0.02}s`;
-        
-        const img = thumb.querySelector('img');
-        if (img) {
-            // If image already loaded
-            if (img.complete) {
-                classifyImage(img, thumb);
-            } else {
-                // Wait for image to load
-                img.addEventListener('load', () => classifyImage(img, thumb));
-            }
-        }
-    });
-    
-    // Add smooth scroll behavior
-    document.documentElement.style.scrollBehavior = 'smooth';
-    
-    // Add loading state to search form
-    const searchForm = document.getElementById('searchForm');
-    if (searchForm) {
-        searchForm.addEventListener('submit', (e) => {
-            const button = searchForm.querySelector('button[type="submit"]');
-            button.style.opacity = '0.7';
-            button.textContent = 'Searching...';
-        });
-    }
-});
-
-function classifyImage(img, container) {
-    const aspectRatio = img.naturalWidth / img.naturalHeight;
-    
-    // Wide images (aspect ratio > 1.5)
-    if (aspectRatio > 1.5) {
-        container.classList.add('wide');
-    }
-    // Tall images (aspect ratio < 0.7)
-    else if (aspectRatio < 0.7) {
-        container.classList.add('tall');
-    }
-}
-
-// Enhanced masonry layout calculation
-function setupMasonryLayout() {
-    const thumbnails = document.querySelectorAll('.thumbnail');
-    const rowHeight = 12; // Must match grid-auto-rows in CSS
-    
-    thumbnails.forEach((thumb, index) => {
-        thumb.style.animationDelay = `${(index % 6) * 0.02}s`;
-        
-        const img = thumb.querySelector('img');
-        if (!img) return;
-        
-        const processImage = () => {
-            if (img.naturalWidth && img.naturalHeight) {
-                const aspectRatio = img.naturalWidth / img.naturalHeight;
-                
-                // Calculate column span
-                let colSpan = 1;
-                if (aspectRatio > 2) {
-                    colSpan = 3;
-                    thumb.classList.add('ultra-wide');
-                } else if (aspectRatio > 1.3) {
-                    colSpan = 2;
-                    thumb.classList.add('wide');
-                } else if (aspectRatio < 0.6) {
-                    colSpan = 1;
-                    thumb.classList.add('ultra-tall');
-                } else if (aspectRatio < 0.8) {
-                    colSpan = 1;
-                    thumb.classList.add('tall');
-                } else {
-                    colSpan = 1;
-                    thumb.classList.add('square');
-                }
-                
-                // Get actual container width after it's been laid out
-                const containerWidth = thumb.offsetWidth || 300;
-                
-                // Calculate precise height based on aspect ratio to minimize cropping
-                const calculatedHeight = containerWidth / aspectRatio;
-                
-                // Convert height to row spans (more precise calculation)
-                const rowSpan = Math.round(calculatedHeight / rowHeight);
-                
-                // Apply the row span
-                thumb.style.gridRowEnd = `span ${Math.max(rowSpan, 10)}`; // Minimum 10 rows
-                thumb.style.gridColumnEnd = `span ${colSpan}`;
-            }
-        };
-        
-        // If image already loaded
-        if (img.complete && img.naturalWidth) {
-            processImage();
-        } else {
-            // Wait for image to load
-            img.addEventListener('load', processImage);
-        }
-    });
-}
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    // Initialize autocomplete
-    new Autocomplete('searchInput', 'autocompleteSuggestions');
-    
-    // Setup masonry layout
-    setupMasonryLayout();
-    
-    // Recalculate layout on window resize
-    let resizeTimer;
-    window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-            setupMasonryLayout();
-        }, 250);
-    });
-    
-    // Add smooth scroll behavior
-    document.documentElement.style.scrollBehavior = 'smooth';
-    
-    // Add loading state to search form
-    const searchForm = document.getElementById('searchForm');
-    if (searchForm) {
-        searchForm.addEventListener('submit', (e) => {
-            const button = searchForm.querySelector('button[type="submit"]');
-            button.style.opacity = '0.7';
-            button.textContent = 'Searching...';
-        });
-    }
 });

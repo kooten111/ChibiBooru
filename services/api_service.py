@@ -12,17 +12,15 @@ RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
 
 def get_images_for_api():
     """Service for the infinite scroll API."""
+    from services import query_service  # Import here to avoid circular import
+    
     search_query = request.args.get('query', '').strip().lower()
     page = request.args.get('page', 1, type=int)
     per_page = 50
     seed = request.args.get('seed', default=None, type=int)
 
-    if search_query:
-        search_results = models.search_images_by_tags(search_query.split())
-        should_shuffle = True
-    else:
-        search_results = models.get_all_images_with_tags()
-        should_shuffle = True
+    # Use the same search logic as the main page for consistency
+    search_results, should_shuffle = query_service.perform_search(search_query)
 
     if should_shuffle and seed is not None:
         random.Random(seed).shuffle(search_results)
@@ -44,6 +42,7 @@ def get_images_for_api():
         "total_results": total_results,
         "has_more": page < total_pages
     })
+
 
 def autocomplete():
     """Service for tag autocomplete suggestions."""
@@ -194,6 +193,78 @@ def saucenao_fetch_metadata_service():
         return jsonify({"error": str(e)}), 500
 
 
+def autocomplete():
+    """Enhanced autocomplete with fuzzy matching, sources, filenames, and extensions."""
+    query = request.args.get('q', '').strip().lower()
+    if not query or len(query) < 2:
+        return jsonify([])
+
+    tag_counts = models.get_tag_counts()
+    last_token = query.split()[-1].lower()
+    
+    suggestions = []
+    
+    # File extension search
+    if last_token.startswith('.'):
+        ext = last_token[1:]  # Remove the dot
+        if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']:
+            suggestions.append({
+                "tag": last_token,
+                "display": f"All {last_token} files",
+                "count": None,
+                "type": "extension",
+                "icon": "📁"
+            })
+    
+    # Source suggestions
+    sources = ['danbooru', 'e621', 'gelbooru', 'yandere', 'camie_tagger']
+    for source in sources:
+        if last_token in source or source.startswith(last_token):
+            suggestions.append({
+                "tag": f"source:{source}",
+                "display": f"{source.title()} images",
+                "count": None,
+                "type": "source",
+                "icon": "🌐"
+            })
+    
+    # Tag matching - both prefix and substring
+    prefix_matches = []
+    substring_matches = []
+    
+    for tag, count in tag_counts.items():
+        tag_lower = tag.lower()
+        
+        # Exact prefix match (highest priority)
+        if tag_lower.startswith(last_token):
+            prefix_matches.append({
+                "tag": tag,
+                "display": tag,
+                "count": count,
+                "type": "tag",
+                "icon": "🏷️"
+            })
+        # Substring match (fuzzy matching)
+        elif last_token in tag_lower:
+            substring_matches.append({
+                "tag": tag,
+                "display": tag,
+                "count": count,
+                "type": "tag",
+                "icon": "🏷️"
+            })
+    
+    # Sort by count
+    prefix_matches.sort(key=lambda x: x['count'], reverse=True)
+    substring_matches.sort(key=lambda x: x['count'], reverse=True)
+    
+    # Combine: extension/source suggestions first, then prefix matches, then substring
+    suggestions.extend(prefix_matches[:8])
+    suggestions.extend(substring_matches[:5])
+    
+    return jsonify(suggestions[:15])
+
+
 def saucenao_apply_service():
     """Service to apply selected metadata and download the new image."""
     data = request.json
@@ -262,3 +333,4 @@ def saucenao_apply_service():
         if new_full_path and os.path.exists(new_full_path):
             os.remove(new_full_path)
         return jsonify({"error": str(e)}), 500
+
