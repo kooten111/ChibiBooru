@@ -1,4 +1,8 @@
 /* Override header animation for image page */
+.header {
+    animation: none !important;
+}
+
 .header-container {
     transition: transform 0.3s ease-in-out;
 }

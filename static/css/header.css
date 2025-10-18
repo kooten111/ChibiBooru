@@ -3,7 +3,7 @@
     position: sticky;
     top: 0;
     z-index: 99;
-    animation: slideDown 0.2s ease-out;
+    /* animation: slideDown 0.2s ease-out; */ /* This line has been removed */
 }
 
 /* Update header to support absolute positioning for toggle button */

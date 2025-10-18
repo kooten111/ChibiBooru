@@ -20,7 +20,6 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
-    animation: slideDown 0.2s ease-out;
 }
 
 .header-content {
