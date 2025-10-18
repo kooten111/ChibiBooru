@@ -268,6 +268,133 @@ function systemReloadData(event) {
     systemAction('/api/reload', event.target, 'Reload Data');
 }
 
+function systemDeduplicate(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    
+    if (!SYSTEM_SECRET) {
+        showNotification('System secret not configured', 'error');
+        return;
+    }
+    
+    const buttonElement = event.target;
+    const originalText = buttonElement.textContent;
+    const originalDisabled = buttonElement.disabled;
+    
+    // First, do a dry run to find duplicates
+    buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">🔍</span> Scanning...`;
+    buttonElement.disabled = true;
+    
+    addLog('Scanning for duplicates (dry run)...', 'info');
+    
+    // Send secret as URL parameter like other system actions
+    const url = `/api/system/deduplicate?secret=${encodeURIComponent(SYSTEM_SECRET)}`;
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            dry_run: true  // Preview mode
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const results = data.results;
+            
+            if (results.duplicates_found === 0) {
+                showNotification('No duplicates found', 'success');
+                addLog(`Scan complete: ${results.scanned} images scanned, no duplicates found`, 'success');
+                buttonElement.textContent = originalText;
+                buttonElement.disabled = originalDisabled;
+                return;
+            }
+            
+            // Show preview of duplicates
+            const dupList = results.duplicates.map(d => 
+                `• ${d.duplicate}\n  → matches ${d.original}`
+            ).join('\n');
+            
+            const confirmMsg = `Found ${results.duplicates_found} duplicate(s):\n\n${dupList}\n\nDelete these duplicates? (keeps first occurrence)`;
+            
+            addLog(`Found ${results.duplicates_found} duplicate(s)`, 'info');
+            results.duplicates.forEach(d => {
+                addLog(`  ${d.duplicate} → ${d.original}`, 'info');
+            });
+            
+            // Ask for confirmation with the list
+            if (confirm(confirmMsg)) {
+                // User confirmed, now actually delete
+                buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">🗑️</span> Deleting...`;
+                addLog('Deleting duplicates...', 'info');
+                
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        dry_run: false  // Actually delete
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const results = data.results;
+                        const msg = `Deleted ${results.removed} duplicate(s)`;
+                        showNotification(msg, 'success');
+                        addLog(msg, 'success');
+                        loadSystemStatus();
+                    } else if (data.error === 'Unauthorized') {
+                        localStorage.removeItem('system_secret');
+                        SYSTEM_SECRET = null;
+                        showNotification('Invalid system secret', 'error');
+                        addLog('Authentication failed - invalid secret', 'error');
+                        updateSecretUI();
+                    } else {
+                        throw new Error(data.error || 'Unknown error');
+                    }
+                })
+                .catch(err => {
+                    const errMsg = `Deletion failed: ${err.message}`;
+                    showNotification(errMsg, 'error');
+                    addLog(errMsg, 'error');
+                })
+                .finally(() => {
+                    buttonElement.textContent = originalText;
+                    buttonElement.disabled = originalDisabled;
+                });
+            } else {
+                // User cancelled
+                addLog('Deduplication cancelled by user', 'info');
+                buttonElement.textContent = originalText;
+                buttonElement.disabled = originalDisabled;
+            }
+        } else if (data.error === 'Unauthorized') {
+            localStorage.removeItem('system_secret');
+            SYSTEM_SECRET = null;
+            showNotification('Invalid system secret', 'error');
+            addLog('Authentication failed - invalid secret', 'error');
+            updateSecretUI();
+            buttonElement.textContent = originalText;
+            buttonElement.disabled = originalDisabled;
+        } else {
+            throw new Error(data.error || 'Unknown error');
+        }
+    })
+    .catch(err => {
+        const errMsg = `Scan failed: ${err.message}`;
+        showNotification(errMsg, 'error');
+        addLog(errMsg, 'error');
+        buttonElement.textContent = originalText;
+        buttonElement.disabled = originalDisabled;
+    });
+}
+
 function systemStartMonitor(event) {
     // FIXED: Stop event bubbling
     if (event) {

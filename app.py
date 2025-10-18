@@ -479,12 +479,12 @@ def trigger_thumbnails():
 @app.route('/api/system/deduplicate', methods=['POST'])
 def deduplicate():
     """Run MD5 deduplication scan"""
-    data = request.json or {}
-    secret = data.get('secret', '')
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
     
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
     
+    data = request.json or {}
     dry_run = data.get('dry_run', True)
     
     try:
