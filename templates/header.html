@@ -93,15 +93,16 @@
                     <div class="stat-card-label">SauceNao Lookups</div>
                 </div>
                 {% endif %}
-                {% if stats.camie_used > 0 %}
-                <a href="{{ url_for('main.home', query='source:camie_tagger') }}" style="text-decoration: none; color: inherit;">
+                
+                {% if stats.local_tagger_used > 0 %}
+                <a href="{{ url_for('main.home', query='source:local_tagger') }}" style="text-decoration: none; color: inherit;">
                     <div class="stat-card">
-                        <div class="stat-card-number">{{ stats.camie_used }}</div>
+                        <div class="stat-card-number">{{ stats.local_tagger_used }}</div>
                         <div class="stat-card-label">AI Tagged</div>
                     </div>
                 </a>
                 {% endif %}
-            </div>
+                </div>
         </div>
 
         {% if stats.source_breakdown %}
@@ -184,7 +185,7 @@
                         🔍 Scan & Process New Images
                     </button>
                     <button class="btn btn-primary" onclick="systemRebuildTags(event)">
-                        🔄 Rebuild Tags from Metadata
+                        🔄 Re-process All Tags
                     </button>
                     <button class="btn btn-primary" onclick="systemGenerateThumbnails(event)">
                         🖼️ Generate Thumbnails
@@ -214,4 +215,4 @@
             </div>
         </div>
     </div>
-</div>
+</div>button class="btn btn-primary

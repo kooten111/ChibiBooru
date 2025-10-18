@@ -341,7 +341,8 @@
     </div>
 
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
-    <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+<input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
+<script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/carousel.js') }}"></script>

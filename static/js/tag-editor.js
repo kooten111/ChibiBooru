@@ -1,3 +1,5 @@
+// static/js/tag-editor.js
+
 class TagEditor {
     constructor() {
         this.tags = [];
@@ -16,7 +18,6 @@ class TagEditor {
         this.render();
         this.attachEvents();
         
-        // Focus input with delay for smooth animation
         setTimeout(() => {
             this.input.focus();
         }, 50);
@@ -42,7 +43,6 @@ class TagEditor {
         this.input.addEventListener('keydown', (e) => this.handleKeydown(e));
         document.addEventListener('click', (e) => this.handleClickOutside(e));
         
-        // Add visual feedback on input focus
         this.input.addEventListener('focus', () => {
             this.input.parentElement.style.transform = 'translateY(-2px)';
         });
@@ -137,13 +137,11 @@ class TagEditor {
             this.tags.push(tag);
             this.render();
             
-            // Flash the container
             this.container.style.borderColor = 'rgba(135, 206, 235, 0.6)';
             setTimeout(() => {
                 this.container.style.borderColor = '';
             }, 200);
         } else if (this.tags.includes(tag)) {
-            // Visual feedback for duplicate
             this.showNotification('Tag already added', 'warning');
         }
         
@@ -193,7 +191,6 @@ class TagEditor {
     }
 }
 
-// Add CSS animations dynamically
 const style = document.createElement('style');
 style.textContent = `
     @keyframes chipOut {
@@ -225,29 +222,30 @@ document.head.appendChild(style);
 
 const tagEditor = new TagEditor();
 
+// --- THIS IS THE CORRECTED FUNCTION ---
 function toggleTagEditor() {
     const editor = document.getElementById('tagEditor');
     const isActive = editor.classList.toggle('active');
     
     if (isActive) {
-        // Initialize with existing tags
-        const existingTags = document.querySelectorAll('.tag-item a');
-        const tags = Array.from(existingTags).map(a => a.textContent.trim());
+        // Initialize with the complete list of tags from the hidden input
+        const allTagsInput = document.getElementById('allTags');
+        const tags = allTagsInput.value.split(' ').filter(t => t);
         tagEditor.init(tags);
     } else {
-        // Clear suggestions when closing
         const suggestions = document.getElementById('tagEditorSuggestions');
         if (suggestions) {
             suggestions.classList.remove('active');
         }
     }
 }
+// --- END OF CORRECTION ---
+
 
 function saveTags() {
     const tags = tagEditor.getTags();
     const filepath = document.getElementById('imageFilepath').value;
     
-    // Show loading state
     const saveBtn = event.target;
     const originalText = saveBtn.textContent;
     saveBtn.textContent = 'Saving...';
@@ -320,7 +318,6 @@ function confirmDelete() {
     `;
     document.body.appendChild(overlay);
 
-    // Add timeout to force redirect if server doesn't respond
     const timeoutId = setTimeout(() => {
         console.log('Delete timeout - forcing redirect');
         window.location.replace('/');
@@ -351,7 +348,6 @@ function confirmDelete() {
         
         if (data.status === 'success') {
             overlay.querySelector('div').textContent = 'Deleted! Redirecting...';
-            // Force redirect immediately
             setTimeout(() => {
                 window.location.replace('/');
             }, 500);
@@ -364,7 +360,6 @@ function confirmDelete() {
         clearTimeout(timeoutId);
         overlay.remove();
         
-        // Show detailed error
         const errorMsg = error.message || error.toString();
         tagEditor.showNotification('Delete failed: ' + errorMsg, 'error');
     });

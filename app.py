@@ -1,25 +1,25 @@
+# app.py
 from flask import Flask
 from dotenv import load_dotenv
-import onnxruntime
 
-# Load environment variables
 load_dotenv(override=True)
-onnxruntime.preload_dlls()
 
-# Import blueprints and services
 from routes import main_blueprint, api_blueprint
-from services import start_monitor
+import models
+from database import initialize_database
 
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
 
-    # Register blueprints
+    # Ensure the database file and tables exist.
+    initialize_database()
+
+    with app.app_context():
+        models.load_data_from_db()
+
     app.register_blueprint(main_blueprint)
     app.register_blueprint(api_blueprint, url_prefix='/api')
-
-    # Start the background monitor
-    start_monitor()
 
     return app
 
