@@ -39,6 +39,20 @@
                     </div>
                     {% endif %}
                     
+                    {% if categorized_tags.copyright %}
+                    <div class="tag-category copyright">
+                        <div class="tag-category-title">Copyright</div>
+                        {% for tag, count in categorized_tags.copyright %}
+                        <div class="tag-item">
+                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
+                            <span class="tag-count">
+                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    
                     {% if categorized_tags.character %}
                     <div class="tag-category character">
                         <div class="tag-category-title">Character</div>
@@ -85,20 +99,6 @@
                     <div class="tag-category meta">
                         <div class="tag-category-title">Meta</div>
                         {% for tag, count in categorized_tags.meta %}
-                        <div class="tag-item">
-                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
-                            <span class="tag-count">
-                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                            </span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    {% if categorized_tags.copyright %}
-                    <div class="tag-category copyright">
-                        <div class="tag-category-title">Copyright</div>
-                        {% for tag, count in categorized_tags.copyright %}
                         <div class="tag-item">
                             <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
@@ -238,6 +238,11 @@
                         <span style="font-size: 1.2em;">🔍</span>
                         <span>Fetch from SauceNao</span>
                     </button>
+                </div>
+                <div class="metadata-item" style="border-bottom: none; padding-bottom: 0;">
+                    <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="btn btn-primary" style="width: 100%;">
+                        📄 View Raw Data
+                    </a>
                 </div>
                 {% if filepath %}
                 <div class="metadata-item">

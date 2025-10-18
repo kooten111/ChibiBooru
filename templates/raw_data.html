@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Raw Data: {{ filepath.split('/')[-1] }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
+    <style>
+        .raw-data-container {
+            background-color: #0c0c14;
+            border: 1px solid rgba(135, 206, 235, 0.2);
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #e8e8e8;
+            font-size: 0.9em;
+            font-family: 'Courier New', monospace;
+        }
+        h2 {
+            color: #87ceeb;
+            border-bottom: 2px solid rgba(135, 206, 235, 0.2);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+
+    <div class="container">
+        <h2>Raw Metadata for {{ filepath.split('/')[-1] }}</h2>
+        <a href="{{ url_for('main.show_image', filepath=filepath) }}" class="btn btn-secondary" style="margin-bottom: 20px;">
+            ← Back to Image
+        </a>
+        <div class="raw-data-container">
+            <pre>{{ raw_data | tojson(indent=2) }}</pre>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+</body>
+</html>

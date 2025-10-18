@@ -66,6 +66,8 @@ def show_image(filepath):
     }
 
     carousel_images = query_service.find_related_by_tags(filepath)
+    related_images = models.get_related_images(data.get('post_id'), data.get('parent_id'))
+
 
     return render_template(
         'image.html',
@@ -73,7 +75,7 @@ def show_image(filepath):
         tags=tags_with_counts,
         categorized_tags=categorized_tags,
         metadata=data.get('raw_metadata'),
-        related_images=[],
+        related_images=related_images,
         carousel_images=carousel_images,
         stats=stats,
         random_tags=[],
@@ -85,6 +87,25 @@ def similar(filepath):
     similar_images = query_service.find_related_by_tags(filepath, limit=50)
     stats = query_service.get_enhanced_stats()
     return render_template('index.html', images=similar_images, query=f"similar:{filepath}", stats=stats, show_similarity=True)
+
+@main_blueprint.route('/raw/<path:filepath>')
+def show_raw_data(filepath):
+    lookup_path = filepath.replace("images/", "", 1)
+    data = models.get_image_details(lookup_path)
+    if not data or not data.get('raw_metadata'):
+        return "Raw metadata not found", 404
+
+    raw_metadata = data.get('raw_metadata')
+    stats = query_service.get_enhanced_stats()
+
+    return render_template(
+        'raw_data.html',
+        filepath=filepath,
+        raw_data=raw_metadata,
+        stats=stats,
+        query='',
+        random_tags=[]
+    )
 
 # --- API Routes ---
 

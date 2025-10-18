@@ -235,12 +235,33 @@ def get_all_images_with_tags():
         """
         return [dict(row) for row in conn.execute(query).fetchall()]
 
-# --- THIS IS THE NEW FUNCTION ---
 def get_all_filepaths():
     """Returns a set of all filepaths in the database."""
     with get_db_connection() as conn:
         return {row['filepath'] for row in conn.execute("SELECT filepath FROM images").fetchall()}
-# --- END OF NEW FUNCTION ---
+
+def get_related_images(post_id, parent_id):
+    """Find parent and child images from the database."""
+    related = []
+    with get_db_connection() as conn:
+        # Find parent
+        if parent_id:
+            parent = conn.execute("SELECT filepath FROM images WHERE post_id = ?", (parent_id,)).fetchone()
+            if parent:
+                related.append({
+                    "path": f"images/{parent['filepath']}",
+                    "type": "parent"
+                })
+
+        # Find children
+        if post_id:
+            children = conn.execute("SELECT filepath FROM images WHERE parent_id = ?", (post_id,)).fetchall()
+            for child in children:
+                related.append({
+                    "path": f"images/{child['filepath']}",
+                    "type": "child"
+                })
+    return related
 
 def search_images_by_tags(tags_list):
     with get_db_connection() as conn:
@@ -387,9 +408,7 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
     ON CONFLICT(name) DO UPDATE SET category = excluded.category
 """, (tag_name, category))
                     cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
-                    # --- THIS IS THE CORRECTED LINE ---
                     tag_id = cursor.fetchone()['id']
-                    # --- END OF CORRECTION ---
                     cursor.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
 
             # 4. Insert raw metadata
