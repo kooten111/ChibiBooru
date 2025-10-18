@@ -56,10 +56,12 @@ def show_image(filepath):
     
     general_tags = sorted((data.get("tags_general") or "").split())
     tags_with_counts = [(tag, tag_counts.get(tag, 0)) for tag in general_tags if tag]
+    
     categorized_tags = {
         "character": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_character") or "").split()) if t],
         "copyright": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_copyright") or "").split()) if t],
         "artist": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_artist") or "").split()) if t],
+        "species": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_species") or "").split()) if t],
         "meta": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_meta") or "").split()) if t],
     }
 

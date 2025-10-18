@@ -280,7 +280,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     gap: 10px;
 }
 
-.top-tag-item {
+.tag-link {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -294,14 +294,18 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     font-weight: 500;
 }
 
-.top-tag-item:hover {
+.tag-link:hover {
     background: rgba(74, 158, 255, 0.15);
     border-color: rgba(135, 206, 235, 0.3);
     transform: translateX(5px);
     color: #fff;
 }
 
-.top-tag-count {
+.tag-name {
+    color: #d0d0d0;
+}
+
+.tag-count {
     color: #87ceeb;
     font-weight: 600;
     font-size: 0.9em;

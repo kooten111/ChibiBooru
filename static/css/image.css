@@ -345,3 +345,8 @@ body.ui-hidden .image-view img {
 .related-thumb .label::first-letter {
     text-transform: capitalize;
 }
+
+.tag-category.species .tag-category-title {
+    color: #4a9eff; /* A distinct blue color */
+    border-bottom-color: rgba(74, 158, 255, 0.3);
+}

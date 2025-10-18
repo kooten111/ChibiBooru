@@ -124,6 +124,19 @@ def process_image_file(filepath):
 
     all_results = search_all_sources(md5)
 
+    # --- START DEBUGGING ---
+    print("\n" + "="*20 + " DEBUGGING START " + "="*20)
+    print(f"File: {rel_path} | MD5: {md5}")
+    print("\n[1] RAW DATA FROM BOORUS:")
+    if 'danbooru' in all_results:
+        print("\n--- Danbooru Data ---")
+        print(json.dumps(all_results['danbooru'], indent=2))
+    if 'e621' in all_results:
+        print("\n--- e621 Data ---")
+        print(json.dumps(all_results['e621'], indent=2))
+    print("\n" + "="*50)
+    # --- END DEBUGGING ---
+
     primary_source_data = None
     source_name = None
     if 'danbooru' in all_results:
@@ -137,6 +150,12 @@ def process_image_file(filepath):
         print(f"No metadata found for {rel_path}")
         return False
         
+    tags_character = ""
+    tags_copyright = ""
+    tags_artist = ""
+    tags_meta = ""
+    tags_general = ""
+
     if source_name == 'danbooru':
         tags_character = primary_source_data.get("tag_string_character", "")
         tags_copyright = primary_source_data.get("tag_string_copyright", "")
@@ -150,14 +169,38 @@ def process_image_file(filepath):
         tags_artist = " ".join(tags.get("artist", []))
         tags_meta = " ".join(tags.get("meta", []))
         tags_general = " ".join(tags.get("general", []))
+
+    # --- START DEBUGGING ---
+    print("\n[2] EXTRACTED TAG STRINGS:")
+    print(f"  Artist Tags:    '{tags_artist}'")
+    print(f"  Character Tags: '{tags_character}'")
+    print(f"  Copyright Tags: '{tags_copyright}'")
+    print(f"  Meta Tags:      '{tags_meta}'")
+    print(f"  General Tags:   '{tags_general}'")
+    print("\n" + "="*50)
+    # --- END DEBUGGING ---
+
+    character_set = set(tags_character.split())
+    copyright_set = set(tags_copyright.split())
+    artist_set = set(tags_artist.split())
+    meta_set = set(tags_meta.split())
+    general_set = set(tags_general.split())
     
+    general_set -= (character_set | copyright_set | artist_set | meta_set)
+
     categorized_tags = {
-        'character': tags_character.split(),
-        'copyright': tags_copyright.split(),
-        'artist': tags_artist.split(),
-        'meta': tags_meta.split(),
-        'general': tags_general.split()
+        'character': list(character_set),
+        'copyright': list(copyright_set),
+        'artist': list(artist_set),
+        'meta': list(meta_set),
+        'general': list(general_set)
     }
+
+    # --- START DEBUGGING ---
+    print("\n[3] FINAL CATEGORIZED TAGS (before sending to database):")
+    print(json.dumps(categorized_tags, indent=2))
+    print("\n" + "="*21 + " DEBUGGING END " + "="*22 + "\n")
+    # --- END DEBUGGING ---
 
     image_info = {
         'filepath': rel_path,

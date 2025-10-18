@@ -66,6 +66,20 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+
+                    {% if categorized_tags.species %}
+                    <div class="tag-category species">
+                        <div class="tag-category-title">Species</div>
+                        {% for tag, count in categorized_tags.species %}
+                        <div class="tag-item">
+                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
+                            <span class="tag-count">
+                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     
                     {% if tags %}
                     <div class="tag-category general">
