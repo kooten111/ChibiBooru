@@ -9,6 +9,14 @@ tag_counts = {}
 image_data = []
 data_lock = threading.Lock()
 
+
+def md5_exists(md5):
+    """Check if an MD5 hash already exists in the images table."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM images WHERE md5 = ?", (md5,))
+        return cursor.fetchone() is not None
+        
 def load_data_from_db():
     """Load or reload data from the database into the in-memory caches."""
     global tag_counts, image_data

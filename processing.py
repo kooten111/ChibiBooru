@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image
 import models
 from database import get_db_connection
+from utils.deduplication import remove_duplicate
 
 # --- Configuration ---
 SAUCENAO_API_KEY = os.environ.get('SAUCENAO_API_KEY', '')
@@ -121,6 +122,11 @@ def process_image_file(filepath):
     print(f"Processing: {filepath}")
     rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
     md5 = get_md5(filepath)
+
+    if models.md5_exists(md5):
+        print(f"Duplicate detected (MD5: {md5}). Removing redundant file: {filepath}")
+        remove_duplicate(filepath)
+        return False
 
     all_results = search_all_sources(md5)
 
