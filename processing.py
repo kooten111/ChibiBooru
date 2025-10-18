@@ -1,4 +1,4 @@
-# processing.py
+import config
 import os
 import hashlib
 import requests
@@ -10,7 +10,7 @@ import models
 from database import get_db_connection
 from utils.deduplication import remove_duplicate
 
-# --- Dependency Imports ---
+# Dependencies
 try:
     import onnxruntime as ort
     ONNX_AVAILABLE = True
@@ -25,20 +25,13 @@ except ImportError:
     TORCHVISION_AVAILABLE = False
     print("Warning: torchvision not installed. Local Tagger's image preprocessing will fail.")
 
+# Load from config
+SAUCENAO_API_KEY = config.SAUCENAO_API_KEY
+THUMB_DIR = config.THUMB_DIR
+THUMB_SIZE = config.THUMB_SIZE
 
-# --- Configuration ---
-SAUCENAO_API_KEY = os.environ.get('SAUCENAO_API_KEY', '')
-GELBOORU_API_KEY = os.environ.get('GELBOORU_API_KEY', '')
-GELBOORU_USER_ID = os.environ.get('GELBOORU_USER_ID', '')
-THUMB_DIR = "./static/thumbnails"
-THUMB_SIZE = 1000
-
-# Local Tagger configuration
-LOCAL_TAGGER_MODEL_PATH = "./models/Tagger/model.onnx"
-LOCAL_TAGGER_METADATA_PATH = "./models/Tagger/metadata.json"
-LOCAL_TAGGER_THRESHOLD = 0.5
-
-# --- Global variable for AI Tagger model ---
+# Local tagger
+tagger_config = config.get_local_tagger_config()
 local_tagger_session = None
 local_tagger_metadata = None
 idx_to_tag_map = {}

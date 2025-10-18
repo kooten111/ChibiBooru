@@ -1,4 +1,4 @@
-# app.py
+import config
 from flask import Flask
 from dotenv import load_dotenv
 
@@ -7,6 +7,16 @@ load_dotenv(override=True)
 from routes import main_blueprint, api_blueprint
 import models
 from database import initialize_database
+
+# Flask config
+app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
+
+# Monitoring
+MONITOR_ENABLED = config.MONITOR_ENABLED
+MONITOR_INTERVAL = config.MONITOR_INTERVAL
+
+# Pagination
+IMAGES_PER_PAGE = config.IMAGES_PER_PAGE
 
 def create_app():
     """Create and configure the Flask application."""
