@@ -8,20 +8,13 @@ from routes import main_blueprint, api_blueprint
 import models
 from database import initialize_database
 
-# Flask config
-app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
-
-# Monitoring
-MONITOR_ENABLED = config.MONITOR_ENABLED
-MONITOR_INTERVAL = config.MONITOR_INTERVAL
-
-# Pagination
-IMAGES_PER_PAGE = config.IMAGES_PER_PAGE
-
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
-
+    
+    # Flask config
+    app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
+    
     # Ensure the database file and tables exist.
     initialize_database()
 
@@ -35,4 +28,4 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host=config.FLASK_HOST, port=config.FLASK_PORT, debug=config.FLASK_DEBUG)

@@ -62,18 +62,12 @@ function clearSystemSecret(event) {
         event.preventDefault();
     }
     
-    if (!confirm('Are you sure you want to change the system secret?')) {
-        return;
-    }
-    
-    SYSTEM_SECRET = null;
-    localStorage.removeItem('system_secret');
-    updateSecretUI();
-    
-    if (systemStatusInterval) {
-        clearInterval(systemStatusInterval);
-        systemStatusInterval = null;
-    }
+    showConfirm('Are you sure you want to change the system secret?', () => {
+        SYSTEM_SECRET = null;
+        localStorage.removeItem('system_secret');
+        showNotification('Secret cleared', 'success');
+        updateSecretUI();
+    });
 }
 
 function addLog(message, type = 'info') {
@@ -242,18 +236,16 @@ function systemScanImages(event) {
 
 function systemRebuildTags(event) {
     if (event) event.preventDefault();
-    if (!confirm('This will delete and re-import all data from your metadata files. Are you sure?')) {
-        return;
-    }
-    systemAction('/api/system/rebuild', event.target, 'Rebuild Tags');
+    showConfirm('This will delete and re-import all data from your metadata files. Are you sure?', () => {
+        systemAction('/api/system/rebuild', event.target, 'Rebuild Tags');
+    });
 }
 
 function systemRecategorizeTags(event) {
     if (event) event.preventDefault();
-    if (!confirm('This will check all general tags and move them to the correct category (artist/character/copyright/meta) if they exist as categorized tags elsewhere. Continue?')) {
-        return;
-    }
-    systemAction('/api/system/recategorize', event.target, 'Recategorize Tags');
+    showConfirm('This will check all general tags and move them to the correct category (artist/character/copyright/meta) if they exist as categorized tags elsewhere. Continue?', () => {
+        systemAction('/api/system/recategorize', event.target, 'Recategorize Tags');
+    });
 }
 
 function systemGenerateThumbnails(event) {
@@ -273,10 +265,9 @@ function systemDeduplicate(event) {
 
 function systemCleanOrphans(event) {
     if (event) event.preventDefault();
-     if (!confirm('This will remove database entries for images that no longer exist on disk. Proceed?')) {
-        return;
-    }
-    systemAction('/api/system/clean_orphans', event.target, 'Clean Orphans', { dry_run: false });
+    showConfirm('This will remove database entries for images that no longer exist on disk. Proceed?', () => {
+        systemAction('/api/system/clean_orphans', event.target, 'Clean Orphans', { dry_run: false });
+    });
 }
 
 function systemStartMonitor(event) {

@@ -49,15 +49,15 @@ def load_local_tagger():
         return
 
     print("[Local Tagger] Attempting to load model...")
-    if not os.path.exists(LOCAL_TAGGER_MODEL_PATH) or not os.path.exists(LOCAL_TAGGER_METADATA_PATH):
+    if not os.path.exists(tagger_config['model_path']) or not os.path.exists(tagger_config['metadata_path']):
         print(f"[Local Tagger] ERROR: Model files not found.")
-        print(f"    - Searched for model at: {os.path.abspath(LOCAL_TAGGER_MODEL_PATH)}")
-        print(f"    - Searched for metadata at: {os.path.abspath(LOCAL_TAGGER_METADATA_PATH)}")
+        print(f"    - Searched for model at: {os.path.abspath(tagger_config['model_path'])}")
+        print(f"    - Searched for metadata at: {os.path.abspath(tagger_config['metadata_path'])}")
         return
 
     try:
         # Load and parse the complex metadata structure
-        with open(LOCAL_TAGGER_METADATA_PATH, 'r') as f:
+        with open(tagger_config['metadata_path'], 'r') as f:
             local_tagger_metadata = json.load(f)
         
         dataset_info = local_tagger_metadata['dataset_info']
@@ -66,7 +66,7 @@ def load_local_tagger():
         tag_to_category_map = tag_mapping['tag_to_category']
         
         providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
-        local_tagger_session = ort.InferenceSession(LOCAL_TAGGER_MODEL_PATH, providers=providers)
+        local_tagger_session = ort.InferenceSession(tagger_config['model_path'], providers=providers)
         
         print(f"[Local Tagger] SUCCESS: Model loaded. Provider: {local_tagger_session.get_providers()[0]}")
         print(f"    - Found {dataset_info['total_tags']} total tags.")
@@ -128,7 +128,7 @@ def tag_with_local_tagger(filepath):
         
         tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": []}
         
-        indices = np.where(probs[0] >= LOCAL_TAGGER_THRESHOLD)[0]
+        indices = np.where(probs[0] >= tagger_config['threshold'])[0]
         for idx in indices:
             idx_str = str(idx)
             tag_name = idx_to_tag_map.get(idx_str)

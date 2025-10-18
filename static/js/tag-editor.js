@@ -283,84 +283,82 @@ function saveTags() {
 }
 
 function confirmDelete() {
-    if (!confirm('Are you sure you want to delete this image? This cannot be undone.')) {
-        return;
-    }
+    showConfirm('Are you sure you want to delete this image? This cannot be undone.', () => {
+        const filepath = document.getElementById('imageFilepath').value;
+        
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease-out;
+        `;
+        overlay.innerHTML = `
+            <div style="
+                color: white;
+                font-size: 1.2em;
+                font-weight: 600;
+                padding: 30px 50px;
+                background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(40, 40, 60, 0.95) 100%);
+                border-radius: 16px;
+                box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+            ">
+                Deleting image...
+            </div>
+        `;
+        document.body.appendChild(overlay);
 
-    const filepath = document.getElementById('imageFilepath').value;
-    
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.8);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-        animation: fadeIn 0.3s ease-out;
-    `;
-    overlay.innerHTML = `
-        <div style="
-            color: white;
-            font-size: 1.2em;
-            font-weight: 600;
-            padding: 30px 50px;
-            background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(40, 40, 60, 0.95) 100%);
-            border-radius: 16px;
-            box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
-        ">
-            Deleting image...
-        </div>
-    `;
-    document.body.appendChild(overlay);
+        const timeoutId = setTimeout(() => {
+            console.log('Delete timeout - forcing redirect');
+            window.location.replace('/');
+        }, 5000);
 
-    const timeoutId = setTimeout(() => {
-        console.log('Delete timeout - forcing redirect');
-        window.location.replace('/');
-    }, 5000);
-
-    fetch('/api/delete_image', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            filepath: filepath
+        fetch('/api/delete_image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                filepath: filepath
+            })
         })
-    })
-    .then(response => {
-        console.log('Delete response status:', response.status);
-        if (!response.ok) {
-            return response.text().then(text => {
-                console.error('Delete error response:', text);
-                throw new Error(text || 'Delete failed');
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log('Delete response data:', data);
-        clearTimeout(timeoutId);
-        
-        if (data.status === 'success') {
-            overlay.querySelector('div').textContent = 'Deleted! Redirecting...';
-            setTimeout(() => {
-                window.location.replace('/');
-            }, 500);
-        } else {
-            throw new Error(data.error || 'Delete returned unsuccessful status');
-        }
-    })
-    .catch(error => {
-        console.error('Delete error:', error);
-        clearTimeout(timeoutId);
-        overlay.remove();
-        
-        const errorMsg = error.message || error.toString();
-        tagEditor.showNotification('Delete failed: ' + errorMsg, 'error');
+        .then(response => {
+            console.log('Delete response status:', response.status);
+            if (!response.ok) {
+                return response.text().then(text => {
+                    console.error('Delete error response:', text);
+                    throw new Error(text || 'Delete failed');
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Delete response data:', data);
+            clearTimeout(timeoutId);
+            
+            if (data.status === 'success') {
+                overlay.querySelector('div').textContent = 'Deleted! Redirecting...';
+                setTimeout(() => {
+                    window.location.replace('/');
+                }, 500);
+            } else {
+                throw new Error(data.error || 'Delete returned unsuccessful status');
+            }
+        })
+        .catch(error => {
+            console.error('Delete error:', error);
+            clearTimeout(timeoutId);
+            overlay.remove();
+            
+            const errorMsg = error.message || error.toString();
+            tagEditor.showNotification('Delete failed: ' + errorMsg, 'error');
+        });
     });
 }
