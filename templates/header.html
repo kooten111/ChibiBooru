@@ -51,6 +51,11 @@
         </button>
         {% endif %}
 
+        <a href="{{ url_for('main.tags_browser') }}" class="stat-tab-button" style="text-decoration: none;">
+            <span class="icon">🔖</span>
+            <span>All Tags</span>
+        </a>
+
         <button class="stat-tab-button" data-tab="system-panel">
             <span class="icon">⚙️</span>
             <span>System</span>

@@ -55,6 +55,18 @@ def get_image_data():
     with data_lock:
         return image_data
 
+def get_all_tags_sorted():
+    """Get all tags with their counts, sorted alphabetically by name."""
+    with get_db_connection() as conn:
+        query = """
+        SELECT t.name, t.category, COUNT(it.image_id) as count
+        FROM tags t
+        LEFT JOIN image_tags it ON t.id = it.tag_id
+        GROUP BY t.id
+        ORDER BY t.name ASC
+        """
+        return [dict(row) for row in conn.execute(query).fetchall()]
+
 def recategorize_misplaced_tags():
     """
     Check all general tags and move them to correct categories if they exist 

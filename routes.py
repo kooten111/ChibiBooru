@@ -44,6 +44,18 @@ def home():
         seed=seed,
     )
 
+@main_blueprint.route('/tags')
+def tags_browser():
+    all_tags = models.get_all_tags_sorted()
+    stats = query_service.get_enhanced_stats()
+    return render_template(
+        'tags.html',
+        all_tags=all_tags,
+        stats=stats,
+        query='',
+        random_tags=[] # Not needed for this page
+    )
+
 @main_blueprint.route('/image/<path:filepath>')
 def show_image(filepath):
     lookup_path = filepath.replace("images/", "", 1)

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>All Tags - HomeBooru</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">
+</head>
+<body>
+    {% include 'header.html' %}
+
+    <div class="container">
+        <div class="tags-browser-header">
+            <h2>Tag Browser</h2>
+            <input type="text" id="tagSearchInput" placeholder="Search for tags...">
+        </div>
+
+        <div class="tags-list-container" id="tagsListContainer">
+            {% for tag in all_tags %}
+            <a href="{{ url_for('main.home', query=tag.name) }}" class="tag-browser-item" data-tag-name="{{ tag.name }}">
+                <span class="tag-browser-name">{{ tag.name }}</span>
+                <span class="tag-browser-category {{ tag.category }}">{{ tag.category }}</span>
+                <span class="tag-browser-count">{{ tag.count }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/tags.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+</body>
+</html>

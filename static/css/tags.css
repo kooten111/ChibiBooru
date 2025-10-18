@@ -1,0 +1,86 @@
+/* static/css/tags.css */
+
+.tags-browser-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid rgba(135, 206, 235, 0.2);
+}
+
+.tags-browser-header h2 {
+    margin: 0;
+    color: #87ceeb;
+}
+
+#tagSearchInput {
+    padding: 10px 15px;
+    width: 300px;
+    background: rgba(30, 30, 40, 0.6);
+    border: 2px solid rgba(135, 206, 235, 0.2);
+    color: #e8e8e8;
+    border-radius: 10px;
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+}
+
+#tagSearchInput:focus {
+    outline: none;
+    border-color: rgba(135, 206, 235, 0.6);
+    box-shadow: 0 0 15px rgba(135, 206, 235, 0.2);
+}
+
+.tags-list-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+}
+
+.tag-browser-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    background: rgba(30, 30, 45, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(135, 206, 235, 0.1);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.tag-browser-item:hover {
+    background: rgba(74, 158, 255, 0.15);
+    border-color: rgba(135, 206, 235, 0.3);
+    transform: translateY(-2px);
+}
+
+.tag-browser-name {
+    flex: 1;
+    color: #d0d0d0;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tag-browser-category {
+    font-size: 0.8em;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 10px;
+    margin: 0 10px;
+    text-transform: capitalize;
+}
+
+.tag-browser-category.general { background-color: rgba(135, 206, 235, 0.2); color: #87ceeb; }
+.tag-browser-category.artist { background-color: rgba(244, 164, 96, 0.2); color: #f4a460; }
+.tag-browser-category.copyright { background-color: rgba(221, 160, 221, 0.2); color: #dda0dd; }
+.tag-browser-category.character { background-color: rgba(144, 238, 144, 0.2); color: #90ee90; }
+.tag-browser-category.meta { background-color: rgba(255, 215, 0, 0.2); color: #ffd700; }
+.tag-browser-category.species { background-color: rgba(74, 158, 255, 0.2); color: #4a9eff; }
+
+.tag-browser-count {
+    color: #87ceeb;
+    font-weight: 600;
+    font-size: 0.9em;
+}
