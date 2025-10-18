@@ -150,9 +150,9 @@
         <div class="related-carousel-section panel">
             <h3>
                 <span>🔗</span>
-                Related Images
+                Similar images
                 <span style="font-size: 0.7em; color: #b0b0b0; font-weight: 400; margin-left: 10px;">
-                    ({{ carousel_images|length }} similar)
+                    ({{ carousel_images|length }} images)
                 </span>
             </h3>
             <div class="carousel-container" id="relatedCarousel">
@@ -182,7 +182,10 @@
         <div class="sidebar-right">
             {% if related_images %}
             <div class="related-images panel">
-                <h3>Related Images</h3>
+                <h3>
+                    <span>👨‍👧</span>
+                    Parent/Child
+                </h3>
                 <div class="related-grid">
                     {% for related in related_images %}
                     <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
