@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, jsonify
 import random
 
-from services import query_service, system_service, api_service
+from services import query_service, system_service, api_service, monitor_service
 import models
 from utils import get_thumbnail_path
 

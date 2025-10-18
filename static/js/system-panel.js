@@ -194,7 +194,16 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
     };
     
     fetch(url, options)
-    .then(res => res.json())
+    .then(async res => {
+        // Check if response is actually JSON before trying to parse
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await res.text();
+            console.error('Non-JSON response:', text);
+            throw new Error(`Server returned non-JSON response. Status: ${res.status}`);
+        }
+        return res.json();
+    })
     .then(data => {
         if (data.status === 'success') {
             const msg = data.message || `${actionName} completed`;
@@ -207,7 +216,7 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         } else if (data.error === 'Unauthorized') {
             localStorage.removeItem('system_secret');
             SYSTEM_SECRET = null;
-            showNotification('Invalid system secret.', 'error');
+            showNotification('Invalid system secret', 'error');
             addLog('Authentication failed - invalid secret', 'error');
             updateSecretUI();
         } else {
@@ -218,6 +227,7 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         const errMsg = `${actionName} failed: ${err.message}`;
         showNotification(errMsg, 'error');
         addLog(errMsg, 'error');
+        console.error('Full error:', err);
     })
     .finally(() => {
         buttonElement.innerHTML = originalText;
