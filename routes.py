@@ -14,6 +14,7 @@ from services import (
     trigger_rebuild as trigger_rebuild_service,
     trigger_thumbnails as trigger_thumbnails_service,
     deduplicate as deduplicate_service,
+    clean_orphans as clean_orphans_service,
     start_monitor as start_monitor_service,
     stop_monitor as stop_monitor_service,
     saucenao_search as saucenao_search_service,
@@ -174,6 +175,10 @@ def trigger_thumbnails():
 @api_blueprint.route('/system/deduplicate', methods=['POST'])
 def deduplicate():
     return deduplicate_service()
+
+@api_blueprint.route('/system/clean_orphans', methods=['POST'])
+def clean_orphans():
+    return clean_orphans_service()
 
 @api_blueprint.route('/system/monitor/start', methods=['POST'])
 def start_monitor():

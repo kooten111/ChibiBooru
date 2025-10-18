@@ -368,6 +368,29 @@ def trigger_thumbnails():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def find_orphan_metadata():
+    """Find metadata entries that don't have a corresponding image file."""
+    raw_data = get_raw_data()
+    orphans = []
+    for path in raw_data.keys():
+        full_path = os.path.join("static/images", path)
+        if not os.path.exists(full_path):
+            orphans.append(path)
+    return orphans
+
+def clean_orphan_metadata_entries(orphans_to_clean):
+    """Remove specified orphan metadata entries from tags.json."""
+    raw_data = get_raw_data().copy()
+    cleaned_count = 0
+    for path in orphans_to_clean:
+        if path in raw_data:
+            del raw_data[path]
+            cleaned_count += 1
+    
+    if cleaned_count > 0:
+        with open('tags.json', 'w') as f:
+            json.dump(raw_data, f, indent=4)
+    return cleaned_count
 
 def deduplicate():
     """Run MD5 deduplication scan"""
@@ -386,6 +409,38 @@ def deduplicate():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def clean_orphans():
+    """Service to find and clean orphan metadata."""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.json or {}
+    dry_run = data.get('dry_run', True)
+    
+    try:
+        orphans = find_orphan_metadata()
+        
+        if dry_run:
+            return jsonify({
+                "status": "success",
+                "orphans_found": len(orphans),
+                "orphans": orphans,
+                "cleaned": 0
+            })
+        else:
+            cleaned_count = clean_orphan_metadata_entries(orphans)
+            if cleaned_count > 0:
+                load_data()
+            return jsonify({
+                "status": "success",
+                "orphans_found": len(orphans),
+                "orphans": orphans,
+                "cleaned": cleaned_count
+            })
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def start_monitor_service():
     """Start the monitoring thread"""

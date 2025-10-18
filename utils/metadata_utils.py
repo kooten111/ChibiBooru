@@ -1,4 +1,5 @@
 import json
+import os
 from .file_utils import get_file_md5
 
 
@@ -24,10 +25,12 @@ def get_related_images(post_id, parent_id, raw_data, id_to_path):
     
     # Add parent
     if parent_id and parent_id in id_to_path:
-        related.append({
-            "path": f"images/{id_to_path[parent_id]}",
-            "type": "parent"
-        })
+        parent_path = f"images/{id_to_path[parent_id]}"
+        if os.path.exists(f"static/{parent_path}"):
+            related.append({
+                "path": parent_path,
+                "type": "parent"
+            })
     
     # Add children (find all images that have this as parent)
     if post_id:
@@ -35,9 +38,11 @@ def get_related_images(post_id, parent_id, raw_data, id_to_path):
             if data == "not_found" or isinstance(data, str):
                 continue
             if data.get("parent_id") == post_id:
-                related.append({
-                    "path": f"images/{path}",
-                    "type": "child"
-                })
+                child_path = f"images/{path}"
+                if os.path.exists(f"static/{child_path}"):
+                    related.append({
+                        "path": f"images/{path}",
+                        "type": "child"
+                    })
     
     return related

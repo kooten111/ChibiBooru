@@ -395,6 +395,112 @@ function systemDeduplicate(event) {
     });
 }
 
+function systemCleanOrphans(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    
+    if (!SYSTEM_SECRET) {
+        showNotification('System secret not configured', 'error');
+        return;
+    }
+    
+    const buttonElement = event.target;
+    const originalText = buttonElement.textContent;
+    const originalDisabled = buttonElement.disabled;
+    
+    buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">🔍</span> Scanning...`;
+    buttonElement.disabled = true;
+    
+    addLog('Scanning for orphan metadata (dry run)...', 'info');
+    
+    const url = `/api/system/clean_orphans?secret=${encodeURIComponent(SYSTEM_SECRET)}`;
+    
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            dry_run: true
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            if (data.orphans_found === 0) {
+                showNotification('No orphan metadata found', 'success');
+                addLog('Scan complete: No orphan metadata entries found', 'success');
+                buttonElement.textContent = originalText;
+                buttonElement.disabled = originalDisabled;
+                return;
+            }
+            
+            const orphanList = data.orphans.map(o => `• ${o}`).join('\n');
+            const confirmMsg = `Found ${data.orphans_found} orphan metadata entries (no matching image file):\n\n${orphanList}\n\nClean these entries from tags.json?`;
+            
+            addLog(`Found ${data.orphans_found} orphan metadata entries`, 'info');
+            
+            if (confirm(confirmMsg)) {
+                buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">🧹</span> Cleaning...`;
+                addLog('Cleaning orphan metadata...', 'info');
+                
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        dry_run: false
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        const msg = `Cleaned ${data.cleaned} orphan metadata entries`;
+                        showNotification(msg, 'success');
+                        addLog(msg, 'success');
+                        loadSystemStatus();
+                    } else {
+                        throw new Error(data.error || 'Unknown error');
+                    }
+                })
+                .catch(err => {
+                    const errMsg = `Cleaning failed: ${err.message}`;
+                    showNotification(errMsg, 'error');
+                    addLog(errMsg, 'error');
+                })
+                .finally(() => {
+                    buttonElement.textContent = originalText;
+                    buttonElement.disabled = originalDisabled;
+                });
+            } else {
+                addLog('Orphan metadata cleaning cancelled by user', 'info');
+                buttonElement.textContent = originalText;
+                buttonElement.disabled = originalDisabled;
+            }
+        } else if (data.error === 'Unauthorized') {
+            localStorage.removeItem('system_secret');
+            SYSTEM_SECRET = null;
+            showNotification('Invalid system secret', 'error');
+            addLog('Authentication failed - invalid secret', 'error');
+            updateSecretUI();
+            buttonElement.textContent = originalText;
+            buttonElement.disabled = originalDisabled;
+        } else {
+            throw new Error(data.error || 'Unknown error');
+        }
+    })
+    .catch(err => {
+        const errMsg = `Orphan scan failed: ${err.message}`;
+        showNotification(errMsg, 'error');
+        addLog(errMsg, 'error');
+        buttonElement.textContent = originalText;
+        buttonElement.disabled = originalDisabled;
+    });
+}
+
 function systemStartMonitor(event) {
     // FIXED: Stop event bubbling
     if (event) {
