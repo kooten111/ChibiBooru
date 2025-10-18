@@ -486,13 +486,19 @@ function renderMetadataPreview(result, idx) {
     const tags = result.tags || {};
     
     return `
-        <div style="
-            background: rgba(30, 30, 45, 0.5);
-            border: 1px solid rgba(135, 206, 235, 0.2);
-            border-radius: 12px;
-            padding: 20px;
-        ">
-            <h3 style="margin: 0 0 15px 0; color: #87ceeb; font-size: 1.1em;">Metadata Preview</h3>
+        <div style="...">
+            <h3 style="...">Metadata Preview</h3>
+            
+            ${result.preview_url ? `
+                <div style="margin-bottom: 15px; text-align: center;">
+                    <img src="${result.preview_url}" style="
+                        max-width: 300px;
+                        max-height: 300px;
+                        border-radius: 8px;
+                        border: 1px solid rgba(135, 206, 235, 0.3);
+                    " onerror="this.style.display='none';">
+                </div>
+            ` : ''}
             
             ${result.image_url ? `
                 <div style="margin-bottom: 15px;">

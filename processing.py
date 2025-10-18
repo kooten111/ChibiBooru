@@ -184,7 +184,7 @@ def extract_tag_data(data, source):
     elif source in ['gelbooru', 'yandere']:
         tags_dict["general"] = data.get("tags", "")
         image_url = data.get('file_url')
-        preview_url = data.get('preview_url') if source == 'yandere' else data.get('sample_url')
+        preview_url = data.get('preview_url')  # Works for both
         width, height, file_size = data.get('width'), data.get('height'), data.get('file_size')
 
     return {
