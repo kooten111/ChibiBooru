@@ -60,6 +60,7 @@ def extract_tags_from_metadata(metadata):
         "character": "",
         "copyright": "",
         "artist": "",
+        "species": "",
         "meta": "",
         "general": ""
     }
@@ -81,6 +82,7 @@ def extract_tags_from_metadata(metadata):
         tags_dict["character"] = " ".join(tag_data.get("character", []))
         tags_dict["copyright"] = " ".join(tag_data.get("copyright", []))
         tags_dict["artist"] = " ".join(tag_data.get("artist", []))
+        tags_dict["species"] = " ".join(tag_data.get("species", []))
         tags_dict["meta"] = " ".join(tag_data.get("meta", []))
         tags_dict["general"] = " ".join(tag_data.get("general", []))
         relationships = primary_source.get("relationships", {})
@@ -96,6 +98,7 @@ def extract_tags_from_metadata(metadata):
         "tags_character": tags_dict["character"],
         "tags_copyright": tags_dict["copyright"],
         "tags_artist": tags_dict["artist"],
+        "tags_species": tags_dict["species"],
         "tags_meta": tags_dict["meta"],
         "tags_general": tags_dict["general"],
         "id": post_id,

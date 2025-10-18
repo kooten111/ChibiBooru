@@ -177,7 +177,10 @@ def repopulate_from_metadata():
                 for tag_name in tags_list:
                     if not tag_name:
                         continue
-                    cur.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, category))
+                    cur.execute("""
+                    INSERT INTO tags (name, category) VALUES (?, ?)
+                        ON CONFLICT(name) DO UPDATE SET category = excluded.category
+                    """, (tag_name, category))
                     cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
                     tag_id = cur.fetchone()['id']
                     cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
@@ -379,7 +382,10 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
             for category, tags_list in categorized_tags.items():
                 for tag_name in tags_list:
                     if not tag_name: continue
-                    cursor.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, category))
+                    cursor.execute("""
+    INSERT INTO tags (name, category) VALUES (?, ?)
+    ON CONFLICT(name) DO UPDATE SET category = excluded.category
+""", (tag_name, category))
                     cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
                     # --- THIS IS THE CORRECTED LINE ---
                     tag_id = cursor.fetchone()['id']

@@ -153,6 +153,7 @@ def process_image_file(filepath):
     tags_character = ""
     tags_copyright = ""
     tags_artist = ""
+    tags_species = ""
     tags_meta = ""
     tags_general = ""
 
@@ -167,6 +168,7 @@ def process_image_file(filepath):
         tags_character = " ".join(tags.get("character", []))
         tags_copyright = " ".join(tags.get("copyright", []))
         tags_artist = " ".join(tags.get("artist", []))
+        tags_species = " ".join(tags.get("species", []))
         tags_meta = " ".join(tags.get("meta", []))
         tags_general = " ".join(tags.get("general", []))
 
@@ -183,6 +185,7 @@ def process_image_file(filepath):
     character_set = set(tags_character.split())
     copyright_set = set(tags_copyright.split())
     artist_set = set(tags_artist.split())
+    species_set = set(tags_species.split()) 
     meta_set = set(tags_meta.split())
     general_set = set(tags_general.split())
     
@@ -192,6 +195,7 @@ def process_image_file(filepath):
         'character': list(character_set),
         'copyright': list(copyright_set),
         'artist': list(artist_set),
+        'species': list(species_set),
         'meta': list(meta_set),
         'general': list(general_set)
     }
