@@ -1,8 +1,8 @@
 // static/js/saucenao-fetch.js
 
-let SYSTEM_SECRET = localStorage.getItem('system_secret');
-let saucenaoResults = [];
-let selectedResult = null;
+var SYSTEM_SECRET = localStorage.getItem('system_secret');
+var saucenaoResults = [];
+var selectedResult = null;
 
 function formatFileSize(bytes) {
     if (bytes >= 1048576) {
@@ -335,7 +335,6 @@ function displayMetadataOptions(metadataResults) {
         </div>
         
         <div style="display: grid; gap: 20px;">
-            <!-- Source Selection -->
             <div style="
                 background: rgba(30, 30, 45, 0.5);
                 border: 1px solid rgba(135, 206, 235, 0.2);
@@ -410,12 +409,10 @@ function displayMetadataOptions(metadataResults) {
                 </div>
             </div>
             
-            <!-- Metadata Preview -->
             <div id="metadataPreview">
                 ${renderMetadataPreview(primaryResult, 0)}
             </div>
             
-            <!-- Apply Options -->
             <div style="
                 background: rgba(30, 30, 45, 0.5);
                 border: 1px solid rgba(135, 206, 235, 0.2);

@@ -1,6 +1,6 @@
-let systemStatusInterval = null;
-let SYSTEM_SECRET = localStorage.getItem('system_secret');
-let processingLogs = [];
+var systemStatusInterval = null;
+var SYSTEM_SECRET = localStorage.getItem('system_secret');
+var processingLogs = [];
 
 function updateSecretUI() {
     const secretSection = document.getElementById('secretSection');
