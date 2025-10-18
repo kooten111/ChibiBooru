@@ -46,49 +46,11 @@
 
 /* Tags List - Scrollable section */
 .tags-list {
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.6) 0%, rgba(40, 40, 60, 0.6) 100%);
-    backdrop-filter: blur(10px);
-    padding: 20px;
-    border-radius: 16px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
     margin-bottom: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
     flex: 1; /* Take remaining space */
     overflow-y: auto; /* Scroll here */
     overflow-x: hidden;
     min-height: 0; /* Required for flex scrolling */
-}
-
-.tags-list:hover {
-    border-color: rgba(135, 206, 235, 0.3);
-}
-
-.tags-list h3 {
-    margin: 0 0 15px 0;
-    font-size: 1.1em;
-    color: #87ceeb;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}
-
-/* Custom scrollbar for tags list */
-.tags-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-.tags-list::-webkit-scrollbar-track {
-    background: rgba(20, 20, 30, 0.3);
-    border-radius: 4px;
-}
-
-.tags-list::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
-    border-radius: 4px;
-}
-
-.tags-list::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
 }
 
 /* Actions Bar - Fixed at bottom */
@@ -194,28 +156,9 @@
 
 /* Related Images */
 .related-images {
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.6) 0%, rgba(40, 40, 60, 0.6) 100%);
-    backdrop-filter: blur(10px);
-    padding: 20px;
-    border-radius: 16px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
     margin-bottom: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
     overflow-y: auto;
     max-height: calc(100vh - 160px);
-}
-
-.related-images:hover {
-    border-color: rgba(135, 206, 235, 0.3);
-}
-
-.related-images h3 {
-    margin: 0 0 15px 0;
-    font-size: 1.1em;
-    color: #87ceeb;
-    font-weight: 600;
-    letter-spacing: 0.5px;
 }
 
 .related-grid {
@@ -268,25 +211,7 @@
 
 /* Metadata Info */
 .metadata-info {
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.6) 0%, rgba(40, 40, 60, 0.6) 100%);
-    backdrop-filter: blur(10px);
-    padding: 20px;
-    border-radius: 16px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-}
-
-.metadata-info:hover {
-    border-color: rgba(135, 206, 235, 0.3);
-}
-
-.metadata-info h3 {
-    margin: 0 0 15px 0;
-    font-size: 1.1em;
-    color: #87ceeb;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    margin-bottom: 20px;
 }
 
 .metadata-item {

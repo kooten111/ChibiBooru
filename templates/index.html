@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>HomeBooru</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/stats-tabs.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
@@ -66,7 +67,7 @@
         </div>
         
         <div class="stats-panels-container" id="statsPanelsContainer">
-            <div class="stat-panel" id="overview-panel">
+            <div class="stat-panel panel" id="overview-panel">
                 <h3><span>📊</span> Collection Overview</h3>
                 <div class="stats-grid">
                     <a href="{{ url_for('main.home') }}" style="text-decoration: none; color: inherit;">
@@ -113,7 +114,7 @@
             </div>
 
             {% if stats.source_breakdown %}
-            <div class="stat-panel" id="sources-panel">
+            <div class="stat-panel panel" id="sources-panel">
                 <h3><span>🌐</span> Source Breakdown</h3>
                 <div class="source-breakdown">
                     {% for source, count in stats.source_breakdown.items() %}
@@ -127,7 +128,7 @@
             {% endif %}
 
             {% if stats.top_tags %}
-            <div class="stat-panel" id="top-tags-panel">
+            <div class="stat-panel panel" id="top-tags-panel">
                 <h3><span>🏆</span> Most Popular Tags</h3>
                 <div class="top-tags-list">
                     {% for tag, count in stats.top_tags %}
@@ -143,7 +144,7 @@
             {% endif %}
 
             {% if stats.category_counts %}
-            <div class="stat-panel" id="categories-panel">
+            <div class="stat-panel panel" id="categories-panel">
                 <h3><span>🏷️</span> Tag Categories</h3>
                 <div class="category-breakdown">
                     {% for category, count in stats.category_counts.items() %}
@@ -161,7 +162,7 @@
             {% endif %}
 
             {% if random_tags %}
-            <div class="stat-panel" id="explore-panel">
+            <div class="stat-panel panel" id="explore-panel">
                 <h3><span>🎲</span> Explore Random Tags</h3>
                 <div class="source-breakdown">
                     {% for tag, count in random_tags %}
@@ -176,7 +177,7 @@
             </div>
             {% endif %}
             
-            <div class="stat-panel" id="system-panel">
+            <div class="stat-panel panel" id="system-panel">
                 <h3><span>⚙️</span> System Control</h3>
                 
                 <div id="secretSection"></div>
@@ -188,26 +189,26 @@
                 <div class="system-actions" id="systemActionsSection">
                     <h4>Actions</h4>
                     <div class="system-buttons">
-                        <button class="system-btn btn-primary" onclick="systemScanImages(event)">
+                        <button class="btn btn-primary" onclick="systemScanImages(event)">
                             🔍 Scan & Process New Images
                         </button>
-                        <button class="system-btn btn-primary" onclick="systemRebuildTags(event)">
+                        <button class="btn btn-primary" onclick="systemRebuildTags(event)">
                             🔄 Rebuild Tags from Metadata
                         </button>
-                        <button class="system-btn btn-primary" onclick="systemGenerateThumbnails(event)">
+                        <button class="btn btn-primary" onclick="systemGenerateThumbnails(event)">
                             🖼️ Generate Thumbnails
                         </button>
-                        <button class="system-btn btn-danger" onclick="systemDeduplicate(event)">
+                        <button class="btn btn-danger" onclick="systemDeduplicate(event)">
                             🗑️ Deduplicate Images
                         </button>
-                        <button class="system-btn btn-success" onclick="systemReloadData(event)">
+                        <button class="btn btn-success" onclick="systemReloadData(event)">
                             ↻ Reload Data
                         </button>
                     </div>
                     
                     <h4>Monitor Control</h4>
                     <div class="system-buttons">
-                        <button id="monitorToggleBtn" class="system-btn btn-success">
+                        <button id="monitorToggleBtn" class="btn btn-success">
                             ▶️ Start Monitor
                         </button>
                     </div>

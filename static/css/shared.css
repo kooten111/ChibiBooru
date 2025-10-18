@@ -1,0 +1,144 @@
+/* ==========================================================================
+   Shared Styles
+   ========================================================================== */
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(100px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideOutRight {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(100px); }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Panels and Cards */
+.panel {
+    background: linear-gradient(135deg, rgba(30, 30, 45, 0.6) 0%, rgba(40, 40, 60, 0.6) 100%);
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid rgba(135, 206, 235, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+}
+
+.panel:hover {
+    border-color: rgba(135, 206, 235, 0.3);
+}
+
+.panel h3 {
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    color: #87ceeb;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Buttons */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.95em;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 600;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    color: #fff;
+}
+
+.btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active {
+    transform: translateY(-1px);
+}
+
+.btn.btn-primary {
+    background: linear-gradient(135deg, #4a7c9e 0%, #357096 100%);
+}
+
+.btn.btn-primary:hover {
+    background: linear-gradient(135deg, #5a8cae 0%, #4580a6 100%);
+    box-shadow: 0 8px 25px rgba(74, 124, 158, 0.4);
+}
+
+.btn.btn-success {
+    background: linear-gradient(135deg, #4a9e6f 0%, #358a5f 100%);
+}
+
+.btn.btn-success:hover {
+    background: linear-gradient(135deg, #5aae7f 0%, #459a6f 100%);
+    box-shadow: 0 8px 25px rgba(74, 158, 111, 0.4);
+}
+
+.btn.btn-danger {
+    background: linear-gradient(135deg, #9e4a4a 0%, #8a3535 100%);
+}
+
+.btn.btn-danger:hover {
+    background: linear-gradient(135deg, #ae5a5a 0%, #9a4545 100%);
+    box-shadow: 0 8px 25px rgba(158, 74, 74, 0.4);
+}
+
+.btn.btn-secondary {
+    background: linear-gradient(135deg, rgba(74, 74, 74, 0.8) 0%, rgba(60, 60, 60, 0.8) 100%);
+}
+
+.btn.btn-secondary:hover {
+    background: linear-gradient(135deg, rgba(90, 90, 90, 0.8) 0%, rgba(75, 75, 75, 0.8) 100%);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(20, 20, 30, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
+}

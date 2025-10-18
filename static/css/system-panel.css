@@ -1,10 +1,7 @@
 /* System Panel Styles */
 .system-status {
-    background: rgba(30, 30, 45, 0.5);
     padding: 20px;
-    border-radius: 12px;
     margin-bottom: 25px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
 }
 
 .status-loading {
@@ -80,64 +77,6 @@
     margin-bottom: 20px;
 }
 
-.system-btn {
-    padding: 12px 20px;
-    border: none;
-    border-radius: 10px;
-    cursor: pointer;
-    font-size: 0.95em;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    color: #fff;
-}
-
-.system-btn.btn-primary {
-    background: linear-gradient(135deg, #4a7c9e 0%, #357096 100%);
-}
-
-.system-btn.btn-primary:hover {
-    background: linear-gradient(135deg, #5a8cae 0%, #4580a6 100%);
-    box-shadow: 0 8px 25px rgba(74, 124, 158, 0.4);
-}
-
-.system-btn.btn-success {
-    background: linear-gradient(135deg, #4a9e6f 0%, #358a5f 100%);
-}
-
-.system-btn.btn-success:hover {
-    background: linear-gradient(135deg, #5aae7f 0%, #459a6f 100%);
-    box-shadow: 0 8px 25px rgba(74, 158, 111, 0.4);
-}
-
-.system-btn.btn-danger {
-    background: linear-gradient(135deg, #9e4a4a 0%, #8a3535 100%);
-}
-
-.system-btn.btn-danger:hover {
-    background: linear-gradient(135deg, #ae5a5a 0%, #9a4545 100%);
-    box-shadow: 0 8px 25px rgba(158, 74, 74, 0.4);
-}
-
-.system-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
-}
-
-.system-btn:active {
-    transform: translateY(-1px);
-}
-
-.system-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
-}
-
 .system-logs {
     background: rgba(20, 20, 30, 0.8);
     padding: 15px;
@@ -169,25 +108,6 @@
 
 .log-entry.info {
     color: #87ceeb;
-}
-
-/* Scrollbar for system logs */
-.system-logs::-webkit-scrollbar {
-    width: 8px;
-}
-
-.system-logs::-webkit-scrollbar-track {
-    background: rgba(20, 20, 30, 0.3);
-    border-radius: 4px;
-}
-
-.system-logs::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
-    border-radius: 4px;
-}
-
-.system-logs::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
 }
 
 /* Responsive */

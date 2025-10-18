@@ -23,15 +23,6 @@ body {
     animation: slideDown 0.2s ease-out;
 }
 
-@keyframes slideDown {
-    from {
-        transform: translateY(-100%);
-    }
-    to {
-        transform: translateY(0);
-    }
-}
-
 .header-content {
     max-width: 1600px;
     margin: auto;
@@ -160,17 +151,6 @@ body {
     animation: fadeIn 0.15s ease-out;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 .autocomplete-suggestions.active {
     display: block;
 }
@@ -212,133 +192,6 @@ body {
     margin: auto;
     padding: 30px;
     animation: fadeInUp 0.3s ease-out;
-}
-
-@keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Statistics */
-.statistics {
-    margin-bottom: 30px;
-    padding: 20px;
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.6) 0%, rgba(40, 40, 60, 0.6) 100%);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
-    display: flex;
-    gap: 20px;
-    justify-content: center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.stat-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px 35px;
-    background: rgba(30, 30, 45, 0.5);
-    border-radius: 12px;
-    text-decoration: none;
-    color: inherit;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    border: 1px solid rgba(135, 206, 235, 0.1);
-}
-
-.stat-item:hover {
-    background: rgba(40, 40, 60, 0.7);
-    transform: translateY(-5px) scale(1.02);
-    box-shadow: 0 12px 40px rgba(135, 206, 235, 0.2);
-    border-color: rgba(135, 206, 235, 0.3);
-}
-
-.stat-number {
-    font-size: 2.5em;
-    font-weight: 800;
-    background: linear-gradient(135deg, #87ceeb 0%, #4a9eff 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: -1px;
-}
-
-.stat-label {
-    font-size: 0.95em;
-    color: #b0b0b0;
-    margin-top: 8px;
-    font-weight: 500;
-}
-
-.stat-item.missing .stat-number {
-    background: linear-gradient(135deg, #ff9966 0%, #ff6b6b 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-.stat-item.found .stat-number {
-    background: linear-gradient(135deg, #90ee90 0%, #66d9a0 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-/* Random Tags */
-.random-tags {
-    margin-bottom: 30px;
-    padding: 25px;
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.6) 0%, rgba(40, 40, 60, 0.6) 100%);
-    backdrop-filter: blur(10px);
-    border-radius: 16px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.random-tags h3 {
-    margin: 0 0 15px 0;
-    font-size: 1.1em;
-    color: #87ceeb;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-}
-
-.random-tags .tag-cloud {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-}
-
-.random-tags .tag-link {
-    display: inline-block;
-    padding: 8px 16px;
-    background: rgba(74, 158, 255, 0.15);
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    border-radius: 20px;
-    color: #87ceeb;
-    text-decoration: none;
-    font-size: 0.9em;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-
-.random-tags .tag-link:hover {
-    background: rgba(74, 158, 255, 0.3);
-    border-color: rgba(135, 206, 235, 0.5);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
-}
-
-.random-tags .tag-count {
-    color: #b0b0b0;
-    margin-left: 6px;
-    font-size: 0.9em;
 }
 
 /* Results Info */
@@ -398,17 +251,6 @@ body {
 .thumbnail.ultra-tall {
     grid-row: span 40;
     grid-column: span 1;
-}
-
-@keyframes scaleIn {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
 }
 
 .thumbnail:nth-child(1) { animation-delay: 0.02s; }
