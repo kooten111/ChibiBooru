@@ -1,3 +1,4 @@
+import config
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -19,23 +20,19 @@ try:
     ONNX_AVAILABLE = True
 except ImportError:
     ONNX_AVAILABLE = False
-    print("Warning: onnxruntime not installed. CamieTagger will not be available.")
+    print("Warning: onnxruntime not installed. Local Tagger will not be available.")
     print("Install with: pip install onnxruntime-gpu (or onnxruntime for CPU)")
 
-THUMB_DIR = "./static/thumbnails"
-THUMB_SIZE = 1000
+# Use config
+IMAGE_DIRECTORY = config.IMAGE_DIRECTORY
+TAGS_FILE = config.TAGS_FILE
+METADATA_DIR = config.METADATA_DIR
+THUMB_DIR = config.THUMB_DIR
+THUMB_SIZE = config.THUMB_SIZE
+SAUCENAO_API_KEY = config.SAUCENAO_API_KEY
 
-IMAGE_DIRECTORY = "./static/images" 
-TAGS_FILE = "./tags.json"
-METADATA_DIR = "./metadata"
-
-SAUCENAO_API_KEY = os.environ.get('SAUCENAO_API_KEY', '')
-
-# CamieTagger configuration
-CAMIE_MODEL_PATH = "./models/CamieTagger/camie-tagger-v2.onnx"
-CAMIE_METADATA_PATH = "./models/CamieTagger/metadata.json"
-CAMIE_THRESHOLD = 0.5
-CAMIE_TARGET_SIZE = 512  # Fixed to 512
+# Local tagger settings
+tagger_config = config.get_local_tagger_config()
 
 os.makedirs(METADATA_DIR, exist_ok=True)
 
@@ -268,8 +265,8 @@ def fetch_by_post_id(source, post_id):
 
 def merge_tag_data(all_results):
     """Merge tag data from multiple sources, prioritizing Danbooru/e621 for categories"""
-    # Priority: danbooru > e621 > gelbooru > yandere > camie_tagger
-    priority_order = ["danbooru", "e621", "gelbooru", "yandere", "camie_tagger"]
+    # Priority: danbooru > e621 > gelbooru > yandere > local_tagger
+    priority_order = ["danbooru", "e621", "gelbooru", "yandere", "local_tagger"]
     
     # Find the highest priority source
     primary_source = None
@@ -342,13 +339,13 @@ def merge_tag_data(all_results):
         "has_children": has_children
     }
 
-def load_camie_tagger():
-    """Load CamieTagger model and metadata"""
+def load_local_tagger():
+    """Load Local Tagger model and metadata"""
     if not ONNX_AVAILABLE:
         return None, None
     
-    if not os.path.exists(CAMIE_MODEL_PATH) or not os.path.exists(CAMIE_METADATA_PATH):
-        print("CamieTagger model files not found. Skipping AI tagging.")
+    if not os.path.exists(LOCAL_TAGGER_MODEL_PATH) or not os.path.exists(LOCAL_TAGGER_METADATA_PATH):
+        print("Local Tagger model files not found. Skipping AI tagging.")
         return None, None
     
     try:
@@ -357,17 +354,17 @@ def load_camie_tagger():
         session = ort.InferenceSession(CAMIE_MODEL_PATH, providers=providers)
         
         # Load metadata (tag mappings)
-        with open(CAMIE_METADATA_PATH, 'r') as f:
+        with open(LOCAL_TAGGER_METADATA_PATH, 'r') as f:
             metadata = json.load(f)
         
-        print(f"CamieTagger loaded with {len(metadata['tags'])} tags")
+        print(f"Local Tagger loaded with {len(metadata['tags'])} tags")
         return session, metadata
     except Exception as e:
-        print(f"Failed to load CamieTagger: {e}")
+        print(f"Failed to load Local Tagger: {e}")
         return None, None
 
 def preprocess_image_for_camie(image_path, target_size=512):
-    """Preprocess image for CamieTagger inference"""
+    """Preprocess image for Local Tagger inference"""
     img = Image.open(image_path).convert('RGB')
     
     # Resize maintaining aspect ratio
@@ -389,7 +386,7 @@ def preprocess_image_for_camie(image_path, target_size=512):
     return img_array
 
 def tag_with_camie(session, metadata, filepath):
-    """Tag an image using CamieTagger"""
+    """Tag an image using Local Tagger"""
     if not session or not metadata:
         return None
     
@@ -465,7 +462,7 @@ def tag_with_camie(session, metadata, filepath):
         }
         
     except Exception as e:
-        print(f"CamieTagger error for {filepath}: {e}")
+        print(f"Local Tagger error for {filepath}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -481,8 +478,8 @@ def main():
     except FileNotFoundError:
         all_tags = {}
 
-    # Load CamieTagger at startup
-    camie_session, camie_metadata = load_camie_tagger()
+    # Load Local Tagger at startup
+    local_session, local_metadata = load_local_tagger()
 
     image_files = [
         os.path.join(root, file)
@@ -562,15 +559,15 @@ def main():
                 saucenao_count += 1
                 time.sleep(5)
         
-        # Try CamieTagger if all else failed
+        # Try Local Tagger if all else failed
         if not all_results and camie_session:
-            print(f"\nAll sources failed for {relative_path}, using CamieTagger...")
+            print(f"\nAll sources failed for {relative_path}, using Local Tagger...")
             used_camie = True
-            camie_result = tag_with_camie(camie_session, camie_metadata, filepath)
-            if camie_result:
-                all_results = {"camie_tagger": camie_result}
-                print(f"Tagged with CamieTagger: {len(camie_result['tag_string'].split())} tags")
-                camie_count += 1
+            tagger_result = tag_with_camie(camie_session, camie_metadata, filepath)
+            if tagger_result:
+                all_results = {"camie_tagger": tagger_result}
+                print(f"Tagged with Local Tagger: {len(tagger_result['tag_string'].split())} tags")
+                local_count += 1
         
         if all_results:
             merged_data = merge_tag_data(all_results)
@@ -624,7 +621,7 @@ def main():
     if saucenao_count > 0:
         print(f"Used SauceNao for {saucenao_count} images")
     if camie_count > 0:
-        print(f"Used CamieTagger for {camie_count} images")
+        print(f"Used Local Tagger for {camie_count} images")
 
 if __name__ == "__main__":
     main()
