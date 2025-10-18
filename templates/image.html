@@ -17,9 +17,9 @@
 <body>
     <div class="header">
         <div class="header-content">
-            <h1><a href="{{ url_for('home') }}">HomeBooru</a></h1>
+            <h1><a href="{{ url_for('main.home') }}">HomeBooru</a></h1>
             <div class="search-bar">
-                <form action="{{ url_for('home') }}" method="get">
+                <form action="{{ url_for('main.home') }}" method="get">
                     <div class="autocomplete-container">
                         <input type="text" name="query" id="searchInput" placeholder="Search tags..." autocomplete="off">
                         <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
@@ -39,7 +39,7 @@
                         <div class="tag-category-title">Artist</div>
                         {% for tag, count in categorized_tags.artist %}
                         <div class="tag-item">
-                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
                                 {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
                             </span>
@@ -53,7 +53,7 @@
                         <div class="tag-category-title">Copyright</div>
                         {% for tag, count in categorized_tags.copyright %}
                         <div class="tag-item">
-                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
                                 {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
                             </span>
@@ -67,7 +67,7 @@
                         <div class="tag-category-title">Character</div>
                         {% for tag, count in categorized_tags.character %}
                         <div class="tag-item">
-                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
                                 {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
                             </span>
@@ -81,7 +81,7 @@
                         <div class="tag-category-title">Tags</div>
                         {% for tag, count in tags %}
                         <div class="tag-item">
-                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
                                 {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
                             </span>
@@ -95,7 +95,7 @@
                         <div class="tag-category-title">Meta</div>
                         {% for tag, count in categorized_tags.meta %}
                         <div class="tag-item">
-                            <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
                                 {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
                             </span>
@@ -107,7 +107,7 @@
                     <h3>Tags</h3>
                     {% for tag, count in tags %}
                     <div class="tag-item">
-                        <a href="{{ url_for('home', query=tag) }}">{{ tag }}</a>
+                        <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                         <span class="tag-count">
                             {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
                         </span>
@@ -119,7 +119,7 @@
                 <button class="btn btn-primary" onclick="toggleTagEditor()">
                     📝 Edit Tags
                 </button>
-                <a href="{{ url_for('find_similar', filepath=filepath) }}" class="btn btn-secondary">
+                <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
                     🔍 Find Similar
                 </a>
                 <button class="btn btn-danger" onclick="confirmDelete()">
@@ -166,7 +166,7 @@
                 <div class="carousel-track">
                     {% for img in carousel_images %}
                     <div class="carousel-item">
-                        <a href="{{ url_for('show_image', filepath=img.path) }}">
+                        <a href="{{ url_for('main.show_image', filepath=img.path) }}">
                             <img src="{{ url_for('static', filename=img.thumb) }}" 
                                  alt="Related image" 
                                  loading="lazy">
@@ -191,7 +191,7 @@
                 <h3>Related Images</h3>
                 <div class="related-grid">
                     {% for related in related_images %}
-                    <a href="{{ url_for('show_image', filepath=related.path) }}" class="related-thumb">
+                    <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
                         <img src="{{ url_for('static', filename=related.path) }}" alt="Related">
                         <span class="label">{{ related.type }}</span>
                     </a>

@@ -10,9 +10,9 @@
 <body>
     <div class="header">
         <div class="header-content">
-            <h1><a href="{{ url_for('home') }}">HomeBooru</a></h1>
+            <h1><a href="{{ url_for('main.home') }}">HomeBooru</a></h1>
             <div class="search-bar">
-                <form action="{{ url_for('home') }}" method="get" id="searchForm">
+                <form action="{{ url_for('main.home') }}" method="get" id="searchForm">
                     <div class="autocomplete-container">
                         <input type="text" name="query" id="searchInput" placeholder="Search tags..." value="{{ query or '' }}" autocomplete="off">
                         <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
@@ -69,19 +69,19 @@
             <div class="stat-panel" id="overview-panel">
                 <h3><span>📊</span> Collection Overview</h3>
                 <div class="stats-grid">
-                    <a href="{{ url_for('home') }}" style="text-decoration: none; color: inherit;">
+                    <a href="{{ url_for('main.home') }}" style="text-decoration: none; color: inherit;">
                         <div class="stat-card">
                             <div class="stat-card-number">{{ stats.total }}</div>
                             <div class="stat-card-label">Total Images</div>
                         </div>
                     </a>
-                    <a href="{{ url_for('home', query='metadata:found') }}" style="text-decoration: none; color: inherit;">
+                    <a href="{{ url_for('main.home', query='metadata:found') }}" style="text-decoration: none; color: inherit;">
                         <div class="stat-card success">
                             <div class="stat-card-number">{{ stats.with_metadata }}</div>
                             <div class="stat-card-label">With Metadata</div>
                         </div>
                     </a>
-                    <a href="{{ url_for('home', query='metadata:missing') }}" style="text-decoration: none; color: inherit;">
+                    <a href="{{ url_for('main.home', query='metadata:missing') }}" style="text-decoration: none; color: inherit;">
                         <div class="stat-card warning">
                             <div class="stat-card-number">{{ stats.without_metadata }}</div>
                             <div class="stat-card-label">Missing Metadata</div>
@@ -102,7 +102,7 @@
                     </div>
                     {% endif %}
                     {% if stats.camie_used > 0 %}
-                    <a href="{{ url_for('home', query='source:camie_tagger') }}" style="text-decoration: none; color: inherit;">
+                    <a href="{{ url_for('main.home', query='source:camie_tagger') }}" style="text-decoration: none; color: inherit;">
                         <div class="stat-card">
                             <div class="stat-card-number">{{ stats.camie_used }}</div>
                             <div class="stat-card-label">AI Tagged</div>
@@ -117,7 +117,7 @@
                 <h3><span>🌐</span> Source Breakdown</h3>
                 <div class="source-breakdown">
                     {% for source, count in stats.source_breakdown.items() %}
-                    <a href="{{ url_for('home', query='source:' + source) }}" class="source-badge" style="text-decoration: none;">
+                    <a href="{{ url_for('main.home', query='source:' + source) }}" class="source-badge" style="text-decoration: none;">
                         <span class="source-name">{{ source }}</span>
                         <span class="source-count">{{ count }}</span>
                     </a>
@@ -131,7 +131,7 @@
                 <h3><span>🏆</span> Most Popular Tags</h3>
                 <div class="top-tags-list">
                     {% for tag, count in stats.top_tags %}
-                    <a href="{{ url_for('home', query=tag) }}" class="top-tag-item">
+                    <a href="{{ url_for('main.home', query=tag) }}" class="top-tag-item">
                         <span>{{ tag }}</span>
                         <span class="top-tag-count">
                             {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
@@ -148,7 +148,7 @@
                 <div class="category-breakdown">
                     {% for category, count in stats.category_counts.items() %}
                     {% if count > 0 %}
-                    <a href="{{ url_for('home', query='category:' + category) }}" style="text-decoration: none; color: inherit;">
+                    <a href="{{ url_for('main.home', query='category:' + category) }}" style="text-decoration: none; color: inherit;">
                         <div class="category-card {{ category }}">
                             <div class="category-number">{{ count }}</div>
                             <div class="category-label">{{ category }}</div>
@@ -165,7 +165,7 @@
                 <h3><span>🎲</span> Explore Random Tags</h3>
                 <div class="source-breakdown">
                     {% for tag, count in random_tags %}
-                    <a href="{{ url_for('home', query=tag) }}" class="source-badge" style="text-decoration: none;">
+                    <a href="{{ url_for('main.home', query=tag) }}" class="source-badge" style="text-decoration: none;">
                         <span class="source-name">{{ tag }}</span>
                         <span class="source-count">
                             {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
@@ -232,7 +232,7 @@
         <div class="gallery">
             {% for image in images %}
             <div class="thumbnail">
-                <a href="{{ url_for('show_image', filepath=image.path) }}">
+                <a href="{{ url_for('main.show_image', filepath=image.path) }}">
                     <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy">
                     {% if show_similarity and image.similarity %}
                     <div style="position: absolute; top: 5px; right: 5px; background-color: rgba(0,0,0,0.8); color: #87ceeb; padding: 4px 8px; border-radius: 3px; font-size: 0.85em; font-weight: bold;">
