@@ -5,7 +5,7 @@ import models
 import generate_thumbnails
 import processing
 from utils.deduplication import scan_and_remove_duplicates
-from . import monitor_service # <-- THIS IS THE CORRECTED IMPORT
+from . import monitor_service
 import subprocess
 import sys
 
@@ -34,14 +34,30 @@ def rebuild_service():
     try:
         monitor_service.stop_monitor()
         
-        # Use the file-based repopulate instead of database-only rebuild
-        models.repopulate_from_metadata()  # Changed from rebuild_tags_from_raw_metadata()
+        models.repopulate_from_metadata()
         
         models.load_data_from_db()
         
         return jsonify({"status": "success", "message": "Tag re-processing complete."})
     except Exception as e:
         models.load_data_from_db()
+        return jsonify({"error": str(e)}), 500
+
+def recategorize_service():
+    """Service to recategorize misplaced tags without full rebuild."""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        changes = models.recategorize_misplaced_tags()
+        models.load_data_from_db()  # Refresh cache
+        return jsonify({
+            "status": "success", 
+            "message": f"Recategorized {changes} tags",
+            "changes": changes
+        })
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 def get_system_status():

@@ -1,4 +1,3 @@
-# models.py
 import threading
 import os
 import json
@@ -48,10 +47,52 @@ def get_image_data():
     with data_lock:
         return image_data
 
+def recategorize_misplaced_tags():
+    """
+    Check all general tags and move them to correct categories if they exist 
+    as categorized tags elsewhere in the database.
+    """
+    print("Recategorizing misplaced tags...")
+    
+    # Build lookup from all known categorized tags
+    known_categorized = {
+        'artist': set(),
+        'copyright': set(),
+        'character': set(),
+        'meta': set()
+    }
+    
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        
+        # Build lookup from existing categorized tags
+        for category in ['artist', 'copyright', 'character', 'meta']:
+            cur.execute("SELECT DISTINCT name FROM tags WHERE category = ?", (category,))
+            known_categorized[category].update(row['name'] for row in cur.fetchall())
+        
+        # Find all general tags that should be recategorized
+        cur.execute("SELECT DISTINCT name FROM tags WHERE category = 'general'")
+        general_tags = [row['name'] for row in cur.fetchall()]
+        
+        changes = 0
+        for tag_name in tqdm(general_tags, desc="Checking tags"):
+            for category, tag_set in known_categorized.items():
+                if tag_name in tag_set:
+                    # Found a match - update this tag's category
+                    cur.execute("UPDATE tags SET category = ? WHERE name = ? AND category = 'general'", 
+                               (category, tag_name))
+                    changes += 1
+                    break
+        
+        conn.commit()
+    
+    print(f"Recategorized {changes} tags")
+    return changes
+
 def rebuild_tags_from_raw_metadata():
     """
     Clears and repopulates the tag tables by parsing the JSON data
-    stored in the 'raw_metadata' table. This is the new 'Rebuild' logic.
+    stored in the 'raw_metadata' table. Then recategorizes any misplaced tags.
     """
     print("Rebuilding tags from raw metadata in database...")
     with get_db_connection() as conn:
@@ -149,7 +190,13 @@ def rebuild_tags_from_raw_metadata():
                                (image_id, tag_id))
         
         conn.commit()
-    print("Tag rebuild from raw metadata completed successfully.")
+    
+    print("Tag rebuild from raw metadata completed.")
+    
+    # Step 4: Recategorize misplaced tags
+    recategorize_misplaced_tags()
+    
+    print("Rebuild process complete.")
 
 def clear_all_data():
     """Deletes all rows from all data tables in the correct order."""
@@ -183,14 +230,16 @@ def repopulate_from_metadata():
             source_map[source_name] = cur.fetchone()[0]
 
         for filename in tqdm(os.listdir(METADATA_DIR), desc="Rebuilding from Metadata"):
-            if not filename.endswith('.json'): continue
+            if not filename.endswith('.json'): 
+                continue
             
             with open(os.path.join(METADATA_DIR, filename), 'r') as f:
                 metadata = json.load(f)
 
             rel_path = metadata.get("relative_path")
             md5 = metadata.get("md5")
-            if not rel_path or not md5: continue
+            if not rel_path or not md5: 
+                continue
 
             # Determine primary source for categorized tags
             primary_source_data = None
@@ -200,7 +249,7 @@ def repopulate_from_metadata():
             elif 'e621' in metadata['sources']:
                 primary_source_data = metadata['sources']['e621']
                 source_name = 'e621'
-            else: # Fallback for other sources
+            else:
                 primary_source_data = next(iter(metadata['sources'].values()), {})
                 source_name = next(iter(metadata['sources'].keys()), None)
             
@@ -218,12 +267,10 @@ def repopulate_from_metadata():
                 if src in source_map:
                     cur.execute("INSERT OR IGNORE INTO image_sources (image_id, source_id) VALUES (?, ?)", (image_id, source_map[src]))
             if metadata.get("camie_tagger_lookup"):
-                 cur.execute("INSERT OR IGNORE INTO image_sources (image_id, source_id) VALUES (?, ?)", (image_id, source_map['local_tagger']))
+                cur.execute("INSERT OR IGNORE INTO image_sources (image_id, source_id) VALUES (?, ?)", (image_id, source_map['local_tagger']))
 
             # Extract and insert tags
-            all_tags = set()
             categorized_tags = {}
-
             if source_name == 'danbooru':
                 categorized_tags = {
                     'character': primary_source_data.get("tag_string_character", "").split(),
@@ -235,24 +282,39 @@ def repopulate_from_metadata():
             elif source_name == 'e621':
                 tags = primary_source_data.get("tags", {})
                 categorized_tags = {
-                    'character': tags.get("character", []), 'copyright': tags.get("copyright", []),
-                    'artist': tags.get("artist", []), 'meta': tags.get("meta", []), 'general': tags.get("general", [])
+                    'character': tags.get("character", []),
+                    'copyright': tags.get("copyright", []),
+                    'artist': tags.get("artist", []),
+                    'meta': tags.get("meta", []),
+                    'general': tags.get("general", [])
                 }
+            elif source_name in ['gelbooru', 'yandere']:
+                tags_str = primary_source_data.get("tags", "")
+                if tags_str:
+                    categorized_tags = {'general': tags_str.split() if isinstance(tags_str, str) else tags_str}
+            elif source_name == 'local_tagger':
+                predictions = primary_source_data.get("predictions", {})
+                if predictions:
+                    categorized_tags = {'general': list(predictions.keys())}
             
-            # Combine all tags and insert
             for category, tags_list in categorized_tags.items():
                 for tag_name in tags_list:
-                    if not tag_name: continue
-                    all_tags.add((tag_name, category))
-            
-            for tag_name, category in all_tags:
-                cur.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, category))
-                cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
-                tag_id = cur.fetchone()['id']
-                cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
+                    if not tag_name:
+                        continue
+                    cur.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, category))
+                    cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+                    tag_id = cur.fetchone()['id']
+                    cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
 
         con.commit()
-    print("Database repopulated successfully.")
+    
+    print("Repopulation complete.")
+    
+    # Recategorize any misplaced tags
+    recategorize_misplaced_tags()
+    
+    print("Database rebuild complete.")
+    
 # --- Direct Database Query Functions ---
 
 def get_image_count():

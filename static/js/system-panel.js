@@ -157,22 +157,20 @@ function loadSystemStatus() {
         });
 }
 
-// --- THIS IS THE CORRECTED FUNCTION ---
 function updateMonitorButton(isRunning) {
     const btn = document.getElementById('monitorToggleBtn');
     if (!btn) return;
     
     if (isRunning) {
-        btn.className = 'btn btn-danger'; // Keep the base 'btn' class
+        btn.className = 'btn btn-danger';
         btn.innerHTML = '⏸️ Stop Monitor';
         btn.onclick = (e) => systemStopMonitor(e);
     } else {
-        btn.className = 'btn btn-success'; // Keep the base 'btn' class
+        btn.className = 'btn btn-success';
         btn.innerHTML = '▶️ Start Monitor';
         btn.onclick = (e) => systemStartMonitor(e);
     }
 }
-// --- END OF CORRECTION ---
 
 function systemAction(endpoint, buttonElement, actionName, body = null) {
     if (!SYSTEM_SECRET) {
@@ -195,7 +193,6 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
     
     fetch(url, options)
     .then(async res => {
-        // Check if response is actually JSON before trying to parse
         const contentType = res.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
             const text = await res.text();
@@ -211,6 +208,9 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
             addLog(msg, 'success');
             if (data.processed !== undefined) {
                 addLog(`Processed ${data.processed} items`, 'success');
+            }
+            if (data.changes !== undefined) {
+                addLog(`Changed ${data.changes} tags`, 'success');
             }
             loadSystemStatus();
         } else if (data.error === 'Unauthorized') {
@@ -242,10 +242,18 @@ function systemScanImages(event) {
 
 function systemRebuildTags(event) {
     if (event) event.preventDefault();
-    if (!confirm('This will delete and re-import all data from your tags.json and metadata files. Are you sure?')) {
+    if (!confirm('This will delete and re-import all data from your metadata files. Are you sure?')) {
         return;
     }
     systemAction('/api/system/rebuild', event.target, 'Rebuild Tags');
+}
+
+function systemRecategorizeTags(event) {
+    if (event) event.preventDefault();
+    if (!confirm('This will check all general tags and move them to the correct category (artist/character/copyright/meta) if they exist as categorized tags elsewhere. Continue?')) {
+        return;
+    }
+    systemAction('/api/system/recategorize', event.target, 'Recategorize Tags');
 }
 
 function systemGenerateThumbnails(event) {
@@ -260,7 +268,6 @@ function systemReloadData(event) {
 
 function systemDeduplicate(event) {
     if (event) event.preventDefault();
-    // Simplified action for now
     systemAction('/api/system/deduplicate', event.target, 'Deduplicate', { dry_run: false });
 }
 

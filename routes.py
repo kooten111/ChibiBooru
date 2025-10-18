@@ -98,15 +98,17 @@ def reload_data():
 def system_status():
     return system_service.get_system_status()
 
-# --- THIS BLOCK IS CORRECTED ---
 @api_blueprint.route('/system/scan', methods=['POST'])
 def trigger_scan():
     return system_service.scan_and_process_service()
-# --- END OF CORRECTION ---
 
 @api_blueprint.route('/system/rebuild', methods=['POST'])
 def trigger_rebuild():
     return system_service.rebuild_service()
+
+@api_blueprint.route('/system/recategorize', methods=['POST'])
+def trigger_recategorize():
+    return system_service.recategorize_service()
 
 @api_blueprint.route('/system/thumbnails', methods=['POST'])
 def trigger_thumbnails():

@@ -87,32 +87,19 @@
                     <div class="stat-card-number">{{ stats.avg_tags_per_image }}</div>
                     <div class="stat-card-label">Avg Tags/Image</div>
                 </div>
-                {% if stats.saucenao_used > 0 %}
-                <div class="stat-card">
-                    <div class="stat-card-number">{{ stats.saucenao_used }}</div>
-                    <div class="stat-card-label">SauceNao Lookups</div>
-                </div>
-                {% endif %}
-                
-                {% if stats.local_tagger_used > 0 %}
-                <a href="{{ url_for('main.home', query='source:local_tagger') }}" style="text-decoration: none; color: inherit;">
-                    <div class="stat-card">
-                        <div class="stat-card-number">{{ stats.local_tagger_used }}</div>
-                        <div class="stat-card-label">AI Tagged</div>
-                    </div>
-                </a>
-                {% endif %}
             </div>
         </div>
 
         {% if stats.source_breakdown %}
         <div class="stat-panel panel" id="sources-panel">
-            <h3><span>🌐</span> Source Breakdown</h3>
-            <div class="source-breakdown">
+            <h3><span>🌐</span> Source Distribution</h3>
+            <div class="stats-grid">
                 {% for source, count in stats.source_breakdown.items() %}
-                <a href="{{ url_for('main.home', query='source:' + source) }}" class="source-badge" style="text-decoration: none;">
-                    <span class="source-name">{{ source }}</span>
-                    <span class="source-count">{{ count }}</span>
+                <a href="{{ url_for('main.home', query='source:' + source) }}" style="text-decoration: none; color: inherit;">
+                    <div class="stat-card">
+                        <div class="stat-card-number">{{ count }}</div>
+                        <div class="stat-card-label">{{ source|capitalize }}</div>
+                    </div>
                 </a>
                 {% endfor %}
             </div>
@@ -124,11 +111,9 @@
             <h3><span>🏆</span> Most Popular Tags</h3>
             <div class="top-tags-list">
                 {% for tag, count in stats.top_tags %}
-                <a href="{{ url_for('main.home', query=tag) }}" class="top-tag-item">
-                    <span>{{ tag }}</span>
-                    <span class="top-tag-count">
-                        {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                    </span>
+                <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                    <span class="tag-name">{{ tag }}</span>
+                    <span class="tag-count">{{ count }}</span>
                 </a>
                 {% endfor %}
             </div>
@@ -140,14 +125,12 @@
             <h3><span>🏷️</span> Tag Categories</h3>
             <div class="category-breakdown">
                 {% for category, count in stats.category_counts.items() %}
-                {% if count > 0 %}
                 <a href="{{ url_for('main.home', query='category:' + category) }}" style="text-decoration: none; color: inherit;">
                     <div class="category-card {{ category }}">
                         <div class="category-number">{{ count }}</div>
-                        <div class="category-label">{{ category }}</div>
+                        <div class="category-label">{{ category|capitalize }}</div>
                     </div>
                 </a>
-                {% endif %}
                 {% endfor %}
             </div>
         </div>
@@ -155,14 +138,12 @@
 
         {% if random_tags %}
         <div class="stat-panel panel" id="explore-panel">
-            <h3><span>🎲</span> Explore Random Tags</h3>
-            <div class="source-breakdown">
+            <h3><span>🎲</span> Random Tags</h3>
+            <div class="top-tags-list">
                 {% for tag, count in random_tags %}
-                <a href="{{ url_for('main.home', query=tag) }}" class="source-badge" style="text-decoration: none;">
-                    <span class="source-name">{{ tag }}</span>
-                    <span class="source-count">
-                        {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                    </span>
+                <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                    <span class="tag-name">{{ tag }}</span>
+                    <span class="tag-count">{{ count }}</span>
                 </a>
                 {% endfor %}
             </div>
@@ -186,6 +167,9 @@
                     </button>
                     <button class="btn btn-primary" onclick="systemRebuildTags(event)">
                         🔄 Re-process All Tags
+                    </button>
+                    <button class="btn btn-primary" onclick="systemRecategorizeTags(event)">
+                        🏷️ Recategorize Tags
                     </button>
                     <button class="btn btn-primary" onclick="systemGenerateThumbnails(event)">
                         🖼️ Generate Thumbnails
@@ -216,3 +200,7 @@
         </div>
     </div>
 </div>
+
+<script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/header.js') }}"></script>
+<script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
