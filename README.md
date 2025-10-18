@@ -1,20 +1,21 @@
 # HomeBooru
 
-Self-hosted image gallery with automatic tag fetching from multiple booru sources (Danbooru, e621, Gelbooru, Yandere) and AI tagging fallback. Features built-in monitoring, infinite scroll, tag editing, similarity search, and real-time statistics.
+Self-hosted image gallery with automatic tag fetching from multiple booru sources (Danbooru, e621, Gelbooru, Yandere) and AI tagging fallback. Features built-in monitoring, infinite scroll, tag editing, similarity search, and deduplication.
 
 ## Features
 
 - **Built-in Monitoring**: Automatic background scanning for new images every 5 minutes
-- **System Control Panel**: Web-based controls for scan, rebuild, thumbnails, and monitor
+- **System Control Panel**: Web-based controls for scan, rebuild, thumbnails, deduplication, and monitor
 - **Automatic Tag Fetching**: MD5-based search across 4 booru APIs in parallel
 - **AI Tagging Fallback**: CamieTagger ONNX model for images not found on boorus
-- **Reverse Image Search**: SauceNao integration for finding booru sources
+- **Reverse Image Search**: SauceNao integration with metadata application and image replacement
+- **Deduplication**: MD5-based duplicate detection and removal
 - **Categorized Tags**: Character, Copyright, Artist, Meta, General
-- **Smart Search**: Multi-tag search with autocomplete
+- **Smart Search**: Multi-tag search with autocomplete, filename, source, and category filters
 - **Infinite Scroll**: Smooth pagination with prefetching
 - **Related Images**: Weighted similarity by character/copyright/artist/general tags
 - **Tag Editing**: In-browser tag editor with autocomplete
-- **Statistics Dashboard**: Expandable tabs showing collection stats, top tags, sources, categories
+- **Statistics Dashboard**: Overview, sources, top tags, categories, random tag explorer
 - **Image Relationships**: Parent/child linking
 - **Hot Reload**: Update without restarting Flask
 
@@ -35,7 +36,7 @@ Self-hosted image gallery with automatic tag fetching from multiple booru source
 │   │   ├── actions.css
 │   │   ├── stats-tabs.css
 │   │   ├── carousel.css
-│   │   └── system-panel.css        # System control panel styles
+│   │   └── system-panel.css
 │   ├── js/
 │   │   ├── autocomplete.js
 │   │   ├── tag-editor.js
@@ -43,7 +44,8 @@ Self-hosted image gallery with automatic tag fetching from multiple booru source
 │   │   ├── stats-tabs.js
 │   │   ├── carousel.js
 │   │   ├── image-preloader.js
-│   │   └── system-panel.js         # System control panel logic
+│   │   ├── system-panel.js
+│   │   └── saucenao-fetch.js
 │   ├── images/                     # Your images
 │   └── thumbnails/                 # Generated WebP thumbnails
 ├── metadata/                       # Generated: Full booru metadata by MD5
@@ -57,7 +59,8 @@ Self-hosted image gallery with automatic tag fetching from multiple booru source
 └── utils/
     ├── __init__.py
     ├── file_utils.py
-    └── metadata_utils.py
+    ├── metadata_utils.py
+    └── deduplication.py
 ```
 
 ## Installation
@@ -77,9 +80,6 @@ pip install flask pillow requests tqdm
 
 # Optional: AI tagging (GPU recommended)
 pip install onnxruntime-gpu numpy  # or onnxruntime for CPU
-
-# Optional: Advanced file processing
-pip install openpyxl pandas
 ```
 
 2. **Create directories**
@@ -219,6 +219,12 @@ Access via the **System** tab on the home page (requires RELOAD_SECRET).
 - Runs generate_thumbnails.py
 - Creates WebP thumbnails for all images
 
+**Find & Remove Duplicates**
+- MD5-based duplicate detection
+- Shows preview with file paths and sizes
+- Confirm before deletion
+- Removes duplicate images, thumbnails, and metadata
+
 **Reload Data**
 - Reloads tags.json into memory
 - Use after manual edits
@@ -250,6 +256,28 @@ When opening System tab for the first time:
 3. **Gelbooru** - Tags only, no categories
 4. **Yandere** - Tags only, no categories
 5. **CamieTagger** - AI predictions with confidence scoring
+
+## SauceNao Integration
+
+For images without metadata, you can use SauceNao reverse image search:
+
+1. Navigate to an image marked "metadata:missing" or "not_found"
+2. Click the "🔍 SauceNao Search" button on the image page
+3. Review found sources (Danbooru, e621, Gelbooru, Yandere)
+4. Click "View Details" to see full metadata preview
+5. Select your preferred source
+6. **Optional**: Check "Download Higher Quality Image" to replace your local file
+7. Click "Apply Metadata"
+
+The system will:
+- Apply tags from the selected source
+- Save metadata to `metadata/{md5}.json`
+- Update `tags.json`
+- Optionally download and replace the image file with the booru source
+- Remove old files if replacing
+- Detect and prevent duplicate filenames
+
+Requires `SAUCENAO_API_KEY` environment variable.
 
 ## Manual Operations
 
@@ -308,9 +336,10 @@ Gallery with search, infinite scroll, stats dashboard
 - `metadata:found` - Images with metadata
 - `filename:term` - Search by filename
 - `source:danbooru` - Filter by source
+- `category:character` - Filter by tag category
 
 ### GET `/image/<path:filepath>`
-Image detail view with tags, metadata, related images carousel
+Image detail view with tags, metadata, related images carousel, SauceNao search
 
 ### GET `/similar/<path:filepath>`
 Find images similar to the given one (Jaccard similarity)
@@ -321,25 +350,6 @@ JSON endpoint for infinite scroll
 ### GET `/api/system/status`
 Get monitoring and collection status (no auth required)
 
-**Returns:**
-```json
-{
-  "monitor": {
-    "enabled": true,
-    "running": true,
-    "last_check": "2025-01-15 14:30:00",
-    "last_scan_found": 5,
-    "total_processed": 123,
-    "interval_seconds": 300
-  },
-  "collection": {
-    "total_images": 1000,
-    "with_metadata": 950,
-    "unprocessed": 50
-  }
-}
-```
-
 ### POST `/api/system/scan`
 Manually trigger scan and processing (requires secret)
 
@@ -349,11 +359,23 @@ Rebuild tags.json from metadata (requires secret)
 ### POST `/api/system/thumbnails`
 Generate thumbnails (requires secret)
 
+### POST `/api/system/deduplicate`
+Find and remove duplicate images (requires secret)
+
 ### POST `/api/system/monitor/start`
 Start monitoring thread (requires secret)
 
 ### POST `/api/system/monitor/stop`
 Stop monitoring thread (requires secret)
+
+### POST `/api/saucenao/search`
+Search SauceNao for image sources (requires secret)
+
+### POST `/api/saucenao/fetch_metadata`
+Fetch full metadata from booru source (requires secret)
+
+### POST `/api/saucenao/apply`
+Apply metadata and optionally replace image (requires secret)
 
 ### POST `/api/reload`
 Reload tags.json without restarting Flask (requires secret)
@@ -373,6 +395,7 @@ Tag suggestions for autocomplete
 - **Multiple tags (AND)**: `1girl blue_eyes long_hair`
 - **Filename search**: `filename:abc123` or just type the filename
 - **Source filter**: `source:danbooru`
+- **Category filter**: `category:character`
 - **Missing metadata**: `metadata:missing`
 - **Found metadata**: `metadata:found`
 
@@ -410,6 +433,15 @@ Image detail page shows:
 - Add: Type and press Enter/Space
 - Remove: Click X or Backspace on empty input
 - Saves to tags.json and triggers reload
+
+### Deduplication
+
+- MD5-based duplicate detection
+- Dry run preview before deletion
+- Shows duplicate groups with file paths and sizes
+- Keeps first occurrence, removes others
+- Cleans up images, thumbnails, and metadata
+- Confirmation required before deletion
 
 ## Metadata Structure
 
@@ -450,8 +482,7 @@ Image detail page shows:
       "tag_string": "...",
       "tag_string_character": "...",
       "rating": "s",
-      "score": 100,
-      ...
+      "score": 100
     }
   }
 }
@@ -481,13 +512,6 @@ Download model files to `models/CamieTagger/`
 - Verify `MONITOR_ENABLED = True` in app.py
 - Check Flask console for errors
 
-### Monitor not finding new images
-
-- Images must be in `static/images/` directory
-- Check that images have valid extensions (.jpg, .jpeg, .png, .gif, .webp)
-- Verify images aren't already in tags.json
-- Check Flask console logs during scan
-
 ### System Control Panel shows "Unauthorized"
 
 - Ensure you entered the correct RELOAD_SECRET
@@ -506,7 +530,6 @@ Download model files to `models/CamieTagger/`
 - Lower WebP quality in `generate_thumbnails.py`
 - Use smaller `per_page` values
 - Disable CamieTagger if not needed
-- Reduce `MONITOR_INTERVAL` to process smaller batches
 
 ### Performance issues
 
@@ -515,61 +538,7 @@ Download model files to `models/CamieTagger/`
 - Increase `MONITOR_INTERVAL` for less frequent checks
 - Consider Redis for tag caching with 100k+ images
 
-## Production Deployment
-
-### With Gunicorn
-
-```bash
-pip install gunicorn
-
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-```
-
-The monitoring thread works with Gunicorn, but runs only in the master process.
-
-### With Nginx
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-    client_max_body_size 100M;
-
-    location / {
-        proxy_pass http://localhost:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location /static/ {
-        alias /path/to/your/booru/static/;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
-
-### Security
-
-1. **Change reload secret**
-   ```bash
-   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-   ```
-
-2. **Restrict system endpoints**
-   ```nginx
-   location /api/system/ {
-       allow 192.168.1.0/24;  # Your internal network
-       deny all;
-       proxy_pass http://localhost:5000;
-   }
-   ```
-
-3. **Add authentication** if hosting publicly
-
-4. **Review content** before hosting (boorus contain NSFW)
-
-### Systemd Service
+## Systemd Service
 
 Create `/etc/systemd/system/homebooru.service`:
 
@@ -605,44 +574,33 @@ View logs:
 sudo journalctl -u homebooru -f
 ```
 
+## Security
+
+1. **Change reload secret**
+   ```bash
+   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+   ```
+
+2. **Restrict system endpoints**
+   ```nginx
+   location /api/system/ {
+       allow 192.168.1.0/24;  # Your internal network
+       deny all;
+       proxy_pass http://localhost:5000;
+   }
+   ```
+
+3. **Add authentication** if hosting publicly
+
+4. **Review content** before hosting (boorus contain NSFW)
+
 ## Performance Tips
 
 - Use SSD for image storage
 - Generate thumbnails during off-peak hours
 - Monitor interval can be adjusted based on how frequently you add images
-- Use CDN for static assets in production
-- Consider database (PostgreSQL) instead of tags.json for 100k+ images
 - Enable gzip compression in nginx
 - The built-in monitor is lightweight and won't impact normal operations
-
-## Migration from tag_watcher_daemon.py
-
-If you were using the old separate daemon:
-
-1. **Stop the old daemon**
-   ```bash
-   pkill -f tag_watcher_daemon.py
-   # or
-   sudo systemctl stop tag-watcher
-   sudo systemctl disable tag-watcher
-   ```
-
-2. **Remove systemd service** (if installed)
-   ```bash
-   sudo rm /etc/systemd/system/tag-watcher.service
-   sudo systemctl daemon-reload
-   ```
-
-3. **Update app.py** to the new version with built-in monitoring
-
-4. **Restart Flask** - monitoring starts automatically
-
-The new system is more efficient because:
-- No separate process to manage
-- Shares memory with Flask app
-- Can be controlled via web interface
-- Automatic data reload after processing
-- Real-time status display
 
 ## Credits
 
