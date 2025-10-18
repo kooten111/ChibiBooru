@@ -57,9 +57,7 @@
 }
 
 .related-images {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 0;
+    overflow-y: auto; /* Allow scrolling if content exceeds max-height */
 }
 
 .metadata-info {
