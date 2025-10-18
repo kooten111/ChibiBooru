@@ -31,10 +31,8 @@
 }
 
 .sidebar-right {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    overflow: hidden;
+    grid-column: 3;
+    grid-row: 1 / 3;
 }
 
 
@@ -45,25 +43,27 @@
     flex-direction: column;
     max-height: calc(100vh - 120px);
     overflow: hidden; /* Hide overflow on the main container */
-}
-
-/* This is the scrolling container for all panels within a sidebar */
-.sidebar-left, .sidebar-right {
-    overflow-y: auto; /* Make the entire sidebar scroll if content overflows */
     gap: 20px;
 }
 
-
-/* Tags List - Scrollable section */
 .tags-list {
-    margin-bottom: 20px;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.actions-bar {
     flex-shrink: 0;
 }
 
-/* Actions Bar - Fixed at bottom */
-.actions-bar {
+.related-images {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.metadata-info {
     flex-shrink: 0;
-    margin-bottom: 0;
 }
 
 
@@ -321,9 +321,9 @@ body.ui-hidden .image-view img {
 
 .related-thumb .label {
     position: absolute;
-    bottom: 8px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 8px;
+    left: 8px;
+    transform: none;
     padding: 4px 12px;
     border-radius: 12px;
     font-size: 0.75em;
@@ -334,6 +334,10 @@ body.ui-hidden .image-view img {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     background: linear-gradient(135deg, rgba(74, 158, 255, 0.95) 0%, rgba(53, 122, 189, 0.95) 100%);
     color: #fff;
+}
+
+.related-thumb .label.parent {
+    background: linear-gradient(135deg, rgba(144, 238, 144, 0.95) 0%, rgba(102, 217, 160, 0.95) 100%);
 }
 
 .related-thumb .label::first-letter {

@@ -185,12 +185,15 @@
                 <h3>
                     <span>👨‍👧</span>
                     Parent/Child
+                    <span style="font-size: 0.7em; color: #b0b0b0; font-weight: 400; margin-left: 10px;">
+                        ({{ related_images|length }} images)
+                    </span>
                 </h3>
                 <div class="related-grid">
                     {% for related in related_images %}
                     <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
                         <img src="{{ url_for('static', filename=related.path) }}" alt="Related">
-                        <span class="label">{{ related.type }}</span>
+                        <span class="label {{ related.type }}">{{ related.type }}</span>
                     </a>
                     {% endfor %}
                 </div>
