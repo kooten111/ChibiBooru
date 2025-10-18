@@ -4,6 +4,11 @@ class StatsTabs {
         this.panels = document.querySelectorAll('.stat-panel');
         this.panelsContainer = document.getElementById('statsPanelsContainer');
         this.currentOpenPanel = null;
+
+        // NEW: Add toggle for image page
+        this.headerContainer = document.querySelector('.header-container');
+        this.tabsToggleButton = document.getElementById('tabs-toggle-button');
+
         this.init();
     }
     
@@ -14,6 +19,13 @@ class StatsTabs {
                 this.handleTabClick(button);
             });
         });
+
+        // NEW: Click handler for the toggle button
+        if (this.tabsToggleButton) {
+            this.tabsToggleButton.addEventListener('click', () => {
+                this.headerContainer.classList.toggle('tabs-expanded');
+            });
+        }
         
         // Close panel when clicking outside
         document.addEventListener('click', (e) => {

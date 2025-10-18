@@ -1,14 +1,11 @@
 document.addEventListener('DOMContentLoaded', function() {
-    const container = document.querySelector('.container');
     const imageView = document.querySelector('.image-view');
+    const body = document.body;
 
-    if (container && imageView) {
-        // When the image area is clicked...
+    if (imageView && body.classList.contains('image-page')) {
         imageView.addEventListener('click', function(event) {
-            // ...and the click is on the image itself...
             if (event.target.tagName === 'IMG') {
-                // ...toggle the fullscreen class on the whole container.
-                container.classList.toggle('image-fullscreen');
+                body.classList.toggle('ui-hidden');
             }
         });
     }

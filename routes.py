@@ -73,6 +73,7 @@ def show_image(filepath):
     tag_counts = get_tag_counts()
     id_to_path = get_id_to_path()
     data = raw_data.get(lookup_path, "")
+    stats = get_enhanced_stats()
 
     if isinstance(data, str):
         tag_list = sorted(data.split())
@@ -102,6 +103,11 @@ def show_image(filepath):
         for img in similar_by_tags
     ]
 
+    random_tags = []
+    if tag_counts:
+        available_tags = list(tag_counts.items())
+        random_tags = random.sample(available_tags, min(len(available_tags), 30))
+
     return render_template(
         'image.html',
         filepath=filepath,
@@ -110,6 +116,8 @@ def show_image(filepath):
         metadata=metadata,
         related_images=related_images,
         carousel_images=carousel_images,
+        stats=stats,
+        random_tags=random_tags,
     )
 
 @main_blueprint.route('/similar/<path:filepath>')

@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/image.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/actions.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/carousel.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
+
 
     {% if related_images %}
         {% for related in related_images %}
@@ -15,21 +18,8 @@
         {% endfor %}
     {% endif %}
 </head>
-<body>
-    <div class="header">
-        <div class="header-content">
-            <h1><a href="{{ url_for('main.home') }}">HomeBooru</a></h1>
-            <div class="search-bar">
-                <form action="{{ url_for('main.home') }}" method="get">
-                    <div class="autocomplete-container">
-                        <input type="text" name="query" id="searchInput" placeholder="Search tags..." autocomplete="off">
-                        <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
-                    </div>
-                    <button type="submit">Search</button>
-                </form>
-            </div>
-        </div>
-    </div>
+<body class="image-page">
+    {% include 'header.html' %}
 
     <div class="container">
         <div class="sidebar-left">
@@ -351,5 +341,8 @@
     <script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-viewer.js') }}"></script> 
     <script src="{{ url_for('static', filename='js/saucenao-fetch.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+
 </body>
 </html>
