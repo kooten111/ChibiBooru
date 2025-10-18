@@ -1,0 +1,132 @@
+/* Source Selector Styles */
+.source-selector {
+    margin: 20px 0;
+    padding: 15px;
+    background: #2a2a2a;
+    border-radius: 8px;
+    border: 1px solid #3a3a3a;
+}
+
+.source-selector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.source-selector-title {
+    font-size: 0.9em;
+    color: #b0b0b0;
+    font-weight: 600;
+}
+
+.active-source-badge {
+    font-size: 0.8em;
+    padding: 4px 10px;
+    background: #4a9eff;
+    color: white;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.source-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.source-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: #1a1a1a;
+    border: 2px solid #3a3a3a;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.source-option:hover {
+    border-color: #4a9eff;
+    background: #252525;
+}
+
+.source-option.active {
+    border-color: #4a9eff;
+    background: #1a2a3a;
+}
+
+.source-option-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.source-icon {
+    font-size: 1.2em;
+}
+
+.source-name {
+    font-weight: 600;
+    color: #e0e0e0;
+}
+
+.source-features {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.source-feature-badge {
+    font-size: 0.7em;
+    padding: 2px 6px;
+    background: #3a3a3a;
+    border-radius: 3px;
+    color: #90ee90;
+}
+
+.source-feature-badge.no-categories {
+    color: #ffb84d;
+}
+
+.source-option-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.source-tag-count {
+    font-size: 0.85em;
+    color: #909090;
+}
+
+.source-select-btn {
+    padding: 6px 14px;
+    background: #4a9eff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.source-select-btn:hover {
+    background: #3a8eef;
+}
+
+.source-option.active .source-select-btn {
+    background: #2a7a2a;
+    cursor: default;
+}
+
+.source-option.active .source-select-btn:hover {
+    background: #2a7a2a;
+}
+
+.source-switching {
+    opacity: 0.5;
+    pointer-events: none;
+}

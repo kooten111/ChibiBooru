@@ -2,13 +2,41 @@
 from flask import request, jsonify, url_for
 import models
 import random
+import sys
 import os
 import requests
 from urllib.parse import urlparse
 from utils import get_thumbnail_path
 import processing
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from switch_metadata_source import switch_metadata_source
+
 RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
+
+
+
+def switch_source_endpoint():
+    """API endpoint to switch the active metadata source for an image"""
+    try:
+        data = request.json
+        filepath = data.get('filepath')
+        source = data.get('source')
+        
+        if not filepath or not source:
+            return jsonify({"error": "Missing filepath or source"}), 400
+        
+        result = switch_metadata_source(filepath, source)
+        
+        if "error" in result:
+            return jsonify(result), 400
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 def get_images_for_api():
     """Service for the infinite scroll API."""

@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/carousel.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
-
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/source-selector.css') }}">
 
     {% if related_images %}
         {% for related in related_images %}
@@ -80,11 +80,11 @@
                         {% endfor %}
                     </div>
                     {% endif %}
-                    
-                    {% if tags %}
-                    <div class="tag-category general">
-                        <div class="tag-category-title">Tags</div>
-                        {% for tag, count in tags %}
+
+                    {% if categorized_tags.meta %}
+                    <div class="tag-category meta">
+                        <div class="tag-category-title">Meta</div>
+                        {% for tag, count in categorized_tags.meta %}
                         <div class="tag-item">
                             <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
@@ -95,10 +95,10 @@
                     </div>
                     {% endif %}
 
-                    {% if categorized_tags.meta %}
-                    <div class="tag-category meta">
-                        <div class="tag-category-title">Meta</div>
-                        {% for tag, count in categorized_tags.meta %}
+                    {% if tags %}
+                    <div class="tag-category general">
+                        <div class="tag-category-title">General</div>
+                        {% for tag, count in tags %}
                         <div class="tag-item">
                             <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
@@ -137,7 +137,7 @@
             <div class="tag-editor" id="tagEditor">
                 <h3>Edit Tags</h3>
                 <div class="tag-chips-container" id="tagChips">
-                    </div>
+                </div>
                 <div class="tag-editor-input-area">
                     <input type="text" 
                            id="tagEditorInput" 
@@ -273,6 +273,83 @@
                 </div>
                 {% endif %}
                 
+                {% if metadata.sources and metadata.sources|length > 1 %}
+                <div class="source-selector">
+                    <div class="source-selector-header">
+                        <div class="source-selector-title">📊 METADATA SOURCE</div>
+                        <div class="active-source-badge">{{ data.active_source|upper if data.active_source else 'AUTO' }}</div>
+                    </div>
+                    
+                    <div class="source-options">
+                        {% for source_name, source_data in metadata.sources.items() %}
+                        <div class="source-option {% if data.active_source == source_name or (not data.active_source and loop.first) %}active{% endif %}" 
+                             data-source="{{ source_name }}">
+                            <div class="source-option-left">
+                                <div class="source-icon">
+                                    {% if source_name == 'danbooru' %}🔵
+                                    {% elif source_name == 'e621' %}🟢
+                                    {% elif source_name == 'gelbooru' %}🟡
+                                    {% elif source_name == 'yandere' %}🔴
+                                    {% elif source_name == 'camie_tagger' %}🤖
+                                    {% else %}📦{% endif %}
+                                </div>
+                                <div>
+                                    <div class="source-name">
+                                        {% if source_name == 'danbooru' %}Danbooru
+                                        {% elif source_name == 'e621' %}e621
+                                        {% elif source_name == 'gelbooru' %}Gelbooru
+                                        {% elif source_name == 'yandere' %}Yande.re
+                                        {% elif source_name == 'camie_tagger' %}AI Tagger
+                                        {% else %}{{ source_name|title }}{% endif %}
+                                    </div>
+                                    <div class="source-features">
+                                        {% if source_name in ['danbooru', 'e621', 'camie_tagger'] %}
+                                            <span class="source-feature-badge">Categorized Tags</span>
+                                        {% else %}
+                                            <span class="source-feature-badge no-categories">General Tags Only</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="source-option-right">
+                                <div class="source-tag-count">
+                                    {% if source_name == 'danbooru' %}
+                                        {% set tag_count = (source_data.tag_string or '').split()|length %}
+                                    {% elif source_name == 'e621' %}
+                                        {% set tag_count = [] %}
+                                        {% if source_data.tags %}
+                                            {% for category, tags in source_data.tags.items() %}
+                                                {% set _ = tag_count.extend(tags) %}
+                                            {% endfor %}
+                                        {% endif %}
+                                        {% set tag_count = tag_count|length %}
+                                    {% elif source_name in ['gelbooru', 'yandere'] %}
+                                        {% set tag_count = (source_data.tags or '').split()|length %}
+                                    {% else %}
+                                        {% set tag_count = 0 %}
+                                    {% endif %}
+                                    {{ tag_count }} tags
+                                </div>
+                                
+                                <button class="source-select-btn" 
+                                        onclick="switchSource('{{ source_name }}')"
+                                        {% if data.active_source == source_name or (not data.active_source and loop.first) %}disabled{% endif %}>
+                                    {% if data.active_source == source_name or (not data.active_source and loop.first) %}
+                                        ✓ Active
+                                    {% else %}
+                                        Switch
+                                    {% endif %}
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <input type="hidden" id="currentSource" value="{{ data.active_source or '' }}">
+                {% endif %}
+                
                 {% if metadata.sources %}
                     {% set first_source = metadata.sources.values()|list|first %}
                     {% if first_source.source %}
@@ -361,16 +438,15 @@
 
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
-
-    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/image-viewer.js') }}"></script> 
-    <script src="{{ url_for('static', filename='js/saucenao-fetch.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+<script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
+<script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
+<script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
+<script src="{{ url_for('static', filename='js/image-viewer.js') }}"></script> 
+<script src="{{ url_for('static', filename='js/saucenao-fetch.js') }}"></script>
+<script src="{{ url_for('static', filename='js/header.js') }}"></script>
+<script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+<script src="{{ url_for('static', filename='js/source-selector.js') }}"></script>
 
 </body>
 </html>
