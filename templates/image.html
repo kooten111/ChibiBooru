@@ -122,6 +122,9 @@
                 <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
                     🔍 Find Similar
                 </a>
+                <a href="{{ url_for('static', filename=filepath) }}" download class="btn btn-success">
+                    💾 Download
+                </a>
                 <button class="btn btn-danger" onclick="confirmDelete()">
                     🗑️ Delete Image
                 </button>
