@@ -32,18 +32,15 @@ def rebuild_service():
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
     try:
-        # Stop the monitor to prevent any conflicts
         monitor_service.stop_monitor()
         
-        # Run the new database-centric rebuild process
-        models.rebuild_tags_from_raw_metadata()
+        # Use the file-based repopulate instead of database-only rebuild
+        models.repopulate_from_metadata()  # Changed from rebuild_tags_from_raw_metadata()
         
-        # Reload the in-memory cache with the fresh data
         models.load_data_from_db()
         
         return jsonify({"status": "success", "message": "Tag re-processing complete."})
     except Exception as e:
-        # In case of failure, reload to prevent crash state
         models.load_data_from_db()
         return jsonify({"error": str(e)}), 500
 

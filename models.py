@@ -74,8 +74,14 @@ def rebuild_tags_from_raw_metadata():
             image_id = row['image_id']
             metadata = json.loads(row['data'])
             
+            # Skip if no sources
+            if not metadata.get('sources') or not isinstance(metadata['sources'], dict):
+                continue
+            
             # Determine primary source for categorized tags
             primary_source_data = None
+            source_name = None
+            
             if 'danbooru' in metadata['sources']:
                 primary_source_data = metadata['sources']['danbooru']
                 source_name = 'danbooru'
@@ -83,8 +89,12 @@ def rebuild_tags_from_raw_metadata():
                 primary_source_data = metadata['sources']['e621']
                 source_name = 'e621'
             else:
-                primary_source_data = next(iter(metadata['sources'].values()), {})
+                # Fallback to first available source
                 source_name = next(iter(metadata['sources'].keys()), None)
+                primary_source_data = metadata['sources'].get(source_name, {})
+            
+            if not primary_source_data or not source_name:
+                continue
             
             # Extract tags based on source
             categorized_tags = {}
@@ -99,26 +109,48 @@ def rebuild_tags_from_raw_metadata():
             elif source_name == 'e621':
                 tags = primary_source_data.get("tags", {})
                 categorized_tags = {
-                    'character': tags.get("character", []), 'copyright': tags.get("copyright", []),
-                    'artist': tags.get("artist", []), 'meta': tags.get("meta", []), 'general': tags.get("general", [])
+                    'character': tags.get("character", []), 
+                    'copyright': tags.get("copyright", []),
+                    'artist': tags.get("artist", []), 
+                    'meta': tags.get("meta", []), 
+                    'general': tags.get("general", [])
                 }
+            elif source_name in ['gelbooru', 'yandere']:
+                # These sources don't have categorized tags, just a tag string
+                tags_str = primary_source_data.get("tags", "")
+                if tags_str:
+                    categorized_tags = {
+                        'general': tags_str.split() if isinstance(tags_str, str) else tags_str
+                    }
+            elif source_name == 'local_tagger':
+                # CamieTagger predictions with confidence scores
+                predictions = primary_source_data.get("predictions", {})
+                if predictions:
+                    categorized_tags = {
+                        'general': list(predictions.keys())
+                    }
             
             # Insert and link all tags
             all_tags = set()
             for category, tags_list in categorized_tags.items():
                 for tag_name in tags_list:
-                    if not tag_name: continue
-                    all_tags.add((tag_name, category))
+                    if not tag_name or not str(tag_name).strip():
+                        continue
+                    all_tags.add((str(tag_name).strip(), category))
             
             for tag_name, category in all_tags:
-                cur.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, category))
+                cur.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", 
+                           (tag_name, category))
                 cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
-                tag_id = cur.fetchone()['id']
-                cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
+                tag_result = cur.fetchone()
+                if tag_result:
+                    tag_id = tag_result['id']
+                    cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", 
+                               (image_id, tag_id))
         
         conn.commit()
     print("Tag rebuild from raw metadata completed successfully.")
-    
+
 def clear_all_data():
     """Deletes all rows from all data tables in the correct order."""
     print("Clearing all data from database...")
