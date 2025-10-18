@@ -13,7 +13,7 @@ class InfiniteScroll {
         this.prefetchQueue = [];
         this.prefetchInProgress = false;
         
-        this.PREFETCH_AHEAD = 2; // Number of pages to prefetch ahead
+        this.PREFETCH_AHEAD = 3; // Number of pages to prefetch ahead
         
         this.init();
     }
