@@ -95,7 +95,6 @@
                     </div>
                     {% endif %}
                     
-                    {# The Meta category is moved here to be sorted last #}
                     {% if categorized_tags.meta %}
                     <div class="tag-category meta">
                         <div class="tag-category-title">Meta</div>
@@ -275,80 +274,26 @@
                 {% endif %}
                 
                 {% if metadata.sources and metadata.sources|length > 1 %}
-                <div class="source-selector">
-                    <div class="source-selector-header">
-                        <div class="source-selector-title">📊 METADATA SOURCE</div>
-                        <div class="active-source-badge">{{ data.active_source|upper if data.active_source else 'AUTO' }}</div>
-                    </div>
-                    
-                    <div class="source-options">
-                        {% for source_name, source_data in metadata.sources.items() %}
-                        <div class="source-option {% if data.active_source == source_name or (not data.active_source and loop.first) %}active{% endif %}" 
-                             data-source="{{ source_name }}">
-                            <div class="source-option-left">
-                                <div class="source-icon">
-                                    {% if source_name == 'danbooru' %}🔵
-                                    {% elif source_name == 'e621' %}🟢
-                                    {% elif source_name == 'gelbooru' %}🟡
-                                    {% elif source_name == 'yandere' %}🔴
-                                    {% elif source_name == 'camie_tagger' %}🤖
-                                    {% else %}📦{% endif %}
-                                </div>
-                                <div>
-                                    <div class="source-name">
-                                        {% if source_name == 'danbooru' %}Danbooru
-                                        {% elif source_name == 'e621' %}e621
-                                        {% elif source_name == 'gelbooru' %}Gelbooru
-                                        {% elif source_name == 'yandere' %}Yande.re
-                                        {% elif source_name == 'camie_tagger' %}AI Tagger
-                                        {% else %}{{ source_name|title }}{% endif %}
-                                    </div>
-                                    <div class="source-features">
-                                        {% if source_name in ['danbooru', 'e621', 'camie_tagger'] %}
-                                            <span class="source-feature-badge">Categorized Tags</span>
-                                        {% else %}
-                                            <span class="source-feature-badge no-categories">General Tags Only</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="source-option-right">
-                                <div class="source-tag-count">
-                                    {% if source_name == 'danbooru' %}
-                                        {% set tag_count = (source_data.tag_string or '').split()|length %}
-                                    {% elif source_name == 'e621' %}
-                                        {% set tag_count = [] %}
-                                        {% if source_data.tags %}
-                                            {% for category, tags in source_data.tags.items() %}
-                                                {% set _ = tag_count.extend(tags) %}
-                                            {% endfor %}
-                                        {% endif %}
-                                        {% set tag_count = tag_count|length %}
-                                    {% elif source_name in ['gelbooru', 'yandere'] %}
-                                        {% set tag_count = (source_data.tags or '').split()|length %}
-                                    {% else %}
-                                        {% set tag_count = 0 %}
-                                    {% endif %}
-                                    {{ tag_count }} tags
-                                </div>
-                                
-                                <button class="source-select-btn" 
-                                        onclick="switchSource('{{ source_name }}')"
-                                        {% if data.active_source == source_name or (not data.active_source and loop.first) %}disabled{% endif %}>
-                                    {% if data.active_source == source_name or (not data.active_source and loop.first) %}
-                                        ✓ Active
-                                    {% else %}
-                                        Switch
-                                    {% endif %}
-                                </button>
-                            </div>
-                        </div>
-                        {% endfor %}
+                <div class="metadata-item">
+                    <div class="metadata-label">Metadata Source</div>
+                    <div class="metadata-value">
+                        <button class="source-toggle-btn" onclick="openSourceModal()">
+                            <span class="current-source-indicator">
+                                {% set active = data.active_source or (metadata.sources.keys()|list|first) %}
+                                {% if active == 'danbooru' %}🔵 Danbooru
+                                {% elif active == 'e621' %}🟢 e621
+                                {% elif active == 'gelbooru' %}🟡 Gelbooru
+                                {% elif active == 'yandere' %}🔴 Yande.re
+                                {% elif active == 'camie_tagger' %}🤖 AI Tagger
+                                {% else %}{{ active|title }}{% endif %}
+                            </span>
+                            <span class="toggle-text">Switch Source</span>
+                        </button>
                     </div>
                 </div>
-                
-                <input type="hidden" id="currentSource" value="{{ data.active_source or '' }}">
+
+                <script type="application/json" id="currentSource">{{ data.active_source or '' }}</script>
+                <script type="application/json" id="sourceData">{{ metadata.sources|tojson }}</script>
                 {% endif %}
                 
                 {% if metadata.sources %}
@@ -436,6 +381,74 @@
             {% endif %}
         </div>
     </div>
+
+<!-- Source Selector Modal (pre-rendered) -->
+{% if metadata.sources and metadata.sources|length > 1 %}
+<div id="sourceModal" class="source-modal">
+    <div class="source-modal-content">
+        <div class="source-modal-header">
+            <h2>🔄 Switch Metadata Source</h2>
+            <button class="source-modal-close" onclick="closeSourceModal()">&times; Close</button>
+        </div>
+        <div class="source-options">
+            {% set active = data.active_source or (metadata.sources.keys()|list|first) %}
+            {% for source_name, source_data in metadata.sources.items() %}
+            <div class="source-option {% if source_name == active %}active{% endif %}" onclick="switchSource('{{ source_name }}')">
+                <div class="source-option-header">
+                    <span class="source-emoji">
+                        {% if source_name == 'danbooru' %}🔵
+                        {% elif source_name == 'e621' %}🟢
+                        {% elif source_name == 'gelbooru' %}🟡
+                        {% elif source_name == 'yandere' %}🔴
+                        {% elif source_name == 'camie_tagger' %}🤖
+                        {% else %}📦{% endif %}
+                    </span>
+                    <span class="source-name">
+                        {% if source_name == 'danbooru' %}Danbooru
+                        {% elif source_name == 'e621' %}e621
+                        {% elif source_name == 'gelbooru' %}Gelbooru
+                        {% elif source_name == 'yandere' %}Yande.re
+                        {% elif source_name == 'camie_tagger' %}AI Tagger
+                        {% else %}{{ source_name|title }}{% endif %}
+                    </span>
+                    {% if source_name == active %}
+                    <span class="active-badge">Active</span>
+                    {% endif %}
+                </div>
+                <div class="source-meta">
+                    {% if source_name in ['danbooru', 'e621', 'camie_tagger'] %}
+                    <span class="meta-badge categorized">Categorized Tags</span>
+                    {% else %}
+                    <span class="meta-badge general">General Tags Only</span>
+                    {% endif %}
+                    <span class="meta-badge count">
+                        {% if source_name == 'danbooru' %}
+                            {% set all_tags = (source_data.tag_string_character or '') + ' ' + (source_data.tag_string_copyright or '') + ' ' + (source_data.tag_string_artist or '') + ' ' + (source_data.tag_string_meta or '') + ' ' + (source_data.tag_string_general or '') %}
+                            {{ all_tags.split()|length }} tags
+                        {% elif source_name == 'e621' %}
+                            {% set tag_count = 0 %}
+                            {% if source_data.tags %}
+                                {% for category_tags in source_data.tags.values() %}
+                                    {% set tag_count = tag_count + (category_tags|length if category_tags is iterable and category_tags is not string else 0) %}
+                                {% endfor %}
+                            {% endif %}
+                            {{ tag_count }} tags
+                        {% elif source_name == 'camie_tagger' %}
+                            {% set all_tags = (source_data.tags_character or '') + ' ' + (source_data.tags_copyright or '') + ' ' + (source_data.tags_artist or '') + ' ' + (source_data.tags_general or '') %}
+                            {{ all_tags.split()|length }} tags
+                        {% elif source_data.tags %}
+                            {{ (source_data.tags.split()|length if source_data.tags is string else source_data.tags|length) }} tags
+                        {% else %}
+                            0 tags
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">

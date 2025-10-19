@@ -23,7 +23,8 @@ def initialize_database():
             post_id INTEGER,
             parent_id INTEGER,
             has_children BOOLEAN,
-            saucenao_lookup BOOLEAN
+            saucenao_lookup BOOLEAN,
+            active_source TEXT
         )
         """)
 

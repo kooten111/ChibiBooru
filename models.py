@@ -346,6 +346,18 @@ def get_image_details(filepath):
         details_dict = dict(details)
         if details_dict.get('raw_metadata'):
             details_dict['raw_metadata'] = json.loads(details_dict['raw_metadata'])
+        
+        # If no active_source set but we have metadata, determine it
+        if not details_dict.get('active_source') and details_dict.get('raw_metadata'):
+            metadata = details_dict['raw_metadata']
+            sources = metadata.get('sources', {})
+            if 'danbooru' in sources:
+                details_dict['active_source'] = 'danbooru'
+            elif 'e621' in sources:
+                details_dict['active_source'] = 'e621'
+            elif sources:
+                details_dict['active_source'] = list(sources.keys())[0]
+        
         return details_dict
 
 def delete_image(filepath):

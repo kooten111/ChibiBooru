@@ -195,7 +195,7 @@ def saucenao_apply():
 
 @api_blueprint.route('/switch_source', methods=['POST'])
 def switch_source():
-    from switch_metadata_source import switch_metadata_source
+    from switch_source_db import switch_metadata_source_db
     
     try:
         data = request.json
@@ -205,10 +205,13 @@ def switch_source():
         if not filepath or not source:
             return jsonify({"error": "Missing filepath or source"}), 400
         
-        result = switch_metadata_source(filepath, source)
+        result = switch_metadata_source_db(filepath, source)
         
         if "error" in result:
             return jsonify(result), 400
+        
+        # Reload in-memory cache after switching
+        models.load_data_from_db()
         
         return jsonify(result), 200
         

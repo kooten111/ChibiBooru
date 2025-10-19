@@ -1,11 +1,40 @@
 // Source Selector JavaScript
-let currentActiveSource = null;
 
-function initializeSourceSelector() {
-    const currentSource = document.getElementById('currentSource')?.value;
-    if (currentSource) {
-        currentActiveSource = currentSource;
+function openSourceModal() {
+    // Simply show the pre-rendered modal
+    const modal = document.getElementById('sourceModal');
+    if (!modal) {
+        alert('Source selector not available');
+        return;
     }
+    
+    modal.classList.add('active');
+    
+    // Add event listeners
+    modal.addEventListener('click', handleModalClick);
+    document.addEventListener('keydown', handleEscape);
+}
+
+function handleModalClick(e) {
+    // Close if clicking the modal background (not the content)
+    if (e.target.id === 'sourceModal') {
+        closeSourceModal();
+    }
+}
+
+function handleEscape(e) {
+    if (e.key === 'Escape') {
+        closeSourceModal();
+    }
+}
+
+function closeSourceModal() {
+    const modal = document.getElementById('sourceModal');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.removeEventListener('click', handleModalClick);
+    }
+    document.removeEventListener('keydown', handleEscape);
 }
 
 async function switchSource(sourceName) {
@@ -17,9 +46,24 @@ async function switchSource(sourceName) {
     }
     
     // Show loading state
-    const sourceOption = document.querySelector(`[data-source="${sourceName}"]`);
+    const sourceOption = document.querySelector(`.source-option[onclick="switchSource('${sourceName}')"]`);
     if (sourceOption) {
-        sourceOption.classList.add('source-switching');
+        sourceOption.classList.add('switching');
+        const originalHTML = sourceOption.innerHTML;
+        sourceOption.innerHTML = `
+            <div class="source-option-header">
+                <span class="source-emoji">⏳</span>
+                <span class="source-name">Switching...</span>
+            </div>
+        `;
+        
+        // Restore after timeout in case of error
+        setTimeout(() => {
+            if (sourceOption.classList.contains('switching')) {
+                sourceOption.innerHTML = originalHTML;
+                sourceOption.classList.remove('switching');
+            }
+        }, 10000);
     }
     
     try {
@@ -42,17 +86,15 @@ async function switchSource(sourceName) {
         } else {
             alert('Error switching source: ' + (result.error || 'Unknown error'));
             if (sourceOption) {
-                sourceOption.classList.remove('source-switching');
+                sourceOption.innerHTML = originalHTML;
+                sourceOption.classList.remove('switching');
             }
         }
     } catch (error) {
         console.error('Error switching source:', error);
         alert('Error switching source: ' + error.message);
         if (sourceOption) {
-            sourceOption.classList.remove('source-switching');
+            sourceOption.classList.remove('switching');
         }
     }
 }
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', initializeSourceSelector);
