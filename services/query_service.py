@@ -39,20 +39,27 @@ def perform_search(search_query):
     source_filters = []
     filename_filter = None
     extension_filter = None
+    relationship_filter = None
     tag_filters = []
     
     for token in tokens:
         if token.startswith('source:'):
-            source_filters.append(token.split(':', 1)[1].strip())  # Append to list
+            source_filters.append(token.split(':', 1)[1].strip())
         elif token.startswith('filename:'):
             filename_filter = token.split(':', 1)[1].strip()
         elif token.startswith('.'):
             extension_filter = token[1:]
+        elif token.startswith('has:'):
+            rel_type = token.split(':', 1)[1].strip()
+            if rel_type in ['parent', 'child', 'relationship']:
+                relationship_filter = 'any' if rel_type == 'relationship' else rel_type
         else:
             tag_filters.append(token)
     
     # Start with appropriate base query
-    if source_filters:
+    if relationship_filter:
+        results = models.search_images_by_relationship(relationship_filter)
+    elif source_filters:
         if len(source_filters) == 1:
             # Single source - use the existing optimized function
             results = models.search_images_by_source(source_filters[0])

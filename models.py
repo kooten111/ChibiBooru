@@ -547,3 +547,98 @@ def search_images_by_multiple_sources(source_names):
         query = query.format(placeholders=placeholders)
         params = source_names + [len(source_names)]
         return [dict(row) for row in conn.execute(query, params).fetchall()]
+
+def search_images_by_relationship(relationship_type):
+    """
+    Search for images by relationship type.
+    relationship_type: 'parent', 'child', or 'any'
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        matching_filepaths = set()
+        
+        # Get all images with raw metadata
+        cursor.execute("SELECT i.id, i.filepath, rm.data FROM images i LEFT JOIN raw_metadata rm ON i.id = rm.image_id WHERE rm.data IS NOT NULL")
+        
+        for row in cursor.fetchall():
+            try:
+                metadata = json.loads(row['data'])
+                image_id = row['id']
+                filepath = row['filepath']
+                
+                has_parent = False
+                has_child = False
+                
+                # Extract all post_ids and parent_ids for this image
+                post_ids = set()
+                parent_ids = set()
+                
+                for source, data in metadata.get('sources', {}).items():
+                    if source == 'danbooru':
+                        pid = data.get('id')
+                        ppid = data.get('parent_id')
+                    elif source == 'e621':
+                        pid = data.get('id')
+                        ppid = data.get('relationships', {}).get('parent_id')
+                    else:
+                        pid = data.get('id')
+                        ppid = data.get('parent_id')
+                    
+                    if pid:
+                        post_ids.add(pid)
+                    if ppid:
+                        parent_ids.add(ppid)
+                
+                # Check if has parent
+                if parent_ids:
+                    has_parent = True
+                
+                # Check if has children (are we a parent to anyone?)
+                if post_ids and relationship_type in ['child', 'any']:
+                    # Quick check: see if any other image references us as parent
+                    cursor2 = conn.cursor()
+                    cursor2.execute("SELECT rm2.data FROM raw_metadata rm2 WHERE rm2.image_id != ?", (image_id,))
+                    for other_row in cursor2.fetchall():
+                        try:
+                            other_metadata = json.loads(other_row['data'])
+                            for other_source, other_data in other_metadata.get('sources', {}).items():
+                                if other_source == 'danbooru':
+                                    other_parent = other_data.get('parent_id')
+                                elif other_source == 'e621':
+                                    other_parent = other_data.get('relationships', {}).get('parent_id')
+                                else:
+                                    other_parent = other_data.get('parent_id')
+                                
+                                if other_parent and other_parent in post_ids:
+                                    has_child = True
+                                    break
+                            if has_child:
+                                break
+                        except:
+                            continue
+                
+                # Add to results based on type
+                if relationship_type == 'parent' and has_parent:
+                    matching_filepaths.add(filepath)
+                elif relationship_type == 'child' and has_child:
+                    matching_filepaths.add(filepath)
+                elif relationship_type == 'any' and (has_parent or has_child):
+                    matching_filepaths.add(filepath)
+                    
+            except:
+                continue
+        
+        # Get full image data with tags
+        if matching_filepaths:
+            placeholders = ','.join('?' for _ in matching_filepaths)
+            query = f"""
+            SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+            FROM images i
+            LEFT JOIN image_tags it ON i.id = it.image_id
+            LEFT JOIN tags t ON it.tag_id = t.id
+            WHERE i.filepath IN ({placeholders})
+            GROUP BY i.id
+            """
+            return [dict(row) for row in conn.execute(query, list(matching_filepaths)).fetchall()]
+        
+        return []
