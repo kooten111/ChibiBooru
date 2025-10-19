@@ -442,3 +442,31 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
     except Exception as e:
         print(f"Database error adding image {image_info['filepath']}: {e}")
         return False
+
+def search_images_by_multiple_sources(source_names):
+    """
+    Search for images that have ALL specified sources (AND logic).
+    Returns images only if they exist in every source in source_names list.
+    """
+    with get_db_connection() as conn:
+        # Build a query that requires the image to have ALL sources
+        # Using HAVING COUNT(DISTINCT s.name) = number_of_sources ensures AND logic
+        query = """
+        SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+        FROM images i
+        LEFT JOIN image_tags it ON i.id = it.image_id
+        LEFT JOIN tags t ON it.tag_id = t.id
+        WHERE i.id IN (
+            SELECT ims.image_id
+            FROM image_sources ims
+            JOIN sources s ON ims.source_id = s.id
+            WHERE s.name IN ({placeholders})
+            GROUP BY ims.image_id
+            HAVING COUNT(DISTINCT s.name) = ?
+        )
+        GROUP BY i.id
+        """
+        placeholders = ','.join('?' for _ in source_names)
+        query = query.format(placeholders=placeholders)
+        params = source_names + [len(source_names)]
+        return [dict(row) for row in conn.execute(query, params).fetchall()]

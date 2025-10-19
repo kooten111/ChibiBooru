@@ -1,4 +1,3 @@
-# services/query_service.py
 import models
 from utils import get_thumbnail_path
 
@@ -37,14 +36,14 @@ def perform_search(search_query):
     
     # Parse the query into components
     tokens = search_query.lower().split()
-    source_filter = None
+    source_filters = []
     filename_filter = None
     extension_filter = None
     tag_filters = []
     
     for token in tokens:
         if token.startswith('source:'):
-            source_filter = token.split(':', 1)[1].strip()
+            source_filters.append(token.split(':', 1)[1].strip())  # Append to list
         elif token.startswith('filename:'):
             filename_filter = token.split(':', 1)[1].strip()
         elif token.startswith('.'):
@@ -53,9 +52,13 @@ def perform_search(search_query):
             tag_filters.append(token)
     
     # Start with appropriate base query
-    if source_filter:
-        # Use the dedicated source search function
-        results = models.search_images_by_source(source_filter)
+    if source_filters:
+        if len(source_filters) == 1:
+            # Single source - use the existing optimized function
+            results = models.search_images_by_source(source_filters[0])
+        else:
+            # Multiple sources - need AND logic
+            results = models.search_images_by_multiple_sources(source_filters)
     elif tag_filters:
         # Use the dedicated tag search function
         results = models.search_images_by_tags(tag_filters)
@@ -71,8 +74,8 @@ def perform_search(search_query):
     if filename_filter:
         results = [img for img in results if filename_filter in img['filepath'].lower()]
     
-    # If we started with source filter but also have tag filters, filter by tags now
-    if source_filter and tag_filters:
+    # If we started with source filter(s) but also have tag filters, filter by tags now
+    if source_filters and tag_filters:
         # Filter the source results to only include images with all required tags
         filtered = []
         for img in results:
@@ -83,10 +86,9 @@ def perform_search(search_query):
     
     # Determine if we should shuffle
     # Only shuffle if it's purely tag-based search (no special filters)
-    should_shuffle = bool(tag_filters) and not (source_filter or filename_filter or extension_filter)
+    should_shuffle = bool(tag_filters) and not (source_filters or filename_filter or extension_filter)
     
     return results, should_shuffle
-
 
 
 def find_related_by_tags(filepath, limit=20):
