@@ -149,13 +149,19 @@ def switch_metadata_source_db(filepath, source_name):
                             VALUES (?, ?)
                         """, (image_id, tag_id))
             
-            # Update image's post_id, parent_id, has_children from this source
+            # *** FIX: Update the cached tag columns in the images table ***
             cursor.execute("""
                 UPDATE images 
-                SET post_id = ?, parent_id = ?, has_children = ?, active_source = ?
+                SET post_id = ?, parent_id = ?, has_children = ?, active_source = ?,
+                    tags_character = ?, tags_copyright = ?, tags_artist = ?, 
+                    tags_species = ?, tags_meta = ?, tags_general = ?
                 WHERE id = ?
             """, (tag_data.get("id"), tag_data.get("parent_id"), 
-                tag_data.get("has_children", False), source_name, image_id))
+                tag_data.get("has_children", False), source_name,
+                tag_data.get("tags_character"), tag_data.get("tags_copyright"),
+                tag_data.get("tags_artist"), tag_data.get("tags_species"),
+                tag_data.get("tags_meta"), tag_data.get("tags_general"),
+                image_id))
             
             conn.commit()
             
