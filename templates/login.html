@@ -17,6 +17,7 @@
             max-width: 400px;
             padding: 40px;
             text-align: center;
+            position: relative; /* Add this */
         }
         .login-container h1 {
             margin-bottom: 25px;
@@ -47,6 +48,15 @@
             color: white;
             font-weight: 500;
         }
+        .login-mascot {
+            position: absolute;
+            left: 100%; /* Sits to the right of the login box */
+            top: 50%;
+            transform: translateY(-50%);
+            height: 250px;
+            width: auto;
+            margin-left: 40px; /* Gap between login box and mascot */
+        }
         .flash-messages .error { background-color: #9e4a4a; }
         .flash-messages .success { background-color: #4a9e6f; }
         .flash-messages .info { background-color: #4a7c9e; }
@@ -54,8 +64,9 @@
 </head>
 <body>
     <div class="login-container panel">
-        <h1>TagStash</h1>
-
+        <img src="{{ url_for('static', filename='mascot/mascot.webp') }}" alt="Mascot" class="login-mascot">
+        <h1>{{ app_name }}</h1>
+        
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             <ul class="flash-messages">
