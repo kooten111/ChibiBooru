@@ -27,6 +27,25 @@ def initialize_database():
             active_source TEXT
         )
         """)
+        
+        # --- SCHEMA MIGRATION: Add categorized tag columns if they don't exist ---
+        # This is a safe way to update existing databases without deleting them.
+        columns_to_add = {
+            'tags_character': 'TEXT',
+            'tags_copyright': 'TEXT',
+            'tags_artist': 'TEXT',
+            'tags_species': 'TEXT',
+            'tags_meta': 'TEXT',
+            'tags_general': 'TEXT'
+        }
+        
+        cur.execute("PRAGMA table_info(images);")
+        existing_columns = [row['name'] for row in cur.fetchall()]
+        
+        for col, col_type in columns_to_add.items():
+            if col not in existing_columns:
+                print(f"Adding column '{col}' to 'images' table...")
+                cur.execute(f"ALTER TABLE images ADD COLUMN {col} {col_type}")
 
         # Tags table
         cur.execute("""

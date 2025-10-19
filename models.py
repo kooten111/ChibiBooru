@@ -1,3 +1,4 @@
+# models.py
 import threading
 import os
 import json
@@ -37,21 +38,10 @@ def load_data_from_db():
             tag_counts = {row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()}
 
             image_data_query = """
-            SELECT
-                i.filepath,
-                (
-                    SELECT GROUP_CONCAT(t.name, ' ')
-                    FROM image_tags it
-                    JOIN tags t ON it.tag_id = t.id
-                    WHERE it.image_id = i.id
-                ) as tags,
-                (
-                    SELECT GROUP_CONCAT(s.name, ' ')
-                    FROM image_sources ims
-                    JOIN sources s ON ims.source_id = s.id
-                    WHERE ims.image_id = i.id
-                ) as sources
+            SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
             FROM images i
+            LEFT JOIN image_tags it ON i.id = it.image_id
+            LEFT JOIN tags t ON it.tag_id = t.id
             GROUP BY i.id
             """
             image_data = [dict(row) for row in conn.execute(image_data_query).fetchall()]
@@ -143,6 +133,63 @@ def recategorize_misplaced_tags():
     
     print(f"Recategorized {changes} tags")
     return changes
+
+def rebuild_categorized_tags_from_relations():
+    """
+    Back-fills the categorized tag columns in the 'images' table based on
+    the existing data in the 'image_tags' and 'tags' tables.
+    This is a data migration step.
+    """
+    print("Rebuilding categorized tag columns...")
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Get all images
+        cursor.execute("SELECT id FROM images")
+        images = cursor.fetchall()
+        
+        updated_count = 0
+        for image_row in tqdm(images, desc="Updating Images"):
+            image_id = image_row['id']
+            
+            # Fetch all tags for this image, grouped by category
+            query = """
+            SELECT category, GROUP_CONCAT(name, ' ') as tags
+            FROM tags t
+            JOIN image_tags it ON t.id = it.tag_id
+            WHERE it.image_id = ?
+            GROUP BY t.category
+            """
+            cursor.execute(query, (image_id,))
+            
+            categorized_tags = {row['category']: row['tags'] for row in cursor.fetchall()}
+            
+            # Update the images table
+            update_query = """
+            UPDATE images SET
+                tags_character = ?,
+                tags_copyright = ?,
+                tags_artist = ?,
+                tags_species = ?,
+                tags_meta = ?,
+                tags_general = ?
+            WHERE id = ?
+            """
+            cursor.execute(update_query, (
+                categorized_tags.get('character'),
+                categorized_tags.get('copyright'),
+                categorized_tags.get('artist'),
+                categorized_tags.get('species'),
+                categorized_tags.get('meta'),
+                categorized_tags.get('general'),
+                image_id
+            ))
+            updated_count += 1
+            
+        conn.commit()
+    
+    print(f"Successfully updated categorized tags for {updated_count} images.")
+    return updated_count
 
 def repopulate_from_metadata():
     """Rebuilds the database by reading all JSON files from the /metadata/ directory."""
@@ -281,21 +328,10 @@ def get_saucenao_lookup_count():
 def get_all_images_with_tags():
     with get_db_connection() as conn:
         query = """
-        SELECT
-            i.filepath,
-            (
-                SELECT GROUP_CONCAT(t.name, ' ')
-                FROM image_tags it
-                JOIN tags t ON it.tag_id = t.id
-                WHERE it.image_id = i.id
-            ) as tags,
-            (
-                SELECT GROUP_CONCAT(s.name, ' ')
-                FROM image_sources ims
-                JOIN sources s ON ims.source_id = s.id
-                WHERE ims.image_id = i.id
-            ) as sources
+        SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
         FROM images i
+        LEFT JOIN image_tags it ON i.id = it.image_id
+        LEFT JOIN tags t ON it.tag_id = t.id
         GROUP BY i.id
         """
         return [dict(row) for row in conn.execute(query).fetchall()]
@@ -742,4 +778,4 @@ def search_images_by_relationship(relationship_type):
             """
             return [dict(row) for row in conn.execute(query, list(matching_filepaths)).fetchall()]
         
-        return
+        return []

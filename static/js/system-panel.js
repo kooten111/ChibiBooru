@@ -241,6 +241,13 @@ function systemRebuildTags(event) {
     });
 }
 
+function systemRebuildCategorized(event) {
+    if (event) event.preventDefault();
+    showConfirm('This will fix tag displays by populating categorized tag data for all images. This is safe to run. Continue?', () => {
+        systemAction('/api/system/rebuild_categorized', event.target, 'Rebuild Categorized Tags');
+    });
+}
+
 function systemRecategorizeTags(event) {
     if (event) event.preventDefault();
     showConfirm('This will check all general tags and move them to the correct category (artist/character/copyright/meta) if they exist as categorized tags elsewhere. Continue?', () => {

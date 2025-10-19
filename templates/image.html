@@ -130,7 +130,7 @@
                 <a href="{{ url_for('static', filename=filepath) }}" download class="btn btn-success">
                     💾 Download
                 </a>
-                <button class="btn btn-danger" onclick="confirmDelete()">
+                <button id="deleteImageBtn" class="btn btn-danger">
                     🗑️ Delete Image
                 </button>
             </div>
@@ -382,7 +382,6 @@
         </div>
     </div>
 
-<!-- Source Selector Modal (pre-rendered) -->
 {% if metadata.sources and metadata.sources|length > 1 %}
 <div id="sourceModal" class="source-modal">
     <div class="source-modal-content">
@@ -452,15 +451,14 @@
 
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
-<script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
-<script src="{{ url_for('static', filename='js/modal.js') }}"></script>
-<script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
-<script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
-<script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
-<script src="{{ url_for('static', filename='js/image-viewer.js') }}"></script> 
-<script src="{{ url_for('static', filename='js/saucenao-fetch.js') }}"></script>
-<script src="{{ url_for('static', filename='js/header.js') }}"></script>
-<script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
-<script src="{{ url_for('static', filename='js/source-selector.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modal.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/autocomplete.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/tag-editor.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/image-viewer.js', v='1.3') }}"></script> 
+<script src="{{ url_for('static', filename='js/saucenao-fetch.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/header.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/system-panel.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/source-selector.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/image-page.js', v='1.3') }}"></script>
 </body>
 </html>

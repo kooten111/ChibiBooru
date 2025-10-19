@@ -515,36 +515,35 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Create instance
-const tagEditor = new TagEditor();
+// Create instance and expose it globally for other scripts to use
+window.tagEditor = new TagEditor();
 
 // Global function for the button
 function toggleTagEditor() {
     console.log('toggleTagEditor called');
     
-    if (tagEditor.isEditing) {
-        // Check if we're trying to save (button says "Save Tags")
+    if (window.tagEditor.isEditing) {
         const editBtn = document.querySelector('.actions-bar .btn-primary');
         if (editBtn && editBtn.classList.contains('editing-mode')) {
-            tagEditor.saveTags();
+            window.tagEditor.saveTags();
         } else {
-            tagEditor.toggleEditMode();
+            window.tagEditor.toggleEditMode();
         }
     } else {
-        tagEditor.toggleEditMode();
+        window.tagEditor.toggleEditMode();
     }
 }
 
 // Attach cancel handler
 document.addEventListener('click', (e) => {
     if (e.target.id === 'cancelEditBtn') {
-        tagEditor.cancelEdit();
+        window.tagEditor.cancelEdit();
     }
 });
 
 // Legacy function for compatibility
 function saveTags() {
-    tagEditor.saveTags();
+    window.tagEditor.saveTags();
 }
 
 console.log('Tag editor with categories loaded');

@@ -43,6 +43,22 @@ def rebuild_service():
         models.load_data_from_db()
         return jsonify({"error": str(e)}), 500
 
+def rebuild_categorized_service():
+    """Service to back-fill the categorized tag columns in the images table."""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        updated_count = models.rebuild_categorized_tags_from_relations()
+        models.load_data_from_db()  # Refresh cache
+        return jsonify({
+            "status": "success",
+            "message": f"Updated categorized tags for {updated_count} images.",
+            "changes": updated_count
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+        
 def recategorize_service():
     """Service to recategorize misplaced tags without full rebuild."""
     secret = request.args.get('secret', '') or request.form.get('secret', '')

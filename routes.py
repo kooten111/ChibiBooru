@@ -141,6 +141,10 @@ def trigger_scan():
 def trigger_rebuild():
     return system_service.rebuild_service()
 
+@api_blueprint.route('/system/rebuild_categorized', methods=['POST'])
+def trigger_rebuild_categorized():
+    return system_service.rebuild_categorized_service()
+    
 @api_blueprint.route('/system/recategorize', methods=['POST'])
 def trigger_recategorize():
     return system_service.recategorize_service()
