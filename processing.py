@@ -366,7 +366,7 @@ def process_image_file(filepath):
 
     primary_source_data = None
     source_name = None
-    priority = ['danbooru', 'e621', 'local_tagger']
+    priority = config.BOORU_PRIORITY
     for src in priority:
         if src in all_results:
             primary_source_data = all_results[src]

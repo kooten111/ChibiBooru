@@ -68,8 +68,8 @@ RATE_LIMIT_DELAY = 0.5  # seconds between requests
 # Order matters - first match wins for primary source
 # Used for determining which source provides categorized tags
 BOORU_PRIORITY = [
-    "danbooru",     # Best categorization
     "e621",         # Good categorization
+    "danbooru",     # Best categorization
     "gelbooru",     # Tags only
     "yandere",      # Tags only
     "local_tagger"  # AI fallback
