@@ -4,7 +4,7 @@ import hashlib
 import requests
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import numpy as np
 import models
 from database import get_db_connection
@@ -65,7 +65,7 @@ def load_local_tagger():
         idx_to_tag_map = tag_mapping['idx_to_tag']
         tag_to_category_map = tag_mapping['tag_to_category']
         
-        providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+        providers = ['CPUExecutionProvider']
         local_tagger_session = ort.InferenceSession(tagger_config['model_path'], providers=providers)
         
         print(f"[Local Tagger] SUCCESS: Model loaded. Provider: {local_tagger_session.get_providers()[0]}")
@@ -85,27 +85,31 @@ def preprocess_image_for_local_tagger(image_path):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     
-    with Image.open(image_path) as img:
-        if img.mode in ('RGBA', 'P'):
-            img = img.convert('RGB')
-        
-        width, height = img.size
-        aspect_ratio = width / height
-        
-        if aspect_ratio > 1:
-            new_width = image_size
-            new_height = int(new_width / aspect_ratio)
-        else:
-            new_height = image_size
-            new_width = int(new_height * aspect_ratio)
+    try:
+        with Image.open(image_path) as img:
+            if img.mode in ('RGBA', 'P'):
+                img = img.convert('RGB')
             
-        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        
-        pad_color = (124, 116, 104) # Corresponds to ImageNet mean
-        new_image = Image.new('RGB', (image_size, image_size), pad_color)
-        new_image.paste(img, ((image_size - new_width) // 2, (image_size - new_height) // 2))
-        
-        return transform(new_image).unsqueeze(0).numpy()
+            width, height = img.size
+            aspect_ratio = width / height
+            
+            if aspect_ratio > 1:
+                new_width = image_size
+                new_height = int(new_width / aspect_ratio)
+            else:
+                new_height = image_size
+                new_width = int(new_height * aspect_ratio)
+                
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            pad_color = (124, 116, 104) # Corresponds to ImageNet mean
+            new_image = Image.new('RGB', (image_size, image_size), pad_color)
+            new_image.paste(img, ((image_size - new_width) // 2, (image_size - new_height) // 2))
+            
+            return transform(new_image).unsqueeze(0).numpy()
+    except UnidentifiedImageError:
+        print(f"[Local Tagger] ERROR: Cannot identify image file {image_path}")
+        return None
 
 
 def tag_with_local_tagger(filepath):
@@ -118,6 +122,8 @@ def tag_with_local_tagger(filepath):
     print(f"[Local Tagger] Analyzing: {os.path.basename(filepath)}")
     try:
         img_numpy = preprocess_image_for_local_tagger(filepath)
+        if img_numpy is None:
+            return None
         input_name = local_tagger_session.get_inputs()[0].name
         
         raw_outputs = local_tagger_session.run(None, {input_name: img_numpy})
