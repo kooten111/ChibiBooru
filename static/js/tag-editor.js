@@ -171,6 +171,7 @@ class TagEditor {
         this.renderTags();
     }
 
+    // Booru-main/static/js/tag-editor.js
     renderTags() {
         const list = document.getElementById('editableTagsList');
         if (!list) {
@@ -200,14 +201,7 @@ class TagEditor {
             });
         }
         
-        // Add the + button
-        const addBtn = document.createElement('div');
-        addBtn.className = 'add-tag-btn';
-        addBtn.innerHTML = `<span>➕ Add ${this.capitalize(this.selectedCategory)} Tag</span>`;
-        addBtn.addEventListener('click', () => {
-            document.getElementById('addTagInput')?.focus();
-        });
-        list.appendChild(addBtn);
+        // The "+ Add Tag" button block has been removed from here.
     }
 
     renderViewMode() {
