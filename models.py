@@ -37,10 +37,21 @@ def load_data_from_db():
             tag_counts = {row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()}
 
             image_data_query = """
-            SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+            SELECT
+                i.filepath,
+                (
+                    SELECT GROUP_CONCAT(t.name, ' ')
+                    FROM image_tags it
+                    JOIN tags t ON it.tag_id = t.id
+                    WHERE it.image_id = i.id
+                ) as tags,
+                (
+                    SELECT GROUP_CONCAT(s.name, ' ')
+                    FROM image_sources ims
+                    JOIN sources s ON ims.source_id = s.id
+                    WHERE ims.image_id = i.id
+                ) as sources
             FROM images i
-            LEFT JOIN image_tags it ON i.id = it.image_id
-            LEFT JOIN tags t ON it.tag_id = t.id
             GROUP BY i.id
             """
             image_data = [dict(row) for row in conn.execute(image_data_query).fetchall()]
@@ -270,10 +281,21 @@ def get_saucenao_lookup_count():
 def get_all_images_with_tags():
     with get_db_connection() as conn:
         query = """
-        SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+        SELECT
+            i.filepath,
+            (
+                SELECT GROUP_CONCAT(t.name, ' ')
+                FROM image_tags it
+                JOIN tags t ON it.tag_id = t.id
+                WHERE it.image_id = i.id
+            ) as tags,
+            (
+                SELECT GROUP_CONCAT(s.name, ' ')
+                FROM image_sources ims
+                JOIN sources s ON ims.source_id = s.id
+                WHERE ims.image_id = i.id
+            ) as sources
         FROM images i
-        LEFT JOIN image_tags it ON i.id = it.image_id
-        LEFT JOIN tags t ON it.tag_id = t.id
         GROUP BY i.id
         """
         return [dict(row) for row in conn.execute(query).fetchall()]
@@ -720,4 +742,4 @@ def search_images_by_relationship(relationship_type):
             """
             return [dict(row) for row in conn.execute(query, list(matching_filepaths)).fetchall()]
         
-        return []
+        return

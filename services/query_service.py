@@ -40,7 +40,7 @@ def perform_search(search_query):
     filename_filter = None
     extension_filter = None
     relationship_filter = None
-    tag_filters = []
+    general_terms = []
     
     for token in tokens:
         if token.startswith('source:'):
@@ -54,46 +54,50 @@ def perform_search(search_query):
             if rel_type in ['parent', 'child', 'relationship']:
                 relationship_filter = 'any' if rel_type == 'relationship' else rel_type
         else:
-            tag_filters.append(token)
+            general_terms.append(token)
     
-    # Start with appropriate base query
+    # Start with all images and filter down
+    results = models.get_all_images_with_tags()
+
+    # Apply specific filters first
     if relationship_filter:
-        results = models.search_images_by_relationship(relationship_filter)
-    elif source_filters:
-        if len(source_filters) == 1:
-            # Single source - use the existing optimized function
-            results = models.search_images_by_source(source_filters[0])
-        else:
-            # Multiple sources - need AND logic
-            results = models.search_images_by_multiple_sources(source_filters)
-    elif tag_filters:
-        # Use the dedicated tag search function
-        results = models.search_images_by_tags(tag_filters)
-    else:
-        # Get all images for non-tag filters
-        results = models.get_all_images_with_tags()
-    
-    # Apply extension filter if present
+        # This is an expensive operation if not done in the DB
+        relationship_images = {img['filepath'] for img in models.search_images_by_relationship(relationship_filter)}
+        results = [img for img in results if img['filepath'] in relationship_images]
+
+    if source_filters:
+        # This is also very expensive. A dedicated SQL query would be better.
+        # For now, we'll filter in Python.
+        temp_results = []
+        for img in results:
+            details = models.get_image_details(img['filepath'])
+            if details and details.get('raw_metadata'):
+                sources = details['raw_metadata'].get('sources', {}).keys()
+                if all(s in sources for s in source_filters):
+                    temp_results.append(img)
+        results = temp_results
+
     if extension_filter:
         results = [img for img in results if img['filepath'].lower().endswith(f'.{extension_filter}')]
     
-    # Apply filename filter if present
     if filename_filter:
         results = [img for img in results if filename_filter in img['filepath'].lower()]
     
-    # If we started with source filter(s) but also have tag filters, filter by tags now
-    if source_filters and tag_filters:
-        # Filter the source results to only include images with all required tags
-        filtered = []
+    # Now, apply the general search terms to the already filtered results
+    if general_terms:
+        filtered_results = []
         for img in results:
-            img_tags = set((img.get('tags') or '').lower().split())
-            if all(tag in img_tags for tag in tag_filters):
-                filtered.append(img)
-        results = filtered
-    
-    # Determine if we should shuffle
-    # Only shuffle if it's purely tag-based search (no special filters)
-    should_shuffle = bool(tag_filters) and not (source_filters or filename_filter or extension_filter)
+            # Create a combined string of searchable fields
+            searchable_content = f"{img.get('tags', '')} {img.get('filepath')}".lower()
+            
+            # You could also add sources to this searchable string if you modify
+            # get_all_images_with_tags to include source information.
+
+            if all(term in searchable_content for term in general_terms):
+                filtered_results.append(img)
+        results = filtered_results
+
+    should_shuffle = bool(general_terms) and not (source_filters or filename_filter or extension_filter)
     
     return results, should_shuffle
 
