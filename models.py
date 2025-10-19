@@ -261,26 +261,91 @@ def get_all_filepaths():
         return {row['filepath'] for row in conn.execute("SELECT filepath FROM images").fetchall()}
 
 def get_related_images(post_id, parent_id):
-    """Find parent and child images from the database."""
+    """Find parent and child images across all sources in raw metadata."""
     related = []
+    
     with get_db_connection() as conn:
-        # Find parent
-        if parent_id:
-            parent = conn.execute("SELECT filepath FROM images WHERE post_id = ?", (parent_id,)).fetchone()
-            if parent:
-                related.append({
-                    "path": f"images/{parent['filepath']}",
-                    "type": "parent"
-                })
-
-        # Find children
-        if post_id:
-            children = conn.execute("SELECT filepath FROM images WHERE parent_id = ?", (post_id,)).fetchall()
-            for child in children:
-                related.append({
-                    "path": f"images/{child['filepath']}",
-                    "type": "child"
-                })
+        cursor = conn.cursor()
+        
+        # Get raw metadata for current image to find ALL its post_ids
+        current_filepath = conn.execute(
+            "SELECT filepath FROM images WHERE post_id = ?", (post_id,)
+        ).fetchone()
+        
+        if not current_filepath:
+            return related
+            
+        current_metadata = conn.execute(
+            "SELECT rm.data FROM images i LEFT JOIN raw_metadata rm ON i.id = rm.image_id WHERE i.filepath = ?",
+            (current_filepath['filepath'],)
+        ).fetchone()
+        
+        current_all_post_ids = set()
+        current_all_parent_ids = set()
+        
+        if current_metadata and current_metadata['data']:
+            try:
+                metadata = json.loads(current_metadata['data'])
+                for source, data in metadata.get('sources', {}).items():
+                    if source == 'danbooru':
+                        pid = data.get('id')
+                        ppid = data.get('parent_id')
+                    elif source == 'e621':
+                        pid = data.get('id')
+                        ppid = data.get('relationships', {}).get('parent_id')
+                    else:
+                        pid = data.get('id')
+                        ppid = data.get('parent_id')
+                    
+                    if pid:
+                        current_all_post_ids.add(pid)
+                    if ppid:
+                        current_all_parent_ids.add(ppid)
+            except:
+                pass
+        
+        # Find parent - check if any of our parent_ids match any image's post_ids
+        if current_all_parent_ids:
+            cursor.execute("SELECT i.filepath, rm.data FROM images i LEFT JOIN raw_metadata rm ON i.id = rm.image_id WHERE rm.data IS NOT NULL")
+            for row in cursor.fetchall():
+                try:
+                    metadata = json.loads(row['data'])
+                    for source, data in metadata.get('sources', {}).items():
+                        check_id = data.get('id')
+                        if check_id and check_id in current_all_parent_ids:
+                            related.append({
+                                "path": f"images/{row['filepath']}",
+                                "type": "parent"
+                            })
+                            break  # Found parent, move on
+                    if related and related[-1]['type'] == 'parent':
+                        break  # Already found parent
+                except:
+                    continue
+        
+        # Find children - images whose parent_id (in any source) matches our post_ids (in any source)
+        if current_all_post_ids:
+            cursor.execute("SELECT i.filepath, rm.data FROM images i LEFT JOIN raw_metadata rm ON i.id = rm.image_id WHERE rm.data IS NOT NULL")
+            for row in cursor.fetchall():
+                try:
+                    metadata = json.loads(row['data'])
+                    for source, data in metadata.get('sources', {}).items():
+                        if source == 'danbooru':
+                            check_parent = data.get('parent_id')
+                        elif source == 'e621':
+                            check_parent = data.get('relationships', {}).get('parent_id')
+                        else:
+                            check_parent = data.get('parent_id')
+                        
+                        if check_parent and check_parent in current_all_post_ids:
+                            related.append({
+                                "path": f"images/{row['filepath']}",
+                                "type": "child"
+                            })
+                            break  # Don't add same child twice
+                except:
+                    continue
+    
     return related
 
 def search_images_by_tags(tags_list):
