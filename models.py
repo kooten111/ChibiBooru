@@ -7,6 +7,7 @@ from database import get_db_connection
 # --- In-memory Caches ---
 tag_counts = {}
 image_data = []
+post_id_to_md5 = {}
 data_lock = threading.Lock()
 
 
@@ -19,7 +20,7 @@ def md5_exists(md5):
         
 def load_data_from_db():
     """Load or reload data from the database into the in-memory caches."""
-    global tag_counts, image_data
+    global tag_counts, image_data, post_id_to_md5
     print("Loading data from database...")
     with data_lock:
         with get_db_connection() as conn:
@@ -29,6 +30,7 @@ def load_data_from_db():
                 print("Warning: Database tables not found. Skipping data load.")
                 tag_counts = {}
                 image_data = []
+                post_id_to_md5 = {}
                 return False
 
             tag_counts_query = "SELECT name, COUNT(image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
@@ -43,7 +45,28 @@ def load_data_from_db():
             """
             image_data = [dict(row) for row in conn.execute(image_data_query).fetchall()]
 
-    print(f"Loaded {len(image_data)} images, {len(tag_counts)} unique tags.")
+            # Build post_id → MD5 mapping for ALL sources
+            print("Building cross-source post_id index...")
+            post_id_to_md5 = {}
+            cursor.execute("""
+                SELECT i.md5, rm.data 
+                FROM images i 
+                JOIN raw_metadata rm ON i.id = rm.image_id 
+                WHERE rm.data IS NOT NULL
+            """)
+            for row in cursor.fetchall():
+                try:
+                    metadata = json.loads(row['data'])
+                    md5 = row['md5']
+                    for source, data in metadata.get('sources', {}).items():
+                        if source in ['danbooru', 'e621', 'gelbooru', 'yandere']:
+                            post_id = data.get('id')
+                            if post_id:
+                                post_id_to_md5[post_id] = md5
+                except:
+                    continue
+
+    print(f"Loaded {len(image_data)} images, {len(tag_counts)} unique tags, {len(post_id_to_md5)} cross-source post_ids.")
     return True
 
 # --- Cache Access Functions ---
@@ -261,90 +284,56 @@ def get_all_filepaths():
         return {row['filepath'] for row in conn.execute("SELECT filepath FROM images").fetchall()}
 
 def get_related_images(post_id, parent_id):
-    """Find parent and child images across all sources in raw metadata."""
+    """Find parent and child images using pre-computed cross-source mapping."""
     related = []
     
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
-        # Get raw metadata for current image to find ALL its post_ids
-        current_filepath = conn.execute(
-            "SELECT filepath FROM images WHERE post_id = ?", (post_id,)
-        ).fetchone()
+        # Find parent using the mapping
+        if parent_id and parent_id in post_id_to_md5:
+            parent_md5 = post_id_to_md5[parent_id]
+            parent = cursor.execute("SELECT filepath FROM images WHERE md5 = ?", (parent_md5,)).fetchone()
+            if parent:
+                related.append({
+                    "path": f"images/{parent['filepath']}",
+                    "type": "parent"
+                })
         
-        if not current_filepath:
-            return related
-            
-        current_metadata = conn.execute(
-            "SELECT rm.data FROM images i LEFT JOIN raw_metadata rm ON i.id = rm.image_id WHERE i.filepath = ?",
-            (current_filepath['filepath'],)
-        ).fetchone()
-        
-        current_all_post_ids = set()
-        current_all_parent_ids = set()
-        
-        if current_metadata and current_metadata['data']:
-            try:
-                metadata = json.loads(current_metadata['data'])
-                for source, data in metadata.get('sources', {}).items():
-                    if source == 'danbooru':
-                        pid = data.get('id')
-                        ppid = data.get('parent_id')
-                    elif source == 'e621':
-                        pid = data.get('id')
-                        ppid = data.get('relationships', {}).get('parent_id')
-                    else:
-                        pid = data.get('id')
-                        ppid = data.get('parent_id')
-                    
-                    if pid:
-                        current_all_post_ids.add(pid)
-                    if ppid:
-                        current_all_parent_ids.add(ppid)
-            except:
-                pass
-        
-        # Find parent - check if any of our parent_ids match any image's post_ids
-        if current_all_parent_ids:
-            cursor.execute("SELECT i.filepath, rm.data FROM images i LEFT JOIN raw_metadata rm ON i.id = rm.image_id WHERE rm.data IS NOT NULL")
-            for row in cursor.fetchall():
-                try:
-                    metadata = json.loads(row['data'])
-                    for source, data in metadata.get('sources', {}).items():
-                        check_id = data.get('id')
-                        if check_id and check_id in current_all_parent_ids:
-                            related.append({
-                                "path": f"images/{row['filepath']}",
-                                "type": "parent"
-                            })
-                            break  # Found parent, move on
-                    if related and related[-1]['type'] == 'parent':
-                        break  # Already found parent
-                except:
-                    continue
-        
-        # Find children - images whose parent_id (in any source) matches our post_ids (in any source)
-        if current_all_post_ids:
-            cursor.execute("SELECT i.filepath, rm.data FROM images i LEFT JOIN raw_metadata rm ON i.id = rm.image_id WHERE rm.data IS NOT NULL")
-            for row in cursor.fetchall():
-                try:
-                    metadata = json.loads(row['data'])
-                    for source, data in metadata.get('sources', {}).items():
-                        if source == 'danbooru':
-                            check_parent = data.get('parent_id')
-                        elif source == 'e621':
-                            check_parent = data.get('relationships', {}).get('parent_id')
-                        else:
-                            check_parent = data.get('parent_id')
-                        
-                        if check_parent and check_parent in current_all_post_ids:
-                            related.append({
-                                "path": f"images/{row['filepath']}",
-                                "type": "child"
-                            })
-                            break  # Don't add same child twice
-                except:
-                    continue
+        # Find children - check ALL parent_ids from ALL sources in raw metadata
+        if post_id:
+            current_md5 = post_id_to_md5.get(post_id)
+            if current_md5:
+                # Get all images with raw metadata
+                cursor.execute("""
+                    SELECT i.filepath, rm.data 
+                    FROM images i 
+                    JOIN raw_metadata rm ON i.id = rm.image_id 
+                    WHERE rm.data IS NOT NULL
+                """)
+                
+                for row in cursor.fetchall():
+                    try:
+                        metadata = json.loads(row['data'])
+                        # Check parent_id from ALL sources
+                        for source, data in metadata.get('sources', {}).items():
+                            if source == 'danbooru':
+                                check_parent = data.get('parent_id')
+                            elif source == 'e621':
+                                check_parent = data.get('relationships', {}).get('parent_id')
+                            else:
+                                check_parent = data.get('parent_id')
+                            
+                            # If this image's parent matches our MD5, it's our child
+                            if check_parent and check_parent in post_id_to_md5:
+                                if post_id_to_md5[check_parent] == current_md5:
+                                    related.append({
+                                        "path": f"images/{row['filepath']}",
+                                        "type": "child"
+                                    })
+                                    break  # Don't add same child twice
+                    except:
+                        continue
     
     return related
 
