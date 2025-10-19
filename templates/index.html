@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>HomeBooru</title>
+    <title>TagStash</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
@@ -10,6 +10,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-uploader.css') }}">
 </head>
 <body>
+    <div id="global-drop-zone" class="global-drop-zone">
+        <div class="drop-zone-content">
+            <div class="drop-zone-icon">📤</div>
+            <div class="drop-zone-text">Drop images to upload</div>
+        </div>
+    </div>
+
     {% include 'header.html' %}
 
     <div class="container">
