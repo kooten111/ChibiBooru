@@ -81,10 +81,10 @@
                     </div>
                     {% endif %}
 
-                    {% if categorized_tags.meta %}
-                    <div class="tag-category meta">
-                        <div class="tag-category-title">Meta</div>
-                        {% for tag, count in categorized_tags.meta %}
+                    {% if tags %}
+                    <div class="tag-category general">
+                        <div class="tag-category-title">General</div>
+                        {% for tag, count in tags %}
                         <div class="tag-item">
                             <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
@@ -94,11 +94,12 @@
                         {% endfor %}
                     </div>
                     {% endif %}
-
-                    {% if tags %}
-                    <div class="tag-category general">
-                        <div class="tag-category-title">General</div>
-                        {% for tag, count in tags %}
+                    
+                    {# The Meta category is moved here to be sorted last #}
+                    {% if categorized_tags.meta %}
+                    <div class="tag-category meta">
+                        <div class="tag-category-title">Meta</div>
+                        {% for tag, count in categorized_tags.meta %}
                         <div class="tag-item">
                             <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
                             <span class="tag-count">
@@ -439,6 +440,7 @@
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
 <script src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modal.js') }}"></script>
 <script src="{{ url_for('static', filename='js/tag-editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/carousel.js') }}"></script>
@@ -447,6 +449,5 @@
 <script src="{{ url_for('static', filename='js/header.js') }}"></script>
 <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/source-selector.js') }}"></script>
-<script src="{{ url_for('static', filename='js/modal.js') }}"></script>
 </body>
 </html>
