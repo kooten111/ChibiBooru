@@ -1,3 +1,4 @@
+// static/js/header.js
 class StatsTabs {
     constructor() {
         this.buttons = document.querySelectorAll('.stat-tab-button');
@@ -29,9 +30,11 @@ class StatsTabs {
         
         // Close panel when clicking outside
         document.addEventListener('click', (e) => {
+            // FIX: Changed check from .stats-tabs-bar (full width) to .stat-tab-button (just the button)
+            // This allows the panel to close when clicking the empty space to the left or right of it.
             if (this.currentOpenPanel && 
                 !e.target.closest('.stats-panels-container') && 
-                !e.target.closest('.stats-tabs-bar')) {
+                !e.target.closest('.stat-tab-button')) {
                 this.closeCurrentPanel();
             }
         });

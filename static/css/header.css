@@ -136,8 +136,11 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
 .stats-panels-container {
     position: absolute;
     top: 100%;
-    left: 0;
-    right: 0;
+    max-width: 1600px;
+    width: calc(100% - 60px);
+    left: 50%;
+    transform: translateX(-50%);
+    
     z-index: 98;
     pointer-events: none;
 }
@@ -154,8 +157,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     border: 1px solid rgba(135, 206, 235, 0.3);
     border-top: none;
     padding: 25px;
-    margin: 0 auto;
-    max-width: 1600px;
+    width: 100%;
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
     animation: slideIn 0.2s ease-out;
 }
