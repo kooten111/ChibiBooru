@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Application name (shown in header and page titles)
+APP_NAME = os.environ.get('APP_NAME', 'ChibiBooru')
+
 # ==================== PATHS ====================
 
 # Image storage

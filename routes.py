@@ -34,7 +34,7 @@ def login():
             return redirect(url_for('main.home'))
         else:
             flash('Incorrect password.', 'error')
-    return render_template('login.html')
+    return render_template('login.html', app_name=config.APP_NAME)
 
 @main_blueprint.route('/logout')
 def logout():
@@ -77,6 +77,7 @@ def home():
         stats=stats,
         total_results=total_results,
         seed=seed,
+        app_name=config.APP_NAME
     )
 
 @main_blueprint.route('/tags')
@@ -89,7 +90,8 @@ def tags_browser():
         all_tags=all_tags,
         stats=stats,
         query='',
-        random_tags=[] # Not needed for this page
+        random_tags=[],
+        app_name=config.APP_NAME
     )
 
 @main_blueprint.route('/image/<path:filepath>')
@@ -128,7 +130,8 @@ def show_image(filepath):
         carousel_images=carousel_images,
         stats=stats,
         random_tags=[],
-        data=data
+        data=data,
+        app_name=config.APP_NAME
     )
 
 @main_blueprint.route('/similar/<path:filepath>')
@@ -155,7 +158,8 @@ def show_raw_data(filepath):
         raw_data=raw_metadata,
         stats=stats,
         query='',
-        random_tags=[]
+        random_tags=[],
+        app_name=config.APP_NAME
     )
 
 @main_blueprint.route('/upload', methods=['GET', 'POST'])
@@ -195,8 +199,13 @@ def upload_image():
             "redirect_url": redirect_url
         })
     
-    # For a GET request, show the upload page
-    return render_template('upload.html', stats=query_service.get_enhanced_stats(), query='', random_tags=[])
+    return render_template(
+        'upload.html',
+        stats=query_service.get_enhanced_stats(),
+        query='',
+        random_tags=[],
+        app_name=config.APP_NAME
+    )
 
 # --- API Routes ---
 
