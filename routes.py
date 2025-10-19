@@ -1,17 +1,52 @@
 # routes.py
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 import random
+from functools import wraps
+import os
+from werkzeug.utils import secure_filename
 
-from services import query_service, system_service, api_service, monitor_service
+import config
 import models
+import processing
+from services import query_service, system_service, api_service, monitor_service
 from utils import get_thumbnail_path
 
 main_blueprint = Blueprint('main', __name__)
 api_blueprint = Blueprint('api', __name__)
 
+
+# --- Login and Protection ---
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('main.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@main_blueprint.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        if request.form.get('password') == config.APP_PASSWORD:
+            session['logged_in'] = True
+            session.permanent = True # Make session last for a long time
+            return redirect(url_for('main.home'))
+        else:
+            flash('Incorrect password.', 'error')
+    return render_template('login.html')
+
+@main_blueprint.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    flash('You have been logged out.', 'info')
+    return redirect(url_for('main.login'))
+
+
 # --- Main Page Routes ---
 
 @main_blueprint.route('/')
+@login_required
 def home():
     search_query = request.args.get('query', '').strip().lower()
     stats = query_service.get_enhanced_stats()
@@ -45,6 +80,7 @@ def home():
     )
 
 @main_blueprint.route('/tags')
+@login_required
 def tags_browser():
     all_tags = models.get_all_tags_sorted()
     stats = query_service.get_enhanced_stats()
@@ -57,6 +93,7 @@ def tags_browser():
     )
 
 @main_blueprint.route('/image/<path:filepath>')
+@login_required
 def show_image(filepath):
     lookup_path = filepath.replace("images/", "", 1)
     data = models.get_image_details(lookup_path)
@@ -95,12 +132,14 @@ def show_image(filepath):
     )
 
 @main_blueprint.route('/similar/<path:filepath>')
+@login_required
 def similar(filepath):
     similar_images = query_service.find_related_by_tags(filepath, limit=50)
     stats = query_service.get_enhanced_stats()
     return render_template('index.html', images=similar_images, query=f"similar:{filepath}", stats=stats, show_similarity=True)
 
 @main_blueprint.route('/raw/<path:filepath>')
+@login_required
 def show_raw_data(filepath):
     lookup_path = filepath.replace("images/", "", 1)
     data = models.get_image_details(lookup_path)
@@ -118,6 +157,46 @@ def show_raw_data(filepath):
         query='',
         random_tags=[]
     )
+
+@main_blueprint.route('/upload', methods=['GET', 'POST'])
+@login_required
+def upload_image():
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return jsonify({"error": "No file part"}), 400
+        
+        files = request.files.getlist('file')
+        if not files or files[0].filename == '':
+            return jsonify({"error": "No selected file"}), 400
+
+        processed_count = 0
+        last_processed_path = None
+        for file in files:
+            if file:
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(config.IMAGE_DIRECTORY, filename)
+                file.save(filepath)
+
+                if processing.process_image_file(filepath):
+                    processed_count += 1
+                    last_processed_path = f'images/{filename}'
+
+        if processed_count > 0:
+            models.load_data_from_db()
+
+        # For multiple files, redirect to home. For one, redirect to the image.
+        redirect_url = None
+        if processed_count == 1 and last_processed_path:
+            redirect_url = url_for('main.show_image', filepath=last_processed_path)
+
+        return jsonify({
+            "status": "success",
+            "message": f"Successfully uploaded and processed {processed_count} image(s).",
+            "redirect_url": redirect_url
+        })
+    
+    # For a GET request, show the upload page
+    return render_template('upload.html', stats=query_service.get_enhanced_stats(), query='', random_tags=[])
 
 # --- API Routes ---
 

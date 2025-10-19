@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Image - TagStash</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+    <style>
+        .upload-container {
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 40px;
+        }
+        #drop-zone {
+            border: 2px dashed rgba(135, 206, 235, 0.4);
+            border-radius: 16px;
+            padding: 50px;
+            text-align: center;
+            color: #87ceeb;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        #drop-zone.dragover {
+            background-color: rgba(74, 158, 255, 0.1);
+            border-style: solid;
+        }
+        #file-input {
+            display: none;
+        }
+        #upload-status {
+            margin-top: 20px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    {% include 'header.html' %}
+    <div class="container">
+        <div class="upload-container panel">
+            <h2>Upload Image</h2>
+            <form id="upload-form" action="{{ url_for('main.upload_image') }}" method="post" enctype="multipart/form-data">
+                <div id="drop-zone">
+                    <p>Drag & Drop files here or click to select</p>
+                    <p style="font-size: 0.8em; opacity: 0.7;">(Images will be processed automatically after upload)</p>
+                </div>
+                <input type="file" id="file-input" name="file" multiple>
+            </form>
+            <div id="upload-status"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const dropZone = document.getElementById('drop-zone');
+            const fileInput = document.getElementById('file-input');
+            const uploadForm = document.getElementById('upload-form');
+            const uploadStatus = document.getElementById('upload-status');
+
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length) {
+                    fileInput.files = files;
+                    handleFiles(files);
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                handleFiles(fileInput.files);
+            });
+
+            function handleFiles(files) {
+                if (!files.length) return;
+                
+                uploadStatus.innerHTML = `Uploading ${files.length} file(s)...`;
+                const formData = new FormData();
+                for (const file of files) {
+                    formData.append('file', file);
+                }
+
+                fetch("{{ url_for('main.upload_image') }}", {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        uploadStatus.innerHTML = `<span style="color: #90ee90;">${data.message}</span>`;
+                        // Optionally redirect after a delay
+                        if (data.redirect_url) {
+                            setTimeout(() => { window.location.href = data.redirect_url; }, 1000);
+                        }
+                    } else {
+                        uploadStatus.innerHTML = `<span style="color: #ff6b6b;">Error: ${data.error}</span>`;
+                    }
+                })
+                .catch(err => {
+                    uploadStatus.innerHTML = `<span style="color: #ff6b6b;">Upload failed. See console for details.</span>`;
+                    console.error('Upload error:', err);
+                });
+            }
+        });
+    </script>
+</body>
+</html>

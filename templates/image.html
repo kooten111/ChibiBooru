@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/source-selector.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-uploader.css') }}">
 
     {% if related_images %}
         {% for related in related_images %}
@@ -460,5 +461,6 @@
 <script src="{{ url_for('static', filename='js/system-panel.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/source-selector.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/image-page.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
 </body>
 </html>

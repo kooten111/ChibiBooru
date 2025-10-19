@@ -29,7 +29,6 @@ def initialize_database():
         """)
         
         # --- SCHEMA MIGRATION: Add categorized tag columns if they don't exist ---
-        # This is a safe way to update existing databases without deleting them.
         columns_to_add = {
             'tags_character': 'TEXT',
             'tags_copyright': 'TEXT',
@@ -94,6 +93,38 @@ def initialize_database():
             FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
         )
         """)
+
+        # --- NEW: Pools Tables ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS pools (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT
+        )
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS pool_images (
+            pool_id INTEGER,
+            image_id INTEGER,
+            sort_order INTEGER,
+            FOREIGN KEY (pool_id) REFERENCES pools (id) ON DELETE CASCADE,
+            FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
+            PRIMARY KEY (pool_id, image_id)
+        )
+        """)
+
+        # --- NEW: Tag Implications Table ---
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS tag_implications (
+            source_tag_id INTEGER,
+            implied_tag_id INTEGER,
+            FOREIGN KEY (source_tag_id) REFERENCES tags (id) ON DELETE CASCADE,
+            FOREIGN KEY (implied_tag_id) REFERENCES tags (id) ON DELETE CASCADE,
+            PRIMARY KEY (source_tag_id, implied_tag_id)
+        )
+        """)
+
 
         conn.commit()
         print("Database initialized successfully.")

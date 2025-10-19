@@ -779,3 +779,112 @@ def search_images_by_relationship(relationship_type):
             return [dict(row) for row in conn.execute(query, list(matching_filepaths)).fetchall()]
         
         return []
+
+# --- NEW: Pool Management Functions ---
+
+def create_pool(name, description=""):
+    """Create a new pool."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO pools (name, description) VALUES (?, ?)", (name, description))
+        conn.commit()
+        return cursor.lastrowid
+
+def get_all_pools():
+    """Get a list of all pools."""
+    with get_db_connection() as conn:
+        return [dict(row) for row in conn.execute("SELECT * FROM pools ORDER BY name ASC").fetchall()]
+
+def get_pool_details(pool_id):
+    """Get details for a single pool and its images."""
+    with get_db_connection() as conn:
+        pool = conn.execute("SELECT * FROM pools WHERE id = ?", (pool_id,)).fetchone()
+        if not pool:
+            return None
+        
+        images_query = """
+        SELECT i.filepath, pi.sort_order
+        FROM images i
+        JOIN pool_images pi ON i.id = pi.image_id
+        WHERE pi.pool_id = ?
+        ORDER BY pi.sort_order ASC
+        """
+        images = [dict(row) for row in conn.execute(images_query, (pool_id,)).fetchall()]
+        return {"pool": dict(pool), "images": images}
+
+def add_image_to_pool(pool_id, image_id):
+    """Add an image to a pool."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        # Get the next sort order
+        cursor.execute("SELECT MAX(sort_order) FROM pool_images WHERE pool_id = ?", (pool_id,))
+        max_order = cursor.fetchone()[0]
+        next_order = (max_order or 0) + 1
+        
+        cursor.execute("INSERT OR IGNORE INTO pool_images (pool_id, image_id, sort_order) VALUES (?, ?, ?)",
+                       (pool_id, image_id, next_order))
+        conn.commit()
+
+# --- NEW: Tag Implication Functions ---
+
+def add_implication(source_tag_name, implied_tag_name):
+    """Create an implication from a source tag to an implied tag."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        # Get tag IDs
+        cursor.execute("SELECT id FROM tags WHERE name = ?", (source_tag_name,))
+        source_id = cursor.fetchone()
+        cursor.execute("SELECT id FROM tags WHERE name = ?", (implied_tag_name,))
+        implied_id = cursor.fetchone()
+        
+        if source_id and implied_id:
+            cursor.execute("INSERT OR IGNORE INTO tag_implications (source_tag_id, implied_tag_id) VALUES (?, ?)",
+                           (source_id['id'], implied_id['id']))
+            conn.commit()
+            return True
+        return False
+
+def get_implications_for_tag(tag_name):
+    """Get all tags implied by a given source tag."""
+    with get_db_connection() as conn:
+        query = """
+        SELECT t_implied.name
+        FROM tags t_source
+        JOIN tag_implications ti ON t_source.id = ti.source_tag_id
+        JOIN tags t_implied ON ti.implied_tag_id = t_implied.id
+        WHERE t_source.name = ?
+        """
+        return [row['name'] for row in conn.execute(query, (tag_name,)).fetchall()]
+
+def apply_implications_for_image(image_id):
+    """Apply all tag implications for a given image."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        # Get all current tags for the image
+        cursor.execute("SELECT t.name FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = ?", (image_id,))
+        current_tags = {row['name'] for row in cursor.fetchall()}
+        
+        tags_to_add = set()
+        
+        # Use a loop to handle chained implications (A->B, B->C)
+        newly_added_tags_this_iteration = set(current_tags)
+        while newly_added_tags_this_iteration:
+            tags_to_check = newly_added_tags_this_iteration
+            newly_added_tags_this_iteration = set()
+            
+            for tag_name in tags_to_check:
+                implied_tags = get_implications_for_tag(tag_name)
+                for implied_tag in implied_tags:
+                    if implied_tag not in current_tags and implied_tag not in tags_to_add:
+                        tags_to_add.add(implied_tag)
+                        newly_added_tags_this_iteration.add(implied_tag)
+
+        # Add the new tags to the database
+        for tag_name in tags_to_add:
+            cursor.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, 'general'))
+            cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+            tag_id = cursor.fetchone()['id']
+            cursor.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
+
+        conn.commit()
+        return len(tags_to_add) > 0

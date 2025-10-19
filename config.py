@@ -32,6 +32,16 @@ GELBOORU_USER_ID = os.environ.get('GELBOORU_USER_ID', '')
 # System control secret
 RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
 
+# ==================== NEW: APP SECURITY ====================
+
+# Password for simple web UI login
+APP_PASSWORD = os.environ.get('APP_PASSWORD', 'default-password')
+
+# Secret key for Flask sessions (required for login)
+# Set this in your .env file to a long, random string
+SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-for-production')
+
+
 # ==================== LOCAL TAGGER (AI TAGGING) ====================
 
 # Model paths - supports any ONNX tagger with similar metadata format
@@ -110,6 +120,12 @@ def validate_config():
     if RELOAD_SECRET == 'change-this-secret':
         warnings.append("RELOAD_SECRET is set to default value - change this for production!")
     
+    if APP_PASSWORD == 'default-password':
+        warnings.append("APP_PASSWORD is set to default value - change this for security!")
+        
+    if SECRET_KEY == 'dev-secret-key-change-for-production':
+        warnings.append("SECRET_KEY is set to default value - change this for production!")
+
     if warnings:
         print("\n⚠️  Configuration Warnings:")
         for warning in warnings:

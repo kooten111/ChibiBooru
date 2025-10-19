@@ -14,6 +14,7 @@ def create_app():
     
     # Flask config
     app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
+    app.config['SECRET_KEY'] = config.SECRET_KEY
     
     # Ensure the database file and tables exist.
     initialize_database()
