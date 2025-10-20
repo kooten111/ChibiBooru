@@ -650,6 +650,40 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
                 "INSERT INTO raw_metadata (image_id, data) VALUES (?, ?)",
                 (image_id, json.dumps(raw_metadata_dict))
             )
+            # 5. Populate categorized tag columns in images table
+            tag_columns = {
+                'character': 'tags_character',
+                'copyright': 'tags_copyright', 
+                'artist': 'tags_artist',
+                'species': 'tags_species',
+                'meta': 'tags_meta',
+                'general': 'tags_general'
+            }
+
+            update_values = {}
+            for category, tags_list in categorized_tags.items():
+                col_name = tag_columns.get(category)
+                if col_name:
+                    update_values[col_name] = ' '.join(tags_list) if tags_list else None
+
+            cursor.execute("""
+                UPDATE images 
+                SET tags_character = ?,
+                    tags_copyright = ?,
+                    tags_artist = ?,
+                    tags_species = ?,
+                    tags_meta = ?,
+                    tags_general = ?
+                WHERE id = ?
+            """, (
+                update_values.get('tags_character'),
+                update_values.get('tags_copyright'),
+                update_values.get('tags_artist'),
+                update_values.get('tags_species'),
+                update_values.get('tags_meta'),
+                update_values.get('tags_general'),
+                image_id
+            ))
 
             conn.commit()
             return True

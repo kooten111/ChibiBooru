@@ -172,9 +172,11 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         return;
     }
     
-    const originalText = buttonElement.innerHTML;
-    buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">⚙️</span> Processing...`;
-    buttonElement.disabled = true;
+    const originalText = buttonElement ? buttonElement.innerHTML : '';
+    if (buttonElement) {
+        buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">⚙️</span> Processing...`;
+        buttonElement.disabled = true;
+    }
     
     addLog(`Starting: ${actionName}...`, 'info');
     
@@ -224,8 +226,10 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         console.error('Full error:', err);
     })
     .finally(() => {
-        buttonElement.innerHTML = originalText;
-        buttonElement.disabled = false;
+        if (buttonElement) {
+            buttonElement.innerHTML = originalText;
+            buttonElement.disabled = false;
+        }
     });
 }
 
@@ -243,8 +247,9 @@ function systemRebuildTags(event) {
 
 function systemRebuildCategorized(event) {
     if (event) event.preventDefault();
+    const buttonElement = event ? event.target : null;
     showConfirm('This will fix tag displays by populating categorized tag data for all images. This is safe to run. Continue?', () => {
-        systemAction('/api/system/rebuild_categorized', event.target, 'Rebuild Categorized Tags');
+        systemAction('/api/system/rebuild_categorized', buttonElement, 'Rebuild Categorized Tags');
     });
 }
 
