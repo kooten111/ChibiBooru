@@ -8,6 +8,7 @@ import requests
 from urllib.parse import urlparse
 from utils import get_thumbnail_path
 import processing
+from database import get_db_connection
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -47,23 +48,6 @@ def get_images_for_api():
         "has_more": page < total_pages
     })
 
-
-def autocomplete():
-    """Service for tag autocomplete suggestions."""
-    query = request.args.get('q', '').strip().lower()
-    if not query or len(query) < 2:
-        return jsonify([])
-
-    tag_counts = models.get_tag_counts()
-    last_token = query.split()[-1]
-    
-    matches = [
-        {"tag": tag, "count": count}
-        for tag, count in tag_counts.items()
-        if tag.startswith(last_token)
-    ]
-    matches.sort(key=lambda x: x['count'], reverse=True)
-    return jsonify(matches[:10])
 
 def update_image_tags_categorized(filepath, categorized_tags):
     """Update image tags by category in the database."""
