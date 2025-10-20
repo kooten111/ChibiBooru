@@ -231,7 +231,7 @@ def search_danbooru(md5):
 
 def search_e621(md5):
     try:
-        headers = {"User-Agent": "HomeBooru/1.0"}
+        headers = {"User-Agent": "ChibiBooru/1.0"}
         url = f"https://e621.net/posts.json?tags=md5:{md5}"
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200 and response.json()["posts"]:
@@ -280,7 +280,7 @@ def fetch_by_post_id(source, post_id):
             return {"source": "danbooru", "data": response.json()}
         
         elif source == "e621":
-            headers = {"User-Agent": "HomeBooru/1.0"}
+            headers = {"User-Agent": "ChibiBooru/1.0"}
             url = f"https://e621.net/posts/{post_id}.json"
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()

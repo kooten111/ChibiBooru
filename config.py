@@ -1,5 +1,4 @@
 """
-HomeBooru Configuration
 Centralized configuration for all modules
 """
 import os

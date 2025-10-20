@@ -1,6 +1,6 @@
-# HomeBooru
+# ChibiBooru
 
-HomeBooru is a self-hosted web application for organizing and browsing your local image collection, designed to automatically fetch tags and metadata from various online sources, similar to popular image boorus. It combines a user-friendly interface with powerful backend tools to create a rich and searchable media library.
+ChibiBooru is a self-hosted web application for organizing and browsing your local image collection, designed to automatically fetch tags and metadata from various online sources, similar to popular image boorus. It combines a user-friendly interface with powerful backend tools to create a rich and searchable media library.
 
 ## 🌟 Features
 
@@ -97,7 +97,7 @@ HomeBooru is a self-hosted web application for organizing and browsing your loca
 2.  Navigate to the **System** panel in the header.
 3.  Enter the `RELOAD_SECRET` you set in your `.env` file.
 4.  Click **"Scan & Process New Images"** to begin indexing your collection. The application will start fetching metadata for all your images. This may take a while for large collections.
-5.  Once the initial scan is complete, you can optionally start the **Monitor** to have HomeBooru automatically process new images you add to the `static/images` folder.
+5.  Once the initial scan is complete, you can optionally start the **Monitor** to have ChibiBooru automatically process new images you add to the `static/images` folder.
 
 ### Searching
 
