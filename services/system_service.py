@@ -34,7 +34,7 @@ def rebuild_service():
     try:
         monitor_service.stop_monitor()
         
-        models.repopulate_from_metadata()
+        models.repopulate_from_database()
         
         models.load_data_from_db()
         

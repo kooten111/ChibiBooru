@@ -408,11 +408,15 @@ def process_image_file(filepath):
         'general': list(general_set)
     }
 
+    parent_id = primary_source_data.get('parent_id')
+    if source_name == 'e621':
+        parent_id = primary_source_data.get('relationships', {}).get('parent_id')
+
     image_info = {
         'filepath': rel_path,
         'md5': md5,
         'post_id': primary_source_data.get('id'),
-        'parent_id': primary_source_data.get('parent_id'),
+        'parent_id': parent_id,
         'has_children': primary_source_data.get('has_children', False),
         'saucenao_lookup': used_saucenao,
     }

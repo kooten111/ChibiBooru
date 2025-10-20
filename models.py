@@ -191,16 +191,18 @@ def rebuild_categorized_tags_from_relations():
     print(f"Successfully updated categorized tags for {updated_count} images.")
     return updated_count
 
-def repopulate_from_metadata():
-    """Rebuilds the database by reading all JSON files from the /metadata/ directory."""
-    print("Repopulating database from /metadata/ files...")
-    METADATA_DIR = "metadata"
-    if not os.path.isdir(METADATA_DIR):
-        raise FileNotFoundError("Metadata directory not found. Cannot rebuild.")
-
+def repopulate_from_database():
+    """Rebuilds the tag and source relationships by reading from the raw_metadata table."""
+    print("Repopulating database from 'raw_metadata' table...")
     with get_db_connection() as con:
         cur = con.cursor()
-        
+
+        # Clear existing tag and source relationships
+        cur.execute("DELETE FROM image_tags")
+        cur.execute("DELETE FROM image_sources")
+        cur.execute("DELETE FROM tags")
+        cur.execute("DELETE FROM sources")
+
         source_map = {}
         known_sources = ["danbooru", "e621", "gelbooru", "yandere", "local_tagger"]
         for source_name in known_sources:
@@ -208,52 +210,52 @@ def repopulate_from_metadata():
             cur.execute("SELECT id FROM sources WHERE name = ?", (source_name,))
             source_map[source_name] = cur.fetchone()[0]
 
-        for filename in tqdm(os.listdir(METADATA_DIR), desc="Rebuilding from Metadata"):
-            if not filename.endswith('.json'): 
-                continue
-            
-            with open(os.path.join(METADATA_DIR, filename), 'r') as f:
-                metadata = json.load(f)
+        # Get all raw metadata
+        cur.execute("SELECT image_id, data FROM raw_metadata")
+        all_metadata = cur.fetchall()
 
-            rel_path = metadata.get("relative_path")
-            md5 = metadata.get("md5")
-            if not rel_path or not md5: 
+        for row in tqdm(all_metadata, desc="Rebuilding from DB Metadata"):
+            image_id = row['image_id']
+            try:
+                metadata = json.loads(row['data'])
+            except (json.JSONDecodeError, TypeError):
                 continue
 
-            # Determine primary source for categorized tags
             primary_source_data = None
-            if 'danbooru' in metadata['sources']:
+            source_name = None
+            if 'danbooru' in metadata.get('sources', {}):
                 primary_source_data = metadata['sources']['danbooru']
                 source_name = 'danbooru'
-            elif 'e621' in metadata['sources']:
+            elif 'e621' in metadata.get('sources', {}):
                 primary_source_data = metadata['sources']['e621']
                 source_name = 'e621'
-            else:
-                primary_source_data = next(iter(metadata['sources'].values()), {})
+            elif metadata.get('sources'):
                 source_name = next(iter(metadata['sources'].keys()), None)
-            
-            # Insert image
-            cur.execute("INSERT OR IGNORE INTO images (filepath, md5, post_id, parent_id, has_children, saucenao_lookup) VALUES (?, ?, ?, ?, ?, ?)",
-                (rel_path, md5, primary_source_data.get("id"), primary_source_data.get("parent_id"), primary_source_data.get("has_children", False), metadata.get("saucenao_lookup", False)))
-            cur.execute("SELECT id FROM images WHERE filepath = ?", (rel_path,))
-            
-            image_row = cur.fetchone()
-            if not image_row:
-                print(f"Warning: Skipping metadata for {rel_path} because it's not in the images table.")
+                primary_source_data = next(iter(metadata['sources'].values()), {})
+
+            if not primary_source_data:
                 continue
-            image_id = image_row['id']
 
-            # Insert raw metadata
-            cur.execute("INSERT OR REPLACE INTO raw_metadata (image_id, data) VALUES (?, ?)", (image_id, json.dumps(metadata)))
+            parent_id = primary_source_data.get('parent_id')
+            if source_name == 'e621':
+                parent_id = primary_source_data.get('relationships', {}).get('parent_id')
 
-            # Insert sources
-            for src in metadata['sources'].keys():
+            cur.execute("""
+                UPDATE images
+                SET post_id = ?, parent_id = ?, has_children = ?, active_source = ?
+                WHERE id = ?
+            """, (
+                primary_source_data.get("id"),
+                parent_id,
+                primary_source_data.get("has_children", False),
+                source_name,
+                image_id
+            ))
+
+            for src in metadata.get('sources', {}).keys():
                 if src in source_map:
                     cur.execute("INSERT OR IGNORE INTO image_sources (image_id, source_id) VALUES (?, ?)", (image_id, source_map[src]))
-            if metadata.get("camie_tagger_lookup"):
-                cur.execute("INSERT OR IGNORE INTO image_sources (image_id, source_id) VALUES (?, ?)", (image_id, source_map['local_tagger']))
 
-            # Extract and insert tags
             categorized_tags = {}
             if source_name == 'danbooru':
                 categorized_tags = {
@@ -266,33 +268,32 @@ def repopulate_from_metadata():
             elif source_name == 'e621':
                 tags = primary_source_data.get("tags", {})
                 categorized_tags = {
+                    'character': tags.get("character", []), 'copyright': tags.get("copyright", []),
+                    'artist': tags.get("artist", []), 'species': tags.get("species", []),
+                    'meta': tags.get("meta", []), 'general': tags.get("general", [])
+                }
+            elif source_name == 'local_tagger':
+                tags = primary_source_data.get("tags", {})
+                categorized_tags = {
                     'character': tags.get("character", []),
                     'copyright': tags.get("copyright", []),
                     'artist': tags.get("artist", []),
-                    'species': tags.get("species", []),
                     'meta': tags.get("meta", []),
                     'general': tags.get("general", [])
                 }
-            
+
             for category, tags_list in categorized_tags.items():
                 for tag_name in tags_list:
-                    if not tag_name:
-                        continue
-                    cur.execute("""
-                    INSERT INTO tags (name, category) VALUES (?, ?)
-                        ON CONFLICT(name) DO UPDATE SET category = excluded.category
-                    """, (tag_name, category))
+                    if not tag_name: continue
+                    cur.execute("INSERT INTO tags (name, category) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET category=excluded.category", (tag_name, category))
                     cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
                     tag_id = cur.fetchone()['id']
                     cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
-
         con.commit()
-    
+
     print("Repopulation complete.")
-    
-    # Recategorize any misplaced tags
     recategorize_misplaced_tags()
-    
+    rebuild_categorized_tags_from_relations()
     print("Database rebuild complete.")
     
 # --- Direct Database Query Functions ---

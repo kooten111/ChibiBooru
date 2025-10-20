@@ -17,6 +17,8 @@ def extract_tags_from_source(source_data, source_name):
     
     all_tags = set()
     parent_id = source_data.get("parent_id")
+    if source_name == 'e621':
+        parent_id = source_data.get('relationships', {}).get('parent_id')
     has_children = source_data.get("has_children", False)
     post_id = source_data.get("id")
     
