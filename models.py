@@ -194,6 +194,9 @@ def rebuild_categorized_tags_from_relations():
 
 def repopulate_from_database():
     """Rebuilds the tag and source relationships by reading from the raw_metadata table."""
+    # Import config here to ensure it's loaded within the application context
+    import config
+
     print("Repopulating database from 'raw_metadata' table...")
     with get_db_connection() as con:
         cur = con.cursor()
@@ -224,15 +227,20 @@ def repopulate_from_database():
 
             primary_source_data = None
             source_name = None
-            if 'danbooru' in metadata.get('sources', {}):
-                primary_source_data = metadata['sources']['danbooru']
-                source_name = 'danbooru'
-            elif 'e621' in metadata.get('sources', {}):
-                primary_source_data = metadata['sources']['e621']
-                source_name = 'e621'
-            elif metadata.get('sources'):
-                source_name = next(iter(metadata['sources'].keys()), None)
-                primary_source_data = next(iter(metadata['sources'].values()), {})
+            available_sources = metadata.get('sources', {})
+
+            # *** CORRECTED LOGIC: Use BOORU_PRIORITY from config ***
+            for src in config.BOORU_PRIORITY:
+                if src in available_sources:
+                    primary_source_data = available_sources[src]
+                    source_name = src
+                    break
+            
+            # Fallback if no priority source is found
+            if not source_name and available_sources:
+                source_name = next(iter(available_sources.keys()), None)
+                primary_source_data = next(iter(available_sources.values()), {})
+
 
             if not primary_source_data:
                 continue

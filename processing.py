@@ -320,7 +320,7 @@ def process_image_file(filepath):
 
     if models.md5_exists(md5):
         print(f"Duplicate detected (MD5: {md5}). Removing redundant file: {filepath}")
-        remove_duplicate(filepath)
+        remove_duplicate(rel_path)
         return False
 
     all_results = search_all_sources(md5)
