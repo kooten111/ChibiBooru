@@ -337,3 +337,11 @@ document.addEventListener('DOMContentLoaded', () => {
         observer.observe(panelsContainer, { attributes: true, subtree: true, attributeFilter: ['class'] });
     }
 });
+
+function toggleDebugOptions() {
+    const debugOptions = document.getElementById('debugOptions');
+    const toggleButton = document.querySelector('.debug-toggle');
+    
+    debugOptions.classList.toggle('open');
+    toggleButton.classList.toggle('expanded');
+}

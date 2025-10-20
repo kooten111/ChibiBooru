@@ -183,14 +183,13 @@
                     </button>
                 </div>
 
-                <!-- Debug Options Toggle -->
                 <div class="debug-section">
                     <button class="btn btn-secondary debug-toggle" onclick="toggleDebugOptions()">
                         🛠️ Debug Options
                         <span class="toggle-arrow">▼</span>
                     </button>
                     
-                    <div class="debug-options" id="debugOptions" style="display: none;">
+                    <div class="debug-options" id="debugOptions">
                         <div class="system-buttons" style="margin-top: 15px;">
                             <button class="btn btn-danger" onclick="systemRebuildTags(event)">
                                 ⚠️ Rebuild Database from Metadata
@@ -219,47 +218,6 @@
                     <div class="log-entry info">No recent activity</div>
                 </div>
             </div>
-
-            <style>
-            .debug-section {
-                margin: 20px 0;
-            }
-
-            .debug-toggle {
-                width: 100%;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-
-            .toggle-arrow {
-                transition: transform 0.3s ease;
-            }
-
-            .debug-toggle.expanded .toggle-arrow {
-                transform: rotate(180deg);
-            }
-
-            .debug-options {
-                overflow: hidden;
-                transition: all 0.3s ease;
-            }
-            </style>
-
-            <script>
-            function toggleDebugOptions() {
-                const debugOptions = document.getElementById('debugOptions');
-                const toggleButton = document.querySelector('.debug-toggle');
-                
-                if (debugOptions.style.display === 'none') {
-                    debugOptions.style.display = 'block';
-                    toggleButton.classList.add('expanded');
-                } else {
-                    debugOptions.style.display = 'none';
-                    toggleButton.classList.remove('expanded');
-                }
-            }
-            </script>
         </div>
     </div>
 </div>
