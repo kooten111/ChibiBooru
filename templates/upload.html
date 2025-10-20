@@ -100,9 +100,9 @@
                 .then(data => {
                     if (data.status === 'success') {
                         uploadStatus.innerHTML = `<span style="color: #90ee90;">${data.message}</span>`;
-                        // Optionally redirect after a delay
+                        // If the server sent a redirect URL, go there after a delay
                         if (data.redirect_url) {
-                            setTimeout(() => { window.location.href = data.redirect_url; }, 1000);
+                            setTimeout(() => { window.location.href = data.redirect_url; }, 1500);
                         }
                     } else {
                         uploadStatus.innerHTML = `<span style="color: #ff6b6b;">Error: ${data.error}</span>`;

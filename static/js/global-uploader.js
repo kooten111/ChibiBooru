@@ -56,8 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (data.status === 'success') {
                 showUploadNotification(data.message, 'success');
-                // Reload after a short delay to see changes
-                setTimeout(() => window.location.reload(), 1500);
+                // If the server sent a redirect URL, go there after a delay
+                if (data.redirect_url) {
+                    setTimeout(() => {
+                        window.location.href = data.redirect_url;
+                    }, 1500); // 1.5 second delay
+                }
             } else {
                 throw new Error(data.error || 'Unknown upload error');
             }

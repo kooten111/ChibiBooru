@@ -188,29 +188,31 @@ def upload_image():
         processed_count = 0
         last_processed_path = None
         for file in files:
-            if file:
+            if file and file.filename:
                 filename = secure_filename(file.filename)
                 filepath = os.path.join(config.IMAGE_DIRECTORY, filename)
                 file.save(filepath)
 
                 if processing.process_image_file(filepath):
                     processed_count += 1
+                    # Keep track of the last successfully processed image's path
                     last_processed_path = f'images/{filename}'
 
         if processed_count > 0:
             models.load_data_from_db()
 
-        # For multiple files, redirect to home. For one, redirect to the image.
         redirect_url = None
-        if processed_count == 1 and last_processed_path:
+        # If any image was processed, generate a URL for the last one
+        if last_processed_path:
             redirect_url = url_for('main.show_image', filepath=last_processed_path)
 
         return jsonify({
             "status": "success",
-            "message": f"Successfully uploaded and processed {processed_count} image(s).",
+            "message": f"Successfully processed {processed_count} image(s).",
             "redirect_url": redirect_url
         })
     
+    # GET request renders the upload page
     return render_template(
         'upload.html',
         stats=query_service.get_enhanced_stats(),
@@ -218,7 +220,6 @@ def upload_image():
         random_tags=[],
         app_name=config.APP_NAME
     )
-
 # --- API Routes ---
 
 @api_blueprint.route('/images')
