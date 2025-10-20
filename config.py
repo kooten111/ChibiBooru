@@ -95,7 +95,7 @@ FLASK_PORT = int(os.environ.get('FLASK_PORT', 5000))
 FLASK_DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
 # Pagination
-IMAGES_PER_PAGE = 50
+IMAGES_PER_PAGE = 100
 
 # ==================== FEATURE FLAGS ====================
 
