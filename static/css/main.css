@@ -485,9 +485,10 @@ body {
 .header-mascot {
     position: absolute;
     left: 140px;
-    top: -10px; /* Adjust to move her up/down */
-    height: 120px; /* Make her as big as you want */
+    top: -10px;
+    height: 75px;
     width: auto;
     z-index: 1;
-    pointer-events: none; /* So she doesn't block clicks */
+    pointer-events: none;
+    margin-right: 40px;
 }
