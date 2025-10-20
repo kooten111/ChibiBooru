@@ -1,3 +1,4 @@
+# processing.py
 import config
 import os
 import hashlib
@@ -439,5 +440,8 @@ def process_image_file(filepath):
 
     if success:
         ensure_thumbnail(filepath)
-    
-    return success
+        return True
+    else:
+        print(f"Failed to add image {rel_path} to DB. It might be a duplicate from a concurrent process. Removing file.")
+        remove_duplicate(filepath)
+        return False

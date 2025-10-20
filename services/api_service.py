@@ -171,28 +171,58 @@ def edit_tags_service():
 def delete_image_service():
     """Service to delete an image and its data."""
     data = request.json
+    # The filepath from the frontend is 'images/folder/image.jpg'
+    # We need the path relative to the 'static/images' directory, which is 'folder/image.jpg'
     filepath = data.get('filepath', '').replace('images/', '', 1)
 
     if not filepath:
         return jsonify({"error": "Filepath is required"}), 400
 
     try:
+        # First, remove the database entry.
         db_success = models.delete_image(filepath)
         if not db_success:
+            # This isn't a fatal error; the file might still exist on disk without a DB entry.
             print(f"Info: delete_image_service called for {filepath}, but it was not in the database.")
 
+        # Construct the full path to the image file.
         full_image_path = os.path.join("static/images", filepath)
-        full_thumb_path = os.path.join("static", get_thumbnail_path(f"images/{filepath}"))
+        
+        # Construct the thumbnail path directly and more reliably.
+        # This creates 'static/thumbnails/folder/image.webp'
+        thumb_path = os.path.join("static/thumbnails", os.path.splitext(filepath)[0] + '.webp')
+
+        # --- Attempt to delete the files ---
+        image_deleted = False
+        thumb_deleted = False
 
         if os.path.exists(full_image_path):
+            print(f"Deleting image file: {full_image_path}")
             os.remove(full_image_path)
-        if os.path.exists(full_thumb_path):
-            os.remove(full_thumb_path)
-        
-        models.load_data_from_db()
+            image_deleted = True
+        else:
+            print(f"Image file not found, skipping deletion: {full_image_path}")
 
-        return jsonify({"status": "success"})
+        if os.path.exists(thumb_path):
+            print(f"Deleting thumbnail file: {thumb_path}")
+            os.remove(thumb_path)
+            thumb_deleted = True
+        else:
+            print(f"Thumbnail file not found, skipping deletion: {thumb_path}")
+
+        # If anything was actually deleted, reload the in-memory data.
+        if db_success or image_deleted or thumb_deleted:
+            print("Reloading data after deletion.")
+            models.load_data_from_db()
+        else:
+            print("No database entry or files were found to delete.")
+
+
+        return jsonify({"status": "success", "message": "Deletion process completed."})
     except Exception as e:
+        # Log the full error to the console for easier debugging in the future.
+        import traceback
+        traceback.print_exc()
         print(f"Error deleting image {filepath}: {e}")
         return jsonify({"error": "An unexpected error occurred during deletion."}), 500
 

@@ -233,6 +233,10 @@ def reload_data():
 def system_status():
     return system_service.get_system_status()
 
+@api_blueprint.route('/system/logs')
+def system_logs():
+    return jsonify(monitor_service.get_status().get('logs', []))
+
 @api_blueprint.route('/system/scan', methods=['POST'])
 def trigger_scan():
     return system_service.scan_and_process_service()

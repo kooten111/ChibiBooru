@@ -1,6 +1,6 @@
+// static/js/system-panel.js
 var systemStatusInterval = null;
 var SYSTEM_SECRET = localStorage.getItem('system_secret');
-var processingLogs = [];
 
 function updateSecretUI() {
     const secretSection = document.getElementById('secretSection');
@@ -54,6 +54,7 @@ function saveSystemSecret() {
     showNotification('Secret saved successfully', 'success');
     updateSecretUI();
     loadSystemStatus();
+    loadLogs();
 }
 
 function clearSystemSecret(event) {
@@ -70,32 +71,28 @@ function clearSystemSecret(event) {
     });
 }
 
-function addLog(message, type = 'info') {
-    const timestamp = new Date().toLocaleTimeString();
-    processingLogs.unshift({ timestamp, message, type });
-    
-    if (processingLogs.length > 20) {
-        processingLogs = processingLogs.slice(0, 20);
-    }
-    
-    updateLogsDisplay();
-}
+function loadLogs() {
+    if (!SYSTEM_SECRET) return;
 
-function updateLogsDisplay() {
-    const logsDiv = document.getElementById('systemLogs');
-    if (!logsDiv) return;
-    
-    if (processingLogs.length === 0) {
-        logsDiv.innerHTML = '<div class="log-entry info">No recent activity</div>';
-        return;
-    }
-    
-    logsDiv.innerHTML = processingLogs.map(log => `
-        <div class="log-entry ${log.type}">
-            <span style="color: #87ceeb; margin-right: 10px;">[${log.timestamp}]</span>
-            ${log.message}
-        </div>
-    `).join('');
+    fetch('/api/system/logs')
+        .then(res => res.json())
+        .then(logs => {
+            const logsDiv = document.getElementById('systemLogs');
+            if (!logsDiv) return;
+
+            if (logs.length === 0) {
+                logsDiv.innerHTML = '<div class="log-entry info">No recent activity</div>';
+                return;
+            }
+
+            logsDiv.innerHTML = logs.map(log => `
+                <div class="log-entry ${log.type}">
+                    <span style="color: #87ceeb; margin-right: 10px;">[${log.timestamp}]</span>
+                    ${log.message}
+                </div>
+            `).join('');
+        })
+        .catch(err => console.error('Error loading logs:', err));
 }
 
 function loadSystemStatus() {
@@ -147,7 +144,6 @@ function loadSystemStatus() {
         })
         .catch(err => {
             console.error('Error loading system status:', err);
-            addLog('Failed to load system status', 'error');
         });
 }
 
@@ -178,7 +174,7 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         buttonElement.disabled = true;
     }
     
-    addLog(`Starting: ${actionName}...`, 'info');
+    loadLogs();
     
     const url = `${endpoint}?secret=${encodeURIComponent(SYSTEM_SECRET)}`;
     const options = {
@@ -201,19 +197,12 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         if (data.status === 'success') {
             const msg = data.message || `${actionName} completed`;
             showNotification(msg, 'success');
-            addLog(msg, 'success');
-            if (data.processed !== undefined) {
-                addLog(`Processed ${data.processed} items`, 'success');
-            }
-            if (data.changes !== undefined) {
-                addLog(`Changed ${data.changes} tags`, 'success');
-            }
+            loadLogs();
             loadSystemStatus();
         } else if (data.error === 'Unauthorized') {
             localStorage.removeItem('system_secret');
             SYSTEM_SECRET = null;
             showNotification('Invalid system secret', 'error');
-            addLog('Authentication failed - invalid secret', 'error');
             updateSecretUI();
         } else {
             throw new Error(data.error || 'Unknown error');
@@ -222,7 +211,6 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
     .catch(err => {
         const errMsg = `${actionName} failed: ${err.message}`;
         showNotification(errMsg, 'error');
-        addLog(errMsg, 'error');
         console.error('Full error:', err);
     })
     .finally(() => {
@@ -319,10 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const systemPanel = document.getElementById('system-panel');
         if (systemPanel && systemPanel.classList.contains('active')) {
             updateSecretUI();
-            updateLogsDisplay();
             if (!systemStatusInterval && SYSTEM_SECRET) {
                 loadSystemStatus();
-                systemStatusInterval = setInterval(loadSystemStatus, 5000);
+                loadLogs();
+                systemStatusInterval = setInterval(() => {
+                    loadSystemStatus();
+                    loadLogs();
+                }, 5000);
             }
         } else {
             if (systemStatusInterval) {

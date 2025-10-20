@@ -2,6 +2,7 @@
 import threading
 import os
 import json
+import sqlite3
 from tqdm import tqdm
 from database import get_db_connection
 
@@ -615,6 +616,7 @@ def update_image_tags_categorized(filepath, categorized_tags):
 def add_image_with_metadata(image_info, source_names, categorized_tags, raw_metadata_dict):
     """
     Adds a new image and all its metadata to the database in a single transaction.
+    Returns True on success, False on failure (including duplicate MD5 race condition).
     """
     try:
         with get_db_connection() as conn:
@@ -688,6 +690,13 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
 
             conn.commit()
             return True
+    except sqlite3.IntegrityError as e:
+        if "UNIQUE constraint failed: images.md5" in str(e):
+            print(f"Race condition: MD5 {image_info['md5']} was inserted by another process. Treating as duplicate.")
+            return False
+        else:
+            print(f"Database integrity error adding image {image_info['filepath']}: {e}")
+            return False
     except Exception as e:
         print(f"Database error adding image {image_info['filepath']}: {e}")
         return False
