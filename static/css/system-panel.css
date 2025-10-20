@@ -120,3 +120,46 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Debug Options Section */
+.debug-section {
+    margin: 20px 0;
+    border-top: 1px solid rgba(135, 206, 235, 0.2);
+    padding-top: 20px;
+}
+
+.debug-toggle {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, rgba(60, 60, 80, 0.6) 0%, rgba(50, 50, 70, 0.6) 100%);
+    transition: all 0.3s ease;
+}
+
+.debug-toggle:hover {
+    background: linear-gradient(135deg, rgba(70, 70, 90, 0.7) 0%, rgba(60, 60, 80, 0.7) 100%);
+}
+
+.toggle-arrow {
+    font-size: 0.8em;
+    transition: transform 0.3s ease;
+    display: inline-block;
+}
+
+.debug-toggle.expanded .toggle-arrow {
+    transform: rotate(180deg);
+}
+
+.debug-options {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.3s ease, margin 0.3s ease;
+}
+
+.debug-options.open {
+    max-height: 800px;
+    opacity: 1;
+    margin-top: 15px;
+}
