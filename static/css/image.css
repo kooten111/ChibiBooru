@@ -10,9 +10,9 @@
 /* Grid Container */
 .container {
     display: grid;
-    grid-template-columns: 320px 1fr 320px;
-    grid-template-rows: auto auto;
-    max-width: 1800px;
+    grid-template-columns: 400px 1fr 400px;
+    grid-template-rows: auto;
+    max-width: 2200px;
     margin: auto;
     padding: 30px;
     gap: 25px;
@@ -21,22 +21,29 @@
 /* Grid positioning */
 .sidebar-left {
     grid-column: 1;
-    grid-row: 1 / 3;
-}
-
-.image-view {
-    grid-column: 2;
     grid-row: 1;
 }
 
-.related-carousel-section {
+.main-content {
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+}
+
+.image-and-actions-container {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+    max-width: fit-content;
 }
 
 .sidebar-right {
     grid-column: 3;
-    grid-row: 1 / 3;
+    grid-row: 1;
 }
 
 
@@ -51,21 +58,15 @@
 }
 
 .tags-list {
-    flex: 1;
+    flex: 2 1 0;
     overflow-y: auto;
     min-height: 0;
 }
 
-.actions-bar {
-    flex-shrink: 0;
-}
-
-.related-images {
-    overflow-y: auto; /* Allow scrolling if content exceeds max-height */
-}
-
 .metadata-info {
-    flex-shrink: 0;
+    flex: 1 1 0;
+    overflow-y: auto;
+    min-height: 0;
 }
 
 
@@ -173,7 +174,7 @@ body.ui-hidden .header-container {
 
 body.ui-hidden .sidebar-left,
 body.ui-hidden .sidebar-right,
-body.ui-hidden .related-carousel-section {
+body.ui-hidden .actions-bar {
     opacity: 0;
     pointer-events: none;
 }
@@ -211,8 +212,7 @@ body.ui-hidden .image-view img {
     
     .sidebar-left,
     .sidebar-right,
-    .image-view,
-    .related-carousel-section {
+    .main-content {
         grid-column: 1;
         grid-row: auto;
     }
@@ -222,16 +222,12 @@ body.ui-hidden .image-view img {
         max-height: none;
     }
     
-    .image-view {
+    .main-content {
         order: -1;
     }
 }
 
 /* Metadata Info Panel */
-.metadata-info {
-    flex-shrink: 0;
-}
-
 .metadata-item {
     padding: 12px 0;
     border-bottom: 1px solid rgba(135, 206, 235, 0.1);
@@ -270,8 +266,14 @@ body.ui-hidden .image-view img {
     text-decoration: underline;
 }
 
-/* Related Images */
-.related-images h3 {
+/* Related Images Vertical Panel */
+.related-images-vertical {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.related-images-vertical h3 {
     margin: 0 0 15px 0;
     font-size: 1.1em;
     color: #87ceeb;
@@ -282,12 +284,10 @@ body.ui-hidden .image-view img {
     gap: 8px;
 }
 
-/* Change grid to vertical stack */
-.related-grid {
+.related-grid-vertical {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    margin-top: 15px;
 }
 
 .related-thumb {
@@ -301,7 +301,7 @@ body.ui-hidden .image-view img {
 }
 
 .related-thumb:hover {
-    transform: scale(1.05);
+    transform: scale(1.03);
     border-color: rgba(135, 206, 235, 0.5);
     box-shadow: 0 8px 20px rgba(135, 206, 235, 0.3);
     z-index: 5;
@@ -314,27 +314,24 @@ body.ui-hidden .image-view img {
     object-fit: contain;
     display: block;
     transition: transform 0.3s ease;
-    background: rgba(10, 10, 15, 0.8);
 }
 
 .related-thumb:hover img {
-    transform: scale(1.1);
+    transform: scale(1.05);
 }
 
 .related-thumb .label {
     position: absolute;
     top: 8px;
     left: 8px;
-    transform: none;
     padding: 4px 12px;
     border-radius: 12px;
     font-size: 0.75em;
     font-weight: 700;
-    text-transform: uppercase;
+    text-transform: capitalize;
     letter-spacing: 0.5px;
     backdrop-filter: blur(5px);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    background: linear-gradient(135deg, rgba(74, 158, 255, 0.95) 0%, rgba(53, 122, 189, 0.95) 100%);
     color: #fff;
 }
 
@@ -342,8 +339,15 @@ body.ui-hidden .image-view img {
     background: linear-gradient(135deg, rgba(144, 238, 144, 0.95) 0%, rgba(102, 217, 160, 0.95) 100%);
 }
 
-.related-thumb .label::first-letter {
-    text-transform: capitalize;
+.related-thumb .label.child {
+    background: linear-gradient(135deg, rgba(221, 160, 221, 0.95) 0%, rgba(186, 127, 186, 0.95) 100%);
+}
+
+.related-thumb .label.similar,
+.related-thumb .label.character,
+.related-thumb .label.copyright,
+.related-thumb .label.artist {
+    background: linear-gradient(135deg, rgba(74, 158, 255, 0.95) 0%, rgba(53, 122, 189, 0.95) 100%);
 }
 
 .tag-category.species .tag-category-title {

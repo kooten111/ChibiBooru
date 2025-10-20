@@ -116,8 +116,21 @@ def show_image(filepath):
         "meta": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_meta") or "").split()) if t],
     }
 
-    carousel_images = query_service.find_related_by_tags(filepath)
-    related_images = models.get_related_images(data.get('post_id'), data.get('parent_id'))
+    similar_images = query_service.find_related_by_tags(filepath)
+    parent_child_images = models.get_related_images(data.get('post_id'), data.get('parent_id'))
+
+    # Add a 'match_type' to parent/child images and get their paths for deduplication
+    parent_child_paths = set()
+    for img in parent_child_images:
+        img['match_type'] = img['type'] # 'parent' or 'child'
+        img['thumb'] = get_thumbnail_path(img['path'])
+        parent_child_paths.add(img['path'])
+
+    # Filter similar images to remove any that are already in the parent/child list
+    filtered_similar = [img for img in similar_images if img['path'] not in parent_child_paths]
+
+    # Combine the lists, parents/children first
+    combined_related = parent_child_images + filtered_similar
 
 
     return render_template(
@@ -126,8 +139,7 @@ def show_image(filepath):
         tags=tags_with_counts,
         categorized_tags=categorized_tags,
         metadata=data.get('raw_metadata'),
-        related_images=related_images,
-        carousel_images=carousel_images,
+        related_images=combined_related,
         stats=stats,
         random_tags=[],
         data=data,

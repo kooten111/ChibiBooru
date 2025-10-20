@@ -128,99 +128,6 @@
                     {% endfor %}
                 {% endif %}
             </div>
-            <div class="actions-bar">
-                <button class="btn btn-primary" onclick="toggleTagEditor()">
-                    📝 Edit Tags
-                </button>
-                <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
-                    🔍 Find Similar
-                </a>
-                <a href="{{ url_for('static', filename=filepath) }}" download class="btn btn-success">
-                    💾 Download
-                </a>
-                <button id="deleteImageBtn" class="btn btn-danger">
-                    🗑️ Delete Image
-                </button>
-            </div>
-            <div class="tag-editor" id="tagEditor">
-                <h3>Edit Tags</h3>
-                <div class="tag-chips-container" id="tagChips">
-                </div>
-                <div class="tag-editor-input-area">
-                    <input type="text" 
-                           id="tagEditorInput" 
-                           class="tag-editor-input" 
-                           placeholder="Type to add tags..." 
-                           autocomplete="off">
-                    <div class="tag-editor-suggestions" id="tagEditorSuggestions"></div>
-                </div>
-                <div class="tag-editor-hint">
-                    Press Enter or Space to add • Backspace on empty input to remove last tag
-                </div>
-                <div class="tag-editor-actions">
-                    <button class="btn btn-success" onclick="saveTags()">Save Changes</button>
-                    <button class="btn btn-secondary" onclick="toggleTagEditor()">Cancel</button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="image-view">
-            <img src="{{ url_for('static', filename=filepath) }}" alt="Image">
-        </div>
-        
-        {% if carousel_images %}
-        <div class="related-carousel-section panel">
-            <h3>
-                <span>🔗</span>
-                Similar images
-                <span style="font-size: 0.7em; color: #b0b0b0; font-weight: 400; margin-left: 10px;">
-                    ({{ carousel_images|length }} images)
-                </span>
-            </h3>
-            <div class="carousel-container" id="relatedCarousel">
-                <button class="carousel-nav prev" aria-label="Previous">‹</button>
-                <div class="carousel-track">
-                    {% for img in carousel_images %}
-                    <div class="carousel-item">
-                        <a href="{{ url_for('main.show_image', filepath=img.path) }}">
-                            <img src="{{ url_for('static', filename=img.thumb) }}" 
-                                 alt="Related image" 
-                                 loading="lazy">
-                            <span class="match-badge {{ img.match_type }}">
-                                {% if img.match_type == 'character' %}Character
-                                {% elif img.match_type == 'copyright' %}Copyright
-                                {% elif img.match_type == 'artist' %}Artist
-                                {% else %}Similar{% endif %}
-                            </span>
-                        </a>
-                    </div>
-                    {% endfor %}
-                </div>
-                <button class="carousel-nav next" aria-label="Next">›</button>
-            </div>
-        </div>
-        {% endif %}
-        
-        <div class="sidebar-right">
-            {% if related_images %}
-            <div class="related-images panel">
-                <h3>
-                    <span>👨‍👧</span>
-                    Parent/Child
-                    <span style="font-size: 0.7em; color: #b0b0b0; font-weight: 400; margin-left: 10px;">
-                        ({{ related_images|length }} images)
-                    </span>
-                </h3>
-                <div class="related-grid">
-                    {% for related in related_images %}
-                    <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
-                        <img src="{{ url_for('static', filename=related.path) }}" alt="Related">
-                        <span class="label {{ related.type }}">{{ related.type }}</span>
-                    </a>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
             
             {% if metadata %}
             <div class="metadata-info panel">
@@ -385,6 +292,76 @@
                     </div>
                     {% endif %}
                 {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="main-content">
+            <div class="image-and-actions-container">
+                <div class="image-view">
+                    <img src="{{ url_for('static', filename=filepath) }}" alt="Image">
+                </div>
+
+                <div class="actions-bar">
+                    <button class="btn btn-primary" onclick="toggleTagEditor()">
+                        📝 Edit Tags
+                    </button>
+                    <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
+                        🔍 Find Similar
+                    </a>
+                    <a href="{{ url_for('static', filename=filepath) }}" download class="btn btn-success">
+                        💾 Download
+                    </a>
+                    <button id="deleteImageBtn" class="btn btn-danger">
+                        🗑️ Delete Image
+                    </button>
+                </div>
+            </div>
+            
+            <div class="tag-editor" id="tagEditor">
+                <h3>Edit Tags</h3>
+                <div class="tag-chips-container" id="tagChips">
+                </div>
+                <div class="tag-editor-input-area">
+                    <input type="text" 
+                           id="tagEditorInput" 
+                           class="tag-editor-input" 
+                           placeholder="Type to add tags..." 
+                           autocomplete="off">
+                    <div class="tag-editor-suggestions" id="tagEditorSuggestions"></div>
+                </div>
+                <div class="tag-editor-hint">
+                    Press Enter or Space to add • Backspace on empty input to remove last tag
+                </div>
+                <div class="tag-editor-actions">
+                    <button class="btn btn-success" onclick="saveTags()">Save Changes</button>
+                    <button class="btn btn-secondary" onclick="toggleTagEditor()">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sidebar-right">
+            {% if related_images %}
+            <div class="related-images-vertical panel">
+                <h3>
+                    <span>🔗</span>
+                    Related
+                    <span style="font-size: 0.7em; color: #b0b0b0; font-weight: 400; margin-left: 10px;">
+                        ({{ related_images|length }} images)
+                    </span>
+                </h3>
+                <div class="related-grid-vertical">
+                    {% for related in related_images %}
+                    <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
+                        <img src="{{ url_for('static', filename=related.thumb) }}" alt="Related">
+                        <span class="label {{ related.match_type }}">
+                            {% if related.match_type == 'parent' %}Parent
+                            {% elif related.match_type == 'child' %}Child
+                            {% else %}Similar{% endif %}
+                        </span>
+                    </a>
+                    {% endfor %}
+                </div>
             </div>
             {% endif %}
         </div>
