@@ -125,6 +125,23 @@ def initialize_database():
         )
         """)
 
+        # Add metadata columns to tag_implications if they don't exist
+        cur.execute("PRAGMA table_info(tag_implications);")
+        impl_columns = [row['name'] for row in cur.fetchall()]
+
+        if 'inference_type' not in impl_columns:
+            cur.execute("ALTER TABLE tag_implications ADD COLUMN inference_type TEXT DEFAULT 'manual'")
+        if 'confidence' not in impl_columns:
+            cur.execute("ALTER TABLE tag_implications ADD COLUMN confidence REAL DEFAULT 1.0")
+        if 'created_at' not in impl_columns:
+            cur.execute("ALTER TABLE tag_implications ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        if 'status' not in impl_columns:
+            cur.execute("ALTER TABLE tag_implications ADD COLUMN status TEXT DEFAULT 'active'")
+
+        # Index for faster implication lookups
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_implications_source ON tag_implications(source_tag_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_implications_status ON tag_implications(status)")
+
         # --- NEW: Tag Delta Tracking Table ---
         # This table preserves manual tag modifications across database rebuilds
         cur.execute("""
