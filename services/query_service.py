@@ -40,13 +40,16 @@ def perform_search(search_query):
     filename_filter = None
     extension_filter = None
     relationship_filter = None
+    pool_filter = None
     general_terms = []
-    
+
     for token in tokens:
         if token.startswith('source:'):
             source_filters.append(token.split(':', 1)[1].strip())
         elif token.startswith('filename:'):
             filename_filter = token.split(':', 1)[1].strip()
+        elif token.startswith('pool:'):
+            pool_filter = token.split(':', 1)[1].strip()
         elif token.startswith('.'):
             extension_filter = token[1:]
         elif token.startswith('has:'):
@@ -60,6 +63,16 @@ def perform_search(search_query):
     results = models.get_all_images_with_tags()
 
     # Apply specific filters first
+    if pool_filter:
+        # Find pool by name and get its images
+        pool_images = models.search_images_by_pool(pool_filter)
+        if pool_images:
+            pool_filepaths = {img['filepath'] for img in pool_images}
+            results = [img for img in results if img['filepath'] in pool_filepaths]
+        else:
+            # No pool found with that name, return empty results
+            results = []
+
     if relationship_filter:
         # This is an expensive operation if not done in the DB
         relationship_images = {img['filepath'] for img in models.search_images_by_relationship(relationship_filter)}

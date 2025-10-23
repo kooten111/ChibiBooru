@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pools.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-uploader.css') }}">
+</head>
+<body>
+    <div id="global-drop-zone" class="global-drop-zone">
+        <div class="drop-zone-content">
+            <div class="drop-zone-icon">📤</div>
+            <div class="drop-zone-text">Drop images to upload</div>
+        </div>
+    </div>
+
+    {% include 'header.html' %}
+
+    <div class="container">
+        <div class="pools-browser-header">
+            <h2>Pools / Collections</h2>
+            <div class="pools-header-actions">
+                <input type="text" id="poolSearchInput" placeholder="Search pools..." value="{{ query }}">
+                <button id="createPoolBtn" class="btn-primary">Create New Pool</button>
+            </div>
+        </div>
+
+        <div class="pools-list-container" id="poolsListContainer">
+            {% if pools %}
+                {% for pool in pools %}
+                <div class="pool-item" data-pool-id="{{ pool.id }}">
+                    <div class="pool-info">
+                        <a href="{{ url_for('main.view_pool', pool_id=pool.id) }}" class="pool-name">{{ pool.name }}</a>
+                        {% if pool.description %}
+                        <p class="pool-description">{{ pool.description }}</p>
+                        {% endif %}
+                        <span class="pool-image-count">{{ pool.image_count }} image{{ 's' if pool.image_count != 1 else '' }}</span>
+                    </div>
+                    <div class="pool-actions">
+                        <button class="btn-edit" onclick="editPool({{ pool.id }}, '{{ pool.name }}', '{{ pool.description or '' }}')">Edit</button>
+                        <button class="btn-delete" onclick="deletePool({{ pool.id }}, '{{ pool.name }}')">Delete</button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-pools-message">
+                    {% if query %}
+                        <p>No pools found matching "{{ query }}"</p>
+                    {% else %}
+                        <p>No pools yet. Create your first collection!</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Create/Edit Pool Modal -->
+    <div id="poolModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modalTitle">Create New Pool</h3>
+            <form id="poolForm">
+                <input type="hidden" id="poolId" value="">
+                <div class="form-group">
+                    <label for="poolName">Pool Name:</label>
+                    <input type="text" id="poolName" name="poolName" required>
+                </div>
+                <div class="form-group">
+                    <label for="poolDescription">Description (optional):</label>
+                    <textarea id="poolDescription" name="poolDescription" rows="3"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Save</button>
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pools.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
+</body>
+</html>

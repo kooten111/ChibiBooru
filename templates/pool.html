@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ pool.name }} - {{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pools.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-uploader.css') }}">
+</head>
+<body>
+    <div id="global-drop-zone" class="global-drop-zone">
+        <div class="drop-zone-content">
+            <div class="drop-zone-icon">📤</div>
+            <div class="drop-zone-text">Drop images to upload</div>
+        </div>
+    </div>
+
+    {% include 'header.html' %}
+
+    <div class="container">
+        <div class="pool-detail-header">
+            <div class="pool-title-section">
+                <h2>{{ pool.name }}</h2>
+                {% if pool.description %}
+                <p class="pool-description">{{ pool.description }}</p>
+                {% endif %}
+                <span class="pool-image-count">{{ images|length }} image{{ 's' if images|length != 1 else '' }}</span>
+            </div>
+            <div class="pool-header-actions">
+                <button class="btn-edit" onclick="editPool({{ pool.id }}, '{{ pool.name }}', '{{ pool.description or '' }}')">Edit Pool</button>
+                <a href="{{ url_for('main.pools_list') }}" class="btn-secondary">Back to Pools</a>
+            </div>
+        </div>
+
+        {% if images %}
+        <div class="gallery pool-gallery" data-pool-id="{{ pool.id }}">
+            {% for image in images %}
+            <div class="thumbnail pool-image-item" data-sort-order="{{ image.sort_order }}" data-filepath="{{ image.path }}">
+                <a href="{{ url_for('main.show_image', filepath=image.path) }}">
+                    <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy">
+                    <div class="image-order-badge">{{ image.sort_order }}</div>
+                </a>
+                <div class="image-actions">
+                    <button class="btn-small btn-remove" onclick="removeFromPool('{{ image.path }}', {{ pool.id }})">Remove</button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-images-message">
+            <p>This pool is empty. Add images from the image detail page.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Edit Pool Modal -->
+    <div id="poolModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3 id="modalTitle">Edit Pool</h3>
+            <form id="poolForm">
+                <input type="hidden" id="poolId" value="{{ pool.id }}">
+                <div class="form-group">
+                    <label for="poolName">Pool Name:</label>
+                    <input type="text" id="poolName" name="poolName" value="{{ pool.name }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="poolDescription">Description (optional):</label>
+                    <textarea id="poolDescription" name="poolDescription" rows="3">{{ pool.description or '' }}</textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary">Save</button>
+                    <button type="button" class="btn-secondary" onclick="closeModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pool-detail.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
+</body>
+</html>
