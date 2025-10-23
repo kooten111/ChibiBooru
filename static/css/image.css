@@ -45,7 +45,7 @@ body.image-page {
     display: flex;
     flex-direction: column;
     height: 100%;
-    width: 100%;
+    align-items: center;
 }
 
 .sidebar-right {
@@ -390,10 +390,11 @@ body.ui-hidden .image-view img {
 
 /* Tag Editor positioning within main content */
 .tag-editor {
-    width: 100%;
-    max-width: 800px;
+    width: fit-content;
+    max-width: calc(100% - 40px);
     flex: 0 0 auto;
     margin: 0 20px 20px 20px;
     overflow-y: auto;
     max-height: 50vh;
+    align-self: center;
 }
