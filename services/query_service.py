@@ -113,18 +113,32 @@ def _should_use_fts(general_terms):
     """
     Determine if we should use FTS5 instead of exact tag matching.
     Use FTS5 when search terms don't match existing tags exactly.
+
+    Returns True if FTS should be used (when any term is NOT an exact tag).
+    Returns False if all terms are exact tags (use fast tag-based search).
     """
     from database import get_db_connection
 
-    # Check if any term doesn't exist as an exact tag
+    if not general_terms:
+        return False
+
+    # Check if all terms exist as exact tags (case-insensitive)
     with get_db_connection() as conn:
         for term in general_terms:
             # Strip quotes if present
-            clean_term = term.strip('"')
-            result = conn.execute("SELECT 1 FROM tags WHERE name = ? LIMIT 1", (clean_term,)).fetchone()
+            clean_term = term.strip('"').lower()
+
+            # Check for exact tag match (case-insensitive)
+            result = conn.execute(
+                "SELECT 1 FROM tags WHERE LOWER(name) = ? LIMIT 1",
+                (clean_term,)
+            ).fetchone()
+
             if not result:
-                # This term is not an exact tag, use FTS
+                # This term is not an exact tag, use FTS for the whole query
                 return True
+
+    # All terms are exact tags - use fast tag-based search
     return False
 
 def _fts_search(general_terms, negative_terms, source_filters, filename_filter,

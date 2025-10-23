@@ -38,7 +38,7 @@ class Autocomplete {
 
     updateClearButton() {
         if (!this.clearButton) return;
-        this.clearButton.style.display = this.searchInput.value.trim() ? 'block' : 'none';
+        this.clearButton.style.display = this.searchInput.value.trim() ? 'flex' : 'none';
     }
 
     getCategoryIcon(category) {

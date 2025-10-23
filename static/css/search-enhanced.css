@@ -1,10 +1,32 @@
 /* Enhanced Search Styles */
 
+/* Update form to flex-direction column */
+.search-bar form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
 /* Search wrapper for better layout */
 .search-wrapper {
     display: flex;
-    gap: 8px;
+    gap: 12px;
+    width: 100%;
+    align-items: center;
+}
+
+/* Update autocomplete container for clear button */
+.autocomplete-container {
+    position: relative;
     flex: 1;
+    display: flex;
+    align-items: center;
+}
+
+/* Adjust input to account for clear button */
+.search-bar input {
+    padding-right: 45px !important;
 }
 
 /* Clear button for search input */
@@ -24,9 +46,10 @@
     transition: all 0.2s ease;
     line-height: 1;
     padding: 0;
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
+    z-index: 10;
 }
 
 .search-clear:hover {
