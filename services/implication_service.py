@@ -29,66 +29,16 @@ class ImplicationSuggestion:
         }
 
 
-def detect_costume_variants() -> List[ImplicationSuggestion]:
+def detect_substring_implications() -> List[ImplicationSuggestion]:
     """
-    Detect costume variant patterns like:
-    - a-chan_(2nd_costume)_(hololive) → a-chan_(hololive)
-    - character_(costume)_(franchise) → character_(franchise)
-    """
-    suggestions = []
+    Detect implications based on substring/naming patterns.
 
-    # Pattern: character_(Nth_costume)_(franchise) or character_(costume)_(franchise)
-    costume_pattern = r'^(.+?)_\((?:\d+(?:st|nd|rd|th)_)?costume\)_\((.+?)\)$'
+    Generic pattern detection that finds:
+    - character_(something)_(franchise) → character_(franchise) (costume variants)
+    - character_(franchise) → franchise (character → copyright)
+    - any tag with parentheses → extracted portion if it exists
 
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-
-        # Find all character tags with costume patterns
-        cursor.execute("""
-            SELECT name, category
-            FROM tags
-            WHERE category = 'character'
-            AND name LIKE '%_costume%'
-        """)
-
-        for row in cursor.fetchall():
-            tag_name = row['name']
-            match = re.match(costume_pattern, tag_name)
-
-            if match:
-                base_char = match.group(1)
-                franchise = match.group(2)
-                base_tag = f"{base_char}_({franchise})"
-
-                # Check if base character tag exists
-                cursor.execute(
-                    "SELECT 1 FROM tags WHERE name = ? AND category = 'character'",
-                    (base_tag,)
-                )
-
-                if cursor.fetchone():
-                    # Check if implication already exists
-                    if not _implication_exists(tag_name, base_tag):
-                        # Count affected images
-                        affected = _count_images_with_tag(tag_name)
-
-                        suggestions.append(ImplicationSuggestion(
-                            source_tag=tag_name,
-                            implied_tag=base_tag,
-                            confidence=0.95,
-                            pattern_type='costume',
-                            reason=f'Costume variant pattern detected',
-                            affected_images=affected
-                        ))
-
-    return suggestions
-
-
-def detect_character_franchise() -> List[ImplicationSuggestion]:
-    """
-    Detect character → franchise implications:
-    - mint_fantome → indie_vtuber
-    - a-chan_(hololive) → hololive
+    This replaces hardcoded costume and franchise detection with a data-driven approach.
     """
     suggestions = []
 
@@ -97,33 +47,63 @@ def detect_character_franchise() -> List[ImplicationSuggestion]:
 
         # Get all character tags
         cursor.execute("SELECT name FROM tags WHERE category = 'character'")
+        character_tags = [row['name'] for row in cursor.fetchall()]
 
-        for row in cursor.fetchall():
-            tag_name = row['name']
-
-            # Extract franchise from parentheses at the end
+        for tag_name in character_tags:
+            # Pattern 1: Extract final parenthesized portion
+            # e.g., character_(franchise) → franchise
             match = re.search(r'\(([^)]+)\)$', tag_name)
 
             if match:
-                franchise = match.group(1)
+                potential_implied = match.group(1)
 
-                # Check if franchise exists as copyright tag
+                # Check if this exists as a copyright tag
                 cursor.execute(
-                    "SELECT 1 FROM tags WHERE name = ? AND category = 'copyright'",
-                    (franchise,)
+                    "SELECT category FROM tags WHERE name = ?",
+                    (potential_implied,)
                 )
+                result = cursor.fetchone()
 
-                if cursor.fetchone():
-                    # Check if implication already exists
-                    if not _implication_exists(tag_name, franchise):
+                if result and result['category'] == 'copyright':
+                    if not _implication_exists(tag_name, potential_implied):
                         affected = _count_images_with_tag(tag_name)
 
                         suggestions.append(ImplicationSuggestion(
                             source_tag=tag_name,
-                            implied_tag=franchise,
-                            confidence=0.90,
-                            pattern_type='franchise',
-                            reason=f'Character belongs to copyright: {franchise}',
+                            implied_tag=potential_implied,
+                            confidence=0.92,
+                            pattern_type='naming_pattern',
+                            reason=f'Naming pattern: extracted "{potential_implied}" from tag name',
+                            affected_images=affected
+                        ))
+
+            # Pattern 2: Substring variations (costume, form, alt, etc.)
+            # e.g., character_(costume)_(franchise) → character_(franchise)
+            # Look for tags that contain this tag as a substring
+            pattern = r'^(.+?)_\([^)]+\)_\((.+?)\)$'
+            match = re.match(pattern, tag_name)
+
+            if match:
+                # This is a tag with intermediate parentheses (like costume variants)
+                base_part = match.group(1)
+                franchise_part = match.group(2)
+                base_tag = f"{base_part}_({franchise_part})"
+
+                # Check if simpler version exists
+                if base_tag in character_tags:
+                    if not _implication_exists(tag_name, base_tag):
+                        affected = _count_images_with_tag(tag_name)
+
+                        # Extract what's in the middle parentheses for the reason
+                        middle_match = re.search(r'_\(([^)]+)\)_', tag_name)
+                        middle_part = middle_match.group(1) if middle_match else 'variant'
+
+                        suggestions.append(ImplicationSuggestion(
+                            source_tag=tag_name,
+                            implied_tag=base_tag,
+                            confidence=0.95,
+                            pattern_type='naming_pattern',
+                            reason=f'Variant pattern: {middle_part} form implies base character',
                             affected_images=affected
                         ))
 
@@ -215,18 +195,15 @@ def get_all_suggestions() -> Dict[str, List[Dict]]:
     """
     Get all auto-detected implication suggestions grouped by pattern type.
     """
-    costume_suggestions = detect_costume_variants()
-    franchise_suggestions = detect_character_franchise()
+    naming_suggestions = detect_substring_implications()
     correlation_suggestions = detect_tag_correlations(min_confidence=0.85, min_co_occurrence=3)
 
     return {
-        'costume': [s.to_dict() for s in costume_suggestions],
-        'franchise': [s.to_dict() for s in franchise_suggestions],
+        'naming': [s.to_dict() for s in naming_suggestions],
         'correlation': [s.to_dict() for s in correlation_suggestions],
         'summary': {
-            'total': len(costume_suggestions) + len(franchise_suggestions) + len(correlation_suggestions),
-            'costume_count': len(costume_suggestions),
-            'franchise_count': len(franchise_suggestions),
+            'total': len(naming_suggestions) + len(correlation_suggestions),
+            'naming_count': len(naming_suggestions),
             'correlation_count': len(correlation_suggestions)
         }
     }

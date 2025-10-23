@@ -54,12 +54,8 @@ async function loadSuggestions() {
                     <div class="stat-number">${data.summary.total}</div>
                 </div>
                 <div class="stat-box">
-                    <h4>Costume Variants</h4>
-                    <div class="stat-number">${data.summary.costume_count}</div>
-                </div>
-                <div class="stat-box">
-                    <h4>Character → Franchise</h4>
-                    <div class="stat-number">${data.summary.franchise_count}</div>
+                    <h4>Naming Patterns</h4>
+                    <div class="stat-number">${data.summary.naming_count}</div>
                 </div>
                 <div class="stat-box">
                     <h4>Statistical Correlations</h4>
@@ -69,14 +65,9 @@ async function loadSuggestions() {
         `;
 
         // Display pattern groups
-        if (data.costume.length > 0) {
-            groupsEl.innerHTML += createPatternGroup('Costume Variants', 'costume', data.costume,
-                'Character costume variants imply base character');
-        }
-
-        if (data.franchise.length > 0) {
-            groupsEl.innerHTML += createPatternGroup('Character → Franchise', 'franchise', data.franchise,
-                'Characters imply their copyright franchise');
+        if (data.naming && data.naming.length > 0) {
+            groupsEl.innerHTML += createPatternGroup('Naming Patterns', 'naming', data.naming,
+                'Tag name structure suggests relationships (costumes, franchises, variants)');
         }
 
         if (data.correlation && data.correlation.length > 0) {
