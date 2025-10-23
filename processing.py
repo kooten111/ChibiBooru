@@ -148,7 +148,10 @@ def tag_with_local_tagger(filepath):
         
         return {
             "source": "local_tagger",
-            "data": { "tags": tags_by_category }
+            "data": {
+                "tags": tags_by_category,
+                "tagger_name": tagger_config.get('name', 'Unknown')
+            }
         }
     except Exception as e:
         print(f"[Local Tagger] ERROR during analysis for {filepath}: {e}")

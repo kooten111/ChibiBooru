@@ -179,8 +179,8 @@
                             <a href="https://gelbooru.com/index.php?page=post&s=view&id={{ source_data.id }}" target="_blank" rel="noopener">Gelbooru</a>
                         {% elif source_name == 'yandere' %}
                             <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank" rel="noopener">Yandere</a>
-                        {% elif source_name == 'camie_tagger' %}
-                            <span style="color: #90ee90;">AI Tagged (CamieTagger)</span>
+                        {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
+                            <span style="color: #90ee90;">AI Tagged ({{ source_data.tagger_name or 'CamieTagger' }})</span>
                         {% endif %}
                             {% if not loop.last %} • {% endif %}
                         {% endfor %}
@@ -199,7 +199,7 @@
                                 {% elif active == 'e621' %}🟢 e621
                                 {% elif active == 'gelbooru' %}🟡 Gelbooru
                                 {% elif active == 'yandere' %}🔴 Yande.re
-                                {% elif active == 'camie_tagger' %}🤖 AI Tagger
+                                {% elif active == 'local_tagger' or active == 'camie_tagger' %}🤖 {{ metadata.sources.get(active, {}).get('tagger_name', 'AI Tagger') }}
                                 {% else %}{{ active|title }}{% endif %}
                             </span>
                             <span class="toggle-text">Switch Source</span>
@@ -384,7 +384,7 @@
                         {% elif source_name == 'e621' %}🟢
                         {% elif source_name == 'gelbooru' %}🟡
                         {% elif source_name == 'yandere' %}🔴
-                        {% elif source_name == 'camie_tagger' %}🤖
+                        {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}🤖
                         {% else %}📦{% endif %}
                     </span>
                     <span class="source-name">
@@ -392,7 +392,7 @@
                         {% elif source_name == 'e621' %}e621
                         {% elif source_name == 'gelbooru' %}Gelbooru
                         {% elif source_name == 'yandere' %}Yande.re
-                        {% elif source_name == 'camie_tagger' %}AI Tagger
+                        {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}{{ source_data.tagger_name or 'AI Tagger' }}
                         {% else %}{{ source_name|title }}{% endif %}
                     </span>
                     {% if source_name == active %}
@@ -400,7 +400,7 @@
                     {% endif %}
                 </div>
                 <div class="source-meta">
-                    {% if source_name in ['danbooru', 'e621', 'camie_tagger'] %}
+                    {% if source_name in ['danbooru', 'e621', 'local_tagger', 'camie_tagger'] %}
                     <span class="meta-badge categorized">Categorized Tags</span>
                     {% else %}
                     <span class="meta-badge general">General Tags Only</span>
@@ -417,9 +417,14 @@
                                 {% endfor %}
                             {% endif %}
                             {{ tag_count }} tags
-                        {% elif source_name == 'camie_tagger' %}
-                            {% set all_tags = (source_data.tags_character or '') + ' ' + (source_data.tags_copyright or '') + ' ' + (source_data.tags_artist or '') + ' ' + (source_data.tags_general or '') %}
-                            {{ all_tags.split()|length }} tags
+                        {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
+                            {% set tag_count = 0 %}
+                            {% if source_data.tags %}
+                                {% for category_tags in source_data.tags.values() %}
+                                    {% set tag_count = tag_count + (category_tags|length if category_tags is iterable and category_tags is not string else 0) %}
+                                {% endfor %}
+                            {% endif %}
+                            {{ tag_count }} tags
                         {% elif source_data.tags %}
                             {{ (source_data.tags.split()|length if source_data.tags is string else source_data.tags|length) }} tags
                         {% else %}

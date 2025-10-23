@@ -39,11 +39,21 @@ def extract_tags_from_source(source_data, source_name):
             tags_dict["meta"] = " ".join(tags.get("meta", []))
             tags_dict["general"] = " ".join(tags.get("general", []))
             
-    elif source_name == "camie_tagger":
-        tags_dict["character"] = source_data.get("tags_character", "")
-        tags_dict["copyright"] = source_data.get("tags_copyright", "")
-        tags_dict["artist"] = source_data.get("tags_artist", "")
-        tags_dict["general"] = source_data.get("tags_general", "")
+    elif source_name == "local_tagger" or source_name == "camie_tagger":
+        # Handle both old 'camie_tagger' and new 'local_tagger' format
+        tags = source_data.get("tags", {})
+        if isinstance(tags, dict):
+            tags_dict["character"] = " ".join(tags.get("character", []))
+            tags_dict["copyright"] = " ".join(tags.get("copyright", []))
+            tags_dict["artist"] = " ".join(tags.get("artist", []))
+            tags_dict["meta"] = " ".join(tags.get("meta", []))
+            tags_dict["general"] = " ".join(tags.get("general", []))
+        else:
+            # Fallback for old format
+            tags_dict["character"] = source_data.get("tags_character", "")
+            tags_dict["copyright"] = source_data.get("tags_copyright", "")
+            tags_dict["artist"] = source_data.get("tags_artist", "")
+            tags_dict["general"] = source_data.get("tags_general", "")
         
     else:
         # Gelbooru, Yandere, etc - general tags only

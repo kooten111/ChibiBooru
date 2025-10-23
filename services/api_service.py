@@ -337,7 +337,7 @@ def autocomplete():
             })
     
     # Source suggestions
-    sources = ['danbooru', 'e621', 'gelbooru', 'yandere', 'camie_tagger']
+    sources = ['danbooru', 'e621', 'gelbooru', 'yandere', 'local_tagger']
     for source in sources:
         if last_token in source or source.startswith(last_token):
             suggestions.append({

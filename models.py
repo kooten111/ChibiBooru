@@ -281,7 +281,7 @@ def repopulate_from_database():
                     'artist': tags.get("artist", []), 'species': tags.get("species", []),
                     'meta': tags.get("meta", []), 'general': tags.get("general", [])
                 }
-            elif source_name == 'local_tagger':
+            elif source_name == 'local_tagger' or source_name == 'camie_tagger':
                 tags = primary_source_data.get("tags", {})
                 categorized_tags = {
                     'character': tags.get("character", []),
