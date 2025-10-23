@@ -1,32 +1,41 @@
 /* Enhanced Search Styles */
 
-/* Update form to flex-direction column */
-.search-bar form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    width: 100%;
+/* Prevent header from expanding */
+.header {
+    min-height: auto !important;
 }
 
-/* Search wrapper for better layout */
+.header-content {
+    min-height: auto !important;
+}
+
+/* Override form layout to prevent header expansion */
+.search-bar form {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    width: 100%;
+    position: relative;
+}
+
+/* Search wrapper contains input + button in a row */
 .search-wrapper {
     display: flex;
     gap: 12px;
     width: 100%;
-    align-items: center;
+    align-items: stretch;
 }
 
-/* Update autocomplete container for clear button */
-.autocomplete-container {
-    position: relative;
+/* Ensure autocomplete container doesn't break layout */
+.search-wrapper .autocomplete-container {
     flex: 1;
-    display: flex;
-    align-items: center;
+    min-width: 0; /* Allow shrinking */
 }
 
 /* Adjust input to account for clear button */
 .search-bar input {
     padding-right: 45px !important;
+    width: 100%;
 }
 
 /* Clear button for search input */
@@ -57,24 +66,25 @@
     transform: translateY(-50%) scale(1.1);
 }
 
-/* Filter chips container */
+/* Filter chips container - positioned below search bar */
 .filter-chips {
     display: none;
     flex-wrap: wrap;
     gap: 8px;
-    padding: 8px 0;
-    animation: slideDown 0.2s ease-out;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    padding: 8px 12px;
+    margin: 0;
+    max-width: 700px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(20, 20, 30, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 12px 12px;
+    border: 1px solid rgba(135, 206, 235, 0.2);
+    border-top: none;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Individual filter chip */
@@ -86,19 +96,7 @@
     border-radius: 16px;
     font-size: 0.85em;
     font-weight: 500;
-    transition: all 0.2s ease;
-    animation: chipAppear 0.3s ease-out;
-}
-
-@keyframes chipAppear {
-    from {
-        opacity: 0;
-        transform: scale(0.8);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+    transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 /* Chip types */

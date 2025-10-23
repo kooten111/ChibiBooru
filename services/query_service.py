@@ -338,18 +338,41 @@ def perform_search(search_query):
         if general_terms:
             filtered_results = []
             for img in results:
-                # Create a combined string of searchable fields
-                searchable_content = f"{img.get('tags', '')} {img.get('filepath')}".lower()
+                # Get tag list and filepath for exact matching
+                tags_str = img.get('tags', '').lower()
+                tag_list = set(tags_str.split())
+                filepath_lower = img.get('filepath', '').lower()
 
-                if all(term in searchable_content for term in general_terms):
+                # Check if ALL general terms match (exact tag match OR filepath substring)
+                match = True
+                for term in general_terms:
+                    # Check exact tag match OR filepath substring match
+                    if term not in tag_list and term not in filepath_lower:
+                        match = False
+                        break
+
+                if match:
                     filtered_results.append(img)
             results = filtered_results
 
-        # Apply negative terms
+        # Apply negative terms (exact tag matching)
         if negative_terms:
-            results = [img for img in results
-                      if not any(term in f"{img.get('tags', '')} {img.get('filepath')}".lower()
-                                for term in negative_terms)]
+            filtered_results = []
+            for img in results:
+                tags_str = img.get('tags', '').lower()
+                tag_list = set(tags_str.split())
+                filepath_lower = img.get('filepath', '').lower()
+
+                # Exclude if any negative term matches (exact tag OR filepath substring)
+                exclude = False
+                for term in negative_terms:
+                    if term in tag_list or term in filepath_lower:
+                        exclude = True
+                        break
+
+                if not exclude:
+                    filtered_results.append(img)
+            results = filtered_results
 
         should_shuffle = bool(general_terms) and not (source_filters or filename_filter or extension_filter)
 
