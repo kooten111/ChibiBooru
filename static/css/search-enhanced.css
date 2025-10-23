@@ -124,6 +124,43 @@
     color: #87ceeb;
 }
 
+/* Category-specific chips */
+.filter-chip.category-character {
+    background: rgba(255, 182, 193, 0.2);
+    border: 1px solid rgba(255, 182, 193, 0.4);
+    color: #ffb6c1;
+}
+
+.filter-chip.category-copyright {
+    background: rgba(255, 215, 0, 0.2);
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    color: #ffd700;
+}
+
+.filter-chip.category-artist {
+    background: rgba(147, 112, 219, 0.2);
+    border: 1px solid rgba(147, 112, 219, 0.4);
+    color: #9370db;
+}
+
+.filter-chip.category-species {
+    background: rgba(144, 238, 144, 0.2);
+    border: 1px solid rgba(144, 238, 144, 0.4);
+    color: #90ee90;
+}
+
+.filter-chip.category-meta {
+    background: rgba(169, 169, 169, 0.2);
+    border: 1px solid rgba(169, 169, 169, 0.4);
+    color: #a9a9a9;
+}
+
+.filter-chip.category-general {
+    background: rgba(135, 206, 235, 0.2);
+    border: 1px solid rgba(135, 206, 235, 0.4);
+    color: #87ceeb;
+}
+
 .filter-chip.source {
     background: rgba(100, 200, 100, 0.2);
     border: 1px solid rgba(100, 200, 100, 0.4);

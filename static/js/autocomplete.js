@@ -83,7 +83,11 @@ class Autocomplete {
                 const categoryBadge = item.category ? `<span class="category-badge ${item.category}">${item.category}</span>` : '';
 
                 html += `
-                    <div class="autocomplete-item ${typeClass}" data-tag="${this.escapeHtml(item.tag)}" data-index="${itemIndex}" style="animation-delay: ${itemIndex * 0.01}s">
+                    <div class="autocomplete-item ${typeClass}"
+                         data-tag="${this.escapeHtml(item.tag)}"
+                         data-category="${this.escapeHtml(item.category || '')}"
+                         data-index="${itemIndex}"
+                         style="animation-delay: ${itemIndex * 0.01}s">
                         <div class="autocomplete-left">
                             <span class="autocomplete-icon">${icon}</span>
                             <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
@@ -107,11 +111,12 @@ class Autocomplete {
         this.suggestions.querySelectorAll('.autocomplete-item').forEach(item => {
             item.addEventListener('click', () => {
                 const tag = item.getAttribute('data-tag');
-                this.insertTag(tag);
+                const category = item.getAttribute('data-category');
+                this.insertTag(tag, category);
             });
 
             item.addEventListener('mouseenter', () => {
-                item.style.transform = 'translateX(5px)';
+                item.style.transform = 'translateX(5px)');
             });
 
             item.addEventListener('mouseleave', () => {
@@ -186,7 +191,15 @@ class Autocomplete {
             let display = token;
             let icon = '🏷️';
 
-            if (token.startsWith('source:')) {
+            // Category filters (character:, copyright:, etc.)
+            const categoryMatch = token.match(/^(character|copyright|artist|species|meta|general):(.+)$/);
+            if (categoryMatch) {
+                const category = categoryMatch[1];
+                const tag = categoryMatch[2];
+                type = `category-${category}`;
+                display = `${category}: ${tag}`;
+                icon = this.getCategoryIcon(category);
+            } else if (token.startsWith('source:')) {
                 type = 'source';
                 display = token.split(':')[1];
                 icon = '🌐';
@@ -261,10 +274,17 @@ class Autocomplete {
         return div.innerHTML;
     }
 
-    insertTag(tag) {
+    insertTag(tag, category = null) {
         const tokens = this.searchInput.value.trim().split(/\s+/);
         tokens.pop();
-        tokens.push(tag);
+
+        // If tag has a category, prepend it (e.g., "character:holo")
+        if (category && category !== '' && category !== 'general') {
+            tokens.push(`${category}:${tag}`);
+        } else {
+            tokens.push(tag);
+        }
+
         this.searchInput.value = tokens.join(' ') + ' ';
         this.suggestions.classList.remove('active');
         this.updateFilterChips();
@@ -344,7 +364,8 @@ class Autocomplete {
         } else if (e.key === 'Enter') {
             if (this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
                 e.preventDefault();
-                this.insertTag(this.currentSuggestions[this.selectedIndex].tag);
+                const suggestion = this.currentSuggestions[this.selectedIndex];
+                this.insertTag(suggestion.tag, suggestion.category);
             }
         } else if (e.key === 'Escape') {
             this.suggestions.classList.remove('active');
@@ -352,7 +373,8 @@ class Autocomplete {
         } else if (e.key === 'Tab') {
             if (this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
                 e.preventDefault();
-                this.insertTag(this.currentSuggestions[this.selectedIndex].tag);
+                const suggestion = this.currentSuggestions[this.selectedIndex];
+                this.insertTag(suggestion.tag, suggestion.category);
             }
         }
     }

@@ -328,15 +328,19 @@ def perform_search(search_query):
     extension_filter = None
     relationship_filter = None
     pool_filter = None
+    category_filters = {}  # {category: [tags]}
     general_terms = []
     negative_terms = []
     freetext_mode = False
+
+    # Valid tag categories
+    valid_categories = ['character', 'copyright', 'artist', 'species', 'meta', 'general']
 
     for token in tokens:
         if token.startswith('source:'):
             source_filters.append(token.split(':', 1)[1].strip())
         elif token.startswith('filename:'):
-            filename_filter = token.split(':', 1)[1].strip()
+            filename_filter = token.split(':', 1)[1].strip())
         elif token.startswith('pool:'):
             pool_filter = token.split(':', 1)[1].strip()
         elif token.startswith('.'):
@@ -352,6 +356,18 @@ def perform_search(search_query):
             # Quoted phrase - switch to freetext mode
             freetext_mode = True
             general_terms.append(token)
+        elif ':' in token:
+            # Check if it's a category filter (e.g., character:holo)
+            parts = token.split(':', 1)
+            category = parts[0]
+            tag = parts[1]
+            if category in valid_categories and tag:
+                if category not in category_filters:
+                    category_filters[category] = []
+                category_filters[category].append(tag)
+            else:
+                # Not a valid category, treat as general term
+                general_terms.append(token)
         else:
             general_terms.append(token)
     
@@ -392,6 +408,39 @@ def perform_search(search_query):
 
         if filename_filter:
             results = [img for img in results if filename_filter in img['filepath'].lower()]
+
+        # Apply category filters (e.g., character:holo)
+        if category_filters:
+            with get_db_connection() as conn:
+                filtered_results = []
+                for img in results:
+                    match = True
+
+                    # Check each category filter
+                    for category, required_tags in category_filters.items():
+                        # Get the specific category column from database
+                        cursor = conn.execute(
+                            f"SELECT tags_{category} FROM images WHERE filepath = ?",
+                            (img['filepath'],)
+                        )
+                        row = cursor.fetchone()
+
+                        if row:
+                            category_tags = set((row[f'tags_{category}'] or '').lower().split())
+
+                            # All tags in this category must match
+                            for tag in required_tags:
+                                if tag not in category_tags:
+                                    match = False
+                                    break
+
+                        if not match:
+                            break
+
+                    if match:
+                        filtered_results.append(img)
+
+                results = filtered_results
 
         # Now, apply the general search terms to the already filtered results
         if general_terms:
