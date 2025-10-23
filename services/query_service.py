@@ -340,7 +340,7 @@ def perform_search(search_query):
         if token.startswith('source:'):
             source_filters.append(token.split(':', 1)[1].strip())
         elif token.startswith('filename:'):
-            filename_filter = token.split(':', 1)[1].strip())
+            filename_filter = token.split(':', 1)[1].strip()
         elif token.startswith('pool:'):
             pool_filter = token.split(':', 1)[1].strip()
         elif token.startswith('.'):
