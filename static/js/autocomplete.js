@@ -116,7 +116,7 @@ class Autocomplete {
             });
 
             item.addEventListener('mouseenter', () => {
-                item.style.transform = 'translateX(5px)');
+                item.style.transform = 'translateX(5px)';
             });
 
             item.addEventListener('mouseleave', () => {
