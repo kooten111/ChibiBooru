@@ -23,105 +23,142 @@
     <div class="container">
         <div class="tags-browser-header">
             <h2>Tag Browser</h2>
+        </div>
+
+        <!-- Collapsible Stats Sections -->
+        <div class="tags-stats-sections">
+            <!-- Overview Section -->
+            <div class="collapsible-section">
+                <button class="section-header" data-section="overview">
+                    <span class="section-icon">📊</span>
+                    <span class="section-title">Collection Overview</span>
+                    <span class="section-arrow">▼</span>
+                </button>
+                <div class="section-content" id="overview-content">
+                    <div class="stats-grid">
+                        <a href="{{ url_for('main.home') }}" style="text-decoration: none; color: inherit;">
+                            <div class="stat-card">
+                                <div class="stat-card-number">{{ stats.total }}</div>
+                                <div class="stat-card-label">Total Images</div>
+                            </div>
+                        </a>
+                        <a href="{{ url_for('main.home', query='metadata:found') }}" style="text-decoration: none; color: inherit;">
+                            <div class="stat-card success">
+                                <div class="stat-card-number">{{ stats.with_metadata }}</div>
+                                <div class="stat-card-label">With Metadata</div>
+                            </div>
+                        </a>
+                        <a href="{{ url_for('main.home', query='metadata:missing') }}" style="text-decoration: none; color: inherit;">
+                            <div class="stat-card warning">
+                                <div class="stat-card-number">{{ stats.without_metadata }}</div>
+                                <div class="stat-card-label">Missing Metadata</div>
+                            </div>
+                        </a>
+                        <div class="stat-card">
+                            <div class="stat-card-number">{{ stats.total_tags }}</div>
+                            <div class="stat-card-label">Unique Tags</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-card-number">{{ stats.avg_tags_per_image }}</div>
+                            <div class="stat-card-label">Avg Tags/Image</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if stats.source_breakdown %}
+            <!-- Sources Section -->
+            <div class="collapsible-section">
+                <button class="section-header" data-section="sources">
+                    <span class="section-icon">🌐</span>
+                    <span class="section-title">Source Distribution</span>
+                    <span class="section-arrow">▼</span>
+                </button>
+                <div class="section-content" id="sources-content">
+                    <div class="stats-grid">
+                        {% for source, count in stats.source_breakdown.items() %}
+                        <a href="{{ url_for('main.home', query='source:' + source) }}" style="text-decoration: none; color: inherit;">
+                            <div class="stat-card">
+                                <div class="stat-card-number">{{ count }}</div>
+                                <div class="stat-card-label">{{ source|capitalize }}</div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if stats.top_tags %}
+            <!-- Top Tags Section -->
+            <div class="collapsible-section">
+                <button class="section-header" data-section="top-tags">
+                    <span class="section-icon">🏆</span>
+                    <span class="section-title">Most Popular Tags</span>
+                    <span class="section-arrow">▼</span>
+                </button>
+                <div class="section-content" id="top-tags-content">
+                    <div class="top-tags-list">
+                        {% for tag, count in stats.top_tags %}
+                        <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                            <span class="tag-name">{{ tag }}</span>
+                            <span class="tag-count">{{ count }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if stats.category_counts %}
+            <!-- Categories Section -->
+            <div class="collapsible-section">
+                <button class="section-header" data-section="categories">
+                    <span class="section-icon">🏷️</span>
+                    <span class="section-title">Tag Categories</span>
+                    <span class="section-arrow">▼</span>
+                </button>
+                <div class="section-content" id="categories-content">
+                    <div class="category-breakdown">
+                        {% for category, count in stats.category_counts.items() %}
+                        <a href="{{ url_for('main.home', query='category:' + category) }}" style="text-decoration: none; color: inherit;">
+                            <div class="category-card {{ category }}">
+                                <div class="category-number">{{ count }}</div>
+                                <div class="category-label">{{ category|capitalize }}</div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if random_tags %}
+            <!-- Explore Section -->
+            <div class="collapsible-section">
+                <button class="section-header" data-section="explore">
+                    <span class="section-icon">🎲</span>
+                    <span class="section-title">Random Tags</span>
+                    <span class="section-arrow">▼</span>
+                </button>
+                <div class="section-content" id="explore-content">
+                    <div class="top-tags-list">
+                        {% for tag, count in random_tags %}
+                        <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                            <span class="tag-name">{{ tag }}</span>
+                            <span class="tag-count">{{ count }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tag Search and Filter -->
+        <div class="tags-search-section">
             <input type="text" id="tagSearchInput" placeholder="Search for tags...">
         </div>
-
-        <!-- Overview Section -->
-        <div class="stat-panel panel" style="margin-bottom: 20px;">
-            <h3><span>📊</span> Collection Overview</h3>
-            <div class="stats-grid">
-                <a href="{{ url_for('main.home') }}" style="text-decoration: none; color: inherit;">
-                    <div class="stat-card">
-                        <div class="stat-card-number">{{ stats.total }}</div>
-                        <div class="stat-card-label">Total Images</div>
-                    </div>
-                </a>
-                <a href="{{ url_for('main.home', query='metadata:found') }}" style="text-decoration: none; color: inherit;">
-                    <div class="stat-card success">
-                        <div class="stat-card-number">{{ stats.with_metadata }}</div>
-                        <div class="stat-card-label">With Metadata</div>
-                    </div>
-                </a>
-                <a href="{{ url_for('main.home', query='metadata:missing') }}" style="text-decoration: none; color: inherit;">
-                    <div class="stat-card warning">
-                        <div class="stat-card-number">{{ stats.without_metadata }}</div>
-                        <div class="stat-card-label">Missing Metadata</div>
-                    </div>
-                </a>
-                <div class="stat-card">
-                    <div class="stat-card-number">{{ stats.total_tags }}</div>
-                    <div class="stat-card-label">Unique Tags</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-number">{{ stats.avg_tags_per_image }}</div>
-                    <div class="stat-card-label">Avg Tags/Image</div>
-                </div>
-            </div>
-        </div>
-
-        {% if stats.source_breakdown %}
-        <!-- Sources Section -->
-        <div class="stat-panel panel" style="margin-bottom: 20px;">
-            <h3><span>🌐</span> Source Distribution</h3>
-            <div class="stats-grid">
-                {% for source, count in stats.source_breakdown.items() %}
-                <a href="{{ url_for('main.home', query='source:' + source) }}" style="text-decoration: none; color: inherit;">
-                    <div class="stat-card">
-                        <div class="stat-card-number">{{ count }}</div>
-                        <div class="stat-card-label">{{ source|capitalize }}</div>
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if stats.top_tags %}
-        <!-- Top Tags Section -->
-        <div class="stat-panel panel" style="margin-bottom: 20px;">
-            <h3><span>🏆</span> Most Popular Tags</h3>
-            <div class="top-tags-list">
-                {% for tag, count in stats.top_tags %}
-                <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
-                    <span class="tag-name">{{ tag }}</span>
-                    <span class="tag-count">{{ count }}</span>
-                </a>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if stats.category_counts %}
-        <!-- Categories Section -->
-        <div class="stat-panel panel" style="margin-bottom: 20px;">
-            <h3><span>🏷️</span> Tag Categories</h3>
-            <div class="category-breakdown">
-                {% for category, count in stats.category_counts.items() %}
-                <a href="{{ url_for('main.home', query='category:' + category) }}" style="text-decoration: none; color: inherit;">
-                    <div class="category-card {{ category }}">
-                        <div class="category-number">{{ count }}</div>
-                        <div class="category-label">{{ category|capitalize }}</div>
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if random_tags %}
-        <!-- Explore Section -->
-        <div class="stat-panel panel" style="margin-bottom: 20px;">
-            <h3><span>🎲</span> Random Tags</h3>
-            <div class="top-tags-list">
-                {% for tag, count in random_tags %}
-                <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
-                    <span class="tag-name">{{ tag }}</span>
-                    <span class="tag-count">{{ count }}</span>
-                </a>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
 
         <div class="category-filter-bar">
             {% set category_counts = {} %}

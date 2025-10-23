@@ -1,14 +1,17 @@
 // static/js/tags.js
 document.addEventListener('DOMContentLoaded', () => {
+    // Collapsible sections functionality
+    initCollapsibleSections();
+
     const searchInput = document.getElementById('tagSearchInput');
     const tagsContainer = document.getElementById('tagsListContainer');
     const categoryButtons = document.querySelectorAll('.category-filter-btn');
     const loadingIndicator = document.getElementById('loadingIndicator');
 
     // Configuration
-    const INITIAL_BATCH_SIZE = 150;
-    const LOAD_MORE_BATCH_SIZE = 100;
-    const PRELOAD_BATCH_SIZE = 100; // Preload next batch in background
+    const INITIAL_BATCH_SIZE = 300;
+    const LOAD_MORE_BATCH_SIZE = 150;
+    const PRELOAD_BATCH_SIZE = 300; // Preload next batch in background
 
     let activeCategory = 'all';
     let currentOffset = 0;
@@ -253,3 +256,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial load
     loadMoreTags();
 });
+
+// Collapsible sections handler
+function initCollapsibleSections() {
+    const sectionHeaders = document.querySelectorAll('.section-header');
+
+    // Load saved states from localStorage
+    const savedStates = JSON.parse(localStorage.getItem('tagsSectionStates') || '{}');
+
+    sectionHeaders.forEach(header => {
+        const sectionName = header.dataset.section;
+        const content = header.nextElementSibling;
+
+        // Restore saved state or default to collapsed
+        const isCollapsed = savedStates[sectionName] !== undefined ? savedStates[sectionName] : true;
+
+        if (isCollapsed) {
+            header.classList.add('collapsed');
+            content.classList.add('collapsed');
+        }
+
+        // Add click handler
+        header.addEventListener('click', () => {
+            const isCurrentlyCollapsed = header.classList.contains('collapsed');
+
+            // Toggle collapsed state
+            header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
+
+            // Save state to localStorage
+            savedStates[sectionName] = !isCurrentlyCollapsed;
+            localStorage.setItem('tagsSectionStates', JSON.stringify(savedStates));
+        });
+    });
+}

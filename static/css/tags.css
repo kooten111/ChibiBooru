@@ -183,3 +183,83 @@
     font-weight: 600;
     font-size: 0.9em;
 }
+
+/* Collapsible Stats Sections */
+.tags-stats-sections {
+    margin-bottom: 30px;
+}
+
+.collapsible-section {
+    margin-bottom: 10px;
+    background: rgba(30, 30, 45, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(135, 206, 235, 0.1);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.collapsible-section:hover {
+    border-color: rgba(135, 206, 235, 0.2);
+}
+
+.section-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 20px;
+    background: transparent;
+    border: none;
+    color: #e8e8e8;
+    font-size: 1.1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+}
+
+.section-header:hover {
+    background: rgba(74, 158, 255, 0.1);
+}
+
+.section-icon {
+    font-size: 1.2em;
+}
+
+.section-title {
+    flex: 1;
+}
+
+.section-arrow {
+    font-size: 0.8em;
+    color: #87ceeb;
+    transition: transform 0.3s ease;
+}
+
+.section-header.collapsed .section-arrow {
+    transform: rotate(-90deg);
+}
+
+.section-content {
+    max-height: 1000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.3s ease;
+    padding: 0 20px 20px 20px;
+    opacity: 1;
+}
+
+.section-content.collapsed {
+    max-height: 0;
+    padding: 0 20px;
+    opacity: 0;
+}
+
+/* Tag Search Section */
+.tags-search-section {
+    margin-bottom: 20px;
+}
+
+.tags-search-section #tagSearchInput {
+    width: 100%;
+    max-width: 100%;
+}
