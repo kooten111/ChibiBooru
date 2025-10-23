@@ -177,8 +177,9 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
                 # So we'll use quotes and rely on tokenization
                 fts_query_parts.append(f'^"{clean_term}"')
             else:
-                # Freetext term - allow partial matching
-                fts_query_parts.append(f'"{clean_term}"')
+                # Freetext term - use wildcard for prefix matching
+                # This allows "fellini" to match "pulchra_fellini"
+                fts_query_parts.append(f'{clean_term}*')
 
         # Add negative terms
         for term in negative_terms:
@@ -372,7 +373,17 @@ def perform_search(search_query):
             general_terms.append(token)
     
     # Decide whether to use FTS5 or tag-based search
+    # Don't use FTS for very short terms or terms with underscores in the middle (infix matches)
     use_fts = freetext_mode or (general_terms and _should_use_fts(general_terms))
+
+    # If any general term looks like an infix search (contains _ in middle or very short),
+    # disable FTS and use LIKE-based search for better substring matching
+    if use_fts and general_terms:
+        for term in general_terms:
+            # Skip if term is very short (< 3 chars) or looks like infix (has _ but not at start/end)
+            if len(term) < 3 or ('_' in term.strip('_')):
+                use_fts = False
+                break
 
     if use_fts and (general_terms or negative_terms):
         # Use FTS5 for freetext search
@@ -446,16 +457,16 @@ def perform_search(search_query):
         if general_terms:
             filtered_results = []
             for img in results:
-                # Get tag list and filepath for exact matching
+                # Get tag list and filepath for matching
                 tags_str = img.get('tags', '').lower()
                 tag_list = set(tags_str.split())
                 filepath_lower = img.get('filepath', '').lower()
 
-                # Check if ALL general terms match (exact tag match OR filepath substring)
+                # Check if ALL general terms match
                 match = True
                 for term in general_terms:
-                    # Check exact tag match OR filepath substring match
-                    if term not in tag_list and term not in filepath_lower:
+                    # Check exact tag match OR substring match in tags OR filepath substring
+                    if term not in tag_list and term not in tags_str and term not in filepath_lower:
                         match = False
                         break
 
