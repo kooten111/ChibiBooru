@@ -1006,7 +1006,8 @@ def record_tag_delta(image_md5, tag_name, tag_category, operation):
 
 def compute_tag_deltas(filepath, new_categorized_tags):
     """
-    Compare new tags against source-derived tags and compute deltas.
+    Compare new tags against CURRENT tags (before this edit) to find what changed.
+    This computes the incremental delta for THIS specific edit.
 
     Args:
         filepath: Image filepath
@@ -1023,11 +1024,12 @@ def compute_tag_deltas(filepath, new_categorized_tags):
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # Get image MD5 and raw metadata
+            # Get image MD5 and CURRENT tags (before this edit)
             cursor.execute("""
-                SELECT i.md5, rm.data
+                SELECT i.md5,
+                       i.tags_character, i.tags_copyright, i.tags_artist,
+                       i.tags_species, i.tags_meta, i.tags_general
                 FROM images i
-                LEFT JOIN raw_metadata rm ON i.id = rm.image_id
                 WHERE i.filepath = ?
             """, (filepath,))
 
@@ -1037,67 +1039,37 @@ def compute_tag_deltas(filepath, new_categorized_tags):
                 return deltas
 
             md5 = result['md5']
-            raw_data = result['data']
 
-            if not raw_data:
-                # No source data, so all current tags are additions
-                for category_key, tags_str in new_categorized_tags.items():
-                    if not tags_str or not tags_str.strip():
-                        continue
-                    category_name = category_key.replace('tags_', '')
-                    for tag_name in tags_str.split():
-                        tag_name = tag_name.strip()
-                        if tag_name:
-                            deltas.append((tag_name, category_name, 'add'))
-                return deltas
+            # Get OLD tags (current state BEFORE this edit)
+            old_tags = {}
+            for category in ['character', 'copyright', 'artist', 'species', 'meta', 'general']:
+                category_key = f'tags_{category}'
+                old_tags_str = result[category_key] or ''
+                old_tags[category] = set(tag.strip() for tag in old_tags_str.split() if tag.strip())
 
-            # Parse raw metadata to get source-derived tags
-            import json
-            import config
-
-            metadata_dict = json.loads(raw_data)
-            source_tags = {}  # category -> set of tags
-
-            # Get tags from primary source
-            for source_name in config.BOORU_PRIORITY:
-                if source_name in metadata_dict:
-                    source_data = metadata_dict[source_name]
-
-                    # Extract categorized tags from source
-                    for category in ['character', 'copyright', 'artist', 'species', 'meta', 'general']:
-                        category_key = f'tags_{category}'
-                        if category_key in source_data:
-                            if category not in source_tags:
-                                source_tags[category] = set()
-                            tags_list = source_data[category_key]
-                            if isinstance(tags_list, list):
-                                source_tags[category].update(tags_list)
-                            elif isinstance(tags_list, str):
-                                source_tags[category].update(tags_list.split())
-                    break
-
-            # Compare new tags against source tags
-            new_tags = {}  # category -> set of tags
+            # Get NEW tags (from this edit)
+            new_tags = {}
             for category_key, tags_str in new_categorized_tags.items():
-                if not tags_str or not tags_str.strip():
-                    continue
                 category_name = category_key.replace('tags_', '')
-                new_tags[category_name] = set(tag.strip() for tag in tags_str.split() if tag.strip())
+                if not tags_str or not tags_str.strip():
+                    new_tags[category_name] = set()
+                else:
+                    new_tags[category_name] = set(tag.strip() for tag in tags_str.split() if tag.strip())
 
-            # Find additions and removals for each category
-            all_categories = set(list(source_tags.keys()) + list(new_tags.keys()))
+            # Find what changed in THIS edit only
+            all_categories = set(list(old_tags.keys()) + list(new_tags.keys()))
 
             for category in all_categories:
-                source_set = source_tags.get(category, set())
+                old_set = old_tags.get(category, set())
                 new_set = new_tags.get(category, set())
 
-                # Tags added by user
-                added = new_set - source_set
+                # Tags added in this edit
+                added = new_set - old_set
                 for tag_name in added:
                     deltas.append((tag_name, category, 'add'))
 
-                # Tags removed by user
-                removed = source_set - new_set
+                # Tags removed in this edit
+                removed = old_set - new_set
                 for tag_name in removed:
                     deltas.append((tag_name, category, 'remove'))
 
