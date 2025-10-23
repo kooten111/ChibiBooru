@@ -2,11 +2,6 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     loadPoolsForImage();
-
-    const addToPoolBtn = document.getElementById('addToPoolBtn');
-    if (addToPoolBtn) {
-        addToPoolBtn.addEventListener('click', showAddToPoolModal);
-    }
 });
 
 async function loadPoolsForImage() {

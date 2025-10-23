@@ -200,7 +200,6 @@
                 <div id="poolsList" class="pools-list-container">
                     <div class="loading-spinner">Loading pools...</div>
                 </div>
-                <button id="addToPoolBtn" class="btn-primary" style="width: 100%; margin-top: 10px;">Add to Pool</button>
             </div>
 
             {% if metadata %}
@@ -379,6 +378,9 @@
                 <div class="actions-bar">
                     <button class="btn btn-primary" onclick="toggleTagEditor()">
                         📝 Edit Tags
+                    </button>
+                    <button class="btn btn-secondary" id="addToPoolBtn" onclick="showAddToPoolModal()">
+                        📁 Add to Pool
                     </button>
                     <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
                         🔍 Find Similar

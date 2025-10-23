@@ -110,7 +110,7 @@ async function savePool() {
         const result = await response.json();
 
         if (response.ok) {
-            alert(result.message || 'Pool saved successfully!');
+            closeModal();
             window.location.reload();
         } else {
             alert(result.error || 'Failed to save pool.');
@@ -135,7 +135,6 @@ async function deletePool(poolId, poolName) {
         const result = await response.json();
 
         if (response.ok) {
-            alert(result.message || 'Pool deleted successfully!');
             window.location.reload();
         } else {
             alert(result.error || 'Failed to delete pool.');
