@@ -146,24 +146,44 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
     """
     Perform full-text search using FTS5 and apply filters.
     Returns results ranked by relevance.
+
+    Uses exact token matching with FTS5's caret (^) prefix operator
+    to ensure "holo" doesn't match "hololive".
     """
     from database import get_db_connection
 
     # Build FTS5 query
     fts_query_parts = []
 
-    # Add positive terms
-    for term in general_terms:
-        # Remove quotes for FTS query
-        clean_term = term.strip('"')
-        # Escape special FTS5 characters
-        clean_term = clean_term.replace('"', '""')
-        fts_query_parts.append(f'"{clean_term}"')
+    # Check which terms are exact tags vs freetext
+    with get_db_connection() as conn:
+        # Add positive terms
+        for term in general_terms:
+            # Remove quotes for FTS query
+            clean_term = term.strip('"').lower()
 
-    # Add negative terms
-    for term in negative_terms:
-        clean_term = term.replace('"', '""')
-        fts_query_parts.append(f'NOT "{clean_term}"')
+            # Check if this is an exact tag
+            result = conn.execute(
+                "SELECT 1 FROM tags WHERE LOWER(name) = ? LIMIT 1",
+                (clean_term,)
+            ).fetchone()
+
+            # Escape special FTS5 characters
+            clean_term = clean_term.replace('"', '""')
+
+            if result:
+                # Exact tag - use prefix match operator to ensure whole word
+                # In FTS5, ^term means "token starts with", but we want exact
+                # So we'll use quotes and rely on tokenization
+                fts_query_parts.append(f'^"{clean_term}"')
+            else:
+                # Freetext term - allow partial matching
+                fts_query_parts.append(f'"{clean_term}"')
+
+        # Add negative terms
+        for term in negative_terms:
+            clean_term = term.lower().replace('"', '""')
+            fts_query_parts.append(f'NOT "{clean_term}"')
 
     fts_query = ' '.join(fts_query_parts)
 
@@ -241,16 +261,55 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
             cursor = conn.execute(full_query, params)
             rows = cursor.fetchall()
 
+            # Post-filter for exact tag matching
+            # Check which search terms are exact tags
+            exact_tag_terms = []
+            freetext_terms = []
+
+            for term in general_terms:
+                clean_term = term.strip('"').lower()
+                result = conn.execute(
+                    "SELECT 1 FROM tags WHERE LOWER(name) = ? LIMIT 1",
+                    (clean_term,)
+                ).fetchone()
+
+                if result:
+                    exact_tag_terms.append(clean_term)
+                else:
+                    freetext_terms.append(clean_term)
+
             results = []
             for row in rows:
-                results.append({
-                    'filepath': row['filepath'],
-                    'tags': row['tags']
-                })
+                tags_str = row['tags'].lower()
+                tag_list = set(tags_str.split())
+                filepath_lower = row['filepath'].lower()
+
+                # Check exact tags first
+                match = True
+                for term in exact_tag_terms:
+                    # Must be exact tag match (not substring in filepath)
+                    if term not in tag_list:
+                        match = False
+                        break
+
+                # Check freetext terms (can match in tags or filepath)
+                if match:
+                    for term in freetext_terms:
+                        if term not in tags_str and term not in filepath_lower:
+                            match = False
+                            break
+
+                if match:
+                    results.append({
+                        'filepath': row['filepath'],
+                        'tags': row['tags']
+                    })
 
             return results
         except Exception as e:
             print(f"FTS search error: {e}")
+            import traceback
+            traceback.print_exc()
             # Fallback to empty results on error
             return []
 

@@ -5,8 +5,26 @@
     min-height: auto !important;
 }
 
+/* Adjust header layout to push search to the right */
 .header-content {
     min-height: auto !important;
+    justify-content: flex-start !important;
+    gap: 20px !important;
+}
+
+/* Mascot and title stay on left */
+.header-mascot {
+    flex-shrink: 0;
+}
+
+.header h1 {
+    flex-shrink: 0;
+}
+
+/* Search bar pushed to the right with margin-left: auto */
+.search-bar {
+    margin-left: auto !important;
+    flex-shrink: 0;
 }
 
 /* Override form layout to prevent header expansion */
