@@ -1,14 +1,91 @@
 import models
+import config
 from utils import get_thumbnail_path
+from math import log
 
 def calculate_similarity(tags1, tags2):
-    """Calculate Jaccard similarity between two tag sets."""
+    """Calculate similarity between two tag sets using the configured method."""
+    if config.SIMILARITY_METHOD == 'weighted':
+        return calculate_weighted_similarity(tags1, tags2)
+    else:
+        return calculate_jaccard_similarity(tags1, tags2)
+
+def calculate_jaccard_similarity(tags1, tags2):
+    """Calculate basic Jaccard similarity between two tag sets."""
     set1 = set((tags1 or "").split())
     set2 = set((tags2 or "").split())
-    
+
     if not set1 or not set2:
         return 0.0
     return len(set1 & set2) / len(set1 | set2) if len(set1 | set2) > 0 else 0.0
+
+def calculate_weighted_similarity(tags1, tags2):
+    """
+    Calculate weighted similarity using inverse frequency weighting and category multipliers.
+
+    Rare tags contribute more to similarity (inverse document frequency),
+    and tags in certain categories (character, copyright) are weighted higher.
+    """
+    set1 = set((tags1 or "").split())
+    set2 = set((tags2 or "").split())
+
+    if not set1 or not set2:
+        return 0.0
+
+    # Get tag counts for IDF calculation
+    tag_counts = models.get_tag_counts()
+    total_images = models.get_image_count()
+
+    # Get tag categories from database
+    tag_categories = _get_tag_categories(set1 | set2)
+
+    # Calculate weighted intersection
+    intersection_weight = 0.0
+    for tag in set1 & set2:
+        idf_weight = _calculate_idf_weight(tag, tag_counts, total_images)
+        category_weight = _get_category_weight(tag, tag_categories)
+        intersection_weight += idf_weight * category_weight
+
+    # Calculate weighted union
+    union_weight = 0.0
+    for tag in set1 | set2:
+        idf_weight = _calculate_idf_weight(tag, tag_counts, total_images)
+        category_weight = _get_category_weight(tag, tag_categories)
+        union_weight += idf_weight * category_weight
+
+    return intersection_weight / union_weight if union_weight > 0 else 0.0
+
+def _calculate_idf_weight(tag, tag_counts, total_images):
+    """Calculate inverse document frequency weight for a tag."""
+    # Get tag frequency (how many images have this tag)
+    tag_freq = tag_counts.get(tag, 1)
+
+    # IDF formula: 1 / log(frequency + 1)
+    # Rare tags (low frequency) get higher weights
+    # Common tags (high frequency) get lower weights
+    return 1.0 / log(tag_freq + 1)
+
+def _get_category_weight(tag, tag_categories):
+    """Get the configured weight for a tag's category."""
+    category = tag_categories.get(tag, 'general')
+    return config.SIMILARITY_CATEGORY_WEIGHTS.get(category, 1.0)
+
+def _get_tag_categories(tags):
+    """Fetch categories for a set of tags from the database."""
+    if not tags:
+        return {}
+
+    # Query database for tag categories
+    from database import get_db_connection
+
+    tag_list = list(tags)
+    placeholders = ','.join(['?'] * len(tag_list))
+
+    with get_db_connection() as conn:
+        query = f"SELECT name, category FROM tags WHERE name IN ({placeholders})"
+        results = conn.execute(query, tag_list).fetchall()
+
+    return {row['name']: row['category'] or 'general' for row in results}
 
 def get_enhanced_stats():
     """Get detailed statistics about the collection from the database."""

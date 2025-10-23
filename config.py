@@ -104,6 +104,23 @@ ENABLE_SAUCENAO = bool(SAUCENAO_API_KEY)  # Auto-enable if key present
 ENABLE_LOCAL_TAGGER = True  # Set to False to disable AI tagging entirely
 ENABLE_DEDUPLICATION = True  # MD5-based duplicate detection
 
+# ==================== SIMILARITY CALCULATION ====================
+
+# Similarity calculation method
+# Options: 'jaccard' (basic set intersection/union), 'weighted' (IDF + category weights)
+SIMILARITY_METHOD = os.environ.get('SIMILARITY_METHOD', 'weighted')
+
+# Category weights for weighted similarity
+# Higher values mean matching tags in that category contributes more to similarity
+SIMILARITY_CATEGORY_WEIGHTS = {
+    'character': 5.0,   # Character matches are very significant
+    'copyright': 3.0,   # Same series/franchise is important
+    'artist': 2.0,      # Same artist style matters
+    'species': 2.5,     # Species tags (for furry content)
+    'general': 1.0,     # Standard descriptive tags
+    'meta': 0.5         # Resolution, format, year - less relevant for similarity
+}
+
 # ==================== VALIDATION ====================
 
 def validate_config():
