@@ -7,6 +7,12 @@
     transition: transform 0.3s ease-in-out;
 }
 
+/* Prevent body scrolling on image page */
+body.image-page {
+    overflow: hidden;
+    height: 100vh;
+}
+
 /* Grid Container */
 .container {
     display: grid;
@@ -16,6 +22,8 @@
     margin: auto;
     padding: 30px;
     gap: 25px;
+    height: calc(100vh - 81px); /* Subtract header height */
+    overflow: hidden;
 }
 
 /* Grid positioning */
@@ -31,6 +39,8 @@
     flex-direction: column;
     gap: 20px;
     align-items: center;
+    height: 100%;
+    overflow-y: auto;
 }
 
 .image-and-actions-container {
@@ -52,8 +62,8 @@
 .sidebar-right {
     display: flex;
     flex-direction: column;
-    max-height: calc(100vh - 120px);
-    overflow: hidden; /* Hide overflow on the main container */
+    height: 100%;
+    overflow: hidden;
     gap: 20px;
 }
 
@@ -61,6 +71,17 @@
     flex: 2 1 0;
     overflow-y: auto;
     min-height: 0;
+}
+
+.tag-deltas {
+    flex: 0 0 auto;
+    overflow-y: auto;
+}
+
+.pool-management {
+    flex: 0 0 auto;
+    overflow-y: auto;
+    max-height: 300px;
 }
 
 .metadata-info {
@@ -152,7 +173,7 @@
 
 .image-view img {
     max-width: 100%;
-    max-height: calc(100vh - 200px);
+    max-height: 100%;
     display: block;
     border-radius: 12px;
     box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
@@ -205,23 +226,31 @@ body.ui-hidden .image-view img {
 /* --- Responsive --- */
 
 @media (max-width: 1200px) {
+    body.image-page {
+        overflow: auto;
+        height: auto;
+    }
+
     .container {
         grid-template-columns: 1fr;
         grid-template-rows: auto;
+        height: auto;
+        overflow: visible;
     }
-    
+
     .sidebar-left,
     .sidebar-right,
     .main-content {
         grid-column: 1;
         grid-row: auto;
+        height: auto;
     }
-    
+
     .sidebar-left,
     .sidebar-right {
         max-height: none;
     }
-    
+
     .main-content {
         order: -1;
     }
