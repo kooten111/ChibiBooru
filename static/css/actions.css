@@ -13,6 +13,9 @@
     transition: all 0.3s ease;
     width: 100%;
     box-sizing: border-box;
+    flex: 0 0 auto;
+    margin: 20px;
+    margin-top: 0;
 }
 
 .actions-bar:hover {
