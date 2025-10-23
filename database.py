@@ -125,6 +125,26 @@ def initialize_database():
         )
         """)
 
+        # --- NEW: Tag Delta Tracking Table ---
+        # This table preserves manual tag modifications across database rebuilds
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS tag_deltas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_md5 TEXT NOT NULL,
+            tag_name TEXT NOT NULL,
+            tag_category TEXT,
+            operation TEXT NOT NULL CHECK(operation IN ('add', 'remove')),
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(image_md5, tag_name, operation)
+        )
+        """)
+
+        # Index for faster lookups during delta reapplication
+        cur.execute("""
+        CREATE INDEX IF NOT EXISTS idx_tag_deltas_md5
+        ON tag_deltas(image_md5)
+        """)
+
 
         conn.commit()
         print("Database initialized successfully.")

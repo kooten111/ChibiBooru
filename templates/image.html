@@ -128,7 +128,46 @@
                     {% endfor %}
                 {% endif %}
             </div>
-            
+
+            {% if tag_deltas and (tag_deltas.added or tag_deltas.removed) %}
+            <div class="tag-deltas panel">
+                <h3 style="color: #ffa500;">Manual Modifications</h3>
+                <p style="font-size: 0.85em; color: #888; margin-bottom: 10px;">These changes will be preserved during database rebuilds</p>
+
+                {% if tag_deltas.added %}
+                <div class="delta-section" style="margin-bottom: 10px;">
+                    <strong style="color: #4a9eff;">Added Tags:</strong>
+                    <div style="margin-top: 5px;">
+                        {% for tag_info in tag_deltas.added %}
+                        <span class="tag-delta-item" style="display: inline-block; margin: 2px; padding: 4px 8px; background: rgba(74, 158, 255, 0.2); border-radius: 4px; font-size: 0.9em;">
+                            +{{ tag_info.name }}
+                            {% if tag_info.category %}
+                            <span style="opacity: 0.6; font-size: 0.85em;">({{ tag_info.category }})</span>
+                            {% endif %}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if tag_deltas.removed %}
+                <div class="delta-section">
+                    <strong style="color: #ff6b6b;">Removed Tags:</strong>
+                    <div style="margin-top: 5px;">
+                        {% for tag_info in tag_deltas.removed %}
+                        <span class="tag-delta-item" style="display: inline-block; margin: 2px; padding: 4px 8px; background: rgba(255, 107, 107, 0.2); border-radius: 4px; font-size: 0.9em;">
+                            -{{ tag_info.name }}
+                            {% if tag_info.category %}
+                            <span style="opacity: 0.6; font-size: 0.85em;">({{ tag_info.category }})</span>
+                            {% endif %}
+                        </span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
             {% if metadata %}
             <div class="metadata-info panel">
                 <h3>Information</h3>

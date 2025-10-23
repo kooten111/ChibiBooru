@@ -303,6 +303,11 @@ def repopulate_from_database():
     print("Repopulation complete.")
     recategorize_misplaced_tags()
     rebuild_categorized_tags_from_relations()
+
+    # Apply tag deltas to restore manual modifications
+    print("Applying tag deltas to restore manual modifications...")
+    apply_tag_deltas()
+
     print("Database rebuild complete.")
     
 # --- Direct Database Query Functions ---
@@ -534,25 +539,30 @@ def update_image_tags(filepath, new_tags_str):
 def update_image_tags_categorized(filepath, categorized_tags):
     """Update image tags by category in the database."""
     from database import get_db_connection
-    
+
     # Normalize filepath
     if filepath.startswith('images/'):
         filepath = filepath[7:]
     elif filepath.startswith('static/images/'):
         filepath = filepath[14:]
-    
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
-            # Get image_id
-            cursor.execute("SELECT id FROM images WHERE filepath = ?", (filepath,))
+
+            # Get image_id and MD5
+            cursor.execute("SELECT id, md5 FROM images WHERE filepath = ?", (filepath,))
             result = cursor.fetchone()
             if not result:
                 print(f"Image not found: {filepath}")
                 return False
-            
+
             image_id = result['id']
+            image_md5 = result['md5']
+
+            # Compute deltas before making changes
+            deltas = compute_tag_deltas(filepath, categorized_tags)
+            print(f"Computed {len(deltas)} tag deltas for {filepath}")
             
             # Update the categorized tag columns in images table
             cursor.execute("""
@@ -611,6 +621,11 @@ def update_image_tags_categorized(filepath, categorized_tags):
             
             conn.commit()
             print(f"Successfully updated tags for {filepath}")
+
+            # Record deltas for future database rebuilds
+            for tag_name, tag_category, operation in deltas:
+                record_tag_delta(image_md5, tag_name, tag_category, operation)
+
             return True
             
     except Exception as e:
@@ -940,3 +955,298 @@ def apply_implications_for_image(image_id):
 
         conn.commit()
         return len(tags_to_add) > 0
+
+
+# ============================================================================
+# DELTA TRACKING FUNCTIONS
+# ============================================================================
+
+def record_tag_delta(image_md5, tag_name, tag_category, operation):
+    """
+    Record a tag change (add/remove) in the delta tracking table.
+    This preserves manual modifications across database rebuilds.
+
+    Args:
+        image_md5: MD5 hash of the image
+        tag_name: Name of the tag
+        tag_category: Category of the tag (character, copyright, artist, species, meta, general)
+        operation: 'add' or 'remove'
+    """
+    from database import get_db_connection
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # If we're adding a tag, remove any previous 'remove' delta
+            # If we're removing a tag, remove any previous 'add' delta
+            opposite_op = 'remove' if operation == 'add' else 'add'
+            cursor.execute("""
+                DELETE FROM tag_deltas
+                WHERE image_md5 = ? AND tag_name = ? AND operation = ?
+            """, (image_md5, tag_name, opposite_op))
+
+            # Insert or update the delta
+            cursor.execute("""
+                INSERT OR REPLACE INTO tag_deltas
+                (image_md5, tag_name, tag_category, operation, timestamp)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """, (image_md5, tag_name, tag_category, operation))
+
+            conn.commit()
+            print(f"Recorded delta: {operation} tag '{tag_name}' for MD5 {image_md5}")
+            return True
+
+    except Exception as e:
+        print(f"Error recording tag delta: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def compute_tag_deltas(filepath, new_categorized_tags):
+    """
+    Compare new tags against source-derived tags and compute deltas.
+
+    Args:
+        filepath: Image filepath
+        new_categorized_tags: Dict of categorized tags after user edit
+
+    Returns:
+        List of tuples: (tag_name, tag_category, operation)
+    """
+    from database import get_db_connection
+
+    deltas = []
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get image MD5 and raw metadata
+            cursor.execute("""
+                SELECT i.md5, rm.data
+                FROM images i
+                LEFT JOIN raw_metadata rm ON i.id = rm.image_id
+                WHERE i.filepath = ?
+            """, (filepath,))
+
+            result = cursor.fetchone()
+            if not result:
+                print(f"Image not found: {filepath}")
+                return deltas
+
+            md5 = result['md5']
+            raw_data = result['data']
+
+            if not raw_data:
+                # No source data, so all current tags are additions
+                for category_key, tags_str in new_categorized_tags.items():
+                    if not tags_str or not tags_str.strip():
+                        continue
+                    category_name = category_key.replace('tags_', '')
+                    for tag_name in tags_str.split():
+                        tag_name = tag_name.strip()
+                        if tag_name:
+                            deltas.append((tag_name, category_name, 'add'))
+                return deltas
+
+            # Parse raw metadata to get source-derived tags
+            import json
+            import config
+
+            metadata_dict = json.loads(raw_data)
+            source_tags = {}  # category -> set of tags
+
+            # Get tags from primary source
+            for source_name in config.BOORU_PRIORITY:
+                if source_name in metadata_dict:
+                    source_data = metadata_dict[source_name]
+
+                    # Extract categorized tags from source
+                    for category in ['character', 'copyright', 'artist', 'species', 'meta', 'general']:
+                        category_key = f'tags_{category}'
+                        if category_key in source_data:
+                            if category not in source_tags:
+                                source_tags[category] = set()
+                            tags_list = source_data[category_key]
+                            if isinstance(tags_list, list):
+                                source_tags[category].update(tags_list)
+                            elif isinstance(tags_list, str):
+                                source_tags[category].update(tags_list.split())
+                    break
+
+            # Compare new tags against source tags
+            new_tags = {}  # category -> set of tags
+            for category_key, tags_str in new_categorized_tags.items():
+                if not tags_str or not tags_str.strip():
+                    continue
+                category_name = category_key.replace('tags_', '')
+                new_tags[category_name] = set(tag.strip() for tag in tags_str.split() if tag.strip())
+
+            # Find additions and removals for each category
+            all_categories = set(list(source_tags.keys()) + list(new_tags.keys()))
+
+            for category in all_categories:
+                source_set = source_tags.get(category, set())
+                new_set = new_tags.get(category, set())
+
+                # Tags added by user
+                added = new_set - source_set
+                for tag_name in added:
+                    deltas.append((tag_name, category, 'add'))
+
+                # Tags removed by user
+                removed = source_set - new_set
+                for tag_name in removed:
+                    deltas.append((tag_name, category, 'remove'))
+
+            return deltas
+
+    except Exception as e:
+        print(f"Error computing tag deltas: {e}")
+        import traceback
+        traceback.print_exc()
+        return deltas
+
+
+def apply_tag_deltas():
+    """
+    Apply all recorded tag deltas after a database rebuild.
+    This should be called at the end of repopulate_from_database().
+    """
+    from database import get_db_connection
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get all deltas grouped by image
+            cursor.execute("""
+                SELECT image_md5, tag_name, tag_category, operation
+                FROM tag_deltas
+                ORDER BY image_md5, timestamp
+            """)
+
+            deltas = cursor.fetchall()
+            delta_count = len(deltas)
+
+            if delta_count == 0:
+                print("No tag deltas to apply.")
+                return True
+
+            print(f"Applying {delta_count} tag deltas...")
+            applied = 0
+
+            for delta in deltas:
+                md5 = delta['image_md5']
+                tag_name = delta['tag_name']
+                tag_category = delta['tag_category']
+                operation = delta['operation']
+
+                # Get image_id from MD5
+                cursor.execute("SELECT id FROM images WHERE md5 = ?", (md5,))
+                img_result = cursor.fetchone()
+
+                if not img_result:
+                    print(f"Warning: Image with MD5 {md5} not found, skipping delta for tag '{tag_name}'")
+                    continue
+
+                image_id = img_result['id']
+
+                # Get or create the tag
+                cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+                tag_result = cursor.fetchone()
+
+                if tag_result:
+                    tag_id = tag_result['id']
+                    # Update category if needed
+                    if tag_category:
+                        cursor.execute("UPDATE tags SET category = ? WHERE id = ?", (tag_category, tag_id))
+                else:
+                    # Create new tag
+                    cursor.execute(
+                        "INSERT INTO tags (name, category) VALUES (?, ?)",
+                        (tag_name, tag_category or 'general')
+                    )
+                    tag_id = cursor.lastrowid
+
+                if operation == 'add':
+                    # Add tag to image
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)",
+                        (image_id, tag_id)
+                    )
+                    applied += 1
+
+                elif operation == 'remove':
+                    # Remove tag from image
+                    cursor.execute(
+                        "DELETE FROM image_tags WHERE image_id = ? AND tag_id = ?",
+                        (image_id, tag_id)
+                    )
+                    applied += 1
+
+            conn.commit()
+            print(f"Successfully applied {applied} tag deltas.")
+
+            # Rebuild categorized tags after applying deltas
+            rebuild_categorized_tags_from_relations()
+
+            return True
+
+    except Exception as e:
+        print(f"Error applying tag deltas: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def get_image_deltas(filepath):
+    """
+    Get all tag deltas for a specific image.
+    Returns a dict with 'added' and 'removed' tag lists.
+    """
+    from database import get_db_connection
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get MD5 for the image
+            cursor.execute("SELECT md5 FROM images WHERE filepath = ?", (filepath,))
+            result = cursor.fetchone()
+
+            if not result:
+                return {'added': [], 'removed': []}
+
+            md5 = result['md5']
+
+            # Get deltas
+            cursor.execute("""
+                SELECT tag_name, tag_category, operation
+                FROM tag_deltas
+                WHERE image_md5 = ?
+                ORDER BY timestamp
+            """, (md5,))
+
+            deltas = cursor.fetchall()
+
+            added = []
+            removed = []
+
+            for delta in deltas:
+                tag_info = {
+                    'name': delta['tag_name'],
+                    'category': delta['tag_category']
+                }
+                if delta['operation'] == 'add':
+                    added.append(tag_info)
+                else:
+                    removed.append(tag_info)
+
+            return {'added': added, 'removed': removed}
+
+    except Exception as e:
+        print(f"Error getting image deltas: {e}")
+        return {'added': [], 'removed': []}

@@ -132,6 +132,8 @@ def show_image(filepath):
     # Combine the lists, parents/children first
     combined_related = parent_child_images + filtered_similar
 
+    # Get tag deltas for this image
+    tag_deltas = models.get_image_deltas(lookup_path)
 
     return render_template(
         'image.html',
@@ -143,7 +145,8 @@ def show_image(filepath):
         stats=stats,
         random_tags=[],
         data=data,
-        app_name=config.APP_NAME
+        app_name=config.APP_NAME,
+        tag_deltas=tag_deltas
     )
 
 @main_blueprint.route('/similar/<path:filepath>')
