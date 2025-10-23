@@ -85,12 +85,20 @@ def home():
 def tags_browser():
     all_tags = models.get_all_tags_sorted()
     stats = query_service.get_enhanced_stats()
+
+    # Get random tags for explore section
+    random_tags = []
+    tag_counts = models.get_tag_counts()
+    if tag_counts:
+        available_tags = list(tag_counts.items())
+        random_tags = random.sample(available_tags, min(len(available_tags), 30))
+
     return render_template(
         'tags.html',
         all_tags=all_tags,
         stats=stats,
         query='',
-        random_tags=[],
+        random_tags=random_tags,
         app_name=config.APP_NAME
     )
 
