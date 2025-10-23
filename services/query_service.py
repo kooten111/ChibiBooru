@@ -2,6 +2,53 @@ import models
 import config
 from utils import get_thumbnail_path
 from math import log
+from functools import lru_cache
+
+# Global cache for tag categories - populated once on first use
+_tag_category_cache = None
+_similarity_context_cache = None
+
+def _initialize_similarity_cache():
+    """Initialize global caches for similarity calculations."""
+    global _tag_category_cache, _similarity_context_cache
+
+    if _tag_category_cache is not None:
+        return
+
+    # Load all tag categories from database once
+    from database import get_db_connection
+    with get_db_connection() as conn:
+        query = "SELECT name, category FROM tags"
+        results = conn.execute(query).fetchall()
+        _tag_category_cache = {row['name']: row['category'] or 'general' for row in results}
+
+    # Cache tag counts and image count
+    _similarity_context_cache = {
+        'tag_counts': models.get_tag_counts(),
+        'total_images': models.get_image_count()
+    }
+
+def invalidate_similarity_cache():
+    """Invalidate similarity caches when data changes."""
+    global _tag_category_cache, _similarity_context_cache
+    _tag_category_cache = None
+    _similarity_context_cache = None
+    _get_tag_weight.cache_clear()
+
+@lru_cache(maxsize=10000)
+def _get_tag_weight(tag):
+    """Get the combined IDF and category weight for a tag (cached)."""
+    _initialize_similarity_cache()
+
+    # Get IDF weight
+    tag_freq = _similarity_context_cache['tag_counts'].get(tag, 1)
+    idf_weight = 1.0 / log(tag_freq + 1)
+
+    # Get category weight
+    category = _tag_category_cache.get(tag, 'general')
+    category_weight = config.SIMILARITY_CATEGORY_WEIGHTS.get(category, 1.0)
+
+    return idf_weight * category_weight
 
 def calculate_similarity(tags1, tags2):
     """Calculate similarity between two tag sets using the configured method."""
@@ -25,6 +72,8 @@ def calculate_weighted_similarity(tags1, tags2):
 
     Rare tags contribute more to similarity (inverse document frequency),
     and tags in certain categories (character, copyright) are weighted higher.
+
+    This version is optimized with caching to avoid repeated database queries.
     """
     set1 = set((tags1 or "").split())
     set2 = set((tags2 or "").split())
@@ -32,60 +81,16 @@ def calculate_weighted_similarity(tags1, tags2):
     if not set1 or not set2:
         return 0.0
 
-    # Get tag counts for IDF calculation
-    tag_counts = models.get_tag_counts()
-    total_images = models.get_image_count()
+    # Initialize caches on first use
+    _initialize_similarity_cache()
 
-    # Get tag categories from database
-    tag_categories = _get_tag_categories(set1 | set2)
+    # Calculate weighted intersection using cached weights
+    intersection_weight = sum(_get_tag_weight(tag) for tag in set1 & set2)
 
-    # Calculate weighted intersection
-    intersection_weight = 0.0
-    for tag in set1 & set2:
-        idf_weight = _calculate_idf_weight(tag, tag_counts, total_images)
-        category_weight = _get_category_weight(tag, tag_categories)
-        intersection_weight += idf_weight * category_weight
-
-    # Calculate weighted union
-    union_weight = 0.0
-    for tag in set1 | set2:
-        idf_weight = _calculate_idf_weight(tag, tag_counts, total_images)
-        category_weight = _get_category_weight(tag, tag_categories)
-        union_weight += idf_weight * category_weight
+    # Calculate weighted union using cached weights
+    union_weight = sum(_get_tag_weight(tag) for tag in set1 | set2)
 
     return intersection_weight / union_weight if union_weight > 0 else 0.0
-
-def _calculate_idf_weight(tag, tag_counts, total_images):
-    """Calculate inverse document frequency weight for a tag."""
-    # Get tag frequency (how many images have this tag)
-    tag_freq = tag_counts.get(tag, 1)
-
-    # IDF formula: 1 / log(frequency + 1)
-    # Rare tags (low frequency) get higher weights
-    # Common tags (high frequency) get lower weights
-    return 1.0 / log(tag_freq + 1)
-
-def _get_category_weight(tag, tag_categories):
-    """Get the configured weight for a tag's category."""
-    category = tag_categories.get(tag, 'general')
-    return config.SIMILARITY_CATEGORY_WEIGHTS.get(category, 1.0)
-
-def _get_tag_categories(tags):
-    """Fetch categories for a set of tags from the database."""
-    if not tags:
-        return {}
-
-    # Query database for tag categories
-    from database import get_db_connection
-
-    tag_list = list(tags)
-    placeholders = ','.join(['?'] * len(tag_list))
-
-    with get_db_connection() as conn:
-        query = f"SELECT name, category FROM tags WHERE name IN ({placeholders})"
-        results = conn.execute(query, tag_list).fetchall()
-
-    return {row['name']: row['category'] or 'general' for row in results}
 
 def get_enhanced_stats():
     """Get detailed statistics about the collection from the database."""

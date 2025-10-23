@@ -24,6 +24,11 @@ def load_data_from_db():
     """Load or reload data from the database into the in-memory caches."""
     global tag_counts, image_data, post_id_to_md5
     print("Loading data from database...")
+
+    # Invalidate similarity caches when reloading data
+    from services.query_service import invalidate_similarity_cache
+    invalidate_similarity_cache()
+
     with data_lock:
         with get_db_connection() as conn:
             cursor = conn.cursor()
