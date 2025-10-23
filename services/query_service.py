@@ -66,16 +66,8 @@ def perform_search(search_query):
         results = [img for img in results if img['filepath'] in relationship_images]
 
     if source_filters:
-        # This is also very expensive. A dedicated SQL query would be better.
-        # For now, we'll filter in Python.
-        temp_results = []
-        for img in results:
-            details = models.get_image_details(img['filepath'])
-            if details and details.get('raw_metadata'):
-                sources = details['raw_metadata'].get('sources', {}).keys()
-                if all(s in sources for s in source_filters):
-                    temp_results.append(img)
-        results = temp_results
+        # Use optimized SQL query instead of N+1 Python loop
+        results = models.search_images_by_multiple_sources(source_filters)
 
     if extension_filter:
         results = [img for img in results if img['filepath'].lower().endswith(f'.{extension_filter}')]

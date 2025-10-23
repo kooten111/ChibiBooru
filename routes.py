@@ -321,10 +321,10 @@ def switch_source():
         
         if "error" in result:
             return jsonify(result), 400
-        
-        # Reload in-memory cache after switching
-        models.load_data_from_db()
-        
+
+        # Selective reload: only update this image
+        models.reload_single_image(filepath.replace('images/', '', 1))
+
         return jsonify(result), 200
         
     except Exception as e:

@@ -158,7 +158,9 @@ def edit_tags_service():
             success = models.update_image_tags(filepath, new_tags_str)
 
         if success:
-            models.load_data_from_db()
+            # Selective reload: only update this image and tag counts
+            models.reload_single_image(filepath)
+            models.reload_tag_counts()
             return jsonify({"status": "success"})
         else:
             return jsonify({"error": "Failed to update tags in the database"}), 500
@@ -210,10 +212,11 @@ def delete_image_service():
         else:
             print(f"Thumbnail file not found, skipping deletion: {thumb_path}")
 
-        # If anything was actually deleted, reload the in-memory data.
+        # If anything was actually deleted, update the in-memory data.
         if db_success or image_deleted or thumb_deleted:
-            print("Reloading data after deletion.")
-            models.load_data_from_db()
+            print("Updating cache after deletion.")
+            models.remove_image_from_cache(filepath)
+            models.reload_tag_counts()
         else:
             print("No database entry or files were found to delete.")
 
@@ -438,7 +441,10 @@ def saucenao_apply_service():
 
         # Step 3: Process the image file (either the new one or the old one)
         if processing.process_image_file(path_to_process):
-            models.load_data_from_db()
+            # Selective reload: only update this image and tag counts
+            rel_path = os.path.relpath(path_to_process, "static/images").replace('\\', '/')
+            models.reload_single_image(rel_path)
+            models.reload_tag_counts()
             return jsonify({
                 "status": "success",
                 "redirect_url": redirect_url

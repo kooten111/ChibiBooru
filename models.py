@@ -80,6 +80,42 @@ def get_image_data():
     with data_lock:
         return image_data
 
+def reload_single_image(filepath):
+    """Reload a single image's data in the in-memory cache without full reload."""
+    global image_data
+    with data_lock:
+        with get_db_connection() as conn:
+            query = """
+            SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+            FROM images i
+            LEFT JOIN image_tags it ON i.id = it.image_id
+            LEFT JOIN tags t ON it.tag_id = t.id
+            WHERE i.filepath = ?
+            GROUP BY i.id
+            """
+            result = conn.execute(query, (filepath,)).fetchone()
+
+            if result:
+                new_entry = dict(result)
+                # Remove old entry if exists
+                image_data[:] = [img for img in image_data if img['filepath'] != filepath]
+                # Add new entry
+                image_data.append(new_entry)
+
+def remove_image_from_cache(filepath):
+    """Remove a single image from the in-memory cache."""
+    global image_data
+    with data_lock:
+        image_data[:] = [img for img in image_data if img['filepath'] != filepath]
+
+def reload_tag_counts():
+    """Reload just the tag counts without reloading all image data."""
+    global tag_counts
+    with data_lock:
+        with get_db_connection() as conn:
+            tag_counts_query = "SELECT name, COUNT(image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
+            tag_counts = {row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()}
+
 def get_all_tags_sorted():
     """Get all tags with their counts, sorted alphabetically by name."""
     with get_db_connection() as conn:

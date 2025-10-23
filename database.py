@@ -145,6 +145,28 @@ def initialize_database():
         ON tag_deltas(image_md5)
         """)
 
+        # --- Performance Indexes ---
+        # Index on images table for common lookups
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_filepath ON images(filepath)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_md5 ON images(md5)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_post_id ON images(post_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_parent_id ON images(parent_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_active_source ON images(active_source)")
+
+        # Index on tags table for faster tag lookups
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")
+
+        # Index on image_tags for join performance
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag_id ON image_tags(tag_id)")
+
+        # Index on image_sources for source filtering
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_image_id ON image_sources(image_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_source_id ON image_sources(source_id)")
+
+        # Index on raw_metadata for faster metadata lookups
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_metadata_image_id ON raw_metadata(image_id)")
 
         conn.commit()
         print("Database initialized successfully.")
