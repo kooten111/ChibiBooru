@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadPoolsForImage() {
     const filepath = document.getElementById('imageFilepath').value;
     const poolsList = document.getElementById('poolsList');
+    const poolsPanel = document.querySelector('.pool-management.panel');
 
     if (!filepath || !poolsList) return;
 
@@ -16,8 +17,15 @@ async function loadPoolsForImage() {
 
         if (response.ok && data.pools) {
             if (data.pools.length === 0) {
-                poolsList.innerHTML = '<div style="color: #888; padding: 10px; text-align: center;">Not in any pools</div>';
+                // Hide the entire pools panel when not in any pools
+                if (poolsPanel) {
+                    poolsPanel.style.display = 'none';
+                }
             } else {
+                // Show the panel and populate with pools
+                if (poolsPanel) {
+                    poolsPanel.style.display = 'block';
+                }
                 poolsList.innerHTML = data.pools.map(pool => `
                     <div class="pool-list-item">
                         <a href="/pool/${pool.id}">${pool.name}</a>
@@ -26,10 +34,18 @@ async function loadPoolsForImage() {
                 `).join('');
             }
         } else {
+            // On error, show the panel with error message
+            if (poolsPanel) {
+                poolsPanel.style.display = 'block';
+            }
             poolsList.innerHTML = '<div style="color: #ff6b6b; padding: 10px;">Failed to load pools</div>';
         }
     } catch (error) {
         console.error('Error loading pools:', error);
+        // On error, show the panel with error message
+        if (poolsPanel) {
+            poolsPanel.style.display = 'block';
+        }
         poolsList.innerHTML = '<div style="color: #ff6b6b; padding: 10px;">Error loading pools</div>';
     }
 }
