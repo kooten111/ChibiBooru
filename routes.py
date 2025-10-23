@@ -343,6 +343,37 @@ def edit_tags():
 def delete_image():
     return api_service.delete_image_service()
 
+@api_blueprint.route('/tags/fetch')
+def fetch_tags():
+    """API endpoint for fetching tags with pagination and filtering."""
+    offset = int(request.args.get('offset', 0))
+    limit = int(request.args.get('limit', 100))
+    search = request.args.get('search', '').lower().strip()
+    category = request.args.get('category', 'all')
+
+    all_tags = models.get_all_tags_sorted()
+
+    # Filter tags based on search and category
+    filtered_tags = []
+    for tag in all_tags:
+        matches_search = search == '' or search in tag['name'].lower()
+        matches_category = category == 'all' or tag['category'].lower() == category.lower()
+
+        if matches_search and matches_category:
+            filtered_tags.append(tag)
+
+    # Paginate
+    total = len(filtered_tags)
+    tags_page = filtered_tags[offset:offset + limit]
+
+    return jsonify({
+        'tags': tags_page,
+        'total': total,
+        'offset': offset,
+        'limit': limit,
+        'hasMore': offset + limit < total
+    })
+
 @api_blueprint.route('/autocomplete')
 def autocomplete():
     return api_service.autocomplete()

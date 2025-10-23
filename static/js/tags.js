@@ -3,16 +3,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('tagSearchInput');
     const tagsContainer = document.getElementById('tagsListContainer');
     const categoryButtons = document.querySelectorAll('.category-filter-btn');
+    const loadingIndicator = document.getElementById('loadingIndicator');
 
-    // Lazy loading configuration
-    const INITIAL_BATCH_SIZE = 100;
-    const LOAD_MORE_BATCH_SIZE = 50;
+    // Configuration
+    const INITIAL_BATCH_SIZE = 150;
+    const LOAD_MORE_BATCH_SIZE = 100;
+    const PRELOAD_BATCH_SIZE = 100; // Preload next batch in background
 
-    let allTags = Array.from(tagsContainer.getElementsByClassName('tag-browser-item'));
-    let hiddenTags = [];
-    let loadedCount = 0;
     let activeCategory = 'all';
+    let currentOffset = 0;
+    let totalTags = 0;
+    let hasMore = true;
     let isLoading = false;
+    let currentSearch = '';
+    let preloadedBatch = null; // Cache for preloaded tags
 
     if (!searchInput) return;
 
@@ -24,17 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCategoryButtons();
     }
 
-    // Initially hide all tags and store them
-    hiddenTags = allTags.slice();
-    allTags.forEach(tag => {
-        tag.style.display = 'none';
-        tag.dataset.loaded = 'false';
-    });
-
-    // Load initial batch of tags
-    loadMoreTags(INITIAL_BATCH_SIZE);
-
-    // Create a sentinel element for infinite scroll
+    // Create sentinel element for infinite scroll
     const sentinel = document.createElement('div');
     sentinel.className = 'scroll-sentinel';
     sentinel.style.height = '1px';
@@ -43,74 +37,159 @@ document.addEventListener('DOMContentLoaded', () => {
     // Intersection Observer for lazy loading
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting && !isLoading) {
-                loadMoreTags(LOAD_MORE_BATCH_SIZE);
+            if (entry.isIntersecting && !isLoading && hasMore) {
+                loadMoreTags();
             }
         });
     }, {
-        rootMargin: '200px' // Start loading before reaching the bottom
+        rootMargin: '400px' // Start loading well before reaching the bottom
     });
 
     observer.observe(sentinel);
 
-    // Load more tags that match current filters
-    function loadMoreTags(batchSize) {
-        if (isLoading) return;
+    // Fetch tags from API
+    async function fetchTags(offset, limit, search = '', category = 'all') {
+        const params = new URLSearchParams({
+            offset: offset.toString(),
+            limit: limit.toString(),
+            search: search,
+            category: category
+        });
 
-        isLoading = true;
-        const query = searchInput.value.toLowerCase().trim();
-        let loadedInBatch = 0;
-
-        // Find tags that should be visible but aren't loaded yet
-        for (let i = 0; i < allTags.length && loadedInBatch < batchSize; i++) {
-            const tagElement = allTags[i];
-
-            if (tagElement.dataset.loaded === 'true') continue;
-
-            const tagName = tagElement.dataset.tagName.toLowerCase();
-            const tagCategory = tagElement.querySelector('.tag-browser-category').textContent.toLowerCase();
-
-            const matchesSearch = tagName.includes(query);
-            const matchesCategory = activeCategory === 'all' || tagCategory === activeCategory;
-
-            if (matchesSearch && matchesCategory) {
-                tagElement.style.display = 'flex';
-                tagElement.dataset.loaded = 'true';
-                loadedInBatch++;
-                loadedCount++;
-            }
+        const response = await fetch(`/api/tags/fetch?${params}`);
+        if (!response.ok) {
+            throw new Error('Failed to fetch tags');
         }
 
-        isLoading = false;
-        updateVisibleCount();
+        return await response.json();
+    }
 
-        // If we loaded fewer tags than requested, we've reached the end
-        if (loadedInBatch < batchSize) {
-            observer.disconnect();
+    // Preload next batch in background
+    async function preloadNextBatch() {
+        if (!hasMore || preloadedBatch) return;
+
+        try {
+            const nextOffset = currentOffset;
+            preloadedBatch = await fetchTags(
+                nextOffset,
+                PRELOAD_BATCH_SIZE,
+                currentSearch,
+                activeCategory
+            );
+        } catch (error) {
+            console.error('Preload failed:', error);
+            preloadedBatch = null;
         }
     }
 
-    // Reset lazy loading when filters change
-    function resetLazyLoading() {
-        // Mark all tags as not loaded
-        allTags.forEach(tag => {
-            tag.style.display = 'none';
-            tag.dataset.loaded = 'false';
+    // Render tags in the container
+    function renderTags(tags) {
+        const fragment = document.createDocumentFragment();
+
+        tags.forEach(tag => {
+            const tagElement = document.createElement('a');
+            tagElement.href = `/?query=${encodeURIComponent(tag.name)}`;
+            tagElement.className = 'tag-browser-item';
+            tagElement.dataset.tagName = tag.name;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'tag-browser-name';
+            nameSpan.textContent = tag.name;
+
+            const categorySpan = document.createElement('span');
+            categorySpan.className = `tag-browser-category ${tag.category}`;
+            categorySpan.textContent = tag.category;
+
+            const countSpan = document.createElement('span');
+            countSpan.className = 'tag-browser-count';
+            countSpan.textContent = tag.count;
+
+            tagElement.appendChild(nameSpan);
+            tagElement.appendChild(categorySpan);
+            tagElement.appendChild(countSpan);
+
+            fragment.appendChild(tagElement);
         });
 
-        loadedCount = 0;
+        tagsContainer.insertBefore(fragment, sentinel);
+    }
+
+    // Load more tags (checks preloaded batch first)
+    async function loadMoreTags() {
+        if (isLoading || !hasMore) return;
+
+        isLoading = true;
+        loadingIndicator.style.display = 'block';
+
+        try {
+            let data;
+
+            // Use preloaded batch if available
+            if (preloadedBatch && preloadedBatch.offset === currentOffset) {
+                data = preloadedBatch;
+                preloadedBatch = null; // Clear cache
+            } else {
+                // Fetch fresh data
+                const batchSize = currentOffset === 0 ? INITIAL_BATCH_SIZE : LOAD_MORE_BATCH_SIZE;
+                data = await fetchTags(currentOffset, batchSize, currentSearch, activeCategory);
+            }
+
+            renderTags(data.tags);
+            currentOffset += data.tags.length;
+            totalTags = data.total;
+            hasMore = data.hasMore;
+
+            updateVisibleCount();
+
+            // Preload next batch in background
+            if (hasMore) {
+                preloadNextBatch();
+            }
+
+            // Disconnect observer if no more tags
+            if (!hasMore) {
+                observer.disconnect();
+            }
+
+        } catch (error) {
+            console.error('Failed to load tags:', error);
+            loadingIndicator.textContent = 'Failed to load tags. Please refresh the page.';
+        } finally {
+            isLoading = false;
+            loadingIndicator.style.display = 'none';
+        }
+    }
+
+    // Reset and reload tags
+    function resetAndReload() {
+        // Clear container (keep sentinel)
+        while (tagsContainer.firstChild && tagsContainer.firstChild !== sentinel) {
+            tagsContainer.removeChild(tagsContainer.firstChild);
+        }
+
+        currentOffset = 0;
+        hasMore = true;
+        preloadedBatch = null;
 
         // Reconnect observer
         observer.disconnect();
         observer.observe(sentinel);
 
-        // Load initial batch with new filters
-        loadMoreTags(INITIAL_BATCH_SIZE);
+        // Load initial batch
+        loadMoreTags();
     }
 
-    // Filter tags based on current search query and active category
-    function filterTags() {
-        resetLazyLoading();
+    // Update the visible tag count display
+    function updateVisibleCount() {
+        const countDisplay = document.getElementById('visibleTagCount');
+        if (countDisplay) {
+            const categoryText = activeCategory === 'all' ? '' : ` ${activeCategory}`;
+            if (hasMore) {
+                countDisplay.textContent = `Showing ${currentOffset} of ${totalTags}${categoryText} tags (scroll for more)`;
+            } else {
+                countDisplay.textContent = `Showing ${currentOffset}${categoryText} tags`;
+            }
+        }
     }
 
     // Update which category button is active
@@ -124,41 +203,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Update the visible tag count display
-    function updateVisibleCount() {
-        const visibleTags = allTags.filter(tag => tag.dataset.loaded === 'true');
-        const query = searchInput.value.toLowerCase().trim();
-
-        // Count total tags that match current filters
-        let totalMatching = 0;
-        allTags.forEach(tagElement => {
-            const tagName = tagElement.dataset.tagName.toLowerCase();
-            const tagCategory = tagElement.querySelector('.tag-browser-category').textContent.toLowerCase();
-
-            const matchesSearch = tagName.includes(query);
-            const matchesCategory = activeCategory === 'all' || tagCategory === activeCategory;
-
-            if (matchesSearch && matchesCategory) {
-                totalMatching++;
-            }
-        });
-
-        const countDisplay = document.getElementById('visibleTagCount');
-        if (countDisplay) {
-            const categoryText = activeCategory === 'all' ? '' : ` ${activeCategory}`;
-            if (visibleTags.length < totalMatching) {
-                countDisplay.textContent = `Showing ${visibleTags.length} of ${totalMatching}${categoryText} tags (scroll for more)`;
-            } else {
-                countDisplay.textContent = `Showing ${visibleTags.length}${categoryText} tags`;
-            }
-        }
-    }
-
     // Set category filter
     function setCategory(category) {
         activeCategory = category;
         updateCategoryButtons();
-        filterTags();
+        resetAndReload();
 
         // Update URL parameter
         const url = new URL(window.location);
@@ -168,6 +217,12 @@ document.addEventListener('DOMContentLoaded', () => {
             url.searchParams.set('category', category);
         }
         window.history.pushState({}, '', url);
+    }
+
+    // Handle search input
+    function handleSearch() {
+        currentSearch = searchInput.value.toLowerCase().trim();
+        resetAndReload();
     }
 
     // Category button click handlers
@@ -188,9 +243,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Search input handler
-    searchInput.addEventListener('input', filterTags);
+    // Search input handler with debouncing
+    let searchTimeout;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(handleSearch, 300); // 300ms debounce
+    });
 
-    // Initial filter application
-    filterTags();
+    // Initial load
+    loadMoreTags();
 });

@@ -56,17 +56,15 @@
         </div>
 
         <div class="visible-count-display" id="visibleTagCount">
-            Showing {{ all_tags|length }} tags
+            Loading tags...
         </div>
 
         <div class="tags-list-container" id="tagsListContainer">
-            {% for tag in all_tags %}
-            <a href="{{ url_for('main.home', query=tag.name) }}" class="tag-browser-item" data-tag-name="{{ tag.name }}">
-                <span class="tag-browser-name">{{ tag.name }}</span>
-                <span class="tag-browser-category {{ tag.category }}">{{ tag.category }}</span>
-                <span class="tag-browser-count">{{ tag.count }}</span>
-            </a>
-            {% endfor %}
+            <!-- Tags will be loaded dynamically via JavaScript -->
+        </div>
+
+        <div class="loading-indicator" id="loadingIndicator" style="display: none; text-align: center; padding: 20px; color: #888;">
+            Loading more tags...
         </div>
     </div>
 
