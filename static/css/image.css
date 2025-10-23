@@ -124,6 +124,45 @@ body.image-page {
     border-bottom-color: rgba(255, 215, 0, 0.3);
 }
 
+/* Tag Category Subtitle (for Manual modifications) */
+.tag-category-subtitle {
+    font-weight: 600;
+    font-size: 0.9em;
+    color: #ffa500;
+    margin-bottom: 8px;
+    text-transform: none;
+    letter-spacing: 0.5px;
+    padding: 8px 0 5px 0;
+}
+
+/* Delta Tag Items */
+.tag-item.delta-added,
+.tag-item.delta-removed {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.tag-item.delta-added a {
+    color: #4a9eff !important;
+    font-weight: 600;
+}
+
+.tag-item.delta-removed a {
+    color: #ff6b6b !important;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.tag-item.delta-added:hover {
+    background: rgba(74, 158, 255, 0.1);
+}
+
+.tag-item.delta-removed:hover {
+    background: rgba(255, 107, 107, 0.1);
+}
+
 /* Tag Items */
 .tag-item {
     display: flex;

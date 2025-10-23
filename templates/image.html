@@ -104,17 +104,37 @@
                     </div>
                     {% endif %}
                     
-                    {% if categorized_tags.meta %}
+                    {% if categorized_tags.meta or (tag_deltas and (tag_deltas.added or tag_deltas.removed)) %}
                     <div class="tag-category meta">
                         <div class="tag-category-title">Meta</div>
-                        {% for tag, count in categorized_tags.meta %}
-                        <div class="tag-item">
-                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
-                            <span class="tag-count">
-                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                            </span>
-                        </div>
-                        {% endfor %}
+                        {% if categorized_tags.meta %}
+                            {% for tag, count in categorized_tags.meta %}
+                            <div class="tag-item">
+                                <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
+                                <span class="tag-count">
+                                    {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        {% if tag_deltas and (tag_deltas.added or tag_deltas.removed) %}
+                        <div class="tag-category-subtitle" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 165, 0, 0.2);">Manual modifications</div>
+                        {% if tag_deltas.added %}
+                            {% for tag_info in tag_deltas.added %}
+                            <div class="tag-item delta-added">
+                                <a href="{{ url_for('main.home', query=tag_info.name) }}" style="color: #4a9eff;">+{{ tag_info.name }}</a>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        {% if tag_deltas.removed %}
+                            {% for tag_info in tag_deltas.removed %}
+                            <div class="tag-item delta-removed">
+                                <a href="{{ url_for('main.home', query=tag_info.name) }}" style="color: #ff6b6b; text-decoration: line-through;">-{{ tag_info.name }}</a>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                        {% endif %}
                     </div>
                     {% endif %}
                 {% else %}
@@ -129,72 +149,6 @@
                     {% endfor %}
                 {% endif %}
             </div>
-
-            {% if tag_deltas and (tag_deltas.added or tag_deltas.removed) %}
-            <div class="tag-deltas panel">
-                <button id="deltasToggleBtn" onclick="toggleDeltas()" style="
-                    width: 100%;
-                    padding: 10px;
-                    background: linear-gradient(135deg, #ffa500 0%, #ff8c00 100%);
-                    border: none;
-                    color: #fff;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-weight: 600;
-                    font-size: 0.95em;
-                    transition: all 0.3s ease;
-                    box-shadow: 0 2px 8px rgba(255, 165, 0, 0.3);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(255, 165, 0, 0.5)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(255, 165, 0, 0.3)';">
-                    <span>⚠️</span>
-                    <span>Manual Modifications ({{ (tag_deltas.added|length) + (tag_deltas.removed|length) }})</span>
-                </button>
-
-                <div id="deltasContent" style="display: none; margin-top: 15px; padding: 10px; background: rgba(255, 165, 0, 0.05); border-radius: 8px;">
-                    <p style="font-size: 0.85em; color: #888; margin-bottom: 10px;">These changes will be preserved during database rebuilds</p>
-
-                    {% if tag_deltas.added %}
-                    <div class="delta-section" style="margin-bottom: 10px;">
-                        <strong style="color: #4a9eff;">Added ({{ tag_deltas.added|length }}):</strong>
-                        <div style="margin-top: 5px;">
-                            {% for tag_info in tag_deltas.added %}
-                            <span class="tag-delta-item" style="display: inline-block; margin: 2px; padding: 4px 8px; background: rgba(74, 158, 255, 0.2); border-radius: 4px; font-size: 0.9em;">
-                                +{{ tag_info.name }}
-                            </span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if tag_deltas.removed %}
-                    <div class="delta-section">
-                        <strong style="color: #ff6b6b;">Removed ({{ tag_deltas.removed|length }}):</strong>
-                        <div style="margin-top: 5px;">
-                            {% for tag_info in tag_deltas.removed %}
-                            <span class="tag-delta-item" style="display: inline-block; margin: 2px; padding: 4px 8px; background: rgba(255, 107, 107, 0.2); border-radius: 4px; font-size: 0.9em;">
-                                -{{ tag_info.name }}
-                            </span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-
-                <script>
-                function toggleDeltas() {
-                    const content = document.getElementById('deltasContent');
-                    if (content.style.display === 'none') {
-                        content.style.display = 'block';
-                    } else {
-                        content.style.display = 'none';
-                    }
-                }
-                </script>
-            </div>
-            {% endif %}
 
             <div class="pool-management panel">
                 <h3>Pools</h3>
