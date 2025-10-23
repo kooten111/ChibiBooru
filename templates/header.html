@@ -5,11 +5,15 @@
             <h1><a href="{{ url_for('main.home') }}">{{ app_name }}</a></h1>
             <div class="search-bar">
                 <form action="{{ url_for('main.home') }}" method="get" id="searchForm">
-                    <div class="autocomplete-container">
-                        <input type="text" name="query" id="searchInput" placeholder="Search tags..." value="{{ query or '' }}" autocomplete="off">
-                        <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
+                    <div class="search-wrapper">
+                        <div class="autocomplete-container">
+                            <input type="text" name="query" id="searchInput" placeholder="Search tags, filters, or freetext..." value="{{ query or '' }}" autocomplete="off">
+                            <button type="button" class="search-clear" id="searchClear" style="display: none;">&times;</button>
+                            <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
+                        </div>
+                        <button type="submit" class="search-submit">Search</button>
                     </div>
-                    <button type="submit">Search</button>
+                    <div class="filter-chips" id="filterChips"></div>
                 </form>
             </div>
             <button id="tabs-toggle-button" class="tabs-toggle-button">

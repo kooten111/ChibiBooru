@@ -168,8 +168,124 @@ def initialize_database():
         # Index on raw_metadata for faster metadata lookups
         cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_metadata_image_id ON raw_metadata(image_id)")
 
+        # --- FTS5 Full-Text Search Table ---
+        # Check if FTS table exists first
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='images_fts'")
+        fts_exists = cur.fetchone()
+
+        if not fts_exists:
+            # Virtual table for fast full-text search across all searchable fields
+            cur.execute("""
+            CREATE VIRTUAL TABLE images_fts USING fts5(
+                filepath,
+                tags_all,
+                tags_character,
+                tags_copyright,
+                tags_artist,
+                tags_species,
+                tags_meta,
+                tags_general
+            )
+            """)
+
+        # Triggers to keep FTS table in sync with images table
+        # Insert trigger
+        cur.execute("""
+        CREATE TRIGGER IF NOT EXISTS images_fts_insert AFTER INSERT ON images
+        BEGIN
+            INSERT INTO images_fts(filepath, tags_all, tags_character, tags_copyright, tags_artist, tags_species, tags_meta, tags_general)
+            VALUES (
+                new.filepath,
+                COALESCE(new.tags_character, '') || ' ' ||
+                COALESCE(new.tags_copyright, '') || ' ' ||
+                COALESCE(new.tags_artist, '') || ' ' ||
+                COALESCE(new.tags_species, '') || ' ' ||
+                COALESCE(new.tags_meta, '') || ' ' ||
+                COALESCE(new.tags_general, ''),
+                COALESCE(new.tags_character, ''),
+                COALESCE(new.tags_copyright, ''),
+                COALESCE(new.tags_artist, ''),
+                COALESCE(new.tags_species, ''),
+                COALESCE(new.tags_meta, ''),
+                COALESCE(new.tags_general, '')
+            );
+        END
+        """)
+
+        # Update trigger
+        cur.execute("""
+        CREATE TRIGGER IF NOT EXISTS images_fts_update AFTER UPDATE ON images
+        BEGIN
+            DELETE FROM images_fts WHERE filepath = old.filepath;
+            INSERT INTO images_fts(filepath, tags_all, tags_character, tags_copyright, tags_artist, tags_species, tags_meta, tags_general)
+            VALUES (
+                new.filepath,
+                COALESCE(new.tags_character, '') || ' ' ||
+                COALESCE(new.tags_copyright, '') || ' ' ||
+                COALESCE(new.tags_artist, '') || ' ' ||
+                COALESCE(new.tags_species, '') || ' ' ||
+                COALESCE(new.tags_meta, '') || ' ' ||
+                COALESCE(new.tags_general, ''),
+                COALESCE(new.tags_character, ''),
+                COALESCE(new.tags_copyright, ''),
+                COALESCE(new.tags_artist, ''),
+                COALESCE(new.tags_species, ''),
+                COALESCE(new.tags_meta, ''),
+                COALESCE(new.tags_general, '')
+            );
+        END
+        """)
+
+        # Delete trigger
+        cur.execute("""
+        CREATE TRIGGER IF NOT EXISTS images_fts_delete AFTER DELETE ON images
+        BEGIN
+            DELETE FROM images_fts WHERE filepath = old.filepath;
+        END
+        """)
+
         conn.commit()
         print("Database initialized successfully.")
 
+def populate_fts_table():
+    """Populate the FTS table with existing data from images table."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # Check if FTS table is empty
+        cur.execute("SELECT COUNT(*) as cnt FROM images_fts")
+        fts_count = cur.fetchone()['cnt']
+
+        cur.execute("SELECT COUNT(*) as cnt FROM images")
+        images_count = cur.fetchone()['cnt']
+
+        if fts_count == 0 and images_count > 0:
+            print(f"Populating FTS table with {images_count} images...")
+            cur.execute("""
+                INSERT INTO images_fts(filepath, tags_all, tags_character, tags_copyright, tags_artist, tags_species, tags_meta, tags_general)
+                SELECT
+                    filepath,
+                    COALESCE(tags_character, '') || ' ' ||
+                    COALESCE(tags_copyright, '') || ' ' ||
+                    COALESCE(tags_artist, '') || ' ' ||
+                    COALESCE(tags_species, '') || ' ' ||
+                    COALESCE(tags_meta, '') || ' ' ||
+                    COALESCE(tags_general, ''),
+                    COALESCE(tags_character, ''),
+                    COALESCE(tags_copyright, ''),
+                    COALESCE(tags_artist, ''),
+                    COALESCE(tags_species, ''),
+                    COALESCE(tags_meta, ''),
+                    COALESCE(tags_general, '')
+                FROM images
+            """)
+            conn.commit()
+            print(f"FTS table populated with {images_count} entries.")
+        elif fts_count != images_count:
+            print(f"Warning: FTS table has {fts_count} entries but images table has {images_count}. Consider rebuilding FTS.")
+        else:
+            print(f"FTS table already populated ({fts_count} entries).")
+
 if __name__ == "__main__":
     initialize_database()
+    populate_fts_table()

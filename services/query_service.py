@@ -109,13 +109,145 @@ def get_enhanced_stats():
         'local_tagger_used': models.get_source_breakdown().get('local_tagger', 0)
     }
 
+def _should_use_fts(general_terms):
+    """
+    Determine if we should use FTS5 instead of exact tag matching.
+    Use FTS5 when search terms don't match existing tags exactly.
+    """
+    from database import get_db_connection
+
+    # Check if any term doesn't exist as an exact tag
+    with get_db_connection() as conn:
+        for term in general_terms:
+            # Strip quotes if present
+            clean_term = term.strip('"')
+            result = conn.execute("SELECT 1 FROM tags WHERE name = ? LIMIT 1", (clean_term,)).fetchone()
+            if not result:
+                # This term is not an exact tag, use FTS
+                return True
+    return False
+
+def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
+               extension_filter, relationship_filter, pool_filter):
+    """
+    Perform full-text search using FTS5 and apply filters.
+    Returns results ranked by relevance.
+    """
+    from database import get_db_connection
+
+    # Build FTS5 query
+    fts_query_parts = []
+
+    # Add positive terms
+    for term in general_terms:
+        # Remove quotes for FTS query
+        clean_term = term.strip('"')
+        # Escape special FTS5 characters
+        clean_term = clean_term.replace('"', '""')
+        fts_query_parts.append(f'"{clean_term}"')
+
+    # Add negative terms
+    for term in negative_terms:
+        clean_term = term.replace('"', '""')
+        fts_query_parts.append(f'NOT "{clean_term}"')
+
+    fts_query = ' '.join(fts_query_parts)
+
+    with get_db_connection() as conn:
+        # Build the SQL query with filters
+        sql_parts = ["""
+            SELECT i.id, i.filepath,
+                   COALESCE(i.tags_character, '') || ' ' ||
+                   COALESCE(i.tags_copyright, '') || ' ' ||
+                   COALESCE(i.tags_artist, '') || ' ' ||
+                   COALESCE(i.tags_species, '') || ' ' ||
+                   COALESCE(i.tags_meta, '') || ' ' ||
+                   COALESCE(i.tags_general, '') as tags,
+                   fts.rank
+            FROM images_fts fts
+            INNER JOIN images i ON i.filepath = fts.filepath
+        """]
+
+        where_clauses = []
+        params = []
+
+        # FTS query
+        if fts_query:
+            where_clauses.append("images_fts MATCH ?")
+            params.append(fts_query)
+
+        # Pool filter
+        if pool_filter:
+            sql_parts[0] += """
+                INNER JOIN pool_images pi ON i.id = pi.image_id
+                INNER JOIN pools p ON pi.pool_id = p.id
+            """
+            where_clauses.append("LOWER(p.name) LIKE ?")
+            params.append(f"%{pool_filter}%")
+
+        # Relationship filter
+        if relationship_filter:
+            if relationship_filter == 'parent':
+                where_clauses.append("i.parent_id IS NOT NULL")
+            elif relationship_filter == 'child':
+                where_clauses.append("i.has_children = 1")
+            elif relationship_filter == 'any':
+                where_clauses.append("(i.parent_id IS NOT NULL OR i.has_children = 1)")
+
+        # Source filters
+        if source_filters:
+            placeholders = ','.join(['?'] * len(source_filters))
+            sql_parts[0] += f"""
+                INNER JOIN image_sources isrc ON i.id = isrc.image_id
+                INNER JOIN sources s ON isrc.source_id = s.id
+            """
+            where_clauses.append(f"s.name IN ({placeholders})")
+            params.extend(source_filters)
+
+        # Extension filter
+        if extension_filter:
+            where_clauses.append("LOWER(i.filepath) LIKE ?")
+            params.append(f"%.{extension_filter}")
+
+        # Filename filter
+        if filename_filter:
+            where_clauses.append("LOWER(i.filepath) LIKE ?")
+            params.append(f"%{filename_filter}%")
+
+        # Add WHERE clause if we have conditions
+        if where_clauses:
+            sql_parts.append("WHERE " + " AND ".join(where_clauses))
+
+        # Order by FTS5 rank (relevance)
+        sql_parts.append("ORDER BY rank")
+
+        full_query = '\n'.join(sql_parts)
+
+        try:
+            cursor = conn.execute(full_query, params)
+            rows = cursor.fetchall()
+
+            results = []
+            for row in rows:
+                results.append({
+                    'filepath': row['filepath'],
+                    'tags': row['tags']
+                })
+
+            return results
+        except Exception as e:
+            print(f"FTS search error: {e}")
+            # Fallback to empty results on error
+            return []
+
 def perform_search(search_query):
     """Perform a search using data from the database, handling special queries and combinations."""
     if not search_query:
         return models.get_all_images_with_tags(), True
 
     import re
-    
+    from database import get_db_connection
+
     # Parse the query into components
     tokens = search_query.lower().split()
     source_filters = []
@@ -124,6 +256,8 @@ def perform_search(search_query):
     relationship_filter = None
     pool_filter = None
     general_terms = []
+    negative_terms = []
+    freetext_mode = False
 
     for token in tokens:
         if token.startswith('source:'):
@@ -138,54 +272,73 @@ def perform_search(search_query):
             rel_type = token.split(':', 1)[1].strip()
             if rel_type in ['parent', 'child', 'relationship']:
                 relationship_filter = 'any' if rel_type == 'relationship' else rel_type
+        elif token.startswith('-'):
+            # Negative search: exclude this term
+            negative_terms.append(token[1:])
+        elif token.startswith('"') or (general_terms and general_terms[-1].startswith('"') and not general_terms[-1].endswith('"')):
+            # Quoted phrase - switch to freetext mode
+            freetext_mode = True
+            general_terms.append(token)
         else:
             general_terms.append(token)
     
-    # Start with all images and filter down
-    results = models.get_all_images_with_tags()
+    # Decide whether to use FTS5 or tag-based search
+    use_fts = freetext_mode or (general_terms and _should_use_fts(general_terms))
 
-    # Apply specific filters first
-    if pool_filter:
-        # Find pool by name and get its images
-        pool_images = models.search_images_by_pool(pool_filter)
-        if pool_images:
-            pool_filepaths = {img['filepath'] for img in pool_images}
-            results = [img for img in results if img['filepath'] in pool_filepaths]
-        else:
-            # No pool found with that name, return empty results
-            results = []
+    if use_fts and (general_terms or negative_terms):
+        # Use FTS5 for freetext search
+        results = _fts_search(general_terms, negative_terms, source_filters, filename_filter,
+                             extension_filter, relationship_filter, pool_filter)
+        should_shuffle = False  # FTS results are ranked by relevance
+    else:
+        # Use traditional tag-based search
+        results = models.get_all_images_with_tags()
 
-    if relationship_filter:
-        # This is an expensive operation if not done in the DB
-        relationship_images = {img['filepath'] for img in models.search_images_by_relationship(relationship_filter)}
-        results = [img for img in results if img['filepath'] in relationship_images]
+        # Apply specific filters first
+        if pool_filter:
+            # Find pool by name and get its images
+            pool_images = models.search_images_by_pool(pool_filter)
+            if pool_images:
+                pool_filepaths = {img['filepath'] for img in pool_images}
+                results = [img for img in results if img['filepath'] in pool_filepaths]
+            else:
+                # No pool found with that name, return empty results
+                results = []
 
-    if source_filters:
-        # Use optimized SQL query instead of N+1 Python loop
-        results = models.search_images_by_multiple_sources(source_filters)
+        if relationship_filter:
+            # This is an expensive operation if not done in the DB
+            relationship_images = {img['filepath'] for img in models.search_images_by_relationship(relationship_filter)}
+            results = [img for img in results if img['filepath'] in relationship_images]
 
-    if extension_filter:
-        results = [img for img in results if img['filepath'].lower().endswith(f'.{extension_filter}')]
-    
-    if filename_filter:
-        results = [img for img in results if filename_filter in img['filepath'].lower()]
-    
-    # Now, apply the general search terms to the already filtered results
-    if general_terms:
-        filtered_results = []
-        for img in results:
-            # Create a combined string of searchable fields
-            searchable_content = f"{img.get('tags', '')} {img.get('filepath')}".lower()
-            
-            # You could also add sources to this searchable string if you modify
-            # get_all_images_with_tags to include source information.
+        if source_filters:
+            # Use optimized SQL query instead of N+1 Python loop
+            results = models.search_images_by_multiple_sources(source_filters)
 
-            if all(term in searchable_content for term in general_terms):
-                filtered_results.append(img)
-        results = filtered_results
+        if extension_filter:
+            results = [img for img in results if img['filepath'].lower().endswith(f'.{extension_filter}')]
 
-    should_shuffle = bool(general_terms) and not (source_filters or filename_filter or extension_filter)
-    
+        if filename_filter:
+            results = [img for img in results if filename_filter in img['filepath'].lower()]
+
+        # Now, apply the general search terms to the already filtered results
+        if general_terms:
+            filtered_results = []
+            for img in results:
+                # Create a combined string of searchable fields
+                searchable_content = f"{img.get('tags', '')} {img.get('filepath')}".lower()
+
+                if all(term in searchable_content for term in general_terms):
+                    filtered_results.append(img)
+            results = filtered_results
+
+        # Apply negative terms
+        if negative_terms:
+            results = [img for img in results
+                      if not any(term in f"{img.get('tags', '')} {img.get('filepath')}".lower()
+                                for term in negative_terms)]
+
+        should_shuffle = bool(general_terms) and not (source_filters or filename_filter or extension_filter)
+
     return results, should_shuffle
 
 

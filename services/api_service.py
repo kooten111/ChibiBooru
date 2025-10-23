@@ -317,75 +317,113 @@ def saucenao_fetch_metadata_service():
 
 
 def autocomplete():
-    """Enhanced autocomplete with fuzzy matching, sources, filenames, and extensions."""
+    """Enhanced autocomplete with grouped suggestions by type and category."""
     query = request.args.get('q', '').strip().lower()
     if not query or len(query) < 2:
-        return jsonify([])
+        return jsonify({"groups": []})
 
     tag_counts = models.get_tag_counts()
     last_token = query.split()[-1].lower()
-    
-    suggestions = []
-    
+
+    # Initialize groups
+    groups = {
+        "Filters": [],
+        "Tags": [],
+        "Files": []
+    }
+
     # File extension search
     if last_token.startswith('.'):
-        ext = last_token[1:]  # Remove the dot
+        ext = last_token[1:]
         if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']:
-            suggestions.append({
+            groups["Filters"].append({
                 "tag": last_token,
                 "display": f"All {last_token} files",
                 "count": None,
-                "type": "extension",
-                "icon": "📁"
+                "type": "extension"
             })
-    
-    # Source suggestions
-    sources = ['danbooru', 'e621', 'gelbooru', 'yandere', 'local_tagger']
-    for source in sources:
-        if last_token in source or source.startswith(last_token):
-            suggestions.append({
-                "tag": f"source:{source}",
-                "display": f"{source.title()} images",
+
+    # Special filter suggestions
+    filters = [
+        ("source:danbooru", "Danbooru images", "danbooru"),
+        ("source:e621", "E621 images", "e621"),
+        ("source:gelbooru", "Gelbooru images", "gelbooru"),
+        ("source:yandere", "Yandere images", "yandere"),
+        ("source:local_tagger", "Locally tagged images", "local"),
+        ("has:parent", "Images with parent", "parent"),
+        ("has:child", "Images with children", "child"),
+        ("pool:", "Search pools", "pool")
+    ]
+
+    for tag, display, keyword in filters:
+        if keyword in last_token or last_token in keyword:
+            groups["Filters"].append({
+                "tag": tag,
+                "display": display,
                 "count": None,
-                "type": "source",
-                "icon": "🌐"
+                "type": "filter"
             })
-    
-    # Tag matching - both prefix and substring
-    prefix_matches = []
-    substring_matches = []
-    
-    for tag, count in tag_counts.items():
-        tag_lower = tag.lower()
-        
-        # Exact prefix match (highest priority)
-        if tag_lower.startswith(last_token):
-            prefix_matches.append({
-                "tag": tag,
-                "display": tag,
-                "count": count,
-                "type": "tag",
-                "icon": "🏷️"
+
+    # Get tag categories from database
+    with get_db_connection() as conn:
+        cursor = conn.execute("""
+            SELECT t.name, t.category, COUNT(it.image_id) as count
+            FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
+            WHERE LOWER(t.name) LIKE ?
+            GROUP BY t.name, t.category
+            ORDER BY count DESC
+            LIMIT 20
+        """, (f"%{last_token}%",))
+        tag_results = cursor.fetchall()
+
+    # Group tags by category
+    tag_categories = {}
+    for row in tag_results:
+        tag_name = row['name']
+        category = row['category'] or 'general'
+        count = row['count']
+
+        if category not in tag_categories:
+            tag_categories[category] = []
+
+        tag_lower = tag_name.lower()
+        is_prefix = tag_lower.startswith(last_token)
+
+        tag_categories[category].append({
+            "tag": tag_name,
+            "display": tag_name,
+            "count": count,
+            "category": category,
+            "type": "tag",
+            "is_prefix": is_prefix
+        })
+
+    # Sort categories by priority and build tag groups
+    category_priority = ['character', 'copyright', 'artist', 'species', 'general', 'meta']
+
+    for category in category_priority:
+        if category not in tag_categories:
+            continue
+
+        # Sort: prefix matches first, then by count
+        sorted_tags = sorted(
+            tag_categories[category],
+            key=lambda x: (not x['is_prefix'], -x['count'])
+        )
+
+        groups["Tags"].extend(sorted_tags[:5])
+
+    # Build response with only non-empty groups
+    response_groups = []
+    for group_name, items in groups.items():
+        if items:
+            response_groups.append({
+                "name": group_name,
+                "items": items[:10]
             })
-        # Substring match (fuzzy matching)
-        elif last_token in tag_lower:
-            substring_matches.append({
-                "tag": tag,
-                "display": tag,
-                "count": count,
-                "type": "tag",
-                "icon": "🏷️"
-            })
-    
-    # Sort by count
-    prefix_matches.sort(key=lambda x: x['count'], reverse=True)
-    substring_matches.sort(key=lambda x: x['count'], reverse=True)
-    
-    # Combine: extension/source suggestions first, then prefix matches, then substring
-    suggestions.extend(prefix_matches[:8])
-    suggestions.extend(substring_matches[:5])
-    
-    return jsonify(suggestions[:15])
+
+    return jsonify({"groups": response_groups})
 
 
 def saucenao_apply_service():
