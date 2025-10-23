@@ -77,30 +77,29 @@ async function loadAllPools() {
     const filepath = document.getElementById('imageFilepath').value;
 
     try {
-        // Get all pools
+        // Get pools this image is in
         const poolsResponse = await fetch('/api/pools/for_image?filepath=' + encodeURIComponent(filepath));
         const poolsData = await poolsResponse.json();
         const imagePools = new Set(poolsData.pools.map(p => p.id));
 
-        // Get all available pools from the pools page
-        const response = await fetch('/pools');
-        const html = await response.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const poolItems = doc.querySelectorAll('.pool-item');
+        // Get all available pools
+        const allPoolsResponse = await fetch('/api/pools/all');
+        const allPoolsData = await allPoolsResponse.json();
 
-        if (poolItems.length === 0) {
+        if (!allPoolsData.pools || allPoolsData.pools.length === 0) {
             poolsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No pools available. Create a pool first!</div>';
             return;
         }
 
-        const allPoolsData = Array.from(poolItems).map(item => ({
-            id: item.dataset.poolId,
-            name: item.querySelector('.pool-name').textContent,
-            inPool: imagePools.has(parseInt(item.dataset.poolId))
+        const poolsWithStatus = allPoolsData.pools.map(pool => ({
+            id: pool.id,
+            name: pool.name,
+            description: pool.description,
+            image_count: pool.image_count || 0,
+            inPool: imagePools.has(pool.id)
         }));
 
-        renderPoolList(allPoolsData);
+        renderPoolList(poolsWithStatus);
     } catch (error) {
         console.error('Error loading pools:', error);
         poolsList.innerHTML = '<div style="color: #ff6b6b; padding: 20px; text-align: center;">Error loading pools</div>';
@@ -109,15 +108,21 @@ async function loadAllPools() {
 
 function renderPoolList(pools) {
     const poolsList = document.getElementById('poolSelectorList');
-    poolsList.innerHTML = pools.map(pool => `
+    poolsList.innerHTML = pools.map(pool => {
+        const escapedName = pool.name.replace(/'/g, "\\'");
+        return `
         <div class="pool-selector-item ${pool.inPool ? 'in-pool' : ''}"
              data-pool-id="${pool.id}"
              data-pool-name="${pool.name.toLowerCase()}"
-             onclick="togglePoolMembership(${pool.id}, '${pool.name}', ${pool.inPool})">
-            <span class="pool-selector-name">${pool.name}</span>
-            <span class="pool-selector-badge">${pool.inPool ? 'In Pool' : 'Add'}</span>
+             onclick="togglePoolMembership(${pool.id}, '${escapedName}', ${pool.inPool})">
+            <div style="flex: 1;">
+                <div class="pool-selector-name">${pool.name}</div>
+                ${pool.description ? `<div style="font-size: 0.85em; color: #888; margin-top: 2px;">${pool.description}</div>` : ''}
+            </div>
+            <span class="pool-selector-badge">${pool.inPool ? '✓ In Pool' : '+ Add'}</span>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function filterPoolList() {

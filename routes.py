@@ -503,3 +503,15 @@ def get_pools_for_image():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@api_blueprint.route('/pools/all', methods=['GET'])
+def get_all_pools():
+    try:
+        pools = models.get_all_pools()
+        # Add image counts
+        for pool in pools:
+            pool_details = models.get_pool_details(pool['id'])
+            pool['image_count'] = len(pool_details['images']) if pool_details else 0
+        return jsonify({"pools": pools})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
