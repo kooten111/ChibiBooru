@@ -1,4 +1,6 @@
-/* static/css/pools.css */
+/* ==========================================================================
+   Pools - Pool Browser & Management
+   ========================================================================== */
 
 /* Pools Browser Header */
 .pools-browser-header {
@@ -6,13 +8,13 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 25px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid rgba(135, 206, 235, 0.2);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: var(--border-width-thick) solid var(--border-color);
 }
 
 .pools-browser-header h2 {
     margin: 0;
-    color: #87ceeb;
+    color: var(--primary-blue);
 }
 
 .pools-header-actions {
@@ -24,18 +26,18 @@
 #poolSearchInput {
     padding: 10px 15px;
     width: 300px;
-    background: rgba(30, 30, 40, 0.6);
-    border: 2px solid rgba(135, 206, 235, 0.2);
-    color: #e8e8e8;
-    border-radius: 10px;
-    font-size: 0.9em;
-    transition: all 0.3s ease;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    transition: all var(--transition-smooth);
 }
 
 #poolSearchInput:focus {
     outline: none;
-    border-color: rgba(135, 206, 235, 0.6);
-    box-shadow: 0 0 15px rgba(135, 206, 235, 0.2);
+    border-color: var(--border-color-focus);
+    box-shadow: 0 0 15px var(--primary-blue-20);
 }
 
 /* Pool List */
@@ -48,18 +50,18 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px;
+    padding: var(--spacing-lg);
     background: rgba(30, 30, 45, 0.5);
-    border-radius: 12px;
-    border: 1px solid rgba(135, 206, 235, 0.1);
-    transition: all 0.3s ease;
+    border-radius: var(--radius-xl);
+    border: var(--border-width) solid var(--primary-blue-10);
+    transition: all var(--transition-smooth);
 }
 
 .pool-item:hover {
-    background: rgba(74, 158, 255, 0.1);
-    border-color: rgba(135, 206, 235, 0.3);
+    background: var(--blue-accent-20);
+    border-color: var(--border-color-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(135, 206, 235, 0.2);
+    box-shadow: 0 4px 15px var(--primary-blue-20);
 }
 
 .pool-info {
@@ -67,34 +69,34 @@
 }
 
 .pool-name {
-    font-size: 1.3em;
-    font-weight: 600;
-    color: #87ceeb;
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-medium);
+    color: var(--primary-blue);
     text-decoration: none;
     display: block;
-    margin-bottom: 8px;
-    transition: color 0.2s ease;
+    margin-bottom: var(--spacing-sm);
+    transition: color var(--transition-normal);
 }
 
 .pool-name:hover {
-    color: #4a9eff;
+    color: var(--primary-blue-dark);
 }
 
 .pool-description {
-    color: #b0b0b0;
+    color: var(--text-muted);
     margin: 5px 0;
-    font-size: 0.95em;
+    font-size: var(--font-size-base);
 }
 
 .pool-image-count {
     display: inline-block;
-    margin-top: 8px;
-    padding: 4px 10px;
-    background: rgba(135, 206, 235, 0.2);
-    color: #87ceeb;
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-xs) 10px;
+    background: var(--primary-blue-20);
+    color: var(--primary-blue);
     border-radius: 15px;
-    font-size: 0.85em;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
 }
 
 .pool-actions {
@@ -104,9 +106,9 @@
 
 .no-pools-message {
     text-align: center;
-    padding: 60px 20px;
-    color: #888;
-    font-size: 1.1em;
+    padding: 60px var(--spacing-lg);
+    color: var(--text-muted);
+    font-size: var(--font-size-lg);
 }
 
 /* Pool Detail Page */
@@ -114,32 +116,32 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 30px;
-    padding-bottom: 20px;
-    border-bottom: 2px solid rgba(135, 206, 235, 0.2);
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: var(--border-width-thick) solid var(--border-color);
 }
 
 .pool-title-section h2 {
     margin: 0 0 10px 0;
-    color: #87ceeb;
-    font-size: 2em;
+    color: var(--primary-blue);
+    font-size: var(--font-size-2xl);
 }
 
 .pool-title-section .pool-description {
-    color: #b0b0b0;
+    color: var(--text-muted);
     margin: 10px 0;
-    font-size: 1.05em;
+    font-size: var(--font-size-lg);
 }
 
 .pool-title-section .pool-image-count {
     display: inline-block;
     margin-top: 10px;
-    padding: 6px 14px;
-    background: rgba(135, 206, 235, 0.2);
-    color: #87ceeb;
+    padding: var(--spacing-xs) 14px;
+    background: var(--primary-blue-20);
+    color: var(--primary-blue);
     border-radius: 15px;
-    font-size: 0.9em;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
 }
 
 .pool-header-actions {
@@ -160,13 +162,13 @@
     position: absolute;
     top: 5px;
     left: 5px;
-    background: rgba(135, 206, 235, 0.9);
-    color: #1a1a2e;
-    padding: 4px 10px;
+    background: var(--primary-blue);
+    color: var(--bg-dark);
+    padding: var(--spacing-xs) 10px;
     border-radius: 15px;
-    font-size: 0.85em;
-    font-weight: 700;
-    z-index: 10;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    z-index: var(--z-dropdown);
 }
 
 .image-actions {
@@ -174,7 +176,7 @@
     bottom: 5px;
     right: 5px;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity var(--transition-normal);
 }
 
 .pool-image-item:hover .image-actions {
@@ -183,121 +185,105 @@
 
 .btn-small {
     padding: 5px 10px;
-    font-size: 0.8em;
+    font-size: var(--font-size-sm);
     border: none;
-    border-radius: 5px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--transition-normal);
 }
 
 .btn-remove {
-    background: rgba(255, 107, 107, 0.9);
+    background: var(--danger);
     color: #fff;
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
 }
 
 .btn-remove:hover {
-    background: rgba(255, 107, 107, 1);
+    background: var(--danger-hover);
     transform: scale(1.05);
 }
 
 .no-images-message {
     text-align: center;
-    padding: 80px 20px;
-    color: #888;
-    font-size: 1.1em;
+    padding: 80px var(--spacing-lg);
+    color: var(--text-muted);
+    font-size: var(--font-size-lg);
 }
 
-/* Modal Styles */
+/* Modal Styles (pool-specific overrides) */
 .modal {
     display: none;
     position: fixed;
-    z-index: 1000;
+    z-index: var(--z-modal);
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
     background-color: rgba(0, 0, 0, 0.8);
-    animation: fadeIn 0.3s ease;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    animation: fadeIn var(--anim-smooth);
 }
 
 .modal-content {
-    background: linear-gradient(135deg, #1e1e2e 0%, #252538 100%);
+    background: var(--gradient-panel-solid);
     margin: 10% auto;
-    padding: 30px;
-    border: 2px solid rgba(135, 206, 235, 0.3);
-    border-radius: 15px;
+    padding: var(--spacing-xl);
+    border: var(--border-width-thick) solid var(--border-color-hover);
+    border-radius: var(--radius-xl);
     width: 90%;
     max-width: 500px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    animation: slideDown 0.3s ease;
-}
-
-@keyframes slideDown {
-    from {
-        transform: translateY(-50px);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
+    box-shadow: var(--shadow-xl);
+    animation: slideDown var(--anim-smooth);
 }
 
 .close {
-    color: #aaa;
+    color: var(--text-muted);
     float: right;
-    font-size: 28px;
-    font-weight: bold;
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-bold);
     cursor: pointer;
-    transition: color 0.2s ease;
+    transition: color var(--transition-normal);
 }
 
 .close:hover,
 .close:focus {
-    color: #87ceeb;
+    color: var(--primary-blue);
 }
 
 .modal-content h3 {
     margin-top: 0;
-    color: #87ceeb;
-    font-size: 1.5em;
+    color: var(--primary-blue);
+    font-size: var(--font-size-xl);
 }
 
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: var(--spacing-lg);
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
-    color: #d0d0d0;
-    font-weight: 600;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
 }
 
 .form-group input[type="text"],
 .form-group textarea {
     width: 100%;
     padding: 10px 15px;
-    background: rgba(30, 30, 40, 0.6);
-    border: 2px solid rgba(135, 206, 235, 0.2);
-    color: #e8e8e8;
-    border-radius: 8px;
-    font-size: 1em;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
     font-family: inherit;
-    transition: all 0.3s ease;
+    transition: all var(--transition-smooth);
 }
 
 .form-group input[type="text"]:focus,
 .form-group textarea:focus {
     outline: none;
-    border-color: rgba(135, 206, 235, 0.6);
-    box-shadow: 0 0 15px rgba(135, 206, 235, 0.2);
+    border-color: var(--border-color-focus);
+    box-shadow: 0 0 15px var(--primary-blue-20);
 }
 
 .form-actions {
@@ -309,33 +295,33 @@
 
 /* Button Styles */
 .btn-primary {
-    padding: 10px 20px;
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    padding: 10px var(--spacing-lg);
+    background: var(--gradient-primary);
     color: #fff;
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 2px 10px rgba(74, 158, 255, 0.3);
+    transition: all var(--transition-smooth);
+    box-shadow: var(--shadow-md);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(74, 158, 255, 0.5);
+    box-shadow: var(--shadow-lg);
 }
 
 .btn-secondary {
-    padding: 10px 20px;
+    padding: 10px var(--spacing-lg);
     background: rgba(100, 100, 120, 0.5);
-    color: #e8e8e8;
+    color: var(--text-primary);
     border: none;
-    border-radius: 8px;
-    font-weight: 600;
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     text-decoration: none;
     display: inline-block;
-    transition: all 0.3s ease;
+    transition: all var(--transition-smooth);
 }
 
 .btn-secondary:hover {
@@ -344,30 +330,30 @@
 }
 
 .btn-edit {
-    padding: 8px 16px;
-    background: rgba(135, 206, 235, 0.3);
-    color: #87ceeb;
-    border: 1px solid rgba(135, 206, 235, 0.5);
-    border-radius: 6px;
-    font-weight: 600;
+    padding: var(--spacing-sm) 16px;
+    background: var(--primary-blue-30);
+    color: var(--primary-blue);
+    border: var(--border-width) solid var(--border-color-hover);
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--transition-normal);
 }
 
 .btn-edit:hover {
-    background: rgba(135, 206, 235, 0.5);
+    background: var(--primary-blue-50);
     transform: scale(1.05);
 }
 
 .btn-delete {
-    padding: 8px 16px;
+    padding: var(--spacing-sm) 16px;
     background: rgba(255, 107, 107, 0.3);
-    color: #ff6b6b;
-    border: 1px solid rgba(255, 107, 107, 0.5);
-    border-radius: 6px;
-    font-weight: 600;
+    color: var(--danger);
+    border: var(--border-width) solid rgba(255, 107, 107, 0.5);
+    border-radius: var(--radius-md);
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--transition-normal);
 }
 
 .btn-delete:hover {
@@ -377,15 +363,15 @@
 
 /* Pool Management on Image Page */
 .pool-management {
-    margin-bottom: 20px;
+    margin-bottom: var(--spacing-lg);
 }
 
 .pool-management h3 {
-    color: #87ceeb;
+    color: var(--primary-blue);
     margin-bottom: 15px;
 }
 
-.pools-list-container {
+.pool-management .pools-list-container {
     max-height: 300px;
     overflow-y: auto;
 }
@@ -395,37 +381,37 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px;
-    background: rgba(30, 30, 45, 0.3);
-    border-radius: 6px;
-    margin-bottom: 8px;
-    transition: all 0.2s ease;
+    background: var(--primary-blue-15);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+    transition: all var(--transition-normal);
 }
 
 .pool-list-item:hover {
-    background: rgba(74, 158, 255, 0.1);
+    background: var(--primary-blue-25);
 }
 
 .pool-list-item a {
-    color: #87ceeb;
+    color: var(--primary-blue);
     text-decoration: none;
     flex: 1;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
 }
 
 .pool-list-item a:hover {
-    color: #4a9eff;
+    color: var(--primary-blue-dark);
 }
 
 .pool-list-item button {
     padding: 5px 10px;
-    font-size: 0.8em;
+    font-size: var(--font-size-sm);
     background: rgba(255, 107, 107, 0.3);
-    color: #ff6b6b;
+    color: var(--danger);
     border: none;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s ease;
+    font-weight: var(--font-weight-medium);
+    transition: all var(--transition-normal);
 }
 
 .pool-list-item button:hover {
@@ -434,56 +420,85 @@
 
 .loading-spinner {
     text-align: center;
-    padding: 20px;
-    color: #888;
+    padding: var(--spacing-lg);
+    color: var(--text-muted);
 }
 
 /* Add to Pool Modal */
 .pool-selector-list {
     max-height: 400px;
     overflow-y: auto;
-    margin: 20px 0;
+    margin: var(--spacing-lg) 0;
 }
 
 .pool-selector-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 15px;
+    padding: var(--spacing-md) 15px;
     background: rgba(30, 30, 45, 0.5);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     margin-bottom: 10px;
-    border: 1px solid rgba(135, 206, 235, 0.1);
-    transition: all 0.2s ease;
+    border: var(--border-width) solid var(--primary-blue-10);
+    transition: all var(--transition-normal);
     cursor: pointer;
 }
 
 .pool-selector-item:hover {
-    background: rgba(74, 158, 255, 0.15);
-    border-color: rgba(135, 206, 235, 0.3);
+    background: var(--blue-accent-20);
+    border-color: var(--border-color-hover);
 }
 
 .pool-selector-item.in-pool {
-    background: rgba(135, 206, 235, 0.2);
-    border-color: rgba(135, 206, 235, 0.4);
+    background: var(--primary-blue-20);
+    border-color: var(--border-color-hover);
 }
 
 .pool-selector-name {
-    color: #d0d0d0;
-    font-weight: 500;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
     flex: 1;
 }
 
 .pool-selector-badge {
-    padding: 4px 10px;
-    background: rgba(135, 206, 235, 0.3);
-    color: #87ceeb;
+    padding: var(--spacing-xs) 10px;
+    background: var(--primary-blue-30);
+    color: var(--primary-blue);
     border-radius: 10px;
-    font-size: 0.85em;
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
 }
 
 .pool-selector-item.in-pool .pool-selector-badge {
-    background: rgba(74, 158, 255, 0.5);
+    background: var(--primary-blue-50);
     color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pools-browser-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    #poolSearchInput {
+        width: 100%;
+    }
+
+    .pool-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .pool-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .pool-detail-header {
+        flex-direction: column;
+        gap: 15px;
+    }
 }

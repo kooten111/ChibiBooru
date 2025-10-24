@@ -1,3 +1,7 @@
+/* ==========================================================================
+   Source Selector - Source Switching Modal
+   ========================================================================== */
+
 /* Source Toggle Button */
 .source-toggle-btn {
     width: 100%;
@@ -5,34 +9,34 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
-    background: rgba(74, 158, 255, 0.1);
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    border-radius: 8px;
+    background: var(--blue-accent-20);
+    border: var(--border-width) solid var(--border-color-hover);
+    border-radius: var(--radius-md);
     cursor: pointer;
-    color: #e0e0e0;
-    font-size: 0.95em;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    transition: all var(--transition-normal);
 }
 
 .source-toggle-btn:hover {
-    background: rgba(74, 158, 255, 0.15);
-    border-color: rgba(135, 206, 235, 0.5);
+    background: var(--primary-blue-15);
+    border-color: var(--primary-blue-50);
     transform: translateY(-1px);
 }
 
 .current-source-indicator {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--spacing-sm);
 }
 
 .toggle-text {
-    color: #87ceeb;
-    font-size: 0.9em;
+    color: var(--primary-blue);
+    font-size: var(--font-size-sm);
 }
 
-/* Modal (matching SauceNao style) */
+/* Modal */
 .source-modal {
     position: fixed;
     top: 0;
@@ -40,11 +44,11 @@
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.9);
-    z-index: 10000;
+    z-index: var(--z-modal);
     display: none;
     align-items: center;
     justify-content: center;
-    animation: fadeIn 0.2s ease-out;
+    animation: fadeIn var(--transition-normal) ease-out;
 }
 
 .source-modal.active {
@@ -52,16 +56,16 @@
 }
 
 .source-modal-content {
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(40, 40, 60, 0.95) 100%);
-    backdrop-filter: blur(15px);
-    border-radius: 16px;
-    border: 1px solid rgba(135, 206, 235, 0.3);
+    background: var(--gradient-panel-solid);
+    backdrop-filter: var(--blur-lg);
+    border-radius: var(--radius-2xl);
+    border: var(--border-width) solid var(--border-color-hover);
     box-shadow: 0 20px 80px rgba(0, 0, 0, 0.8);
     max-width: 600px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
-    padding: 30px;
+    padding: var(--spacing-xl);
 }
 
 .source-modal-header {
@@ -73,19 +77,19 @@
 
 .source-modal-header h2 {
     margin: 0;
-    color: #87ceeb;
-    font-size: 1.5em;
+    color: var(--primary-blue);
+    font-size: var(--font-size-2xl);
 }
 
 .source-modal-close {
     background: rgba(255, 107, 107, 0.2);
-    border: 1px solid rgba(255, 107, 107, 0.5);
-    color: #ff6b6b;
-    padding: 8px 16px;
-    border-radius: 8px;
+    border: var(--border-width) solid rgba(255, 107, 107, 0.5);
+    color: var(--danger);
+    padding: var(--spacing-sm) 16px;
+    border-radius: var(--radius-md);
     cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s ease;
+    font-weight: var(--font-weight-medium);
+    transition: all var(--transition-normal);
 }
 
 .source-modal-close:hover {
@@ -97,27 +101,27 @@
 .source-options {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--spacing-md);
 }
 
 .source-option {
     padding: 18px;
-    background: rgba(30, 30, 45, 0.6);
-    border: 2px solid rgba(135, 206, 235, 0.2);
-    border-radius: 12px;
+    background: var(--bg-panel);
+    border: var(--border-width-thick) solid var(--border-color);
+    border-radius: var(--radius-xl);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--transition-normal);
 }
 
 .source-option:hover {
-    background: rgba(74, 158, 255, 0.15);
-    border-color: rgba(74, 158, 255, 0.5);
+    background: var(--primary-blue-15);
+    border-color: var(--primary-blue-50);
     transform: translateX(5px);
 }
 
 .source-option.active {
-    background: rgba(74, 158, 255, 0.2);
-    border-color: rgba(74, 158, 255, 0.6);
+    background: var(--blue-accent-20);
+    border-color: var(--border-color-focus);
 }
 
 .source-option.switching {
@@ -128,7 +132,7 @@
 .source-option-header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--spacing-md);
     margin-bottom: 10px;
 }
 
@@ -137,38 +141,38 @@
 }
 
 .source-name {
-    font-weight: 600;
-    color: #e0e0e0;
-    font-size: 1.1em;
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    font-size: var(--font-size-lg);
     flex: 1;
 }
 
 .active-badge {
-    padding: 4px 12px;
-    background: rgba(144, 238, 144, 0.2);
-    color: #90ee90;
-    border-radius: 6px;
-    font-size: 0.85em;
-    font-weight: 600;
-    border: 1px solid rgba(144, 238, 144, 0.4);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--tag-character-bg);
+    color: var(--tag-character);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    border: var(--border-width) solid var(--tag-character-border);
 }
 
 .source-meta {
     display: flex;
-    gap: 8px;
+    gap: var(--spacing-sm);
     flex-wrap: wrap;
 }
 
 .meta-badge {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.8em;
-    font-weight: 500;
+    padding: var(--spacing-xs) 10px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
 }
 
 .meta-badge.categorized {
-    background: rgba(144, 238, 144, 0.2);
-    color: #90ee90;
+    background: var(--tag-character-bg);
+    color: var(--tag-character);
 }
 
 .meta-badge.general {
@@ -177,23 +181,14 @@
 }
 
 .meta-badge.count {
-    background: rgba(135, 206, 235, 0.2);
-    color: #87ceeb;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-    to {
-        opacity: 1;
-    }
+    background: var(--tag-general-bg);
+    color: var(--tag-general);
 }
 
 /* Mobile Responsive */
 @media (max-width: 600px) {
     #sourceModal > div {
         width: 95%;
-        padding: 20px;
+        padding: var(--spacing-lg);
     }
 }

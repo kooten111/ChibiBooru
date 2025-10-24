@@ -1,28 +1,31 @@
+/* ==========================================================================
+   Main Styles - Gallery & Layout
+   ========================================================================== */
+
 * {
     box-sizing: border-box;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    color: #e8e8e8;
+    font-family: var(--font-family);
+    background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+    color: var(--text-primary);
     margin: 0;
     min-height: 100vh;
 }
 
 /* Header */
 .header {
-    background: linear-gradient(135deg, rgba(15, 15, 25, 0.95) 0%, rgba(25, 25, 40, 0.95) 100%);
-    backdrop-filter: blur(10px);
-    padding: 20px 30px;
-    border-bottom: 1px solid rgba(135, 206, 235, 0.2);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    background: var(--gradient-panel-solid);
+    backdrop-filter: var(--blur-md);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    border-bottom: var(--border-width) solid var(--border-color);
+    box-shadow: var(--shadow-md);
     position: sticky;
     top: 0;
-    z-index: 100;
-    overflow: visible; /* Add this */
+    z-index: var(--z-header);
+    overflow: visible;
 }
-
 
 .header-content {
     max-width: 1600px;
@@ -30,14 +33,14 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 30px;
+    gap: var(--spacing-xl);
 }
 
 .header h1 {
     margin: 0;
     font-size: 1.8em;
-    font-weight: 700;
-    background: linear-gradient(135deg, #87ceeb 0%, #4a9eff 100%);
+    font-weight: var(--font-weight-bold);
+    background: var(--gradient-text);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -46,11 +49,11 @@ body {
 
 .header h1 a {
     text-decoration: none;
-    background: linear-gradient(135deg, #87ceeb 0%, #4a9eff 100%);
+    background: var(--gradient-text);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    transition: all 0.3s ease;
+    transition: all var(--transition-smooth);
 }
 
 .header h1 a:hover {
@@ -62,7 +65,7 @@ body {
 /* Search Bar */
 .search-bar {
     display: flex;
-    gap: 12px;
+    gap: var(--spacing-md);
     position: relative;
     flex: 1;
     max-width: 700px;
@@ -70,7 +73,7 @@ body {
 
 .search-bar form {
     display: flex;
-    gap: 12px;
+    gap: var(--spacing-md);
     width: 100%;
 }
 
@@ -82,52 +85,52 @@ body {
 .search-bar input {
     padding: 12px 18px;
     width: 100%;
-    background: rgba(30, 30, 40, 0.6);
-    border: 2px solid rgba(135, 206, 235, 0.2);
-    color: #e8e8e8;
-    border-radius: 12px;
-    font-size: 0.95em;
-    transition: all 0.3s ease;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-xl);
+    font-size: var(--font-size-base);
+    transition: all var(--transition-smooth);
 }
 
 .search-bar input:focus {
     outline: none;
-    border-color: rgba(135, 206, 235, 0.6);
+    border-color: var(--border-color-focus);
     background: rgba(30, 30, 40, 0.8);
-    box-shadow: 0 0 20px rgba(135, 206, 235, 0.2);
+    box-shadow: 0 0 20px var(--primary-blue-20);
     transform: translateY(-2px);
 }
 
 .search-bar select {
     padding: 12px 18px;
-    background: rgba(30, 30, 40, 0.6);
-    border: 2px solid rgba(135, 206, 235, 0.2);
-    color: #e8e8e8;
-    border-radius: 12px;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-xl);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all var(--transition-smooth);
 }
 
 .search-bar select:hover {
-    border-color: rgba(135, 206, 235, 0.4);
+    border-color: var(--border-color-hover);
     background: rgba(30, 30, 40, 0.8);
 }
 
 .search-bar button {
     padding: 12px 28px;
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    background: var(--gradient-primary);
     border: none;
     color: #fff;
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
     cursor: pointer;
-    font-weight: 600;
-    transition: all 0.3s ease;
+    font-weight: var(--font-weight-medium);
+    transition: all var(--transition-smooth);
     box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
 }
 
 .search-bar button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(74, 158, 255, 0.5);
+    box-shadow: var(--shadow-blue-hover);
 }
 
 .search-bar button:active {
@@ -141,15 +144,15 @@ body {
     left: 0;
     right: 0;
     background: rgba(20, 20, 30, 0.98);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    border-radius: 12px;
+    backdrop-filter: var(--blur-md);
+    border: var(--border-width) solid var(--border-color-hover);
+    border-radius: var(--radius-xl);
     max-height: 350px;
     overflow-y: auto;
-    z-index: 10001; /* Increased from 1000 */
+    z-index: calc(var(--z-modal) + 1);
     display: none;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    animation: fadeIn 0.15s ease-out;
+    box-shadow: var(--shadow-xl);
+    animation: fadeIn var(--anim-fast) ease-out;
 }
 
 .autocomplete-suggestions.active {
@@ -162,8 +165,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 1px solid rgba(135, 206, 235, 0.1);
-    transition: all 0.2s ease;
+    border-bottom: var(--border-width) solid var(--primary-blue-10);
+    transition: all var(--transition-normal);
 }
 
 .autocomplete-item:last-child {
@@ -172,43 +175,73 @@ body {
 
 .autocomplete-item:hover,
 .autocomplete-item.selected {
-    background: rgba(74, 158, 255, 0.2);
+    background: var(--blue-accent-20);
     transform: translateX(5px);
 }
 
+.autocomplete-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.autocomplete-icon {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
 .autocomplete-tag {
-    color: #e8e8e8;
-    font-weight: 500;
+    color: var(--text-primary);
+    font-weight: var(--font-weight-normal);
 }
 
 .autocomplete-count {
-    color: #87ceeb;
-    font-size: 0.9em;
-    font-weight: 600;
+    color: var(--primary-blue);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+/* Special styling for different suggestion types */
+.autocomplete-item.extension {
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.autocomplete-item.extension:hover,
+.autocomplete-item.extension.selected {
+    background: rgba(255, 193, 7, 0.15);
+}
+
+.autocomplete-item.source {
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.autocomplete-item.source:hover,
+.autocomplete-item.source.selected {
+    background: rgba(76, 175, 80, 0.15);
 }
 
 /* Container */
 .container {
     max-width: 1600px;
     margin: auto;
-    padding: 30px;
-    animation: fadeInUp 0.3s ease-out;
+    padding: var(--spacing-xl);
+    animation: fadeInUp var(--anim-smooth) ease-out;
 }
 
 /* Results Info */
 .results-info {
     text-align: center;
-    margin-bottom: 20px;
-    color: #b0b0b0;
+    margin-bottom: var(--spacing-lg);
+    color: var(--text-muted);
     font-size: 1.05em;
-    font-weight: 500;
+    font-weight: var(--font-weight-normal);
 }
 
 /* Gallery - Masonry Layout */
 .gallery {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    grid-auto-rows: 12px; /* Small row height for fine-grained control */
+    grid-auto-rows: 12px;
     grid-auto-flow: dense;
     gap: 10px;
 }
@@ -216,11 +249,11 @@ body {
 .thumbnail {
     position: relative;
     overflow: hidden;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: rgba(30, 30, 45, 0.5);
-    border: 1px solid rgba(135, 206, 235, 0.1);
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: scaleIn 0.3s ease-out backwards;
+    border: var(--border-width) solid var(--primary-blue-10);
+    transition: all var(--transition-bezier);
+    animation: scaleIn var(--anim-smooth) ease-out backwards;
 }
 
 /* Base sizing - will be overridden by JS */
@@ -254,6 +287,7 @@ body {
     grid-column: span 1;
 }
 
+/* Staggered animation delays */
 .thumbnail:nth-child(1) { animation-delay: 0.02s; }
 .thumbnail:nth-child(2) { animation-delay: 0.04s; }
 .thumbnail:nth-child(3) { animation-delay: 0.06s; }
@@ -263,9 +297,9 @@ body {
 
 .thumbnail:hover {
     transform: scale(1.02);
-    box-shadow: 0 16px 48px rgba(135, 206, 235, 0.3);
-    border-color: rgba(135, 206, 235, 0.4);
-    z-index: 10;
+    box-shadow: 0 16px 48px var(--primary-blue-30);
+    border-color: var(--border-color-hover);
+    z-index: var(--z-dropdown);
 }
 
 .thumbnail a {
@@ -278,9 +312,9 @@ body {
 .thumbnail img {
     width: 100%;
     height: 100%;
-    object-fit: cover; /* Fill the space */
+    object-fit: cover;
     display: block;
-    transition: transform 0.4s ease;
+    transition: transform var(--transition-bezier);
 }
 
 .thumbnail:hover img {
@@ -300,195 +334,25 @@ body {
         grid-auto-rows: 10px;
         gap: 8px;
     }
-    
+
     .thumbnail.wide,
     .thumbnail.ultra-wide {
         grid-column: span 2;
     }
-    
+
     .thumbnail.ultra-wide {
         grid-row: span 15;
     }
 }
 
-/* Enhanced Autocomplete */
-.autocomplete-suggestions {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    right: 0;
-    background: rgba(20, 20, 30, 0.98);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    border-radius: 12px;
-    max-height: 400px;
-    overflow-y: auto;
-    z-index: 1000;
-    display: none;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    animation: fadeIn 0.15s ease-out;
-}
-
-.autocomplete-suggestions.active {
-    display: block;
-}
-
-.autocomplete-item {
-    padding: 12px 18px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(135, 206, 235, 0.1);
-    transition: all 0.2s ease;
-}
-
-.autocomplete-item:last-child {
-    border-bottom: none;
-}
-
-.autocomplete-item:hover,
-.autocomplete-item.selected {
-    background: rgba(74, 158, 255, 0.2);
-    transform: translateX(5px);
-}
-
-.autocomplete-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.autocomplete-icon {
-    font-size: 1.2em;
-    opacity: 0.9;
-}
-
-.autocomplete-tag {
-    color: #e8e8e8;
-    font-weight: 500;
-}
-
-.autocomplete-count {
-    color: #87ceeb;
-    font-size: 0.9em;
-    font-weight: 600;
-}
-
-/* Special styling for different suggestion types */
-.autocomplete-item.extension {
-    background: rgba(255, 193, 7, 0.05);
-}
-
-.autocomplete-item.extension:hover,
-.autocomplete-item.extension.selected {
-    background: rgba(255, 193, 7, 0.15);
-}
-
-.autocomplete-item.source {
-    background: rgba(76, 175, 80, 0.05);
-}
-
-.autocomplete-item.source:hover,
-.autocomplete-item.source.selected {
-    background: rgba(76, 175, 80, 0.15);
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Custom Confirmation Modal */
-.custom-confirm-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10000;
-    animation: fadeIn 0.2s ease-out;
-}
-
-.custom-confirm-modal {
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(40, 40, 60, 0.95) 100%);
-    padding: 30px;
-    border-radius: 16px;
-    min-width: 300px;
-    max-width: 500px;
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
-    animation: slideInUp 0.3s ease-out;
-}
-
-.custom-confirm-modal p {
-    color: #e8e8e8;
-    margin: 0 0 25px 0;
-    font-size: 1.1em;
-}
-
-.custom-confirm-modal .button-group {
-    display: flex;
-    gap: 15px;
-    justify-content: flex-end;
-}
-
-.custom-confirm-modal .btn-cancel,
-.custom-confirm-modal .btn-confirm {
-    padding: 10px 24px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.2s ease;
-}
-
-.custom-confirm-modal .btn-cancel {
-    background: rgba(255, 255, 255, 0.1);
-    color: #e8e8e8;
-}
-
-.custom-confirm-modal .btn-confirm {
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
-    color: white;
-}
-
-.custom-confirm-modal .btn-cancel:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.custom-confirm-modal .btn-confirm:hover {
-    transform: translateY(-2px);
-}
-
-@keyframes slideInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-
+/* Header Mascot */
 .header-mascot {
     position: absolute;
     left: 140px;
     top: -10px;
     height: 75px;
     width: auto;
-    z-index: 1;
+    z-index: var(--z-base);
     pointer-events: none;
     margin-right: 40px;
 }
