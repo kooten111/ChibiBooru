@@ -4,26 +4,53 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 
 ## 🌟 Features
 
+### Core Functionality
   * **🖼️ Elegant Image Gallery:** A responsive, masonry-style layout for browsing your images with infinite scroll.
   * **🤖 Automated Tagging:** Automatically fetches detailed, categorized tags for your images from multiple sources:
       * **Direct Hash Search:** Finds metadata from **Danbooru** and **e621** using the image's MD5 hash.
       * **Reverse Image Search:** Uses **SauceNao** to find sources and metadata when direct hash matching fails.
       * **AI Tagging:** Includes a local, ONNX-based AI tagger as a fallback to analyze and tag images that have no online matches.
   * **📂 Comprehensive Metadata:** Gathers rich metadata, including artist, character, copyright, species, and general tags, as well as image dimensions, file size, and original sources.
-  * **🔍 Powerful Search:**
-      * Search by tags with autocomplete suggestions.
-      * Advanced search filters like `source:danbooru`, `filename:cute_cat`, `.png`, and `has:children` to narrow down results.
+
+### Search & Discovery
+  * **🔍 Advanced Search System:**
+      * **Tag Search:** Search by tags with intelligent autocomplete suggestions
+      * **Category-Specific Search:** Filter by tag category (e.g., `character:holo`, `copyright:spice_and_wolf`, `artist:name`)
+      * **Full-Text Search:** Partial matching and fuzzy search for finding images even when you don't know exact tag names
+      * **Negative Search:** Exclude tags with the `-` prefix (e.g., `-sketch` to exclude sketches)
+      * **File Filters:** Search by filename (`filename:cute_cat`) or extension (`.png`, `.gif`)
+      * **Source Filtering:** Find images from specific sources (`source:danbooru`)
+      * **Relationship Filters:** Find parent/child images (`has:parent`, `has:child`, `has:relationship`)
+      * **Pool Search:** Find images in specific collections (`pool:series_name`)
+  * **🎯 Smart Similarity:** Weighted similarity matching that prioritizes rare tags and important categories (characters, copyright) over common descriptive tags
+
+### Tag Management
   * **✏️ Full Tag Control:**
-      * An intuitive in-line tag editor to add, remove, and recategorize tags.
-      * Ability to switch between different metadata sources (e.g., switch from Danbooru's tags to e621's for the same image).
-  * **🔗 Image Relationships:** Automatically detects and displays parent/child relationships between images.
-  * **⚙️ System Management Panel:** A web UI with powerful tools to manage your library:
-      * Scan for and process new images.
-      * Generate thumbnails.
-      * Find and remove duplicate files.
-      * Clean the database of orphaned entries.
-      * Rebuild tag data from source metadata.
-  * **🔄 Background Monitoring:** An optional service that automatically watches your image directory for new files and processes them in the background.
+      * Intuitive in-line tag editor to add, remove, and recategorize tags
+      * Ability to switch between different metadata sources (e.g., switch from Danbooru's tags to e621's for the same image)
+      * Tag delta tracking preserves manual modifications across database rebuilds
+  * **🔗 Tag Implications:** Automatic tag relationship detection and management:
+      * **Smart Detection:** Automatically suggests implications based on naming patterns (e.g., `character_(series)` → `series`)
+      * **Statistical Analysis:** Detects correlations between tags based on co-occurrence patterns
+      * **Manual Control:** Create, approve, or delete implications with a dedicated management interface
+      * **Chain Preview:** See the full impact of implications before applying them
+
+### Organization
+  * **📚 Pools:** Group related images into named collections with custom ordering
+  * **🔗 Image Relationships:** Automatically detects and displays parent/child relationships between images
+  * **🏷️ Tag Browser:** Browse all tags by category with usage counts and quick search access
+
+### System Management
+  * **🔒 Authentication:** Password-protected web interface with session-based login
+  * **📤 Image Upload:** Drag-and-drop interface for adding new images with automatic processing
+  * **⚙️ System Management Panel:** Web UI with powerful tools to manage your library:
+      * Scan for and process new images
+      * Generate thumbnails
+      * Find and remove duplicate files
+      * Clean the database of orphaned entries
+      * Rebuild tag data from source metadata
+      * Apply tag implications in bulk
+  * **🔄 Background Monitoring:** Optional service that automatically watches your image directory for new files and processes them in the background
 
 -----
 
@@ -40,7 +67,7 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 
     ```bash
     git clone <repository-url>
-    cd Booru-main
+    cd Booru
     ```
 
 2.  **Install dependencies:**
@@ -53,20 +80,17 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
     ```
 
 3.  **Configuration:**
-    Create a `.env` file in the root of the project by copying the example:
-
-    ```bash
-    cp .env.example .env
-    ```
-
-    Now, edit the `.env` file to add your API keys and customize settings:
+    Create a `.env` file in the root of the project:
 
     ```env
+    # Application Settings
+    APP_NAME="ChibiBooru"
+    APP_PASSWORD="your-secure-password"
+    SECRET_KEY="your-secret-key-for-sessions"
+    RELOAD_SECRET="a-very-secret-string"
+
     # Required for reverse image search
     SAUCENAO_API_KEY="your_saucenao_api_key"
-
-    # A secret key for accessing system management functions in the UI
-    RELOAD_SECRET="a-very-secret-string"
 
     # Optional: Gelbooru API for authenticated requests
     GELBOORU_API_KEY=""
@@ -74,7 +98,21 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 
     # Optional: Name for the local AI tagger
     LOCAL_TAGGER_NAME="CamieTagger"
+
+    # Optional: Similarity calculation method ('jaccard' or 'weighted')
+    SIMILARITY_METHOD="weighted"
+
+    # Optional: Flask server settings
+    FLASK_HOST="0.0.0.0"
+    FLASK_PORT="5000"
+    FLASK_DEBUG="False"
     ```
+
+    **Important Security Notes:**
+    - Change `APP_PASSWORD` to a strong password to protect your instance
+    - Set `SECRET_KEY` to a long random string for secure sessions
+    - Change `RELOAD_SECRET` for system management access
+    - Never commit your `.env` file to version control
 
 4.  **Place your images:**
     Move your image collection into the `static/images/` directory. You can create subdirectories to organize them.
@@ -94,19 +132,31 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 ### Initial Setup
 
 1.  After running the application for the first time, open the web interface.
-2.  Navigate to the **System** panel in the header.
-3.  Enter the `RELOAD_SECRET` you set in your `.env` file.
-4.  Click **"Scan & Process New Images"** to begin indexing your collection. The application will start fetching metadata for all your images. This may take a while for large collections.
-5.  Once the initial scan is complete, you can optionally start the **Monitor** to have ChibiBooru automatically process new images you add to the `static/images` folder.
+2.  Log in with the `APP_PASSWORD` you set in your `.env` file.
+3.  Navigate to the **System** panel in the header.
+4.  Enter the `RELOAD_SECRET` you set in your `.env` file.
+5.  Click **"Scan & Process New Images"** to begin indexing your collection. The application will start fetching metadata for all your images. This may take a while for large collections.
+6.  Once the initial scan is complete, you can optionally start the **Monitor** to have ChibiBooru automatically process new images you add to the `static/images` folder.
 
 ### Searching
 
   * **Basic Tag Search:** Just type tags separated by spaces in the search bar (e.g., `1girl blue_hair`).
+  * **Category Search:** Search within specific tag categories:
+      * `character:holo` - Find images with this character
+      * `copyright:spice_and_wolf` - Find images from this series
+      * `artist:artist_name` - Find images by this artist
+      * `species:wolf` - Find images with this species tag
   * **Advanced Queries:**
-      * `source:<name>`: Find images from a specific source (e.g., `source:danbooru`).
-      * `filename:<text>`: Search for text within the image's filename.
-      * `.<ext>`: Filter by file extension (e.g., `.png`, `.gif`).
-      * `has:<parent|child>`: Find images that have a parent or child.
+      * `source:<name>` - Find images from a specific source (e.g., `source:danbooru`)
+      * `filename:<text>` - Search for text within the image's filename
+      * `.<ext>` - Filter by file extension (e.g., `.png`, `.gif`)
+      * `has:parent` - Find images that have a parent
+      * `has:child` - Find images that have children
+      * `has:relationship` - Find images with any parent/child relationship
+      * `pool:<name>` - Find images in a specific pool
+      * `-<tag>` - Exclude a tag (e.g., `-sketch -monochrome`)
+  * **Combine Multiple Filters:** Mix and match any of the above for powerful queries like:
+      * `character:holo source:danbooru .png -sketch`
 
 ### Editing Tags
 
@@ -114,31 +164,124 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 2.  Click the **"📝 Edit Tags"** button.
 3.  An inline editor will appear, allowing you to add or remove tags within their specific categories.
 4.  Click **"💾 Save Tags"** when you are done.
+5.  Your manual modifications will be preserved even if you rebuild the database.
+
+### Managing Tag Implications
+
+1.  Navigate to the **Implications** page from the header menu.
+2.  Review auto-detected suggestions based on:
+     * **Naming Patterns:** e.g., `character_(costume)_(series)` → `character_(series)`
+     * **Statistical Correlation:** Tags that commonly appear together
+3.  Approve suggestions to automatically apply them to all relevant images.
+4.  Create manual implications for custom tag relationships.
+5.  View and manage all active implications in a single interface.
+
+### Creating Pools
+
+1.  Navigate to the **Pools** page from the header menu.
+2.  Click **"Create New Pool"** to create an image collection.
+3.  Give your pool a name and optional description.
+4.  Add images to pools from the image detail page or pool management interface.
+5.  Search for pools using `pool:<name>` in the main search bar.
+
+### Uploading Images
+
+1.  Click the **Upload** button in the header.
+2.  Drag and drop images or click to select files.
+3.  Images will be automatically processed and added to your collection.
 
 -----
 
 ## 📁 Project Structure
 
 ```
-Booru-main/
+Booru/
 ├── static/
-│   ├── css/         # Stylesheets
-│   ├── js/          # JavaScript files
-│   └── images/      # Your image collection goes here
-├── templates/       # Flask HTML templates
-├── utils/           # Utility scripts (deduplication, file handling)
-├── services/        # Service layer for business logic
-├── app.py           # Main Flask application
-├── config.py        # Configuration settings
-├── database.py      # Database schema and initialization
-├── models.py        # Database models and data access layer
-└── processing.py    # Core image processing and metadata fetching logic
+│   ├── css/            # Stylesheets
+│   ├── js/             # JavaScript files
+│   ├── images/         # Your image collection goes here
+│   └── thumbnails/     # Auto-generated thumbnails
+├── templates/          # Flask HTML templates
+├── services/           # Service layer for business logic
+│   ├── api_service.py       # API integration services
+│   ├── implication_service.py  # Tag implication detection
+│   ├── monitor_service.py   # Background file monitoring
+│   ├── query_service.py     # Search and similarity calculations
+│   └── system_service.py    # System management operations
+├── utils/              # Utility scripts
+│   ├── deduplication.py     # Duplicate detection
+│   └── file_utils.py        # File handling utilities
+├── models/             # AI tagging models (place ONNX models here)
+├── app.py              # Main Flask application
+├── config.py           # Centralized configuration
+├── database.py         # Database schema and initialization
+├── models.py           # Database models and data access layer
+├── processing.py       # Core image processing and metadata fetching
+├── routes.py           # Flask routes and web endpoints
+└── booru.db            # SQLite database (created automatically)
+```
+
+## 🛠️ Advanced Configuration
+
+### Similarity Calculation Methods
+
+ChibiBooru supports two similarity calculation methods, configurable via the `SIMILARITY_METHOD` environment variable:
+
+- **`jaccard`** (default): Simple set intersection/union calculation. Fast and straightforward.
+- **`weighted`**: Advanced method using Inverse Document Frequency (IDF) and category weights. This method:
+  - Prioritizes rare tags over common ones
+  - Weights character and copyright tags higher than general descriptive tags
+  - Provides more nuanced similarity matching for better recommendations
+
+### Category Weights
+
+When using weighted similarity, you can adjust category importance in `config.py`:
+
+```python
+SIMILARITY_CATEGORY_WEIGHTS = {
+    'character': 5.0,   # Character matches are very significant
+    'copyright': 3.0,   # Same series/franchise is important
+    'artist': 2.0,      # Same artist style matters
+    'species': 2.5,     # Species tags
+    'general': 1.0,     # Standard descriptive tags
+    'meta': 0.5         # Resolution, format, year - less relevant
+}
+```
+
+### Custom AI Tagger Models
+
+ChibiBooru supports any ONNX-based tagging model with compatible metadata:
+
+1. Place your `model.onnx` and `metadata.json` files in `models/Tagger/`
+2. Update `LOCAL_TAGGER_NAME` in `.env` to reflect your model
+3. Adjust `LOCAL_TAGGER_THRESHOLD` in `config.py` if needed
+
+## 🔧 Database Management
+
+The application uses SQLite with several advanced features:
+
+- **FTS5 Full-Text Search:** Fast partial matching and fuzzy search
+- **Automatic Indexing:** Optimized queries for large collections
+- **Tag Delta Tracking:** Preserves manual tag edits across rebuilds
+- **Tag Implications:** Recursive tag relationships with chain support
+
+To rebuild the FTS index if needed:
+```bash
+python database.py
 ```
 
 ## 🙏 Acknowledgements
 
 This project relies on several fantastic services for providing tag data:
 
-  * [suspicious link removed]
-  * [suspicious link removed]
+  * [Danbooru](https://danbooru.donmai.us/)
+  * [e621](https://e621.net/)
   * [SauceNao](https://saucenao.com/)
+
+Special thanks to the booru communities for maintaining comprehensive tagging systems that make projects like this possible.
+
+-----
+
+## 📝 License
+
+This project is provided as-is for personal use. Please respect the terms of service of the external APIs used for metadata fetching.
