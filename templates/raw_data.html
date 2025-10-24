@@ -3,30 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <title>Raw Data: {{ filepath.split('/')[-1] }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
     <style>
         .raw-data-container {
-            background-color: #0c0c14;
-            border: 1px solid rgba(135, 206, 235, 0.2);
-            border-radius: 12px;
-            padding: 25px;
-            margin-top: 20px;
+            background: var(--bg-dark);
+            border: var(--border-width) solid var(--border-color);
+            border-radius: var(--radius-xl);
+            padding: var(--spacing-xl);
+            margin-top: var(--spacing-lg);
+            box-shadow: var(--shadow-lg);
         }
+
         pre {
             white-space: pre-wrap;
             word-wrap: break-word;
-            color: #e8e8e8;
-            font-size: 0.9em;
-            font-family: 'Courier New', monospace;
+            color: var(--text-primary);
+            font-size: var(--font-size-sm);
+            font-family: 'Courier New', 'Monaco', monospace;
+            line-height: 1.6;
+            margin: 0;
         }
+
         h2 {
-            color: #87ceeb;
-            border-bottom: 2px solid rgba(135, 206, 235, 0.2);
-            padding-bottom: 10px;
-            margin-bottom: 20px;
+            color: var(--primary-blue);
+            border-bottom: var(--border-width-thick) solid var(--border-color);
+            padding-bottom: var(--spacing-sm);
+            margin-bottom: var(--spacing-lg);
+            font-size: var(--font-size-2xl);
+            font-weight: var(--font-weight-bold);
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-bottom: var(--spacing-lg);
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background: var(--gradient-panel);
+            border: var(--border-width) solid var(--border-color);
+            border-radius: var(--radius-lg);
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all var(--transition-smooth);
+            font-weight: var(--font-weight-medium);
+        }
+
+        .back-button:hover {
+            background: var(--blue-accent-20);
+            border-color: var(--border-color-hover);
+            transform: translateX(-5px);
         }
     </style>
 </head>
@@ -35,7 +62,7 @@
 
     <div class="container">
         <h2>Raw Metadata for {{ filepath.split('/')[-1] }}</h2>
-        <a href="{{ url_for('main.show_image', filepath=filepath) }}" class="btn btn-secondary" style="margin-bottom: 20px;">
+        <a href="{{ url_for('main.show_image', filepath=filepath) }}" class="back-button">
             ← Back to Image
         </a>
         <div class="raw-data-container">

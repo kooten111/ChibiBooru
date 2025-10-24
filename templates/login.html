@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <style>
@@ -12,54 +13,84 @@
             justify-content: center;
             height: 100vh;
         }
+
         .login-container {
             width: 100%;
             max-width: 400px;
-            padding: 40px;
+            padding: var(--spacing-2xl);
             text-align: center;
-            position: relative; /* Add this */
+            position: relative;
         }
+
         .login-container h1 {
             margin-bottom: 25px;
-            font-size: 2.5em;
+            font-size: var(--font-size-3xl);
+            color: var(--primary-blue);
         }
+
         .login-form input {
             width: 100%;
             padding: 15px;
-            margin-bottom: 20px;
-            background: rgba(30, 30, 40, 0.8);
-            border: 2px solid rgba(135, 206, 235, 0.2);
-            color: #e8e8e8;
-            border-radius: 12px;
-            font-size: 1em;
+            margin-bottom: var(--spacing-lg);
+            background: var(--bg-input);
+            border: var(--border-width-thick) solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: var(--radius-xl);
+            font-size: var(--font-size-base);
+            transition: all var(--transition-smooth);
         }
+
         .login-form input:focus {
             outline: none;
-            border-color: rgba(135, 206, 235, 0.6);
+            border-color: var(--border-color-focus);
+            box-shadow: 0 0 15px var(--primary-blue-20);
         }
+
+        .login-form button {
+            width: 100%;
+        }
+
         .flash-messages {
             list-style: none;
             padding: 0;
-            margin-bottom: 20px;
+            margin-bottom: var(--spacing-lg);
         }
+
         .flash-messages li {
-            padding: 10px;
-            border-radius: 8px;
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-md);
             color: white;
-            font-weight: 500;
+            font-weight: var(--font-weight-medium);
+            margin-bottom: var(--spacing-sm);
         }
+
+        .flash-messages .error {
+            background-color: var(--danger);
+        }
+
+        .flash-messages .success {
+            background-color: var(--success);
+        }
+
+        .flash-messages .info {
+            background-color: var(--primary-blue);
+        }
+
         .login-mascot {
             position: absolute;
-            left: 100%; /* Sits to the right of the login box */
+            left: 100%;
             top: 50%;
             transform: translateY(-50%);
             height: 250px;
             width: auto;
-            margin-left: 40px; /* Gap between login box and mascot */
+            margin-left: var(--spacing-2xl);
         }
-        .flash-messages .error { background-color: #9e4a4a; }
-        .flash-messages .success { background-color: #4a9e6f; }
-        .flash-messages .info { background-color: #4a7c9e; }
+
+        @media (max-width: 768px) {
+            .login-mascot {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -79,7 +110,7 @@
 
         <form method="post" class="login-form">
             <input type="password" name="password" placeholder="Password" required>
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+            <button type="submit" class="btn btn-primary">Login</button>
         </form>
     </div>
 </body>
