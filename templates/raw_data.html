@@ -9,16 +9,48 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
     <style>
-        .raw-data-container {
-            background: var(--bg-dark);
-            border: var(--border-width) solid var(--border-color);
-            border-radius: var(--radius-xl);
-            padding: var(--spacing-xl);
-            margin-top: var(--spacing-lg);
-            box-shadow: var(--shadow-lg);
+        .raw-data-page .container {
+            max-width: 1400px;
         }
 
-        pre {
+        .raw-data-header {
+            background: var(--gradient-panel);
+            backdrop-filter: var(--blur-md);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius-2xl);
+            border: var(--border-width) solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+            margin-bottom: var(--spacing-lg);
+            transition: all var(--transition-smooth);
+        }
+
+        .raw-data-header:hover {
+            border-color: var(--border-color-hover);
+        }
+
+        .raw-data-header h2 {
+            margin: 0 0 var(--spacing-md) 0;
+            font-size: var(--font-size-2xl);
+            color: var(--primary-blue);
+            font-weight: var(--font-weight-bold);
+            letter-spacing: 0.5px;
+        }
+
+        .raw-data-container {
+            background: var(--gradient-panel);
+            backdrop-filter: var(--blur-md);
+            border: var(--border-width) solid var(--border-color);
+            border-radius: var(--radius-2xl);
+            padding: var(--spacing-xl);
+            box-shadow: var(--shadow-lg);
+            transition: all var(--transition-smooth);
+        }
+
+        .raw-data-container:hover {
+            border-color: var(--border-color-hover);
+        }
+
+        .raw-data-container pre {
             white-space: pre-wrap;
             word-wrap: break-word;
             color: var(--text-primary);
@@ -26,46 +58,25 @@
             font-family: 'Courier New', 'Monaco', monospace;
             line-height: 1.6;
             margin: 0;
-        }
-
-        h2 {
-            color: var(--primary-blue);
-            border-bottom: var(--border-width-thick) solid var(--border-color);
-            padding-bottom: var(--spacing-sm);
-            margin-bottom: var(--spacing-lg);
-            font-size: var(--font-size-2xl);
-            font-weight: var(--font-weight-bold);
-        }
-
-        .back-button {
-            display: inline-block;
-            margin-bottom: var(--spacing-lg);
-            padding: var(--spacing-sm) var(--spacing-lg);
-            background: var(--gradient-panel);
-            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-input);
+            padding: var(--spacing-lg);
             border-radius: var(--radius-lg);
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: all var(--transition-smooth);
-            font-weight: var(--font-weight-medium);
-        }
-
-        .back-button:hover {
-            background: var(--blue-accent-20);
-            border-color: var(--border-color-hover);
-            transform: translateX(-5px);
+            border: var(--border-width) solid var(--border-color);
         }
     </style>
 </head>
-<body>
+<body class="raw-data-page">
     {% include 'header.html' %}
 
     <div class="container">
-        <h2>Raw Metadata for {{ filepath.split('/')[-1] }}</h2>
-        <a href="{{ url_for('main.show_image', filepath=filepath) }}" class="back-button">
-            ← Back to Image
-        </a>
-        <div class="raw-data-container">
+        <div class="raw-data-header">
+            <h2>Raw Metadata for {{ filepath.split('/')[-1] }}</h2>
+            <a href="{{ url_for('main.show_image', filepath=filepath) }}" class="btn btn-secondary">
+                ← Back to Image
+            </a>
+        </div>
+
+        <div class="raw-data-container panel">
             <pre>{{ raw_data | tojson(indent=2) }}</pre>
         </div>
     </div>
