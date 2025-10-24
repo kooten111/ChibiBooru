@@ -1,44 +1,80 @@
 // static/js/autocomplete.js
 class Autocomplete {
-    constructor(inputId, suggestionsId, filterChipsId = 'filterChips') {
-        this.searchInput = document.getElementById(inputId);
+    constructor(chipInputId = 'chipTextInput', suggestionsId = 'autocompleteSuggestions') {
+        this.chipTextInput = document.getElementById(chipInputId);
+        this.chipInputChips = document.getElementById('chipInputChips');
+        this.chipInputWrapper = document.getElementById('chipInputWrapper');
+        this.hiddenInput = document.getElementById('searchInput');
         this.suggestions = document.getElementById(suggestionsId);
-        this.filterChipsContainer = document.getElementById(filterChipsId);
         this.clearButton = document.getElementById('searchClear');
+        this.searchForm = document.getElementById('searchForm');
+
         this.debounceTimer = null;
         this.selectedIndex = -1;
         this.currentSuggestions = [];
-        this.activeFilters = new Set();
+        this.chips = [];
 
-        if (!this.searchInput || !this.suggestions) {
+        if (!this.chipTextInput || !this.suggestions) {
             console.error('Autocomplete: Required elements not found');
             return;
         }
 
-        this.searchInput.addEventListener('input', this.handleInput.bind(this));
-        this.searchInput.addEventListener('keydown', this.handleKeydown.bind(this));
-        this.searchInput.addEventListener('focus', this.handleFocus.bind(this));
-        document.addEventListener('click', this.handleClickOutside.bind(this));
-
-        // Clear button handler
-        if (this.clearButton) {
-            this.clearButton.addEventListener('click', () => {
-                this.searchInput.value = '';
-                this.updateFilterChips();
-                this.updateClearButton();
-                this.suggestions.classList.remove('active');
-                this.searchInput.focus();
-            });
-        }
-
-        // Parse initial query to show chips
-        this.updateFilterChips();
-        this.updateClearButton();
+        this.init();
+        this.loadInitialQuery();
     }
 
-    updateClearButton() {
-        if (!this.clearButton) return;
-        this.clearButton.style.display = this.searchInput.value.trim() ? 'flex' : 'none';
+    init() {
+        // Input event for autocomplete
+        this.chipTextInput.addEventListener('input', this.handleInput.bind(this));
+
+        // Keydown for navigation and chip creation
+        this.chipTextInput.addEventListener('keydown', this.handleKeydown.bind(this));
+
+        // Focus handler
+        this.chipTextInput.addEventListener('focus', this.handleFocus.bind(this));
+
+        // Click on wrapper to focus input or remove chip
+        this.chipInputWrapper.addEventListener('click', (e) => {
+            // Check if clicking on a chip to remove it
+            if (e.target.closest('.search-chip')) {
+                const chip = e.target.closest('.search-chip');
+                const index = parseInt(chip.getAttribute('data-index'), 10);
+                if (!isNaN(index)) {
+                    this.removeChip(index);
+                }
+            } else if (e.target === this.chipInputWrapper || e.target === this.chipInputChips) {
+                this.chipTextInput.focus();
+            }
+        });
+
+        // Click outside to close suggestions
+        document.addEventListener('click', this.handleClickOutside.bind(this));
+
+        // Form submit handler
+        if (this.searchForm) {
+            this.searchForm.addEventListener('submit', () => {
+                // Add current text as chip if not empty
+                const currentText = this.chipTextInput.value.trim();
+                if (currentText) {
+                    this.addChipFromText(currentText);
+                }
+                this.updateHiddenInput();
+            });
+        }
+    }
+
+    loadInitialQuery() {
+        // Parse initial query from hidden input and create chips
+        const initialQuery = this.hiddenInput.value.trim();
+        if (initialQuery) {
+            const tokens = initialQuery.split(/\s+/);
+            tokens.forEach(token => {
+                if (token) {
+                    this.addChipFromText(token);
+                }
+            });
+        }
+        this.updateClearButton();
     }
 
     getCategoryIcon(category) {
@@ -51,6 +87,113 @@ class Autocomplete {
             'meta': '⚙️'
         };
         return icons[category] || '🏷️';
+    }
+
+    parseToken(token) {
+        let type = 'tag';
+        let display = token;
+        let icon = '🏷️';
+        let category = null;
+
+        // Category filters (character:, copyright:, etc.)
+        const categoryMatch = token.match(/^(character|copyright|artist|species|meta|general):(.+)$/);
+        if (categoryMatch) {
+            category = categoryMatch[1];
+            const tag = categoryMatch[2];
+            type = category;
+            display = tag;
+            icon = this.getCategoryIcon(category);
+        } else if (token.startsWith('source:')) {
+            type = 'source';
+            display = token.split(':')[1];
+            icon = '🌐';
+        } else if (token.startsWith('filename:')) {
+            type = 'filename';
+            display = token.split(':')[1];
+            icon = '📁';
+        } else if (token.startsWith('pool:')) {
+            type = 'pool';
+            display = token.split(':')[1];
+            icon = '📚';
+        } else if (token.startsWith('has:')) {
+            type = 'filter';
+            display = token;
+            icon = '🔗';
+        } else if (token.startsWith('.')) {
+            type = 'extension';
+            display = token;
+            icon = '📄';
+        } else if (token.startsWith('-')) {
+            type = 'negative';
+            display = token.substring(1);
+            icon = '🚫';
+        }
+
+        return { token, type, display, icon, category };
+    }
+
+    addChipFromText(text) {
+        const trimmed = text.trim();
+        if (!trimmed) return;
+
+        const parsed = this.parseToken(trimmed);
+        this.chips.push(parsed);
+        this.renderChips();
+        this.updateHiddenInput();
+        this.updateClearButton();
+    }
+
+    addChipFromAutocomplete(tag, category = null) {
+        let token = tag;
+        // Always use category prefix if category is provided and not empty
+        if (category && category !== '') {
+            token = `${category}:${tag}`;
+        }
+
+        this.addChipFromText(token);
+        this.chipTextInput.value = '';
+        this.suggestions.classList.remove('active');
+        this.chipTextInput.focus();
+
+        // Visual feedback
+        this.chipInputWrapper.style.borderColor = 'rgba(135, 206, 235, 0.8)';
+        setTimeout(() => {
+            this.chipInputWrapper.style.borderColor = '';
+        }, 200);
+    }
+
+    removeChip(index) {
+        this.chips.splice(index, 1);
+        this.renderChips();
+        this.updateHiddenInput();
+        this.updateClearButton();
+        this.chipTextInput.focus();
+    }
+
+    removeLastChip() {
+        if (this.chips.length > 0) {
+            this.chips.pop();
+            this.renderChips();
+            this.updateHiddenInput();
+            this.updateClearButton();
+        }
+    }
+
+    renderChips() {
+        this.chipInputChips.innerHTML = this.chips.map((chip, index) => `
+            <div class="search-chip ${chip.type}" data-index="${index}">
+                <span class="search-chip-icon">${chip.icon}</span>
+                <span class="search-chip-text">${this.escapeHtml(chip.display)}</span>
+            </div>
+        `).join('');
+    }
+
+    updateHiddenInput() {
+        this.hiddenInput.value = this.chips.map(chip => chip.token).join(' ');
+    }
+
+    updateClearButton() {
+        // No clear button anymore
     }
 
     showSuggestions(data) {
@@ -112,7 +255,7 @@ class Autocomplete {
             item.addEventListener('click', () => {
                 const tag = item.getAttribute('data-tag');
                 const category = item.getAttribute('data-category');
-                this.insertTag(tag, category);
+                this.addChipFromAutocomplete(tag, category);
             });
 
             item.addEventListener('mouseenter', () => {
@@ -158,7 +301,7 @@ class Autocomplete {
         this.suggestions.querySelectorAll('.autocomplete-item').forEach(item => {
             item.addEventListener('click', () => {
                 const tag = item.getAttribute('data-tag');
-                this.insertTag(tag);
+                this.addChipFromAutocomplete(tag);
             });
 
             item.addEventListener('mouseenter', () => {
@@ -173,95 +316,6 @@ class Autocomplete {
         });
     }
 
-    updateFilterChips() {
-        if (!this.filterChipsContainer) return;
-
-        const query = this.searchInput.value.trim();
-        if (!query) {
-            this.filterChipsContainer.innerHTML = '';
-            this.filterChipsContainer.style.display = 'none';
-            return;
-        }
-
-        const tokens = query.split(/\s+/);
-        const chips = [];
-
-        tokens.forEach(token => {
-            let type = 'tag';
-            let display = token;
-            let icon = '🏷️';
-
-            // Category filters (character:, copyright:, etc.)
-            const categoryMatch = token.match(/^(character|copyright|artist|species|meta|general):(.+)$/);
-            if (categoryMatch) {
-                const category = categoryMatch[1];
-                const tag = categoryMatch[2];
-                type = `category-${category}`;
-                display = `${category}: ${tag}`;
-                icon = this.getCategoryIcon(category);
-            } else if (token.startsWith('source:')) {
-                type = 'source';
-                display = token.split(':')[1];
-                icon = '🌐';
-            } else if (token.startsWith('filename:')) {
-                type = 'filename';
-                display = `file: ${token.split(':')[1]}`;
-                icon = '📁';
-            } else if (token.startsWith('pool:')) {
-                type = 'pool';
-                display = `pool: ${token.split(':')[1]}`;
-                icon = '📚';
-            } else if (token.startsWith('has:')) {
-                type = 'filter';
-                display = token;
-                icon = '🔗';
-            } else if (token.startsWith('.')) {
-                type = 'extension';
-                display = token;
-                icon = '📄';
-            } else if (token.startsWith('-')) {
-                type = 'negative';
-                display = token;
-                icon = '🚫';
-            }
-
-            chips.push({ token, type, display, icon });
-        });
-
-        if (chips.length === 0) {
-            this.filterChipsContainer.innerHTML = '';
-            this.filterChipsContainer.style.display = 'none';
-            return;
-        }
-
-        this.filterChipsContainer.innerHTML = chips.map(chip => `
-            <div class="filter-chip ${chip.type}">
-                <span class="chip-icon">${chip.icon}</span>
-                <span class="chip-text">${this.escapeHtml(chip.display)}</span>
-                <button class="chip-remove" data-token="${this.escapeHtml(chip.token)}">&times;</button>
-            </div>
-        `).join('');
-        this.filterChipsContainer.style.display = 'flex';
-
-        // Add click handlers for remove buttons
-        this.filterChipsContainer.querySelectorAll('.chip-remove').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.preventDefault();
-                const token = btn.getAttribute('data-token');
-                this.removeToken(token);
-            });
-        });
-    }
-
-    removeToken(token) {
-        const tokens = this.searchInput.value.trim().split(/\s+/);
-        const filtered = tokens.filter(t => t !== token);
-        this.searchInput.value = filtered.join(' ');
-        if (this.searchInput.value) this.searchInput.value += ' ';
-        this.updateFilterChips();
-        this.searchInput.focus();
-    }
-
     formatCount(count) {
         if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
         if (count >= 1000) return (count / 1000).toFixed(1) + 'k';
@@ -272,28 +326,6 @@ class Autocomplete {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    }
-
-    insertTag(tag, category = null) {
-        const tokens = this.searchInput.value.trim().split(/\s+/);
-        tokens.pop();
-
-        // If tag has a category, prepend it (e.g., "character:holo")
-        if (category && category !== '' && category !== 'general') {
-            tokens.push(`${category}:${tag}`);
-        } else {
-            tokens.push(tag);
-        }
-
-        this.searchInput.value = tokens.join(' ') + ' ';
-        this.suggestions.classList.remove('active');
-        this.updateFilterChips();
-        this.searchInput.focus();
-
-        this.searchInput.style.borderColor = 'rgba(135, 206, 235, 0.8)';
-        setTimeout(() => {
-            this.searchInput.style.borderColor = '';
-        }, 200);
     }
 
     updateSelection(direction) {
@@ -315,7 +347,7 @@ class Autocomplete {
     }
 
     handleFocus() {
-        const query = this.searchInput.value.trim();
+        const query = this.chipTextInput.value.trim();
         if (query.length >= 2) {
             this.performSearch(query);
         }
@@ -325,8 +357,7 @@ class Autocomplete {
         clearTimeout(this.debounceTimer);
         const query = e.target.value;
 
-        // Update filter chips and clear button immediately
-        this.updateFilterChips();
+        // Update clear button immediately
         this.updateClearButton();
 
         if (query.length < 2) {
@@ -353,29 +384,71 @@ class Autocomplete {
     }
 
     handleKeydown(e) {
-        if (!this.suggestions.classList.contains('active')) return;
+        const hasActiveSuggestions = this.suggestions.classList.contains('active');
 
-        if (e.key === 'ArrowDown') {
+        // Backspace: Delete last chip if input is empty
+        if (e.key === 'Backspace' && this.chipTextInput.value === '') {
             e.preventDefault();
-            this.updateSelection(1);
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            this.updateSelection(-1);
-        } else if (e.key === 'Enter') {
+            this.removeLastChip();
+            return;
+        }
+
+        // Enter: Create chip from current text OR select from autocomplete
+        if (e.key === 'Enter') {
+            if (hasActiveSuggestions && this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
+                e.preventDefault();
+                const suggestion = this.currentSuggestions[this.selectedIndex];
+                this.addChipFromAutocomplete(suggestion.tag, suggestion.category);
+            } else {
+                const currentText = this.chipTextInput.value.trim();
+                if (currentText) {
+                    e.preventDefault();
+                    this.addChipFromText(currentText);
+                    this.chipTextInput.value = '';
+                    this.suggestions.classList.remove('active');
+                }
+                // If empty and has chips, allow form submission
+            }
+            return;
+        }
+
+        // Space: Create chip from current text
+        if (e.key === ' ') {
+            const currentText = this.chipTextInput.value.trim();
+            if (currentText) {
+                e.preventDefault();
+                this.addChipFromText(currentText);
+                this.chipTextInput.value = '';
+                this.suggestions.classList.remove('active');
+            }
+            return;
+        }
+
+        // Tab: Select from autocomplete if available
+        if (e.key === 'Tab' && hasActiveSuggestions) {
             if (this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
                 e.preventDefault();
                 const suggestion = this.currentSuggestions[this.selectedIndex];
-                this.insertTag(suggestion.tag, suggestion.category);
+                this.addChipFromAutocomplete(suggestion.tag, suggestion.category);
             }
-        } else if (e.key === 'Escape') {
+            return;
+        }
+
+        // Arrow navigation
+        if (hasActiveSuggestions) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.updateSelection(1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.updateSelection(-1);
+            }
+        }
+
+        // Escape: Close suggestions
+        if (e.key === 'Escape') {
             this.suggestions.classList.remove('active');
-            this.searchInput.blur();
-        } else if (e.key === 'Tab') {
-            if (this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
-                e.preventDefault();
-                const suggestion = this.currentSuggestions[this.selectedIndex];
-                this.insertTag(suggestion.tag, suggestion.category);
-            }
+            this.chipTextInput.blur();
         }
     }
 
@@ -387,5 +460,5 @@ class Autocomplete {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new Autocomplete('searchInput', 'autocompleteSuggestions');
+    new Autocomplete('chipTextInput', 'autocompleteSuggestions');
 });

@@ -53,40 +53,180 @@
     position: relative;
 }
 
-/* Adjust input to account for clear button and chips */
-.search-bar input {
-    padding-right: 45px !important;
-    padding-bottom: 8px !important;
+/* Chip Input Wrapper - main container that looks like an input */
+.chip-input-wrapper {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
     width: 100%;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-xl);
+    transition: all var(--transition-smooth);
+    position: relative;
     min-height: 48px;
+    max-height: 48px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    cursor: text;
 }
 
-/* Clear button for search input */
-.search-clear {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(255, 255, 255, 0.1);
+/* Hide scrollbar but keep functionality */
+.chip-input-wrapper::-webkit-scrollbar {
+    height: 4px;
+}
+
+.chip-input-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.chip-input-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(135, 206, 235, 0.3);
+    border-radius: 2px;
+}
+
+.chip-input-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(135, 206, 235, 0.5);
+}
+
+.chip-input-wrapper:focus-within {
+    border-color: var(--border-color-focus);
+    background: rgba(30, 30, 40, 0.8);
+    box-shadow: 0 0 20px var(--primary-blue-20);
+    transform: translateY(-2px);
+}
+
+/* Container for chips */
+.chip-input-chips {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* Actual text input (borderless, grows to fill space) */
+#chipTextInput {
+    flex: 1 1 auto;
+    min-width: 120px;
     border: none;
-    color: #fff;
-    font-size: 20px;
-    width: 28px;
-    height: 28px;
-    border-radius: var(--radius-round);
+    background: transparent;
+    outline: none;
+    padding: 6px 4px;
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+#chipTextInput::placeholder {
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+/* Hide placeholder when chips are present */
+.chip-input-wrapper:has(.search-chip) #chipTextInput::placeholder {
+    opacity: 0;
+}
+
+/* Individual search chip inside input */
+.search-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: var(--radius-2xl);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
     cursor: pointer;
     transition: all var(--transition-normal);
-    line-height: 1;
-    padding: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: var(--z-dropdown);
+    flex-shrink: 0;
 }
 
-.search-clear:hover {
-    background: rgba(255, 100, 100, 0.3);
-    transform: translateY(-50%) scale(1.1);
+.search-chip:hover {
+    opacity: 0.7;
+    transform: scale(0.95);
+}
+
+/* Chip types - matching filter-chip styles */
+.search-chip.tag,
+.search-chip.general {
+    background: var(--tag-general-bg);
+    border: var(--border-width) solid var(--tag-general-border);
+    color: var(--tag-general);
+}
+
+.search-chip.character {
+    background: rgba(255, 182, 193, 0.25);
+    border: var(--border-width) solid rgba(255, 182, 193, 0.5);
+    color: #ffb6c1;
+}
+
+.search-chip.copyright {
+    background: var(--tag-meta-bg);
+    border: var(--border-width) solid var(--tag-meta-border);
+    color: var(--tag-meta);
+}
+
+.search-chip.artist {
+    background: rgba(147, 112, 219, 0.25);
+    border: var(--border-width) solid rgba(147, 112, 219, 0.5);
+    color: #9370db;
+}
+
+.search-chip.species {
+    background: var(--tag-character-bg);
+    border: var(--border-width) solid var(--tag-character-border);
+    color: var(--tag-character);
+}
+
+.search-chip.meta {
+    background: rgba(169, 169, 169, 0.25);
+    border: var(--border-width) solid rgba(169, 169, 169, 0.5);
+    color: #a9a9a9;
+}
+
+.search-chip.source {
+    background: rgba(100, 200, 100, 0.25);
+    border: var(--border-width) solid rgba(100, 200, 100, 0.5);
+    color: var(--success);
+}
+
+.search-chip.filename,
+.search-chip.extension {
+    background: rgba(255, 200, 100, 0.25);
+    border: var(--border-width) solid rgba(255, 200, 100, 0.5);
+    color: #ffd966;
+}
+
+.search-chip.pool {
+    background: rgba(200, 150, 255, 0.25);
+    border: var(--border-width) solid rgba(200, 150, 255, 0.5);
+    color: #c9a0ff;
+}
+
+.search-chip.filter {
+    background: rgba(100, 150, 255, 0.25);
+    border: var(--border-width) solid rgba(100, 150, 255, 0.5);
+    color: #6495ed;
+}
+
+.search-chip.negative {
+    background: rgba(255, 100, 100, 0.25);
+    border: var(--border-width) solid rgba(255, 100, 100, 0.5);
+    color: var(--danger);
+}
+
+.search-chip-icon {
+    font-size: 1em;
+    line-height: 1;
+}
+
+.search-chip-text {
+    line-height: 1;
 }
 
 /* Filter chips container - positioned inside search input */

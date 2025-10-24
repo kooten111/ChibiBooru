@@ -7,13 +7,15 @@
                 <form action="{{ url_for('main.home') }}" method="get" id="searchForm">
                     <div class="search-wrapper">
                         <div class="autocomplete-container">
-                            <input type="text" name="query" id="searchInput" placeholder="Search tags, filters, or freetext..." value="{{ query or '' }}" autocomplete="off">
-                            <button type="button" class="search-clear" id="searchClear" style="display: none;">&times;</button>
+                            <div class="chip-input-wrapper" id="chipInputWrapper">
+                                <div class="chip-input-chips" id="chipInputChips"></div>
+                                <input type="text" id="chipTextInput" placeholder="Search tags, filters, or freetext..." autocomplete="off">
+                            </div>
+                            <input type="hidden" name="query" id="searchInput" value="{{ query or '' }}">
                             <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
                         </div>
                         <button type="submit" class="search-submit">Search</button>
                     </div>
-                    <div class="filter-chips" id="filterChips"></div>
                 </form>
             </div>
             <button id="tabs-toggle-button" class="tabs-toggle-button">
