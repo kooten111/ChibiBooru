@@ -149,11 +149,15 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
 
     Uses exact token matching with FTS5's caret (^) prefix operator
     to ensure "holo" doesn't match "hololive".
+
+    For freetext terms, also uses filepath LIKE matching to catch
+    substring matches that FTS tokenization might miss (e.g., hashes).
     """
     from database import get_db_connection
 
     # Build FTS5 query
     fts_query_parts = []
+    freetext_filepath_terms = []  # Terms to search as substrings in filepath
 
     # Check which terms are exact tags vs freetext
     with get_db_connection() as conn:
@@ -169,17 +173,19 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
             ).fetchone()
 
             # Escape special FTS5 characters
-            clean_term = clean_term.replace('"', '""')
+            clean_term_escaped = clean_term.replace('"', '""')
 
             if result:
                 # Exact tag - use prefix match operator to ensure whole word
                 # In FTS5, ^term means "token starts with", but we want exact
                 # So we'll use quotes and rely on tokenization
-                fts_query_parts.append(f'^"{clean_term}"')
+                fts_query_parts.append(f'^"{clean_term_escaped}"')
             else:
                 # Freetext term - use wildcard for prefix matching
                 # This allows "fellini" to match "pulchra_fellini"
-                fts_query_parts.append(f'{clean_term}*')
+                fts_query_parts.append(f'{clean_term_escaped}*')
+                # Also track for filepath substring matching
+                freetext_filepath_terms.append(clean_term)
 
         # Add negative terms
         for term in negative_terms:
@@ -189,27 +195,54 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
     fts_query = ' '.join(fts_query_parts)
 
     with get_db_connection() as conn:
-        # Build the SQL query with filters
-        sql_parts = ["""
-            SELECT i.id, i.filepath,
-                   COALESCE(i.tags_character, '') || ' ' ||
-                   COALESCE(i.tags_copyright, '') || ' ' ||
-                   COALESCE(i.tags_artist, '') || ' ' ||
-                   COALESCE(i.tags_species, '') || ' ' ||
-                   COALESCE(i.tags_meta, '') || ' ' ||
-                   COALESCE(i.tags_general, '') as tags,
-                   fts.rank
-            FROM images_fts fts
-            INNER JOIN images i ON i.filepath = fts.filepath
-        """]
+        # For freetext terms, we'll use a simpler approach: LEFT JOIN with FTS
+        # and rely on post-filtering for comprehensive matching
+        if freetext_filepath_terms:
+            # Use LEFT JOIN so we can include results that only match filepath
+            sql_parts = ["""
+                SELECT i.id, i.filepath,
+                       COALESCE(i.tags_character, '') || ' ' ||
+                       COALESCE(i.tags_copyright, '') || ' ' ||
+                       COALESCE(i.tags_artist, '') || ' ' ||
+                       COALESCE(i.tags_species, '') || ' ' ||
+                       COALESCE(i.tags_meta, '') || ' ' ||
+                       COALESCE(i.tags_general, '') as tags,
+                       COALESCE(fts.rank, 0) as rank
+                FROM images i
+                LEFT JOIN images_fts fts ON i.filepath = fts.filepath
+            """]
+        else:
+            # Regular FTS search with INNER JOIN
+            sql_parts = ["""
+                SELECT i.id, i.filepath,
+                       COALESCE(i.tags_character, '') || ' ' ||
+                       COALESCE(i.tags_copyright, '') || ' ' ||
+                       COALESCE(i.tags_artist, '') || ' ' ||
+                       COALESCE(i.tags_species, '') || ' ' ||
+                       COALESCE(i.tags_meta, '') || ' ' ||
+                       COALESCE(i.tags_general, '') as tags,
+                       fts.rank
+                FROM images_fts fts
+                INNER JOIN images i ON i.filepath = fts.filepath
+            """]
 
         where_clauses = []
         params = []
 
-        # FTS query
-        if fts_query:
+        # Add FTS match condition (only for non-freetext or as one option)
+        if fts_query and not freetext_filepath_terms:
             where_clauses.append("images_fts MATCH ?")
             params.append(fts_query)
+        elif fts_query and freetext_filepath_terms:
+            # Build OR condition: FTS match OR filepath substring
+            fts_or_conditions = ["fts.filepath IN (SELECT filepath FROM images_fts WHERE images_fts MATCH ?)"]
+            params.append(fts_query)
+
+            for term in freetext_filepath_terms:
+                fts_or_conditions.append("LOWER(i.filepath) LIKE ?")
+                params.append(f"%{term}%")
+
+            where_clauses.append(f"({' OR '.join(fts_or_conditions)})")
 
         # Pool filter
         if pool_filter:
@@ -293,9 +326,10 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
                         match = False
                         break
 
-                # Check freetext terms (can match in tags or filepath)
+                # Check freetext terms (can match as substring in tags or filepath)
                 if match:
                     for term in freetext_terms:
+                        # Check for substring match in tags OR filepath
                         if term not in tags_str and term not in filepath_lower:
                             match = False
                             break
