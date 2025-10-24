@@ -8,64 +8,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
-    <style>
-        .raw-data-page .container {
-            max-width: 1400px;
-        }
-
-        .raw-data-header {
-            background: var(--gradient-panel);
-            backdrop-filter: var(--blur-md);
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-2xl);
-            border: var(--border-width) solid var(--border-color);
-            box-shadow: var(--shadow-lg);
-            margin-bottom: var(--spacing-lg);
-            transition: all var(--transition-smooth);
-        }
-
-        .raw-data-header:hover {
-            border-color: var(--border-color-hover);
-        }
-
-        .raw-data-header h2 {
-            margin: 0 0 var(--spacing-md) 0;
-            font-size: var(--font-size-2xl);
-            color: var(--primary-blue);
-            font-weight: var(--font-weight-bold);
-            letter-spacing: 0.5px;
-        }
-
-        .raw-data-container {
-            background: var(--gradient-panel);
-            backdrop-filter: var(--blur-md);
-            border: var(--border-width) solid var(--border-color);
-            border-radius: var(--radius-2xl);
-            padding: var(--spacing-xl);
-            box-shadow: var(--shadow-lg);
-            transition: all var(--transition-smooth);
-        }
-
-        .raw-data-container:hover {
-            border-color: var(--border-color-hover);
-        }
-
-        .raw-data-container pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            color: var(--text-primary);
-            font-size: var(--font-size-sm);
-            font-family: 'Courier New', 'Monaco', monospace;
-            line-height: 1.6;
-            margin: 0;
-            background: var(--bg-input);
-            padding: var(--spacing-lg);
-            border-radius: var(--radius-lg);
-            border: var(--border-width) solid var(--border-color);
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/raw-data.css') }}">
 </head>
-<body class="raw-data-page">
+<body>
     {% include 'header.html' %}
 
     <div class="container">
@@ -76,7 +21,7 @@
             </a>
         </div>
 
-        <div class="raw-data-container panel">
+        <div class="raw-data-container">
             <pre>{{ raw_data | tojson(indent=2) }}</pre>
         </div>
     </div>
