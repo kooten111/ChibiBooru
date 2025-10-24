@@ -325,6 +325,14 @@ def autocomplete():
     tag_counts = models.get_tag_counts()
     last_token = query.split()[-1].lower()
 
+    # Strip the '-' prefix for negative searches so autocomplete works
+    is_negative_search = last_token.startswith('-')
+    search_token = last_token[1:] if is_negative_search else last_token
+
+    # Need at least 2 characters for the actual search term
+    if len(search_token) < 2:
+        return jsonify({"groups": []})
+
     # Initialize groups
     groups = {
         "Filters": [],
@@ -332,37 +340,38 @@ def autocomplete():
         "Files": []
     }
 
-    # File extension search
-    if last_token.startswith('.'):
-        ext = last_token[1:]
+    # File extension search (only if not a negative search)
+    if not is_negative_search and search_token.startswith('.'):
+        ext = search_token[1:]
         if ext in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']:
             groups["Filters"].append({
-                "tag": last_token,
-                "display": f"All {last_token} files",
+                "tag": search_token,
+                "display": f"All {search_token} files",
                 "count": None,
                 "type": "extension"
             })
 
-    # Special filter suggestions
-    filters = [
-        ("source:danbooru", "Danbooru images", "danbooru"),
-        ("source:e621", "E621 images", "e621"),
-        ("source:gelbooru", "Gelbooru images", "gelbooru"),
-        ("source:yandere", "Yandere images", "yandere"),
-        ("source:local_tagger", "Locally tagged images", "local"),
-        ("has:parent", "Images with parent", "parent"),
-        ("has:child", "Images with children", "child"),
-        ("pool:", "Search pools", "pool")
-    ]
+    # Special filter suggestions (only if not a negative search)
+    if not is_negative_search:
+        filters = [
+            ("source:danbooru", "Danbooru images", "danbooru"),
+            ("source:e621", "E621 images", "e621"),
+            ("source:gelbooru", "Gelbooru images", "gelbooru"),
+            ("source:yandere", "Yandere images", "yandere"),
+            ("source:local_tagger", "Locally tagged images", "local"),
+            ("has:parent", "Images with parent", "parent"),
+            ("has:child", "Images with children", "child"),
+            ("pool:", "Search pools", "pool")
+        ]
 
-    for tag, display, keyword in filters:
-        if keyword in last_token or last_token in keyword:
-            groups["Filters"].append({
-                "tag": tag,
-                "display": display,
-                "count": None,
-                "type": "filter"
-            })
+        for tag, display, keyword in filters:
+            if keyword in search_token or search_token in keyword:
+                groups["Filters"].append({
+                    "tag": tag,
+                    "display": display,
+                    "count": None,
+                    "type": "filter"
+                })
 
     # Get tag categories from database
     with get_db_connection() as conn:
@@ -374,7 +383,7 @@ def autocomplete():
             GROUP BY t.name, t.category
             ORDER BY count DESC
             LIMIT 20
-        """, (f"%{last_token}%",))
+        """, (f"%{search_token}%",))
         tag_results = cursor.fetchall()
 
     # Group tags by category
@@ -388,13 +397,23 @@ def autocomplete():
             tag_categories[category] = []
 
         tag_lower = tag_name.lower()
-        is_prefix = tag_lower.startswith(last_token)
+        is_prefix = tag_lower.startswith(search_token)
+
+        # If this was a negative search, prepend '-' to the tag and don't use category
+        if is_negative_search:
+            final_tag = f"-{tag_name}"
+            final_display = f"-{tag_name}"
+            final_category = None  # Don't use category prefix for negative tags
+        else:
+            final_tag = tag_name
+            final_display = tag_name
+            final_category = category
 
         tag_categories[category].append({
-            "tag": tag_name,
-            "display": tag_name,
+            "tag": final_tag,
+            "display": final_display,
             "count": count,
-            "category": category,
+            "category": final_category,
             "type": "tag",
             "is_prefix": is_prefix
         })
