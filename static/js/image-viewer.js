@@ -46,39 +46,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Double-click to zoom in at cursor position
-    img.addEventListener('dblclick', function(event) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        if (scale < MAX_SCALE) {
-            const rect = img.getBoundingClientRect();
-
-            // Calculate point on image where mouse is (in screen coordinates)
-            const pointX = event.clientX;
-            const pointY = event.clientY;
-
-            // Calculate the center of the image in screen coordinates
-            const imgCenterX = rect.left + rect.width / 2;
-            const imgCenterY = rect.top + rect.height / 2;
-
-            const newScale = Math.min(scale * 2, MAX_SCALE);
-            const scaleChange = newScale / scale;
-
-            // New translation to keep point under cursor
-            translateX = pointX - imgCenterX - (pointX - imgCenterX - translateX) * scaleChange;
-            translateY = pointY - imgCenterY - (pointY - imgCenterY - translateY) * scaleChange;
-
-            scale = newScale;
-        } else {
-            // Reset if already at max zoom
-            resetZoom();
-        }
-
-        updateTransform();
-        updateCursor();
-    });
-
     // Mouse wheel to zoom (only in fullscreen mode)
     imageView.addEventListener('wheel', function(event) {
         if (!body.classList.contains('ui-hidden')) return;
