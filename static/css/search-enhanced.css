@@ -50,11 +50,15 @@
 .search-wrapper .autocomplete-container {
     flex: 1;
     min-width: 0;
+    position: relative;
 }
 
-/* Adjust input to account for clear button */
-.search-bar input:has(~ .filter-chips.active) {
-    padding-top: 40px !important;
+/* Adjust input to account for clear button and chips */
+.search-bar input {
+    padding-right: 45px !important;
+    padding-bottom: 8px !important;
+    width: 100%;
+    min-height: 48px;
 }
 
 /* Clear button for search input */
@@ -85,30 +89,39 @@
     transform: translateY(-50%) scale(1.1);
 }
 
-/* Filter chips container - positioned below search bar */
+/* Filter chips container - positioned inside search input */
 .filter-chips {
     display: none;
     flex-wrap: wrap;
-    gap: 4px;
-    padding: 4px 45px 4px 8px;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    margin: 0;
     position: absolute;
-    top: 6px;
-    left: 6px;
+    bottom: 4px;
+    left: 4px;
     right: 50px;
-    pointer-events: none;
-    z-index: 2;
-}
-
-.filter-chips.active {
-    display: flex;
+    background: rgba(20, 20, 30, 0.8);
+    backdrop-filter: var(--blur-md);
+    border-radius: var(--radius-md);
+    z-index: 5;
+    max-height: 80px;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* Individual filter chip */
 .filter-chip {
-    pointer-events: auto;
-    padding: 2px 8px;
-    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px var(--spacing-md);
+    border-radius: var(--radius-2xl);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+    transition: background-color var(--transition-normal),
+                border-color var(--transition-normal);
 }
+
 /* Chip types */
 .filter-chip.tag {
     background: var(--tag-general-bg);
