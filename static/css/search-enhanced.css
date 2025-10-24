@@ -92,13 +92,6 @@
     background: rgba(135, 206, 235, 0.5);
 }
 
-.chip-input-wrapper:focus-within {
-    border-color: var(--border-color-focus);
-    background: rgba(30, 30, 40, 0.8);
-    box-shadow: 0 0 20px var(--primary-blue-20);
-    transform: translateY(-2px);
-}
-
 /* Container for chips */
 .chip-input-chips {
     display: flex;
@@ -115,10 +108,17 @@
     border: none;
     background: transparent;
     outline: none;
+    box-shadow: none;
     padding: 6px 4px;
     font-size: var(--font-size-base);
     color: var(--text-primary);
     font-family: inherit;
+}
+
+#chipTextInput:focus {
+    outline: none;
+    box-shadow: none;
+    border: none;
 }
 
 #chipTextInput::placeholder {
