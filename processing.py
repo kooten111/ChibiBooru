@@ -28,6 +28,8 @@ except ImportError:
 
 # Load from config
 SAUCENAO_API_KEY = config.SAUCENAO_API_KEY
+GELBOORU_API_KEY = config.GELBOORU_API_KEY
+GELBOORU_USER_ID = config.GELBOORU_USER_ID
 THUMB_DIR = config.THUMB_DIR
 THUMB_SIZE = config.THUMB_SIZE
 
