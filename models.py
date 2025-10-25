@@ -1120,23 +1120,32 @@ def record_tag_delta(image_md5, tag_name, tag_category, operation):
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # If we're adding a tag, remove any previous 'remove' delta
-            # If we're removing a tag, remove any previous 'add' delta
+            # Check if there's an opposite operation that would cancel this out
             opposite_op = 'remove' if operation == 'add' else 'add'
             cursor.execute("""
-                DELETE FROM tag_deltas
+                SELECT COUNT(*) as count FROM tag_deltas
                 WHERE image_md5 = ? AND tag_name = ? AND operation = ?
             """, (image_md5, tag_name, opposite_op))
 
-            # Insert or update the delta
-            cursor.execute("""
-                INSERT OR REPLACE INTO tag_deltas
-                (image_md5, tag_name, tag_category, operation, timestamp)
-                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            """, (image_md5, tag_name, tag_category, operation))
+            has_opposite = cursor.fetchone()['count'] > 0
+
+            if has_opposite:
+                # Cancel out: remove the opposite operation and don't insert this one
+                cursor.execute("""
+                    DELETE FROM tag_deltas
+                    WHERE image_md5 = ? AND tag_name = ? AND operation = ?
+                """, (image_md5, tag_name, opposite_op))
+                print(f"Cancelled out: {operation} tag '{tag_name}' with existing {opposite_op}")
+            else:
+                # No opposite to cancel, insert or update the delta
+                cursor.execute("""
+                    INSERT OR REPLACE INTO tag_deltas
+                    (image_md5, tag_name, tag_category, operation, timestamp)
+                    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                """, (image_md5, tag_name, tag_category, operation))
+                print(f"Recorded delta: {operation} tag '{tag_name}' for MD5 {image_md5}")
 
             conn.commit()
-            print(f"Recorded delta: {operation} tag '{tag_name}' for MD5 {image_md5}")
             return True
 
     except Exception as e:
@@ -1346,15 +1355,37 @@ def get_image_deltas(filepath):
 
             deltas = cursor.fetchall()
 
+            # Track net changes: process all deltas in order
+            # and calculate what the final state is
+            tag_states = {}  # tag_name -> (operation, category)
+
+            for delta in deltas:
+                tag_name = delta['tag_name']
+                tag_category = delta['tag_category']
+                operation = delta['operation']
+
+                if operation == 'add':
+                    # Adding a tag
+                    tag_states[tag_name] = ('add', tag_category)
+                elif operation == 'remove':
+                    # Removing a tag
+                    if tag_name in tag_states and tag_states[tag_name][0] == 'add':
+                        # If we previously added this tag, cancel it out
+                        del tag_states[tag_name]
+                    else:
+                        # Otherwise mark it as removed
+                        tag_states[tag_name] = ('remove', tag_category)
+
+            # Convert net changes to lists
             added = []
             removed = []
 
-            for delta in deltas:
+            for tag_name, (operation, tag_category) in tag_states.items():
                 tag_info = {
-                    'name': delta['tag_name'],
-                    'category': delta['tag_category']
+                    'name': tag_name,
+                    'category': tag_category
                 }
-                if delta['operation'] == 'add':
+                if operation == 'add':
                     added.append(tag_info)
                 else:
                     removed.append(tag_info)

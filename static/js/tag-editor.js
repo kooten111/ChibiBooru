@@ -67,9 +67,16 @@ class TagEditor {
             if (categoryDiv) {
                 const tagItems = categoryDiv.querySelectorAll('.tag-item a');
                 tagItems.forEach(link => {
+                    // Skip delta items (manual modifications)
+                    if (link.closest('.delta-added') || link.closest('.delta-removed')) {
+                        return;
+                    }
+
                     const tag = link.textContent.trim();
-                    if (tag && !this.tags[category].includes(tag)) {
-                        this.tags[category].push(tag);
+                    // Remove any leading + or - that might be from delta display
+                    const cleanTag = tag.replace(/^[+-]+/, '');
+                    if (cleanTag && !this.tags[category].includes(cleanTag)) {
+                        this.tags[category].push(cleanTag);
                     }
                 });
             }
