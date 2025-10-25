@@ -108,17 +108,25 @@ class TagEditor {
             </div>
             <div class="editable-tags-list" id="editableTagsList"></div>
             <div class="add-tag-section">
-                <input type="text" 
-                       id="addTagInput" 
-                       class="add-tag-input" 
+                <input type="text"
+                       id="addTagInput"
+                       class="add-tag-input"
                        placeholder="Type to add a ${this.selectedCategory} tag..."
                        autocomplete="off">
-                <div class="tag-suggestions" id="tagSuggestions"></div>
             </div>
         `;
         
         tagsList.after(editContainer);
-        
+
+        // Create suggestions dropdown as a fixed element
+        let suggestionsEl = document.getElementById('tagSuggestions');
+        if (!suggestionsEl) {
+            suggestionsEl = document.createElement('div');
+            suggestionsEl.id = 'tagSuggestions';
+            suggestionsEl.className = 'tag-suggestions';
+            document.body.appendChild(suggestionsEl);
+        }
+
         // Attach category button handlers
         editContainer.querySelectorAll('.category-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -126,10 +134,10 @@ class TagEditor {
                 this.selectCategory(category);
             });
         });
-        
+
         this.renderTags();
         this.attachEditEvents();
-        
+
         console.log('Edit mode rendered');
     }
 
@@ -206,33 +214,47 @@ class TagEditor {
 
     renderViewMode() {
         console.log('Rendering view mode');
-        
+
         const editContainer = document.getElementById('inlineTagEditor');
         if (editContainer) {
             editContainer.remove();
         }
-        
+
         const tagsList = document.querySelector('.tags-list');
         if (tagsList) {
             tagsList.style.display = 'block';
         }
-        
+
         // Reset button
         const editBtn = document.querySelector('.actions-bar .btn-primary');
         if (editBtn) {
             editBtn.textContent = '📝 Edit Tags';
             editBtn.classList.remove('editing-mode');
         }
-        
+
         const cancelBtn = document.getElementById('cancelEditBtn');
         if (cancelBtn) {
             cancelBtn.remove();
         }
-        
+
         this.isEditing = false;
-        
+
+        // Clean up suggestions dropdown
         if (this.suggestions) {
             this.suggestions.classList.remove('active');
+            this.suggestions.remove();
+            this.suggestions = null;
+        }
+
+        // Remove event handlers
+        if (this.clickOutsideHandler) {
+            document.removeEventListener('click', this.clickOutsideHandler);
+        }
+        if (this.scrollHandler) {
+            document.removeEventListener('scroll', this.scrollHandler, true);
+        }
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
         }
     }
 
@@ -242,23 +264,51 @@ class TagEditor {
             console.error('addTagInput not found');
             return;
         }
-        
+
         this.suggestions = document.getElementById('tagSuggestions');
-        
+
         input.addEventListener('input', (e) => this.handleInput(e));
         input.addEventListener('keydown', (e) => this.handleKeydown(e));
-        
+
         // Click outside to close suggestions
         const closeHandler = (e) => {
-            if (!e.target.closest('.add-tag-section')) {
+            if (!e.target.closest('.add-tag-section') && !e.target.closest('#tagSuggestions')) {
                 this.suggestions?.classList.remove('active');
             }
         };
-        
+
         // Remove old handler if exists
         document.removeEventListener('click', this.clickOutsideHandler);
         this.clickOutsideHandler = closeHandler;
         document.addEventListener('click', closeHandler);
+
+        // Reposition on scroll/resize
+        const repositionHandler = () => {
+            if (this.suggestions?.classList.contains('active')) {
+                this.repositionSuggestions();
+            }
+        };
+
+        // Remove old handlers if exist
+        document.removeEventListener('scroll', this.scrollHandler, true);
+        window.removeEventListener('resize', this.resizeHandler);
+
+        this.scrollHandler = repositionHandler;
+        this.resizeHandler = repositionHandler;
+
+        document.addEventListener('scroll', repositionHandler, true);
+        window.addEventListener('resize', repositionHandler);
+    }
+
+    repositionSuggestions() {
+        const input = document.getElementById('addTagInput');
+        if (input && this.suggestions) {
+            const rect = input.getBoundingClientRect();
+            this.suggestions.style.top = `${rect.bottom + 8}px`;
+            this.suggestions.style.left = `${rect.left}px`;
+            this.suggestions.style.width = `${rect.width}px`;
+            this.suggestions.style.minWidth = '300px';
+        }
     }
 
     handleInput(e) {
@@ -293,9 +343,10 @@ class TagEditor {
     fetchSuggestions(query) {
         fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`)
             .then(res => res.json())
-            .then(results => {
-                if (results.length > 0) {
-                    this.displaySuggestions(results);
+            .then(data => {
+                // Handle new grouped format
+                if (data.groups && data.groups.length > 0) {
+                    this.displaySuggestions(data);
                 } else {
                     this.suggestions?.classList.remove('active');
                 }
@@ -303,24 +354,65 @@ class TagEditor {
             .catch(err => console.error('Autocomplete error:', err));
     }
 
-    displaySuggestions(results) {
+    displaySuggestions(data) {
         if (!this.suggestions) return;
-        
-        this.suggestions.innerHTML = results.map(item => `
-            <div class="autocomplete-item" data-tag="${this.escapeHtml(item.tag)}">
-                <span class="autocomplete-tag">${this.escapeHtml(item.tag)}</span>
-                <span class="autocomplete-count">${this.formatCount(item.count)}</span>
-            </div>
-        `).join('');
-        
+
+        // Handle grouped autocomplete response
+        let html = '';
+
+        if (data.groups) {
+            // New grouped format
+            data.groups.forEach(group => {
+                if (group.items.length === 0) return;
+
+                // Only show tags group in tag editor (skip filters)
+                if (group.name === 'Tags') {
+                    group.items.forEach(item => {
+                        const displayText = item.display || item.tag;
+                        const countText = item.count ? this.formatCount(item.count) : '';
+                        const icon = this.getCategoryIcon(item.category || 'general');
+
+                        html += `
+                            <div class="autocomplete-item" data-tag="${this.escapeHtml(item.tag)}" data-category="${this.escapeHtml(item.category || '')}">
+                                <div class="autocomplete-left">
+                                    <span class="autocomplete-icon">${icon}</span>
+                                    <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
+                                </div>
+                                ${countText ? `<span class="autocomplete-count">${countText}</span>` : ''}
+                            </div>
+                        `;
+                    });
+                }
+            });
+        }
+
+        if (!html) {
+            this.suggestions?.classList.remove('active');
+            return;
+        }
+
+        this.suggestions.innerHTML = html;
+
+        // Position the fixed dropdown below the input
+        const input = document.getElementById('addTagInput');
+        if (input) {
+            const rect = input.getBoundingClientRect();
+            this.suggestions.style.top = `${rect.bottom + 8}px`;
+            this.suggestions.style.left = `${rect.left}px`;
+            this.suggestions.style.width = `${rect.width}px`;
+        }
+
         // Attach click handlers
         this.suggestions.querySelectorAll('.autocomplete-item').forEach(item => {
             item.addEventListener('click', () => {
                 const tag = item.getAttribute('data-tag');
-                this.addTag(tag, this.selectedCategory);
+                const category = item.getAttribute('data-category');
+                // Use the suggested category if available, otherwise use selected category
+                const targetCategory = category && category !== '' ? category : this.selectedCategory;
+                this.addTag(tag, targetCategory);
             });
         });
-        
+
         this.suggestions.classList.add('active');
     }
 

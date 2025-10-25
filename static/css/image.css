@@ -65,6 +65,7 @@ body.image-page {
     height: 100%;
     overflow: hidden;
     gap: var(--spacing-lg);
+    position: relative;
 }
 
 .tags-list {

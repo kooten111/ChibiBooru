@@ -49,7 +49,7 @@
     padding: var(--spacing-lg);
     margin-bottom: var(--spacing-lg);
     position: relative;
-    z-index: var(--z-base) + 1;
+    z-index: calc(var(--z-overlay) + 5);
 }
 
 .inline-tag-editor h3 {
@@ -224,7 +224,7 @@
 .add-tag-section {
     position: relative;
     margin-top: 15px;
-    z-index: 5;
+    z-index: var(--z-overlay);
 }
 
 .add-tag-input {
@@ -245,17 +245,14 @@
 }
 
 .tag-suggestions {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    right: 0;
+    position: fixed;
     background: rgba(20, 20, 30, 0.98);
     backdrop-filter: var(--blur-md);
     border: var(--border-width) solid var(--border-color-hover);
     border-radius: var(--radius-md);
     max-height: 250px;
     overflow-y: auto;
-    z-index: var(--z-overlay);
+    z-index: calc(var(--z-overlay) + 10);
     display: none;
     box-shadow: var(--shadow-xl);
 }
