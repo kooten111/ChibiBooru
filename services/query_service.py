@@ -3,6 +3,7 @@ import config
 from utils import get_thumbnail_path
 from math import log
 from functools import lru_cache
+from events.cache_events import register_cache_invalidation_callback
 
 # Global cache for tag categories - populated once on first use
 _tag_category_cache = None
@@ -34,6 +35,10 @@ def invalidate_similarity_cache():
     _tag_category_cache = None
     _similarity_context_cache = None
     _get_tag_weight.cache_clear()
+
+# Register this module's invalidation function with the cache events system
+# This breaks the circular dependency: models.py doesn't need to import query_service.py
+register_cache_invalidation_callback(invalidate_similarity_cache)
 
 @lru_cache(maxsize=10000)
 def _get_tag_weight(tag):

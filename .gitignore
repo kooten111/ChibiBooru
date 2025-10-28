@@ -10,6 +10,12 @@ static/logo/
 venv/
 .vscode/
 
+# Testing and documentation
+tests/
+docs/
+pytest.ini
+requirements-dev.txt
+
 # Specific files to ignore
 booru.db
 tags.json

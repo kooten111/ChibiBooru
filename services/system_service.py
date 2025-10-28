@@ -2,7 +2,7 @@
 import os
 from flask import request, jsonify
 import models
-import generate_thumbnails
+import scripts.generate_thumbnails as generate_thumbnails
 import processing
 from utils.deduplication import scan_and_remove_duplicates
 from . import monitor_service
