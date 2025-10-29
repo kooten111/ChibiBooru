@@ -5,7 +5,7 @@
     <title>{{ filepath.split('/')[-1] }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=7' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=9' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 
     {% if related_images %}
@@ -26,14 +26,14 @@
 
     <div class="container">
         <div class="sidebar-left" id="sidebarLeft">
-            <button class="section-header mobile-toggle" data-section="tags-content">
-                <span class="section-icon">🏷️</span>
-                <span class="section-title">Tags</span>
-                <span class="section-arrow">▼</span>
-            </button>
-
             <div class="section-content" id="tags-content">
                 <div class="tags-list panel">
+                    <button class="panel-header mobile-toggle" data-section="tags-panel-content">
+                        <span class="section-icon">🏷️</span>
+                        <span class="section-title">Tags</span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <div class="panel-collapsible-content" id="tags-panel-content">
                     {% if categorized_tags %}
                         {% if categorized_tags.artist %}
                         <div class="tag-category artist">
@@ -149,34 +149,36 @@
                         </div>
                         {% endfor %}
                     {% endif %}
-                </div>
-            </div>
-
-            <button class="section-header mobile-toggle" data-section="pools-content">
-                <span class="section-icon">📁</span>
-                <span class="section-title">Pools</span>
-                <span class="section-arrow">▼</span>
-            </button>
-
-            <div class="section-content" id="pools-content">
-                <div class="pool-management panel">
-                    <h3>Pools</h3>
-                    <div id="poolsList" class="pools-list-container">
-                        <div class="loading-spinner">Loading pools...</div>
                     </div>
                 </div>
             </div>
 
-            <button class="section-header mobile-toggle" data-section="metadata-content">
-                <span class="section-icon">ℹ️</span>
-                <span class="section-title">Information</span>
-                <span class="section-arrow">▼</span>
-            </button>
+            <div class="section-content" id="pools-content">
+                <div class="pool-management panel">
+                    <button class="panel-header mobile-toggle" data-section="pools-panel-content">
+                        <span class="section-icon">📁</span>
+                        <span class="section-title">Pools</span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <h3 class="desktop-only">Pools</h3>
+                    <div class="panel-collapsible-content" id="pools-panel-content">
+                        <div id="poolsList" class="pools-list-container">
+                            <div class="loading-spinner">Loading pools...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             {% if metadata %}
             <div class="section-content" id="metadata-content">
                 <div class="metadata-info panel">
-                    <h3>Information</h3>
+                    <button class="panel-header mobile-toggle" data-section="metadata-panel-content">
+                        <span class="section-icon">ℹ️</span>
+                        <span class="section-title">Information</span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <h3 class="desktop-only">Information</h3>
+                    <div class="panel-collapsible-content" id="metadata-panel-content">
                     <div class="metadata-item border-bottom-none pb-0">
                         <button onclick="showSauceNaoFetcher()" class="btn-saucenao">
                             <span class="icon">🔍</span>
@@ -321,6 +323,7 @@
                         </div>
                         {% endif %}
                     {% endif %}
+                    </div>
                 </div>
             </div>
             {% endif %}
@@ -374,33 +377,39 @@
         </div>
         
         <div class="sidebar-right" id="sidebarRight">
-            <button class="section-header mobile-toggle" data-section="sidebar-right-content">
-                <span class="section-icon">🔗</span>
-                <span class="section-title">Related Images</span>
-                <span class="section-arrow">▼</span>
-            </button>
-            
             <div class="section-content" id="sidebar-right-content">
                 {% if related_images %}
                 <div class="related-images-vertical panel">
-                    <h3>
+                    <button class="panel-header mobile-toggle" data-section="related-images-content">
+                        <span class="section-icon">🔗</span>
+                        <span class="section-title">
+                            Related
+                            <span class="text-muted-tiny">
+                                ({{ related_images|length }} images)
+                            </span>
+                        </span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <h3 class="desktop-only">
                         <span>🔗</span>
                         Related
                         <span class="text-muted-tiny">
                             ({{ related_images|length }} images)
                         </span>
                     </h3>
-                    <div class="related-grid-vertical">
-                        {% for related in related_images %}
-                        <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
-                            <img src="{{ url_for('static', filename=related.thumb) }}" alt="Related">
-                            <span class="label {{ related.match_type }}">
-                                {% if related.match_type == 'parent' %}Parent
-                                {% elif related.match_type == 'child' %}Child
-                                {% else %}Similar{% endif %}
-                            </span>
-                        </a>
-                        {% endfor %}
+                    <div class="panel-collapsible-content" id="related-images-content">
+                        <div class="related-grid-vertical">
+                            {% for related in related_images %}
+                            <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
+                                <img src="{{ url_for('static', filename=related.thumb) }}" alt="Related">
+                                <span class="label {{ related.match_type }}">
+                                    {% if related.match_type == 'parent' %}Parent
+                                    {% elif related.match_type == 'child' %}Child
+                                    {% else %}Similar{% endif %}
+                                </span>
+                            </a>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
                 {% endif %}
@@ -490,7 +499,7 @@
 <script src="{{ url_for('static', filename='js/header.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/system-panel.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/source-selector.js', v='1.3') }}"></script>
-<script src="{{ url_for('static', filename='js/image-page.js', v='1.7') }}"></script>
+<script src="{{ url_for('static', filename='js/image-page.js', v='1.8') }}"></script>
 <script src="{{ url_for('static', filename='js/carousel.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/pool-manager.js') }}"></script>
 <script src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>

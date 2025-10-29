@@ -1783,6 +1783,43 @@ body.ui-hidden::after {
     display: block;
 }
 
+.desktop-only {
+    display: block;
+}
+
+/* Panel Header for integrated collapse functionality */
+.panel-header {
+    width: 100%;
+    display: none; /* Hidden on desktop, shown on mobile */
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: 15px var(--spacing-lg);
+    background: var(--blue-accent);
+    border: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background var(--transition-smooth);
+    margin: 0;
+    text-align: left;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+}
+
+.panel-header:hover {
+    background: var(--blue-accent-light);
+}
+
+.panel-header .section-arrow {
+    margin-left: auto;
+    font-size: var(--font-size-sm);
+    transition: transform var(--transition-smooth);
+}
+
+.panel-header.collapsed .section-arrow {
+    transform: rotate(-90deg);
+}
+
 /* Section content - transparent wrapper on desktop, functional on mobile */
 .section-content {
     display: contents; /* Makes the wrapper transparent on desktop */
@@ -1798,39 +1835,51 @@ body.ui-hidden::after {
         display: none;
     }
 
-    /* Collapsible section styles - only on mobile */
-    .section-content {
-        display: block; /* Override display: contents on mobile */
+    .desktop-only {
+        display: none;
+    }
+
+    /* Show panel headers on mobile */
+    .panel-header {
+        display: flex;
+    }
+
+    /* Panel with integrated header - adjust styles */
+    .panel:has(.panel-header) {
+        padding: 0;
+        margin-bottom: var(--spacing-md);
+    }
+
+    .panel:has(.panel-header) .panel-collapsible-content {
+        padding: var(--spacing-lg);
         max-height: 2000px;
-        min-height: 200px; /* Minimum height when expanded */
         overflow-y: auto;
         transition: max-height var(--transition-smooth), padding var(--transition-smooth), opacity var(--transition-smooth);
         opacity: 1;
     }
 
-    .section-content.collapsed {
+    .panel:has(.panel-header.collapsed) .panel-collapsible-content {
         max-height: 0 !important;
-        min-height: 0 !important;
         padding: 0 !important;
         overflow: hidden;
         opacity: 0;
     }
 
-    /* Specific minimum heights for different sections when expanded */
-    #tags-content:not(.collapsed) {
-        min-height: 300px; /* Tags need more space */
+    /* Collapsible section styles - only on mobile */
+    .section-content {
+        display: block; /* Override display: contents on mobile */
+        max-height: none; /* Remove max-height constraint */
+        min-height: 0; /* Remove minimum height */
+        overflow: visible; /* Allow content to be visible */
+        transition: none; /* No transition on wrapper */
     }
 
-    #pools-content:not(.collapsed) {
-        min-height: 150px; /* Pools */
-    }
-
-    #metadata-content:not(.collapsed) {
-        min-height: 200px; /* Metadata info */
-    }
-
-    #sidebar-right-content:not(.collapsed) {
-        min-height: 200px; /* Related images */
+    .section-content.collapsed {
+        max-height: none !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        overflow: visible;
+        opacity: 1; /* Keep wrapper visible */
     }
 
     /* Ensure sidebars are visible on mobile */

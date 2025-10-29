@@ -49,6 +49,7 @@ function confirmDelete() {
 /**
  * Initialize collapsible sections for mobile-friendly UI
  * Handles the collapse/expand behavior of sidebar sections on mobile
+ * Supports both standalone section headers and integrated panel headers
  */
 function initCollapsibleSections() {
     const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
@@ -62,12 +63,18 @@ function initCollapsibleSections() {
 
         if (!content) return;
 
+        // Check if this is a panel header (integrated) or section header (standalone)
+        const isPanelHeader = header.classList.contains('panel-header');
+
         // Restore saved state or default to expanded on first visit
         const isCollapsed = savedStates[sectionId] !== undefined ? savedStates[sectionId] : false;
 
         if (isCollapsed) {
             header.classList.add('collapsed');
-            content.classList.add('collapsed');
+            if (!isPanelHeader) {
+                // For standalone section headers, collapse the content wrapper
+                content.classList.add('collapsed');
+            }
         }
 
         // Add click handler
@@ -75,9 +82,13 @@ function initCollapsibleSections() {
             e.preventDefault();
             const isCurrentlyCollapsed = header.classList.contains('collapsed');
 
-            // Toggle collapsed state
+            // Toggle collapsed state on header
             header.classList.toggle('collapsed');
-            content.classList.toggle('collapsed');
+
+            // For standalone section headers, also toggle content wrapper
+            if (!isPanelHeader) {
+                content.classList.toggle('collapsed');
+            }
 
             // Save state to localStorage
             savedStates[sectionId] = !isCurrentlyCollapsed;
