@@ -200,14 +200,14 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     padding: var(--spacing-lg);
     border-radius: var(--radius-xl);
     text-align: center;
-    border: var(--border-width) solid var(--primary-blue-10);
+    border: var(--border-width) solid var(--primary-blue-light);
     transition: all var(--transition-smooth);
 }
 
 .stat-card:hover {
     background: rgba(40, 40, 60, 0.7);
     transform: translateY(-3px);
-    box-shadow: 0 8px 24px var(--primary-blue-20);
+    box-shadow: 0 8px 24px var(--primary-blue-light);
 }
 
 .stat-card-number {
@@ -249,7 +249,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     display: inline-flex;
     align-items: center;
     gap: var(--spacing-sm);
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     border: var(--border-width) solid var(--border-color-hover);
     padding: 10px 18px;
     border-radius: 20px;
@@ -258,9 +258,9 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
 }
 
 .source-badge:hover {
-    background: var(--primary-blue-25);
+    background: var(--primary-blue-medium);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px var(--blue-accent-30);
+    box-shadow: 0 4px 12px var(--blue-accent-medium);
 }
 
 .source-name {
@@ -287,7 +287,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     padding: 10px 15px;
     background: rgba(30, 30, 45, 0.5);
     border-radius: var(--radius-lg);
-    border: var(--border-width) solid var(--primary-blue-10);
+    border: var(--border-width) solid var(--primary-blue-light);
     transition: all var(--transition-normal);
     color: var(--text-secondary);
     text-decoration: none;
@@ -295,7 +295,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
 }
 
 .tag-link:hover {
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     border-color: var(--border-color-hover);
     transform: translateX(5px);
     color: #fff;
@@ -309,7 +309,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     color: var(--primary-blue);
     font-weight: var(--font-weight-medium);
     font-size: var(--font-size-sm);
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
     padding: var(--spacing-xs) 10px;
     border-radius: var(--radius-xl);
 }
@@ -326,7 +326,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     padding: var(--spacing-lg);
     border-radius: var(--radius-xl);
     text-align: center;
-    border: var(--border-width) solid var(--primary-blue-10);
+    border: var(--border-width) solid var(--primary-blue-light);
     transition: all var(--transition-smooth);
 }
 

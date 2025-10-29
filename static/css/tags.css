@@ -25,7 +25,7 @@
     margin-bottom: 10px;
     background: rgba(30, 30, 45, 0.3);
     border-radius: var(--radius-xl);
-    border: var(--border-width) solid var(--primary-blue-10);
+    border: var(--border-width) solid var(--primary-blue-light);
     overflow: hidden;
     transition: all var(--transition-smooth);
 }
@@ -51,7 +51,7 @@
 }
 
 .section-header:hover {
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
 }
 
 .section-icon {
@@ -204,7 +204,7 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-sm) 15px;
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     border-radius: var(--radius-md);
     border: var(--border-width) solid var(--border-color);
     text-decoration: none;
@@ -212,7 +212,7 @@
 }
 
 .tag-link:hover {
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
     border-color: var(--border-color-hover);
     transform: translateX(5px);
 }
@@ -227,7 +227,7 @@
     color: var(--primary-blue);
     font-weight: var(--font-weight-medium);
     font-size: var(--font-size-sm);
-    background: var(--primary-blue-20);
+    background: var(--primary-blue-light);
     padding: 2px var(--spacing-sm);
     border-radius: var(--radius-sm);
 }
@@ -251,7 +251,7 @@
 #tagSearchInput:focus {
     outline: none;
     border-color: var(--border-color-focus);
-    box-shadow: 0 0 15px var(--primary-blue-20);
+    box-shadow: 0 0 15px var(--primary-blue-light);
 }
 
 /* Category Filter Bar */
@@ -263,7 +263,7 @@
     padding: 15px;
     background: rgba(30, 30, 45, 0.3);
     border-radius: var(--radius-xl);
-    border: var(--border-width) solid var(--primary-blue-10);
+    border: var(--border-width) solid var(--primary-blue-light);
 }
 
 .category-filter-btn {
@@ -287,9 +287,9 @@
 }
 
 .category-filter-btn.active {
-    background: var(--blue-accent-40);
+    background: var(--blue-accent-medium);
     border-color: var(--border-color-focus);
-    box-shadow: 0 0 20px var(--primary-blue-30);
+    box-shadow: 0 0 20px var(--primary-blue-medium);
     transform: translateY(-2px);
 }
 
@@ -365,13 +365,13 @@
     padding: 10px 15px;
     background: rgba(30, 30, 45, 0.5);
     border-radius: var(--radius-md);
-    border: var(--border-width) solid var(--primary-blue-10);
+    border: var(--border-width) solid var(--primary-blue-light);
     text-decoration: none;
     transition: all var(--transition-normal);
 }
 
 .tag-browser-item:hover {
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
     border-color: var(--border-color-hover);
     transform: translateY(-2px);
 }

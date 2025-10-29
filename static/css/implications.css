@@ -46,7 +46,7 @@
 
 .tab-button:hover {
     color: var(--text-primary);
-    background: var(--primary-blue-10);
+    background: var(--primary-blue-light);
 }
 
 .tab-button.active {
@@ -193,7 +193,7 @@
 
 .tag-badge {
     padding: var(--spacing-xs) var(--spacing-md);
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     border-radius: var(--radius-sm);
     font-family: monospace;
     font-size: var(--font-size-sm);
@@ -296,7 +296,7 @@
     align-items: center;
     gap: var(--spacing-xs);
     padding: var(--spacing-xs) var(--spacing-sm);
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-sm);
 }

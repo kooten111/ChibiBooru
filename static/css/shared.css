@@ -162,9 +162,9 @@
 
 .btn-edit {
     padding: 8px 16px;
-    background: var(--primary-blue-30);
+    background: var(--primary-blue-medium);
     color: var(--primary-blue);
-    border: var(--border-width) solid var(--primary-blue-50);
+    border: var(--border-width) solid var(--primary-blue-strong);
     border-radius: var(--radius-sm);
     font-weight: var(--font-weight-medium);
     cursor: pointer;
@@ -172,7 +172,7 @@
 }
 
 .btn-edit:hover {
-    background: var(--primary-blue-50);
+    background: var(--primary-blue-strong);
     transform: scale(1.05);
 }
 
@@ -302,7 +302,7 @@
 .form-group textarea:focus {
     outline: none;
     border-color: var(--border-color-focus);
-    box-shadow: 0 0 15px var(--primary-blue-20);
+    box-shadow: 0 0 15px var(--primary-blue-light);
 }
 
 .form-actions {

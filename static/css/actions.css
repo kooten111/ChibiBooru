@@ -68,7 +68,7 @@
 
 .category-btn {
     padding: var(--spacing-sm) 14px;
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-md);
     color: var(--text-muted);
@@ -79,16 +79,16 @@
 }
 
 .category-btn:hover {
-    background: var(--primary-blue-25);
+    background: var(--primary-blue-medium);
     border-color: var(--border-color-hover);
     color: var(--text-secondary);
 }
 
 .category-btn.active {
-    background: var(--blue-accent-40);
+    background: var(--blue-accent-medium);
     border-color: var(--border-color-focus);
     color: var(--primary-blue);
-    box-shadow: 0 0 10px var(--primary-blue-30);
+    box-shadow: 0 0 10px var(--primary-blue-medium);
 }
 
 .editable-tags-list {
@@ -114,12 +114,12 @@
 }
 
 .editable-tags-list::-webkit-scrollbar-thumb {
-    background: var(--primary-blue-30);
+    background: var(--primary-blue-medium);
     border-radius: var(--radius-xs);
 }
 
 .editable-tags-list::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-blue-50);
+    background: var(--primary-blue-strong);
 }
 
 .no-tags-message {
@@ -135,7 +135,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 18px;
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-md);
     transition: all var(--transition-normal);
@@ -145,7 +145,7 @@
 }
 
 .editable-tag-item:hover {
-    background: var(--primary-blue-25);
+    background: var(--primary-blue-medium);
     border-color: var(--border-color-hover);
     transform: translateX(3px);
 }
@@ -241,7 +241,7 @@
 .add-tag-input:focus {
     outline: none;
     border-color: var(--border-color-focus);
-    box-shadow: 0 0 0 3px var(--primary-blue-10);
+    box-shadow: 0 0 0 3px var(--primary-blue-light);
 }
 
 .tag-suggestions {
@@ -267,7 +267,7 @@
     align-items: center;
     padding: var(--spacing-md) 15px;
     cursor: pointer;
-    border-bottom: var(--border-width) solid var(--primary-blue-10);
+    border-bottom: var(--border-width) solid var(--primary-blue-light);
     transition: all var(--transition-normal);
 }
 
@@ -276,7 +276,7 @@
 }
 
 .autocomplete-item:hover {
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
 }
 
 .autocomplete-tag {

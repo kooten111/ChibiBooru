@@ -23,7 +23,7 @@
     padding: 15px;
     background: rgba(40, 40, 60, 0.5);
     border-radius: var(--radius-lg);
-    border: var(--border-width) solid var(--primary-blue-10);
+    border: var(--border-width) solid var(--primary-blue-light);
     transition: all var(--transition-smooth);
 }
 
@@ -93,7 +93,7 @@
 
 .log-entry {
     padding: 5px 0;
-    border-bottom: var(--border-width) solid var(--primary-blue-10);
+    border-bottom: var(--border-width) solid var(--primary-blue-light);
     color: var(--text-secondary);
 }
 

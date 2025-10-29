@@ -9,7 +9,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 10px 14px;
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
     border: var(--border-width) solid var(--border-color-hover);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -20,8 +20,8 @@
 }
 
 .source-toggle-btn:hover {
-    background: var(--primary-blue-15);
-    border-color: var(--primary-blue-50);
+    background: var(--primary-blue-light);
+    border-color: var(--primary-blue-strong);
     transform: translateY(-1px);
 }
 
@@ -114,13 +114,13 @@
 }
 
 .source-option:hover {
-    background: var(--primary-blue-15);
-    border-color: var(--primary-blue-50);
+    background: var(--primary-blue-light);
+    border-color: var(--primary-blue-strong);
     transform: translateX(5px);
 }
 
 .source-option.active {
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
     border-color: var(--border-color-focus);
 }
 

@@ -8,34 +8,31 @@
     --primary-blue-dark: #4a9eff;
     --primary-blue-darker: #357abd;
 
-    /* Colors - Opacity Variants */
-    --primary-blue-10: rgba(135, 206, 235, 0.1);
-    --primary-blue-15: rgba(135, 206, 235, 0.15);
-    --primary-blue-20: rgba(135, 206, 235, 0.2);
-    --primary-blue-25: rgba(135, 206, 235, 0.25);
-    --primary-blue-30: rgba(135, 206, 235, 0.3);
-    --primary-blue-40: rgba(135, 206, 235, 0.4);
-    --primary-blue-50: rgba(135, 206, 235, 0.5);
-    --primary-blue-60: rgba(135, 206, 235, 0.6);
+    /* Colors - Opacity Variants (Streamlined) */
+    /* Replaces: --primary-blue-10, --primary-blue-15, --primary-blue-20 */
+    --primary-blue-light: rgba(135, 206, 235, 0.15);
 
-    --blue-accent-20: rgba(74, 158, 255, 0.2);
-    --blue-accent-30: rgba(74, 158, 255, 0.3);
-    --blue-accent-40: rgba(74, 158, 255, 0.4);
+    /* Replaces: --primary-blue-25, --primary-blue-30 */
+    --primary-blue-medium: rgba(135, 206, 235, 0.3);
+
+    /* Replaces: --primary-blue-50 */
+    --primary-blue-strong: rgba(135, 206, 235, 0.5);
+
+    /* Replaces: --blue-accent-20, --blue-accent-30, --blue-accent-40 */
+    --blue-accent-light: rgba(74, 158, 255, 0.2);
+    --blue-accent-medium: rgba(74, 158, 255, 0.35);
 
     /* Colors - Background */
     --bg-gradient-start: #1a1a2e;
     --bg-gradient-end: #16213e;
     --bg-dark: rgba(15, 15, 25, 0.95);
-    --bg-dark-alt: rgba(25, 25, 40, 0.95);
     --bg-panel: rgba(30, 30, 45, 0.6);
-    --bg-panel-alt: rgba(40, 40, 60, 0.6);
     --bg-panel-dark: rgba(30, 30, 45, 0.95);
-    --bg-panel-dark-alt: rgba(40, 40, 60, 0.95);
     --bg-input: rgba(30, 30, 40, 0.6);
-    --bg-input-dark: rgba(20, 20, 30, 0.6);
     --bg-hover: rgba(40, 40, 50, 0.6);
     --bg-overlay: rgba(0, 0, 0, 0.8);
     --bg-black-trans: rgba(20, 20, 30, 0.3);
+    /* Removed unused: --bg-dark-alt, --bg-panel-alt, --bg-panel-dark-alt, --bg-input-dark */
 
     /* Colors - Text */
     --text-primary: #e8e8e8;

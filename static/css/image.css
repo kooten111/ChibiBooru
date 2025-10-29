@@ -164,7 +164,7 @@ body.image-page {
 }
 
 .tag-item.delta-added:hover {
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
 }
 
 .tag-item.delta-removed:hover {
@@ -182,7 +182,7 @@ body.image-page {
 }
 
 .tag-item:hover {
-    background: var(--blue-accent-20);
+    background: var(--blue-accent-light);
     padding-left: var(--spacing-sm);
 }
 
@@ -203,7 +203,7 @@ body.image-page {
     margin-left: 10px;
     white-space: nowrap;
     font-weight: var(--font-weight-medium);
-    background: var(--primary-blue-15);
+    background: var(--primary-blue-light);
     padding: 2px var(--spacing-sm);
     border-radius: var(--radius-lg);
 }
@@ -252,7 +252,7 @@ body.image-page {
     display: flex;
     justify-content: space-between;
     padding: var(--spacing-sm) 0;
-    border-bottom: var(--border-width) solid var(--primary-blue-10);
+    border-bottom: var(--border-width) solid var(--primary-blue-light);
 }
 
 .metadata-item:last-child {
@@ -274,7 +274,7 @@ body.image-page {
 /* Metadata Info Panel */
 .metadata-item {
     padding: var(--spacing-md) 0;
-    border-bottom: var(--border-width) solid var(--primary-blue-10);
+    border-bottom: var(--border-width) solid var(--primary-blue-light);
     display: flex;
     flex-direction: column;
     gap: var(--spacing-xs);
@@ -347,7 +347,7 @@ body.image-page {
 .related-thumb:hover {
     transform: scale(1.03);
     border-color: var(--border-color-hover);
-    box-shadow: 0 8px 20px var(--primary-blue-30);
+    box-shadow: 0 8px 20px var(--primary-blue-medium);
     z-index: var(--z-base) + 1;
 }
 
