@@ -1,0 +1,88 @@
+/* ==========================================================================
+   Login Page Styles
+   ========================================================================== */
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 400px;
+    padding: var(--spacing-2xl);
+    text-align: center;
+    position: relative;
+}
+
+.login-container h1 {
+    margin-bottom: 25px;
+    font-size: var(--font-size-3xl);
+    color: var(--primary-blue);
+}
+
+.login-form input {
+    width: 100%;
+    padding: 15px;
+    margin-bottom: var(--spacing-lg);
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-xl);
+    font-size: var(--font-size-base);
+    transition: all var(--transition-smooth);
+}
+
+.login-form input:focus {
+    outline: none;
+    border-color: var(--border-color-focus);
+    box-shadow: 0 0 15px var(--primary-blue-light);
+}
+
+.login-form button {
+    width: 100%;
+}
+
+.flash-messages {
+    list-style: none;
+    padding: 0;
+    margin-bottom: var(--spacing-lg);
+}
+
+.flash-messages li {
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-md);
+    color: white;
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-sm);
+}
+
+.flash-messages .error {
+    background-color: var(--danger);
+}
+
+.flash-messages .success {
+    background-color: var(--success);
+}
+
+.flash-messages .info {
+    background-color: var(--primary-blue);
+}
+
+.login-mascot {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 250px;
+    width: auto;
+    margin-left: var(--spacing-2xl);
+}
+
+@media (max-width: 768px) {
+    .login-mascot {
+        display: none;
+    }
+}

@@ -393,3 +393,77 @@
 .custom-confirm-modal .btn-confirm:hover {
     transform: translateY(-2px);
 }
+
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+
+/* Similarity Badge */
+.similarity-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: var(--primary-blue);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+}
+
+/* Text Color Utilities */
+.text-success {
+    color: var(--success);
+}
+
+.text-danger {
+    color: var(--danger);
+}
+
+.text-muted-small {
+    font-size: 0.8em;
+    opacity: 0.7;
+}
+
+/* Link Utilities */
+.link-unstyled {
+    text-decoration: none;
+    color: inherit;
+}
+
+.link-primary {
+    color: var(--primary-blue-dark);
+}
+
+.link-danger {
+    color: var(--danger);
+    text-decoration: line-through;
+}
+
+/* Spacing Utilities */
+.mt-10 {
+    margin-top: 10px;
+}
+
+.mt-15 {
+    margin-top: 15px;
+}
+
+/* Border Utilities */
+.border-bottom-none {
+    border-bottom: none;
+}
+
+.pb-0 {
+    padding-bottom: 0;
+}
+
+/* Button Width Utilities */
+.btn-full-width {
+    width: 100%;
+}
+
+/* Display Utilities */
+.hidden {
+    display: none;
+}

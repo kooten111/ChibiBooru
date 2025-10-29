@@ -1,0 +1,34 @@
+/* ==========================================================================
+   Upload Page Styles
+   ========================================================================== */
+
+.upload-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 40px;
+}
+
+#drop-zone {
+    border: 2px dashed var(--border-color-hover);
+    border-radius: var(--radius-2xl);
+    padding: 50px;
+    text-align: center;
+    color: var(--primary-blue);
+    font-size: var(--font-size-lg);
+    transition: all var(--transition-smooth);
+    cursor: pointer;
+}
+
+#drop-zone.dragover {
+    background-color: var(--primary-blue-light);
+    border-style: solid;
+}
+
+#file-input {
+    display: none;
+}
+
+#upload-status {
+    margin-top: var(--spacing-lg);
+    font-weight: var(--font-weight-medium);
+}

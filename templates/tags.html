@@ -38,19 +38,19 @@
                 </button>
                 <div class="section-content" id="overview-content">
                     <div class="stats-grid">
-                        <a href="{{ url_for('main.home') }}" style="text-decoration: none; color: inherit;">
+                        <a href="{{ url_for('main.home') }}" class="link-unstyled">
                             <div class="stat-card">
                                 <div class="stat-card-number">{{ stats.total }}</div>
                                 <div class="stat-card-label">Total Images</div>
                             </div>
                         </a>
-                        <a href="{{ url_for('main.home', query='metadata:found') }}" style="text-decoration: none; color: inherit;">
+                        <a href="{{ url_for('main.home', query='metadata:found') }}" class="link-unstyled">
                             <div class="stat-card success">
                                 <div class="stat-card-number">{{ stats.with_metadata }}</div>
                                 <div class="stat-card-label">With Metadata</div>
                             </div>
                         </a>
-                        <a href="{{ url_for('main.home', query='metadata:missing') }}" style="text-decoration: none; color: inherit;">
+                        <a href="{{ url_for('main.home', query='metadata:missing') }}" class="link-unstyled">
                             <div class="stat-card warning">
                                 <div class="stat-card-number">{{ stats.without_metadata }}</div>
                                 <div class="stat-card-label">Missing Metadata</div>
@@ -79,7 +79,7 @@
                 <div class="section-content" id="sources-content">
                     <div class="stats-grid">
                         {% for source, count in stats.source_breakdown.items() %}
-                        <a href="{{ url_for('main.home', query='source:' + source) }}" style="text-decoration: none; color: inherit;">
+                        <a href="{{ url_for('main.home', query='source:' + source) }}" class="link-unstyled">
                             <div class="stat-card">
                                 <div class="stat-card-number">{{ count }}</div>
                                 <div class="stat-card-label">{{ source|capitalize }}</div>
@@ -123,7 +123,7 @@
                 <div class="section-content" id="categories-content">
                     <div class="category-breakdown">
                         {% for category, count in stats.category_counts.items() %}
-                        <a href="{{ url_for('main.home', query='category:' + category) }}" style="text-decoration: none; color: inherit;">
+                        <a href="{{ url_for('main.home', query='category:' + category) }}" class="link-unstyled">
                             <div class="category-card {{ category }}">
                                 <div class="category-number">{{ count }}</div>
                                 <div class="category-label">{{ category|capitalize }}</div>
@@ -199,7 +199,7 @@
             <!-- Tags will be loaded dynamically via JavaScript -->
         </div>
 
-        <div class="loading-indicator" id="loadingIndicator" style="display: none; text-align: center; padding: 20px; color: #888;">
+        <div class="loading-indicator hidden" id="loadingIndicator" style="text-align: center; padding: 20px; color: #888;">
             Loading more tags...
         </div>
     </div>

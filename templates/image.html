@@ -121,18 +121,18 @@
                         {% endif %}
 
                         {% if tag_deltas and (tag_deltas.added or tag_deltas.removed) %}
-                        <div class="tag-category-subtitle" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255, 165, 0, 0.2);">Manual modifications</div>
+                        <div class="tag-category-subtitle mt-10" style="padding-top: 10px; border-top: 1px solid rgba(255, 165, 0, 0.2);">Manual modifications</div>
                         {% if tag_deltas.added %}
                             {% for tag_info in tag_deltas.added %}
                             <div class="tag-item delta-added">
-                                <a href="{{ url_for('main.home', query=tag_info.name) }}" style="color: #4a9eff;">+{{ tag_info.name }}</a>
+                                <a href="{{ url_for('main.home', query=tag_info.name) }}" class="link-primary">+{{ tag_info.name }}</a>
                             </div>
                             {% endfor %}
                         {% endif %}
                         {% if tag_deltas.removed %}
                             {% for tag_info in tag_deltas.removed %}
                             <div class="tag-item delta-removed">
-                                <a href="{{ url_for('main.home', query=tag_info.name) }}" style="color: #ff6b6b; text-decoration: line-through;">-{{ tag_info.name }}</a>
+                                <a href="{{ url_for('main.home', query=tag_info.name) }}" class="link-danger">-{{ tag_info.name }}</a>
                             </div>
                             {% endfor %}
                         {% endif %}
@@ -162,30 +162,14 @@
             {% if metadata %}
             <div class="metadata-info panel">
                 <h3>Information</h3>
-                <div class="metadata-item" style="border-bottom: none; padding-bottom: 0;">
-                    <button onclick="showSauceNaoFetcher()" style="
-                        width: 100%;
-                        padding: 12px;
-                        background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
-                        border: none;
-                        color: #fff;
-                        border-radius: 10px;
-                        cursor: pointer;
-                        font-weight: 600;
-                        font-size: 0.95em;
-                        transition: all 0.3s ease;
-                        box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 8px;
-                    " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(74, 158, 255, 0.5)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(74, 158, 255, 0.3)';">
-                        <span style="font-size: 1.2em;">🔍</span>
+                <div class="metadata-item border-bottom-none pb-0">
+                    <button onclick="showSauceNaoFetcher()" class="btn-saucenao">
+                        <span class="icon">🔍</span>
                         <span>Fetch from SauceNao</span>
                     </button>
                 </div>
-                <div class="metadata-item" style="border-bottom: none; padding-bottom: 0;">
-                    <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="btn btn-primary" style="width: 100%;">
+                <div class="metadata-item border-bottom-none pb-0">
+                    <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="btn btn-primary btn-full-width">
                         📄 View Raw Data
                     </a>
                 </div>
@@ -210,7 +194,7 @@
                         {% elif source_name == 'yandere' %}
                             <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank" rel="noopener">Yandere</a>
                         {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
-                            <span style="color: #90ee90;">AI Tagged ({{ source_data.tagger_name or 'CamieTagger' }})</span>
+                            <span class="text-success">AI Tagged ({{ source_data.tagger_name or 'CamieTagger' }})</span>
                         {% endif %}
                             {% if not loop.last %} • {% endif %}
                         {% endfor %}
@@ -379,7 +363,7 @@
                 <h3>
                     <span>🔗</span>
                     Related
-                    <span style="font-size: 0.7em; color: #b0b0b0; font-weight: 400; margin-left: 10px;">
+                    <span class="text-muted-tiny">
                         ({{ related_images|length }} images)
                     </span>
                 </h3>

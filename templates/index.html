@@ -34,7 +34,7 @@
                 <a href="{{ url_for('main.show_image', filepath=image.path) }}">
                     <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy">
                     {% if show_similarity and image.similarity %}
-                    <div style="position: absolute; top: 5px; right: 5px; background-color: rgba(0,0,0,0.8); color: #87ceeb; padding: 4px 8px; border-radius: 3px; font-size: 0.85em; font-weight: bold;">
+                    <div class="similarity-badge">
                         {{ "%.0f"|format(image.similarity * 100) }}%
                     </div>
                     {% endif %}

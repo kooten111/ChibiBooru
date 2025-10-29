@@ -7,34 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
-    <style>
-        .upload-container {
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 40px;
-        }
-        #drop-zone {
-            border: 2px dashed rgba(135, 206, 235, 0.4);
-            border-radius: 16px;
-            padding: 50px;
-            text-align: center;
-            color: #87ceeb;
-            font-size: 1.2em;
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        #drop-zone.dragover {
-            background-color: rgba(74, 158, 255, 0.1);
-            border-style: solid;
-        }
-        #file-input {
-            display: none;
-        }
-        #upload-status {
-            margin-top: 20px;
-            font-weight: 500;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
 </head>
 <body>
     {% include 'header.html' %}
@@ -44,7 +17,7 @@
             <form id="upload-form" action="{{ url_for('main.upload_image') }}" method="post" enctype="multipart/form-data">
                 <div id="drop-zone">
                     <p>Drag & Drop files here or click to select</p>
-                    <p style="font-size: 0.8em; opacity: 0.7;">(Images will be processed automatically after upload)</p>
+                    <p class="text-muted-small">(Images will be processed automatically after upload)</p>
                 </div>
                 <input type="file" id="file-input" name="file" multiple>
             </form>
@@ -100,17 +73,17 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        uploadStatus.innerHTML = `<span style="color: #90ee90;">${data.message}</span>`;
+                        uploadStatus.innerHTML = `<span class="text-success">${data.message}</span>`;
                         // If the server sent a redirect URL, go there after a delay
                         if (data.redirect_url) {
                             setTimeout(() => { window.location.href = data.redirect_url; }, 1500);
                         }
                     } else {
-                        uploadStatus.innerHTML = `<span style="color: #ff6b6b;">Error: ${data.error}</span>`;
+                        uploadStatus.innerHTML = `<span class="text-danger">Error: ${data.error}</span>`;
                     }
                 })
                 .catch(err => {
-                    uploadStatus.innerHTML = `<span style="color: #ff6b6b;">Upload failed. See console for details.</span>`;
+                    uploadStatus.innerHTML = `<span class="text-danger">Upload failed. See console for details.</span>`;
                     console.error('Upload error:', err);
                 });
             }
