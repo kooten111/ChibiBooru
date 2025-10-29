@@ -4,17 +4,9 @@
     <meta charset="UTF-8">
     <title>{{ filepath.split('/')[-1] }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/shared.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/image.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/search-enhanced.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/actions.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/carousel.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/header.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/system-panel.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/source-selector.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pools.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/global-uploader.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
 
     {% if related_images %}
         {% for related in related_images %}
