@@ -1,5 +1,6 @@
 # routes.py
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
+from services.switch_source_db import switch_metadata_source_db
 import random
 from functools import wraps
 import os
