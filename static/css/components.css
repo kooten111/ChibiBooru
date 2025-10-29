@@ -1776,7 +1776,7 @@ body.ui-hidden::after {
 
 /* Mobile/Desktop Toggle Visibility */
 .mobile-toggle {
-    display: none;
+    display: none !important;
 }
 
 .desktop-toggle {
@@ -1828,7 +1828,7 @@ body.ui-hidden::after {
 /* Mobile-only collapsible sections */
 @media (max-width: 1200px) {
     .mobile-toggle {
-        display: flex;
+        display: flex !important;
     }
 
     .desktop-toggle {
@@ -1836,7 +1836,7 @@ body.ui-hidden::after {
     }
 
     .desktop-only {
-        display: none;
+        display: none !important;
     }
 
     /* Show panel headers on mobile */
