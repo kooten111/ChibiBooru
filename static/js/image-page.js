@@ -46,9 +46,53 @@ function confirmDelete() {
 }
 
 
+/**
+ * Initialize collapsible sections for mobile-friendly UI
+ * Handles the collapse/expand behavior of sidebar sections on mobile
+ */
+function initCollapsibleSections() {
+    const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
+
+    // Load saved states from localStorage
+    const savedStates = JSON.parse(localStorage.getItem('imageSectionStates') || '{}');
+
+    sectionHeaders.forEach(header => {
+        const sectionId = header.dataset.section;
+        const content = document.getElementById(sectionId);
+
+        if (!content) return;
+
+        // Restore saved state or default to expanded on first visit
+        const isCollapsed = savedStates[sectionId] !== undefined ? savedStates[sectionId] : false;
+
+        if (isCollapsed) {
+            header.classList.add('collapsed');
+            content.classList.add('collapsed');
+        }
+
+        // Add click handler
+        header.addEventListener('click', (e) => {
+            e.preventDefault();
+            const isCurrentlyCollapsed = header.classList.contains('collapsed');
+
+            // Toggle collapsed state
+            header.classList.toggle('collapsed');
+            content.classList.toggle('collapsed');
+
+            // Save state to localStorage
+            savedStates[sectionId] = !isCurrentlyCollapsed;
+            localStorage.setItem('imageSectionStates', JSON.stringify(savedStates));
+        });
+    });
+}
+
+
 // --- Main Page Initialization ---
 // This ensures all scripts are loaded before we try to attach event listeners.
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize collapsible sections for mobile
+    initCollapsibleSections();
+
     // Attach event listener for the delete button
     const deleteBtn = document.getElementById('deleteImageBtn');
     if (deleteBtn) {

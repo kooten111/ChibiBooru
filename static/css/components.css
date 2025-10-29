@@ -1749,6 +1749,7 @@ body.ui-hidden::after {
     cursor: pointer;
     transition: all var(--transition-smooth);
     text-align: left;
+    margin: 0;
 }
 
 .section-header:hover {
@@ -1773,18 +1774,72 @@ body.ui-hidden::after {
     transform: rotate(-90deg);
 }
 
-.section-content {
-    max-height: 1000px;
-    overflow: hidden;
-    transition: max-height var(--transition-smooth), padding var(--transition-smooth), opacity var(--transition-smooth);
-    padding: 0 var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
-    opacity: 1;
+/* Mobile/Desktop Toggle Visibility */
+.mobile-toggle {
+    display: none;
 }
 
-.section-content.collapsed {
-    max-height: 0;
-    padding: 0 var(--spacing-lg);
-    opacity: 0;
+.desktop-toggle {
+    display: block;
+}
+
+/* Section content - transparent wrapper on desktop, functional on mobile */
+.section-content {
+    display: contents; /* Makes the wrapper transparent on desktop */
+}
+
+/* Mobile-only collapsible sections */
+@media (max-width: 1200px) {
+    .mobile-toggle {
+        display: flex;
+    }
+
+    .desktop-toggle {
+        display: none;
+    }
+
+    /* Collapsible section styles - only on mobile */
+    .section-content {
+        display: block; /* Override display: contents on mobile */
+        max-height: 2000px;
+        min-height: 200px; /* Minimum height when expanded */
+        overflow-y: auto;
+        transition: max-height var(--transition-smooth), padding var(--transition-smooth), opacity var(--transition-smooth);
+        opacity: 1;
+    }
+
+    .section-content.collapsed {
+        max-height: 0 !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        overflow: hidden;
+        opacity: 0;
+    }
+
+    /* Specific minimum heights for different sections when expanded */
+    #tags-content:not(.collapsed) {
+        min-height: 300px; /* Tags need more space */
+    }
+
+    #pools-content:not(.collapsed) {
+        min-height: 150px; /* Pools */
+    }
+
+    #metadata-content:not(.collapsed) {
+        min-height: 200px; /* Metadata info */
+    }
+
+    #sidebar-right-content:not(.collapsed) {
+        min-height: 200px; /* Related images */
+    }
+
+    /* Ensure sidebars are visible on mobile */
+    .sidebar-left,
+    .sidebar-right {
+        position: relative;
+        transform: none !important;
+        width: 100%;
+    }
 }
 
 /* Stats Grid */

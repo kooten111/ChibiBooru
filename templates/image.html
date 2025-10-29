@@ -5,7 +5,7 @@
     <title>{{ filepath.split('/')[-1] }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=7' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 
     {% if related_images %}
@@ -25,68 +25,121 @@
     {% include 'header.html' %}
 
     <div class="container">
-        <div class="sidebar-left">
-            <div class="tags-list panel">
-                {% if categorized_tags %}
-                    {% if categorized_tags.artist %}
-                    <div class="tag-category artist">
-                        <div class="tag-category-title">Artist</div>
-                        {% for tag, count in categorized_tags.artist %}
-                        <div class="tag-item">
-                            <a href="{{ url_for('main.home', query='artist:' + tag) }}">{{ tag }}</a>
-                            <span class="tag-count">
-                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                            </span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    
-                    {% if categorized_tags.copyright %}
-                    <div class="tag-category copyright">
-                        <div class="tag-category-title">Copyright</div>
-                        {% for tag, count in categorized_tags.copyright %}
-                        <div class="tag-item">
-                            <a href="{{ url_for('main.home', query='copyright:' + tag) }}">{{ tag }}</a>
-                            <span class="tag-count">
-                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                            </span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    
-                    {% if categorized_tags.character %}
-                    <div class="tag-category character">
-                        <div class="tag-category-title">Character</div>
-                        {% for tag, count in categorized_tags.character %}
-                        <div class="tag-item">
-                            <a href="{{ url_for('main.home', query='character:' + tag) }}">{{ tag }}</a>
-                            <span class="tag-count">
-                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                            </span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
+        <div class="sidebar-left" id="sidebarLeft">
+            <button class="section-header mobile-toggle" data-section="tags-content">
+                <span class="section-icon">🏷️</span>
+                <span class="section-title">Tags</span>
+                <span class="section-arrow">▼</span>
+            </button>
 
-                    {% if categorized_tags.species %}
-                    <div class="tag-category species">
-                        <div class="tag-category-title">Species</div>
-                        {% for tag, count in categorized_tags.species %}
-                        <div class="tag-item">
-                            <a href="{{ url_for('main.home', query='species:' + tag) }}">{{ tag }}</a>
-                            <span class="tag-count">
-                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                            </span>
+            <div class="section-content" id="tags-content">
+                <div class="tags-list panel">
+                    {% if categorized_tags %}
+                        {% if categorized_tags.artist %}
+                        <div class="tag-category artist">
+                            <div class="tag-category-title">Artist</div>
+                            {% for tag, count in categorized_tags.artist %}
+                            <div class="tag-item">
+                                <a href="{{ url_for('main.home', query='artist:' + tag) }}">{{ tag }}</a>
+                                <span class="tag-count">
+                                    {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                </span>
+                            </div>
+                            {% endfor %}
                         </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
+                        {% endif %}
+                        
+                        {% if categorized_tags.copyright %}
+                        <div class="tag-category copyright">
+                            <div class="tag-category-title">Copyright</div>
+                            {% for tag, count in categorized_tags.copyright %}
+                            <div class="tag-item">
+                                <a href="{{ url_for('main.home', query='copyright:' + tag) }}">{{ tag }}</a>
+                                <span class="tag-count">
+                                    {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if categorized_tags.character %}
+                        <div class="tag-category character">
+                            <div class="tag-category-title">Character</div>
+                            {% for tag, count in categorized_tags.character %}
+                            <div class="tag-item">
+                                <a href="{{ url_for('main.home', query='character:' + tag) }}">{{ tag }}</a>
+                                <span class="tag-count">
+                                    {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
 
-                    {% if tags %}
-                    <div class="tag-category general">
-                        <div class="tag-category-title">General</div>
+                        {% if categorized_tags.species %}
+                        <div class="tag-category species">
+                            <div class="tag-category-title">Species</div>
+                            {% for tag, count in categorized_tags.species %}
+                            <div class="tag-item">
+                                <a href="{{ url_for('main.home', query='species:' + tag) }}">{{ tag }}</a>
+                                <span class="tag-count">
+                                    {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        {% if tags %}
+                        <div class="tag-category general">
+                            <div class="tag-category-title">General</div>
+                            {% for tag, count in tags %}
+                            <div class="tag-item">
+                                <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
+                                <span class="tag-count">
+                                    {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        
+                        {% if categorized_tags.meta or (tag_deltas and (tag_deltas.added or tag_deltas.removed)) %}
+                        <div class="tag-category meta">
+                            <div class="tag-category-title">Meta</div>
+                            {% if categorized_tags.meta %}
+                                {% for tag, count in categorized_tags.meta %}
+                                <div class="tag-item">
+                                    <a href="{{ url_for('main.home', query='meta:' + tag) }}">{{ tag }}</a>
+                                    <span class="tag-count">
+                                        {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+
+                            {% if tag_deltas and (tag_deltas.added or tag_deltas.removed) %}
+                            <div class="tag-category-subtitle mt-10" style="padding-top: 10px; border-top: 1px solid rgba(255, 165, 0, 0.2);">Manual modifications</div>
+                            {% if tag_deltas.added %}
+                                {% for tag_info in tag_deltas.added %}
+                                <div class="tag-item delta-added">
+                                    <a href="{{ url_for('main.home', query=tag_info.name) }}" class="link-primary">+{{ tag_info.name }}</a>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            {% if tag_deltas.removed %}
+                                {% for tag_info in tag_deltas.removed %}
+                                <div class="tag-item delta-removed">
+                                    <a href="{{ url_for('main.home', query=tag_info.name) }}" class="link-danger">-{{ tag_info.name }}</a>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <h3>Tags</h3>
                         {% for tag, count in tags %}
                         <div class="tag-item">
                             <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
@@ -95,209 +148,180 @@
                             </span>
                         </div>
                         {% endfor %}
-                    </div>
                     {% endif %}
-                    
-                    {% if categorized_tags.meta or (tag_deltas and (tag_deltas.added or tag_deltas.removed)) %}
-                    <div class="tag-category meta">
-                        <div class="tag-category-title">Meta</div>
-                        {% if categorized_tags.meta %}
-                            {% for tag, count in categorized_tags.meta %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query='meta:' + tag) }}">{{ tag }}</a>
-                                <span class="tag-count">
-                                    {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                                </span>
-                            </div>
-                            {% endfor %}
-                        {% endif %}
-
-                        {% if tag_deltas and (tag_deltas.added or tag_deltas.removed) %}
-                        <div class="tag-category-subtitle mt-10" style="padding-top: 10px; border-top: 1px solid rgba(255, 165, 0, 0.2);">Manual modifications</div>
-                        {% if tag_deltas.added %}
-                            {% for tag_info in tag_deltas.added %}
-                            <div class="tag-item delta-added">
-                                <a href="{{ url_for('main.home', query=tag_info.name) }}" class="link-primary">+{{ tag_info.name }}</a>
-                            </div>
-                            {% endfor %}
-                        {% endif %}
-                        {% if tag_deltas.removed %}
-                            {% for tag_info in tag_deltas.removed %}
-                            <div class="tag-item delta-removed">
-                                <a href="{{ url_for('main.home', query=tag_info.name) }}" class="link-danger">-{{ tag_info.name }}</a>
-                            </div>
-                            {% endfor %}
-                        {% endif %}
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                {% else %}
-                    <h3>Tags</h3>
-                    {% for tag, count in tags %}
-                    <div class="tag-item">
-                        <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
-                        <span class="tag-count">
-                            {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
-                        </span>
-                    </div>
-                    {% endfor %}
-                {% endif %}
-            </div>
-
-            <div class="pool-management panel">
-                <h3>Pools</h3>
-                <div id="poolsList" class="pools-list-container">
-                    <div class="loading-spinner">Loading pools...</div>
                 </div>
             </div>
+
+            <button class="section-header mobile-toggle" data-section="pools-content">
+                <span class="section-icon">📁</span>
+                <span class="section-title">Pools</span>
+                <span class="section-arrow">▼</span>
+            </button>
+
+            <div class="section-content" id="pools-content">
+                <div class="pool-management panel">
+                    <h3>Pools</h3>
+                    <div id="poolsList" class="pools-list-container">
+                        <div class="loading-spinner">Loading pools...</div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="section-header mobile-toggle" data-section="metadata-content">
+                <span class="section-icon">ℹ️</span>
+                <span class="section-title">Information</span>
+                <span class="section-arrow">▼</span>
+            </button>
 
             {% if metadata %}
-            <div class="metadata-info panel">
-                <h3>Information</h3>
-                <div class="metadata-item border-bottom-none pb-0">
-                    <button onclick="showSauceNaoFetcher()" class="btn-saucenao">
-                        <span class="icon">🔍</span>
-                        <span>Fetch from SauceNao</span>
-                    </button>
-                </div>
-                <div class="metadata-item border-bottom-none pb-0">
-                    <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="btn btn-primary btn-full-width">
-                        📄 View Raw Data
-                    </a>
-                </div>
-                {% if filepath %}
-                <div class="metadata-item">
-                    <div class="metadata-label">Filename</div>
-                    <div class="metadata-value">{{ filepath.split('/')[-1] }}</div>
-                </div>
-                {% endif %}
-                
-                {% if metadata.sources %}
-                <div class="metadata-item">
-                    <div class="metadata-label">Found On</div>
-                    <div class="metadata-value">
-                        {% for source_name, source_data in metadata.sources.items() %}
-                        {% if source_name == 'danbooru' %}
-                            <a href="https://danbooru.donmai.us/posts/{{ source_data.id }}" target="_blank" rel="noopener">Danbooru</a>
-                        {% elif source_name == 'e621' %}
-                            <a href="https://e621.net/posts/{{ source_data.id }}" target="_blank" rel="noopener">e621</a>
-                        {% elif source_name == 'gelbooru' %}
-                            <a href="https://gelbooru.com/index.php?page=post&s=view&id={{ source_data.id }}" target="_blank" rel="noopener">Gelbooru</a>
-                        {% elif source_name == 'yandere' %}
-                            <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank" rel="noopener">Yandere</a>
-                        {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
-                            <span class="text-success">AI Tagged ({{ source_data.tagger_name or 'CamieTagger' }})</span>
-                        {% endif %}
-                            {% if not loop.last %} • {% endif %}
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if metadata.sources and metadata.sources|length > 1 %}
-                <div class="metadata-item">
-                    <div class="metadata-label">Metadata Source</div>
-                    <div class="metadata-value">
-                        <button class="source-toggle-btn" onclick="openSourceModal()">
-                            <span class="current-source-indicator">
-                                {% set active = data.active_source or (metadata.sources.keys()|list|first) %}
-                                {% if active == 'danbooru' %}🔵 Danbooru
-                                {% elif active == 'e621' %}🟢 e621
-                                {% elif active == 'gelbooru' %}🟡 Gelbooru
-                                {% elif active == 'yandere' %}🔴 Yande.re
-                                {% elif active == 'local_tagger' or active == 'camie_tagger' %}🤖 {{ metadata.sources.get(active, {}).get('tagger_name', 'AI Tagger') }}
-                                {% else %}{{ active|title }}{% endif %}
-                            </span>
-                            <span class="toggle-text">Switch Source</span>
+            <div class="section-content" id="metadata-content">
+                <div class="metadata-info panel">
+                    <h3>Information</h3>
+                    <div class="metadata-item border-bottom-none pb-0">
+                        <button onclick="showSauceNaoFetcher()" class="btn-saucenao">
+                            <span class="icon">🔍</span>
+                            <span>Fetch from SauceNao</span>
                         </button>
                     </div>
-                </div>
-
-                <script type="application/json" id="currentSource">{{ data.active_source or '' }}</script>
-                <script type="application/json" id="sourceData">{{ metadata.sources|tojson }}</script>
-                {% endif %}
-                
-                {% if metadata.sources %}
-                    {% set first_source = metadata.sources.values()|list|first %}
-                    {% if first_source.source %}
-                    <div class="metadata-item">
-                        <div class="metadata-label">Original Source</div>
-                        <div class="metadata-value">
-                            <a href="{{ first_source.source }}" target="_blank" rel="noopener">{{ first_source.source }}</a>
-                        </div>
+                    <div class="metadata-item border-bottom-none pb-0">
+                        <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="btn btn-primary btn-full-width">
+                            📄 View Raw Data
+                        </a>
                     </div>
-                    {% elif first_source.sources and first_source.sources|length > 0 %}
+                    {% if filepath %}
                     <div class="metadata-item">
-                        <div class="metadata-label">Original Source</div>
-                        <div class="metadata-value">
-                            <a href="{{ first_source.sources[0] }}" target="_blank" rel="noopener">{{ first_source.sources[0] }}</a>
-                        </div>
+                        <div class="metadata-label">Filename</div>
+                        <div class="metadata-value">{{ filepath.split('/')[-1] }}</div>
                     </div>
                     {% endif %}
-                {% endif %}
-                
-                {% if metadata.sources %}
-                    {% set first_source = metadata.sources.values()|list|first %}
-                    {% set width = first_source.image_width or (first_source.file.width if first_source.file else none) %}
-                    {% set height = first_source.image_height or (first_source.file.height if first_source.file else none) %}
-                    {% if width and height %}
+                    
+                    {% if metadata.sources %}
                     <div class="metadata-item">
-                        <div class="metadata-label">Dimensions</div>
-                        <div class="metadata-value">{{ width }} × {{ height }}</div>
-                    </div>
-                    {% endif %}
-                {% endif %}
-                
-                {% if metadata.sources %}
-                    {% set first_source = metadata.sources.values()|list|first %}
-                    {% set file_size = first_source.file_size or (first_source.file.size if first_source.file else none) %}
-                    {% if file_size %}
-                    <div class="metadata-item">
-                        <div class="metadata-label">File Size</div>
+                        <div class="metadata-label">Found On</div>
                         <div class="metadata-value">
-                            {% if file_size >= 1048576 %}
-                                {{ "%.2f"|format(file_size / 1048576.0) }} MB
-                            {% elif file_size >= 1024 %}
-                                {{ "%.2f"|format(file_size / 1024.0) }} KB
-                            {% else %}
-                                {{ file_size }} bytes
+                            {% for source_name, source_data in metadata.sources.items() %}
+                            {% if source_name == 'danbooru' %}
+                                <a href="https://danbooru.donmai.us/posts/{{ source_data.id }}" target="_blank" rel="noopener">Danbooru</a>
+                            {% elif source_name == 'e621' %}
+                                <a href="https://e621.net/posts/{{ source_data.id }}" target="_blank" rel="noopener">e621</a>
+                            {% elif source_name == 'gelbooru' %}
+                                <a href="https://gelbooru.com/index.php?page=post&s=view&id={{ source_data.id }}" target="_blank" rel="noopener">Gelbooru</a>
+                            {% elif source_name == 'yandere' %}
+                                <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank" rel="noopener">Yandere</a>
+                            {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
+                                <span class="text-success">AI Tagged ({{ source_data.tagger_name or 'CamieTagger' }})</span>
                             {% endif %}
+                                {% if not loop.last %} • {% endif %}
+                            {% endfor %}
                         </div>
                     </div>
                     {% endif %}
-                {% endif %}
-                
-                {% if metadata.md5 %}
-                <div class="metadata-item">
-                    <div class="metadata-label">MD5</div>
-                    <div class="metadata-value">{{ metadata.md5 }}</div>
+                    
+                    {% if metadata.sources and metadata.sources|length > 1 %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">Metadata Source</div>
+                        <div class="metadata-value">
+                            <button class="source-toggle-btn" onclick="openSourceModal()">
+                                <span class="current-source-indicator">
+                                    {% set active = data.active_source or (metadata.sources.keys()|list|first) %}
+                                    {% if active == 'danbooru' %}🔵 Danbooru
+                                    {% elif active == 'e621' %}🟢 e621
+                                    {% elif active == 'gelbooru' %}🟡 Gelbooru
+                                    {% elif active == 'yandere' %}🔴 Yande.re
+                                    {% elif active == 'local_tagger' or active == 'camie_tagger' %}🤖 {{ metadata.sources.get(active, {}).get('tagger_name', 'AI Tagger') }}
+                                    {% else %}{{ active|title }}{% endif %}
+                                </span>
+                                <span class="toggle-text">Switch Source</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <script type="application/json" id="currentSource">{{ data.active_source or '' }}</script>
+                    <script type="application/json" id="sourceData">{{ metadata.sources|tojson }}</script>
+                    {% endif %}
+                    
+                    {% if metadata.sources %}
+                        {% set first_source = metadata.sources.values()|list|first %}
+                        {% if first_source.source %}
+                        <div class="metadata-item">
+                            <div class="metadata-label">Original Source</div>
+                            <div class="metadata-value">
+                                <a href="{{ first_source.source }}" target="_blank" rel="noopener">{{ first_source.source }}</a>
+                            </div>
+                        </div>
+                        {% elif first_source.sources and first_source.sources|length > 0 %}
+                        <div class="metadata-item">
+                            <div class="metadata-label">Original Source</div>
+                            <div class="metadata-value">
+                                <a href="{{ first_source.sources[0] }}" target="_blank" rel="noopener">{{ first_source.sources[0] }}</a>
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                    
+                    {% if metadata.sources %}
+                        {% set first_source = metadata.sources.values()|list|first %}
+                        {% set width = first_source.image_width or (first_source.file.width if first_source.file else none) %}
+                        {% set height = first_source.image_height or (first_source.file.height if first_source.file else none) %}
+                        {% if width and height %}
+                        <div class="metadata-item">
+                            <div class="metadata-label">Dimensions</div>
+                            <div class="metadata-value">{{ width }} × {{ height }}</div>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                    
+                    {% if metadata.sources %}
+                        {% set first_source = metadata.sources.values()|list|first %}
+                        {% set file_size = first_source.file_size or (first_source.file.size if first_source.file else none) %}
+                        {% if file_size %}
+                        <div class="metadata-item">
+                            <div class="metadata-label">File Size</div>
+                            <div class="metadata-value">
+                                {% if file_size >= 1048576 %}
+                                    {{ "%.2f"|format(file_size / 1048576.0) }} MB
+                                {% elif file_size >= 1024 %}
+                                    {{ "%.2f"|format(file_size / 1024.0) }} KB
+                                {% else %}
+                                    {{ file_size }} bytes
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                    
+                    {% if metadata.md5 %}
+                    <div class="metadata-item">
+                        <div class="metadata-label">MD5</div>
+                        <div class="metadata-value">{{ metadata.md5 }}</div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if metadata.sources %}
+                        {% set first_source = metadata.sources.values()|list|first %}
+                        {% if first_source.rating %}
+                        <div class="metadata-item">
+                            <div class="metadata-label">Rating</div>
+                            <div class="metadata-value">{{ first_source.rating }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% set score = first_source.score.total if first_source.score and first_source.score.total is defined else (first_source.score if first_source.score is defined else none) %}
+                        {% if score is not none %}
+                        <div class="metadata-item">
+                            <div class="metadata-label">Score</div>
+                            <div class="metadata-value">{{ score }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if first_source.fav_count %}
+                        <div class="metadata-item">
+                            <div class="metadata-label">Favorites</div>
+                            <div class="metadata-value">{{ first_source.fav_count }}</div>
+                        </div>
+                        {% endif %}
+                    {% endif %}
                 </div>
-                {% endif %}
-                
-                {% if metadata.sources %}
-                    {% set first_source = metadata.sources.values()|list|first %}
-                    {% if first_source.rating %}
-                    <div class="metadata-item">
-                        <div class="metadata-label">Rating</div>
-                        <div class="metadata-value">{{ first_source.rating }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% set score = first_source.score.total if first_source.score and first_source.score.total is defined else (first_source.score if first_source.score is defined else none) %}
-                    {% if score is not none %}
-                    <div class="metadata-item">
-                        <div class="metadata-label">Score</div>
-                        <div class="metadata-value">{{ score }}</div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if first_source.fav_count %}
-                    <div class="metadata-item">
-                        <div class="metadata-label">Favorites</div>
-                        <div class="metadata-value">{{ first_source.fav_count }}</div>
-                    </div>
-                    {% endif %}
-                {% endif %}
             </div>
             {% endif %}
         </div>
@@ -349,30 +373,38 @@
             </div>
         </div>
         
-        <div class="sidebar-right">
-            {% if related_images %}
-            <div class="related-images-vertical panel">
-                <h3>
-                    <span>🔗</span>
-                    Related
-                    <span class="text-muted-tiny">
-                        ({{ related_images|length }} images)
-                    </span>
-                </h3>
-                <div class="related-grid-vertical">
-                    {% for related in related_images %}
-                    <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
-                        <img src="{{ url_for('static', filename=related.thumb) }}" alt="Related">
-                        <span class="label {{ related.match_type }}">
-                            {% if related.match_type == 'parent' %}Parent
-                            {% elif related.match_type == 'child' %}Child
-                            {% else %}Similar{% endif %}
+        <div class="sidebar-right" id="sidebarRight">
+            <button class="section-header mobile-toggle" data-section="sidebar-right-content">
+                <span class="section-icon">🔗</span>
+                <span class="section-title">Related Images</span>
+                <span class="section-arrow">▼</span>
+            </button>
+            
+            <div class="section-content" id="sidebar-right-content">
+                {% if related_images %}
+                <div class="related-images-vertical panel">
+                    <h3>
+                        <span>🔗</span>
+                        Related
+                        <span class="text-muted-tiny">
+                            ({{ related_images|length }} images)
                         </span>
-                    </a>
-                    {% endfor %}
+                    </h3>
+                    <div class="related-grid-vertical">
+                        {% for related in related_images %}
+                        <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
+                            <img src="{{ url_for('static', filename=related.thumb) }}" alt="Related">
+                            <span class="label {{ related.match_type }}">
+                                {% if related.match_type == 'parent' %}Parent
+                                {% elif related.match_type == 'child' %}Child
+                                {% else %}Similar{% endif %}
+                            </span>
+                        </a>
+                        {% endfor %}
+                    </div>
                 </div>
+                {% endif %}
             </div>
-            {% endif %}
         </div>
     </div>
 
@@ -451,14 +483,14 @@
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
 <script src="{{ url_for('static', filename='js/modal.js', v='1.3') }}"></script>
-<script src="{{ url_for('static', filename='js/autocomplete.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/autocomplete.js', v='1.g') }}"></script>
 <script src="{{ url_for('static', filename='js/tag-editor.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/image-viewer.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/saucenao-fetch.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/header.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/system-panel.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/source-selector.js', v='1.3') }}"></script>
-<script src="{{ url_for('static', filename='js/image-page.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/image-page.js', v='1.7') }}"></script>
 <script src="{{ url_for('static', filename='js/carousel.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/pool-manager.js') }}"></script>
 <script src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
