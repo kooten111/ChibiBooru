@@ -210,9 +210,13 @@ def show_image(filepath):
     # Get tag deltas for this image
     tag_deltas = models.get_image_deltas(lookup_path)
 
+    # Get thumbnail path for progressive loading
+    thumbnail_path = get_thumbnail_path(filepath)
+
     return render_template(
         'image.html',
         filepath=filepath,
+        thumbnail_path=thumbnail_path,
         tags=tags_with_counts,
         categorized_tags=categorized_tags,
         metadata=data.get('raw_metadata'),

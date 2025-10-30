@@ -6,7 +6,7 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=9' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=10' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 
     {% if related_images %}
@@ -332,14 +332,17 @@
         
         <div class="main-content">
             <div class="image-and-actions-container">
-                <div class="image-view">
+                <div class="image-view" id="imageViewContainer" data-full-image="{{ filepath }}" data-thumbnail="{{ thumbnail_path if thumbnail_path else '' }}">
                     {% if filepath.endswith('.mp4') %}
                     <video controls loop>
                         <source src="{{ url_for('static', filename=filepath) }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                     {% else %}
-                    <img src="{{ url_for('static', filename=filepath) }}" alt="Image">
+                    <img src="{{ url_for('static', filename=thumbnail_path if thumbnail_path and thumbnail_path != filepath else filepath) }}"
+                         alt="Image"
+                         class="progressive-image"
+                         data-full-src="{{ url_for('static', filename=filepath) }}">
                     {% endif %}
                 </div>
 
@@ -499,6 +502,7 @@
 
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
+<script src="{{ url_for('static', filename='js/progressive-image-loader.js', v='1.0') }}"></script>
 <script src="{{ url_for('static', filename='js/modal.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/autocomplete.js', v='1.g') }}"></script>
 <script src="{{ url_for('static', filename='js/tag-editor.js', v='1.3') }}"></script>
@@ -512,5 +516,18 @@
 <script src="{{ url_for('static', filename='js/pool-manager.js') }}"></script>
 <script src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
+<script>
+// Initialize progressive image loading for the main image
+document.addEventListener('DOMContentLoaded', () => {
+    const container = document.getElementById('imageViewContainer');
+    if (container) {
+        const fullPath = container.dataset.fullImage;
+        const thumbPath = container.dataset.thumbnail;
+        if (fullPath && thumbPath && thumbPath !== fullPath) {
+            window.progressiveLoader.loadProgressively(container, fullPath, thumbPath);
+        }
+    }
+});
+</script>
 </body>
 </html>
