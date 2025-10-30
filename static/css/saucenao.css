@@ -1,3 +1,4 @@
+/* SAUCENAO MODAL STYLES */
 
 @keyframes fadeIn {
     from {
@@ -30,7 +31,6 @@
     }
 }
 
-/* Custom scrollbar for modal */
 #saucenaoModal > div::-webkit-scrollbar {
     width: 8px;
 }

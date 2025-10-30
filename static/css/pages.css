@@ -1,14 +1,6 @@
-/* Booru-main/static/css/pages.css */
-/* ==========================================================================
-   PAGE-SPECIFIC OVERRIDES
-   Only add styles here that are specific to certain pages and don't fit
-   in the component files
-   ========================================================================== */
+/* PAGE-SPECIFIC OVERRIDES - Only for page-specific styles that don't fit in components */
 
-/* Override for mobile image page:
-   Remove max-height on related thumbnails to allow
-   them to expand horizontally and push content down.
-*/
+/* IMPORTANT: Remove max-height on related thumbnails for mobile to allow horizontal expansion */
 @media (max-width: 1200px) {
     .image-page .related-thumb img {
         max-height: none;

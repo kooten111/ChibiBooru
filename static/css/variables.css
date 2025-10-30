@@ -1,28 +1,17 @@
-/* ==========================================================================
-   CSS Variables - Design System
-   ========================================================================== */
+/* CSS VARIABLES - Design System */
 
 :root {
-    /* Colors - Primary */
     --primary-blue: #87ceeb;
     --primary-blue-dark: #4a9eff;
     --primary-blue-darker: #357abd;
 
-    /* Colors - Opacity Variants (Streamlined) */
-    /* Replaces: --primary-blue-10, --primary-blue-15, --primary-blue-20 */
+    /* IMPORTANT: Streamlined opacity variants replacing multiple specific values */
     --primary-blue-light: rgba(135, 206, 235, 0.15);
-
-    /* Replaces: --primary-blue-25, --primary-blue-30 */
     --primary-blue-medium: rgba(135, 206, 235, 0.3);
-
-    /* Replaces: --primary-blue-50 */
     --primary-blue-strong: rgba(135, 206, 235, 0.5);
-
-    /* Replaces: --blue-accent-20, --blue-accent-30, --blue-accent-40 */
     --blue-accent-light: rgba(74, 158, 255, 0.2);
     --blue-accent-medium: rgba(74, 158, 255, 0.35);
 
-    /* Colors - Background */
     --bg-gradient-start: #1a1a2e;
     --bg-gradient-end: #16213e;
     --bg-dark: rgba(15, 15, 25, 0.95);
@@ -32,15 +21,12 @@
     --bg-hover: rgba(40, 40, 50, 0.6);
     --bg-overlay: rgba(0, 0, 0, 0.8);
     --bg-black-trans: rgba(20, 20, 30, 0.3);
-    /* Removed unused: --bg-dark-alt, --bg-panel-alt, --bg-panel-dark-alt, --bg-input-dark */
 
-    /* Colors - Text */
     --text-primary: #e8e8e8;
     --text-secondary: #d0d0d0;
     --text-muted: #b0b0b0;
     --text-disabled: #888;
 
-    /* Colors - Semantic */
     --success: #90ee90;
     --success-dark: #66d9a0;
     --warning: #ff9966;
@@ -49,7 +35,6 @@
     --danger-hover: #ff4444;
     --info: #87ceeb;
 
-    /* Colors - Tag Categories */
     --tag-character: #90ee90;
     --tag-character-bg: rgba(144, 238, 144, 0.2);
     --tag-character-border: rgba(144, 238, 144, 0.3);
@@ -69,7 +54,6 @@
     --tag-general-bg: rgba(135, 206, 235, 0.2);
     --tag-general-border: rgba(135, 206, 235, 0.3);
 
-    /* Spacing */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 12px;
@@ -77,7 +61,6 @@
     --spacing-xl: 30px;
     --spacing-2xl: 40px;
 
-    /* Border Radius */
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 10px;
@@ -85,14 +68,12 @@
     --radius-2xl: 16px;
     --radius-round: 50%;
 
-    /* Borders */
     --border-width: 1px;
     --border-width-thick: 2px;
     --border-color: rgba(135, 206, 235, 0.2);
     --border-color-hover: rgba(135, 206, 235, 0.4);
     --border-color-focus: rgba(135, 206, 235, 0.6);
 
-    /* Shadows */
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
     --shadow-md: 0 4px 15px rgba(0, 0, 0, 0.3);
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
@@ -101,14 +82,12 @@
     --shadow-blue: 0 8px 25px rgba(74, 158, 255, 0.4);
     --shadow-blue-hover: 0 8px 25px rgba(74, 158, 255, 0.5);
 
-    /* Transitions */
     --transition-fast: 0.15s ease;
     --transition-normal: 0.2s ease;
     --transition-smooth: 0.3s ease;
     --transition-slow: 0.4s ease;
     --transition-bezier: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* Z-index Scale */
     --z-base: 1;
     --z-dropdown: 10;
     --z-sticky: 50;
@@ -116,7 +95,6 @@
     --z-overlay: 1000;
     --z-modal: 10000;
 
-    /* Gradients */
     --gradient-primary: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
     --gradient-primary-hover: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
     --gradient-success: linear-gradient(135deg, #4a9e6f 0%, #358a5f 100%);
@@ -131,7 +109,6 @@
     --gradient-scrollbar-hover: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
     --gradient-text: linear-gradient(135deg, #87ceeb 0%, #4a9eff 100%);
 
-    /* Typography */
     --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     --font-size-xs: 0.75em;
     --font-size-sm: 0.85em;
@@ -146,12 +123,10 @@
     --font-weight-bold: 700;
     --font-weight-extra-bold: 800;
 
-    /* Blur */
     --blur-sm: blur(5px);
     --blur-md: blur(10px);
     --blur-lg: blur(15px);
 
-    /* Animation Durations */
     --anim-fast: 0.15s;
     --anim-normal: 0.2s;
     --anim-smooth: 0.3s;

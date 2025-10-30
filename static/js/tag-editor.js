@@ -186,7 +186,6 @@ class TagEditor {
         this.renderTags();
     }
 
-    // Booru-main/static/js/tag-editor.js
     renderTags() {
         const list = document.getElementById('editableTagsList');
         if (!list) {
@@ -215,8 +214,6 @@ class TagEditor {
                 });
             });
         }
-        
-        // The "+ Add Tag" button block has been removed from here.
     }
 
     renderViewMode() {

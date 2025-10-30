@@ -1,11 +1,4 @@
-/* ==========================================================================
-   BASE STYLES
-   Merged from: main.css + shared.css
-   ========================================================================== */
-
-/* ==========================================================================
-   Main Styles - Gallery & Layout
-   ========================================================================== */
+/* BASE STYLES - Main Styles - Gallery & Layout */
 
 * {
     box-sizing: border-box;
@@ -19,7 +12,6 @@ body {
     min-height: 100vh;
 }
 
-/* Header */
 .header {
     background: var(--gradient-panel-solid);
     backdrop-filter: var(--blur-md);
@@ -67,7 +59,6 @@ body {
     display: inline-block;
 }
 
-/* Search Bar */
 .search-bar {
     display: flex;
     gap: var(--spacing-md);
@@ -142,7 +133,6 @@ body {
     transform: translateY(0);
 }
 
-/* Autocomplete */
 .autocomplete-suggestions {
     position: absolute;
     top: calc(100% + 8px);
@@ -206,7 +196,6 @@ body {
     font-weight: var(--font-weight-medium);
 }
 
-/* Special styling for different suggestion types */
 .autocomplete-item.extension {
     background: rgba(255, 193, 7, 0.05);
 }
@@ -225,7 +214,6 @@ body {
     background: rgba(76, 175, 80, 0.15);
 }
 
-/* Container */
 .container {
     max-width: 1600px;
     margin: auto;
@@ -233,7 +221,6 @@ body {
     animation: fadeInUp var(--anim-smooth) ease-out;
 }
 
-/* Results Info */
 .results-info {
     text-align: center;
     margin-bottom: var(--spacing-lg);
@@ -242,7 +229,7 @@ body {
     font-weight: var(--font-weight-normal);
 }
 
-/* Gallery - Masonry Layout */
+/* IMPORTANT: Gallery uses masonry layout with dynamic grid-row spans set by JS */
 .gallery {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -261,12 +248,11 @@ body {
     animation: scaleIn var(--anim-smooth) ease-out backwards;
 }
 
-/* Base sizing - will be overridden by JS */
+/* IMPORTANT: Base sizing overridden by JS based on image aspect ratio */
 .thumbnail {
     grid-row: span 20;
 }
 
-/* Different aspect ratio classes */
 .thumbnail.square {
     grid-row: span 20;
     grid-column: span 1;
@@ -292,7 +278,6 @@ body {
     grid-column: span 1;
 }
 
-/* Staggered animation delays */
 .thumbnail:nth-child(1) { animation-delay: 0.02s; }
 .thumbnail:nth-child(2) { animation-delay: 0.04s; }
 .thumbnail:nth-child(3) { animation-delay: 0.06s; }
@@ -326,7 +311,6 @@ body {
     transform: scale(1.05);
 }
 
-/* Responsive adjustments */
 @media (max-width: 1200px) {
     .gallery {
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -350,7 +334,6 @@ body {
     }
 }
 
-/* Header Mascot */
 .header-mascot {
     position: absolute;
     left: 140px;
@@ -362,16 +345,8 @@ body {
     margin-right: 40px;
 }
 
-/* ==========================================================================
-   SHARED COMPONENTS
-   Source: static/css/shared.css
-   ========================================================================== */
+/* SHARED COMPONENTS - Common Components & Animations */
 
-/* ==========================================================================
-   Shared Styles - Common Components
-   ========================================================================== */
-
-/* Animations */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(-5px); }
     to { opacity: 1; transform: translateY(0); }
@@ -427,7 +402,6 @@ body {
     10%, 90% { opacity: 1; }
 }
 
-/* Panels and Cards */
 .panel {
     background: var(--gradient-panel);
     backdrop-filter: var(--blur-md);
@@ -450,7 +424,6 @@ body {
     letter-spacing: 0.5px;
 }
 
-/* Buttons - Base */
 .btn {
     padding: 10px 20px;
     border: none;
@@ -477,7 +450,6 @@ body {
     transform: translateY(-1px);
 }
 
-/* Button Variants */
 .btn.btn-primary,
 .btn-primary {
     background: var(--gradient-primary);
@@ -519,7 +491,6 @@ body {
     background: var(--gradient-secondary-hover);
 }
 
-/* Small Buttons */
 .btn-small {
     padding: 5px 10px;
     font-size: var(--font-size-sm);
@@ -572,7 +543,6 @@ body {
     transform: scale(1.05);
 }
 
-/* Custom Scrollbars */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -592,7 +562,6 @@ body {
     background: var(--gradient-scrollbar-hover);
 }
 
-/* Modal Styles */
 .modal {
     display: none;
     position: fixed;
@@ -642,7 +611,6 @@ body {
     color: var(--primary-blue);
 }
 
-/* Form Elements */
 .form-group {
     margin-bottom: var(--spacing-lg);
 }
@@ -681,14 +649,12 @@ body {
     margin-top: 25px;
 }
 
-/* Loading Spinners */
 .loading-spinner {
     text-align: center;
     padding: var(--spacing-lg);
     color: var(--text-disabled);
 }
 
-/* No Content Messages */
 .no-pools-message,
 .no-images-message,
 .no-tags-message {
@@ -698,7 +664,6 @@ body {
     font-size: var(--font-size-lg);
 }
 
-/* Custom Confirmation Modal */
 .custom-confirm-overlay {
     position: fixed;
     top: 0;
@@ -763,11 +728,8 @@ body {
     transform: translateY(-2px);
 }
 
-/* ==========================================================================
-   Utility Classes
-   ========================================================================== */
+/* UTILITY CLASSES */
 
-/* Similarity Badge */
 .similarity-badge {
     position: absolute;
     top: 5px;
@@ -780,7 +742,6 @@ body {
     font-weight: var(--font-weight-bold);
 }
 
-/* Video Badge */
 .video-badge {
     position: absolute;
     bottom: 5px;
@@ -793,7 +754,6 @@ body {
     font-weight: var(--font-weight-bold);
 }
 
-/* Text Color Utilities */
 .text-success {
     color: var(--success);
 }
@@ -807,7 +767,6 @@ body {
     opacity: 0.7;
 }
 
-/* Link Utilities */
 .link-unstyled {
     text-decoration: none;
     color: inherit;
@@ -822,7 +781,6 @@ body {
     text-decoration: line-through;
 }
 
-/* Spacing Utilities */
 .mt-10 {
     margin-top: 10px;
 }
@@ -831,7 +789,6 @@ body {
     margin-top: 15px;
 }
 
-/* Border Utilities */
 .border-bottom-none {
     border-bottom: none;
 }
@@ -840,12 +797,10 @@ body {
     padding-bottom: 0;
 }
 
-/* Button Width Utilities */
 .btn-full-width {
     width: 100%;
 }
 
-/* Display Utilities */
 .hidden {
     display: none;
 }

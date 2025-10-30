@@ -1,46 +1,13 @@
-/* ==========================================================================
-   COMPONENTS
-   Merged from 13 component files
-   Order: Header → Search → System Panel → Gallery → Image → Tags → Actions
-          → Carousel → Source Selector → Pools → Implications → Raw Data → Uploader
-   ========================================================================== */
+/* COMPONENTS: Header, Search, System Panel, Gallery, Image, Tags, Actions, Carousel, Source Selector, Pools, Implications, Raw Data, Uploader, SauceNao */
 
-/*
- * COMPONENTS TABLE OF CONTENTS
- * ============================
- * 1. Header ........................... line 20
- * 2. Search & Autocomplete ............ line TBD
- * 3. System Panel ..................... line TBD
- * 4. Image Detail View ................ line TBD
- * 5. Tags & Categories ................ line TBD
- * 6. Actions Panel .................... line TBD
- * 7. Carousel ......................... line TBD
- * 8. Source Selector .................. line TBD
- * 9. Pools ............................ line TBD
- * 10. Implications .................... line TBD
- * 11. Raw Data Viewer ................. line TBD
- * 12. Global Uploader ................. line TBD
- * 13. SauceNao ........................ line TBD
- */
+/* HEADER COMPONENT - Stats Tabs & Panels */
 
-
-/* ============================================================================
-   HEADER COMPONENT
-   Source: static/css/header.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Header - Stats Tabs & Panels
-   ========================================================================== */
-
-/* Stats Tabs - Folder Style */
 .header-container {
     position: sticky;
     top: 0;
     z-index: calc(var(--z-header) - 1);
 }
 
-/* Update header to support absolute positioning for toggle button */
 .header {
     position: relative;
 }
@@ -66,7 +33,6 @@
     max-height: 100px;
 }
 
-/* Styling for the toggle button - positioned at bottom of header */
 .tabs-toggle-button {
     display: none;
     background: rgba(40, 40, 60, 0.7);
@@ -105,7 +71,7 @@ body.image-page .tabs-toggle-button {
     display: block;
 }
 
-/* Collapse tabs by default on the image page */
+/* IMPORTANT: Tabs collapsed by default on image page, expanded when .tabs-expanded class added */
 body.image-page .stats-tabs-bar {
     max-height: 0;
     padding: 0 var(--spacing-xl);
@@ -114,7 +80,6 @@ body.image-page .stats-tabs-bar {
     overflow: hidden;
 }
 
-/* Expand tabs when the container has the 'tabs-expanded' class */
 body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     max-height: 100px;
     opacity: 1;
@@ -149,7 +114,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     border-top-color: var(--primary-blue-dark);
 }
 
-/* Arrow pointing down from active tab */
 .stat-tab-button.active::after {
     content: '';
     position: absolute;
@@ -169,7 +133,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     font-size: 1.1em;
 }
 
-/* Stats Panels Container - positioned right after tabs */
 .stats-panels-container {
     position: absolute;
     top: 100%;
@@ -219,7 +182,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     border-bottom: var(--border-width-thick) solid var(--border-color);
 }
 
-/* Overview Stats Grid */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -269,7 +231,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     -webkit-text-fill-color: transparent;
 }
 
-/* Source Breakdown */
 .source-breakdown {
     display: flex;
     flex-wrap: wrap;
@@ -304,7 +265,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     font-size: var(--font-size-sm);
 }
 
-/* Top Tags List */
 .top-tags-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -345,7 +305,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     border-radius: var(--radius-xl);
 }
 
-/* Category Breakdown */
 .category-breakdown {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -430,7 +389,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     letter-spacing: 0.5px;
 }
 
-/* Responsive */
 @media (max-width: 768px) {
     .stats-tabs-bar {
         padding: 0 15px;
@@ -462,28 +420,18 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     }
 }
 
-/* ============================================================================
-   SEARCH & AUTOCOMPLETE
-   Source: static/css/search-enhanced.css
-   ============================================================================ */
+/* SEARCH & AUTOCOMPLETE - Enhanced Search Styles */
 
-/* ==========================================================================
-   Enhanced Search Styles
-   ========================================================================== */
-
-/* Prevent header from expanding */
 .header {
     min-height: auto !important;
 }
 
-/* Adjust header layout to push search to the right */
 .header-content {
     min-height: auto !important;
     justify-content: flex-start !important;
     gap: var(--spacing-lg) !important;
 }
 
-/* Mascot and title stay on left */
 .header-mascot {
     flex-shrink: 0;
 }
@@ -492,7 +440,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     flex-shrink: 0;
 }
 
-/* Search bar pushed to the right with margin-left: auto */
 .search-bar {
     margin-left: auto !important;
     flex-shrink: 0;
@@ -943,14 +890,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     border-left: 3px solid var(--primary-blue);
 }
 
-/* ============================================================================
-   SYSTEM PANEL
-   Source: static/css/system-panel.css
-   ============================================================================ */
-
-/* ==========================================================================
-   System Panel - Status & Controls
-   ========================================================================== */
 
 .system-status {
     padding: var(--spacing-lg);
@@ -1119,14 +1058,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     }
 }
 
-/* ============================================================================
-   IMAGE DETAIL VIEW
-   Source: static/css/image.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Image Page - Layout & Tags
-   ========================================================================== */
 
 /* Override header animation for image page */
 .image-page .header {
@@ -1668,9 +1599,6 @@ body.ui-hidden::after {
     }
 }
 
-/* ==========================================================================
-   Metadata Buttons
-   ========================================================================== */
 
 .image-page .btn-saucenao {
     width: 100%;
@@ -1699,14 +1627,6 @@ body.ui-hidden::after {
     font-size: 1.2em;
 }
 
-/* ============================================================================
-   TAGS & CATEGORIES
-   Source: static/css/tags.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Tags - Tag Browser
-   ========================================================================== */
 
 .tags-browser-header {
     display: flex;
@@ -2275,14 +2195,6 @@ body.ui-hidden::after {
     }
 }
 
-/* ============================================================================
-   ACTIONS PANEL
-   Source: static/css/actions.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Actions Bar & Tag Editor
-   ========================================================================== */
 
 /* Actions Bar */
 .actions-bar {
@@ -2572,14 +2484,6 @@ body.ui-hidden::after {
     font-weight: var(--font-weight-medium);
 }
 
-/* ============================================================================
-   CAROUSEL
-   Source: static/css/carousel.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Related Images Carousel
-   ========================================================================== */
 
 .related-carousel-section {
     margin: var(--spacing-xl) 0;
@@ -2769,14 +2673,6 @@ body.ui-hidden::after {
     }
 }
 
-/* ============================================================================
-   SOURCE SELECTOR
-   Source: static/css/source-selector.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Source Selector - Source Switching Modal
-   ========================================================================== */
 
 /* Source Toggle Button */
 .source-toggle-btn {
@@ -2969,14 +2865,6 @@ body.ui-hidden::after {
     }
 }
 
-/* ============================================================================
-   POOLS
-   Source: static/css/pools.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Pools - Pool Browser & Management
-   ========================================================================== */
 
 /* Pools Browser Header */
 .pools-browser-header {
@@ -3328,14 +3216,6 @@ body.ui-hidden::after {
     }
 }
 
-/* ============================================================================
-   IMPLICATIONS
-   Source: static/css/implications.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Tag Implications Manager
-   ========================================================================== */
 
 .implications-header {
     text-align: center;
@@ -3965,14 +3845,6 @@ body.ui-hidden::after {
     }
 }
 
-/* ============================================================================
-   RAW DATA VIEWER
-   Source: static/css/raw-data.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Raw Data Page - Metadata Viewer
-   ========================================================================== */
 
 /* Page Header */
 .raw-data-header {
@@ -4020,14 +3892,6 @@ body.ui-hidden::after {
     border: var(--border-width) solid var(--border-color);
 }
 
-/* ============================================================================
-   GLOBAL UPLOADER
-   Source: static/css/global-uploader.css
-   ============================================================================ */
-
-/* ==========================================================================
-   Global Uploader - Drag & Drop Zone
-   ========================================================================== */
 
 .global-drop-zone {
     position: fixed;
@@ -4068,11 +3932,6 @@ body.ui-hidden::after {
     margin-top: var(--spacing-lg);
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
-
-/* ============================================================================
-   SAUCENAO
-   Source: static/css/saucenao.css
-   ============================================================================ */
 
 
 @keyframes fadeIn {
