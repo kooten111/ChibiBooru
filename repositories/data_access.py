@@ -144,33 +144,72 @@ def delete_image(filepath):
 # ============================================================================
 
 def get_related_images(post_id, parent_id, post_id_to_md5_mapping):
-    """Find parent and child images using pre-computed cross-source mapping."""
+    """
+    Find parent and child images using optimized database queries.
+
+    Uses indexed columns (parent_id, has_children) instead of scanning
+    all raw_metadata JSON blobs, providing near-instant lookups.
+    """
     related = []
 
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
-        # Find parent using the mapping
-        if parent_id and parent_id in post_id_to_md5_mapping:
-            parent_md5 = post_id_to_md5_mapping[parent_id]
-            parent = cursor.execute("SELECT filepath FROM images WHERE md5 = ?", (parent_md5,)).fetchone()
+        # Find parent using direct indexed lookup
+        if parent_id:
+            # First try: Use the parent_id column directly (fastest)
+            # This works if parent_id was populated during repopulation
+            parent = cursor.execute(
+                "SELECT filepath FROM images WHERE post_id = ?",
+                (parent_id,)
+            ).fetchone()
+
+            # Second try: Use the mapping (fallback for cross-source relationships)
+            if not parent and parent_id in post_id_to_md5_mapping:
+                parent_md5 = post_id_to_md5_mapping[parent_id]
+                parent = cursor.execute(
+                    "SELECT filepath FROM images WHERE md5 = ?",
+                    (parent_md5,)
+                ).fetchone()
+
             if parent:
                 related.append({
                     "path": f"images/{parent['filepath']}",
                     "type": "parent"
                 })
 
-        # Find children - check ALL parent_ids from ALL sources in raw metadata
+        # Find children using indexed parent_id column (MUCH faster than JSON scanning)
         if post_id:
+            # Direct lookup using indexed parent_id column
+            children = cursor.execute(
+                "SELECT filepath FROM images WHERE parent_id = ?",
+                (post_id,)
+            ).fetchall()
+
+            for child in children:
+                related.append({
+                    "path": f"images/{child['filepath']}",
+                    "type": "child"
+                })
+
+            # Fallback: Check for cross-source relationships using MD5 mapping
+            # This handles cases where parent_id might be from a different source
             current_md5 = post_id_to_md5_mapping.get(post_id)
             if current_md5:
-                # Get all images with raw metadata
+                # Only scan metadata for images that have has_children flag or parent_id set
+                # This dramatically reduces the search space
                 cursor.execute("""
                     SELECT i.filepath, rm.data
                     FROM images i
                     JOIN raw_metadata rm ON i.id = rm.image_id
-                    WHERE rm.data IS NOT NULL
-                """)
+                    WHERE (i.parent_id IS NOT NULL OR i.has_children = 1)
+                    AND rm.data IS NOT NULL
+                    AND i.filepath NOT IN (
+                        SELECT filepath FROM images WHERE parent_id = ?
+                    )
+                """, (post_id,))
+
+                existing_children = {img['path'] for img in related}
 
                 for row in cursor.fetchall():
                     try:
@@ -187,10 +226,13 @@ def get_related_images(post_id, parent_id, post_id_to_md5_mapping):
                             # If this image's parent matches our MD5, it's our child
                             if check_parent and check_parent in post_id_to_md5_mapping:
                                 if post_id_to_md5_mapping[check_parent] == current_md5:
-                                    related.append({
-                                        "path": f"images/{row['filepath']}",
-                                        "type": "child"
-                                    })
+                                    child_path = f"images/{row['filepath']}"
+                                    if child_path not in existing_children:
+                                        related.append({
+                                            "path": child_path,
+                                            "type": "child"
+                                        })
+                                        existing_children.add(child_path)
                                     break  # Don't add same child twice
                     except:
                         continue

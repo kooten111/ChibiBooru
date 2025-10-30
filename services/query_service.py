@@ -573,7 +573,14 @@ def perform_search(search_query):
 
 @lru_cache(maxsize=10000)
 def find_related_by_tags(filepath, limit=20):
-    """Find related images by weighted tag similarity using the database."""
+    """
+    Find related images by weighted tag similarity using efficient database queries.
+
+    Uses SQL JOIN to only fetch candidates that share at least one tag,
+    drastically reducing the number of similarity calculations needed.
+    """
+    from database import get_db_connection
+
     details = models.get_image_details(filepath.replace("images/", "", 1))
     if not details:
         return []
@@ -582,18 +589,41 @@ def find_related_by_tags(filepath, limit=20):
     if not ref_tags_str:
         return []
 
-    all_images = models.get_all_images_with_tags()
-    similarities = []
+    # Get the reference image's ID for exclusion
+    image_id = details.get('id')
+    if not image_id:
+        return []
 
-    for img in all_images:
-        if img['filepath'] == details['filepath']:
-            continue
-        
-        sim = calculate_similarity(ref_tags_str, img['tags'])
+    # Strategy: Only calculate similarity for images that share at least one tag
+    # This dramatically reduces the search space from O(N) to O(M) where M << N
+    with get_db_connection() as conn:
+        query = """
+        SELECT DISTINCT i.filepath,
+               COALESCE(i.tags_character, '') || ' ' ||
+               COALESCE(i.tags_copyright, '') || ' ' ||
+               COALESCE(i.tags_artist, '') || ' ' ||
+               COALESCE(i.tags_species, '') || ' ' ||
+               COALESCE(i.tags_meta, '') || ' ' ||
+               COALESCE(i.tags_general, '') as tags
+        FROM images i
+        INNER JOIN image_tags it ON i.id = it.image_id
+        WHERE it.tag_id IN (
+            SELECT tag_id FROM image_tags WHERE image_id = ?
+        )
+        AND i.id != ?
+        LIMIT 500
+        """
+        cursor = conn.execute(query, (image_id, image_id))
+        candidates = cursor.fetchall()
+
+    # Calculate similarity only for candidates (images that share tags)
+    similarities = []
+    for row in candidates:
+        sim = calculate_similarity(ref_tags_str, row['tags'])
         if sim > 0.1:
             similarities.append({
-                'path': f"images/{img['filepath']}",
-                'thumb': get_thumbnail_path(f"images/{img['filepath']}"),
+                'path': f"images/{row['filepath']}",
+                'thumb': get_thumbnail_path(f"images/{row['filepath']}"),
                 'match_type': 'similar',
                 'score': sim
             })

@@ -168,7 +168,11 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_md5 ON images(md5)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_post_id ON images(post_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_parent_id ON images(parent_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_has_children ON images(has_children)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_active_source ON images(active_source)")
+
+        # Composite index for relationship queries (parent_id + has_children filtering)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_relationships ON images(parent_id, has_children)")
 
         # Index on tags table for faster tag lookups
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
