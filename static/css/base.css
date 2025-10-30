@@ -780,6 +780,19 @@ body {
     font-weight: var(--font-weight-bold);
 }
 
+/* Video Badge */
+.video-badge {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+}
+
 /* Text Color Utilities */
 .text-success {
     color: var(--success);

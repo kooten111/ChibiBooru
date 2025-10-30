@@ -45,8 +45,8 @@ class ImageFileHandler(FileSystemEventHandler):
         self.debounce_seconds = 2
 
     def is_image_file(self, filepath):
-        """Check if file is an image."""
-        return filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.gif'))
+        """Check if file is an image or video."""
+        return filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4'))
 
     def should_process(self, filepath):
         """Check if we should process this file (debouncing)."""
@@ -105,7 +105,7 @@ def find_unprocessed_images():
     disk_filepaths = []
     for root, _, files in os.walk("static/images"):
         for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
                 disk_filepaths.append(os.path.join(root, file))
 
     unprocessed_files = [

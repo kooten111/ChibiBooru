@@ -333,7 +333,14 @@
         <div class="main-content">
             <div class="image-and-actions-container">
                 <div class="image-view">
+                    {% if filepath.endswith('.mp4') %}
+                    <video controls loop>
+                        <source src="{{ url_for('static', filename=filepath) }}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    {% else %}
                     <img src="{{ url_for('static', filename=filepath) }}" alt="Image">
+                    {% endif %}
                 </div>
 
                 <div class="actions-bar">

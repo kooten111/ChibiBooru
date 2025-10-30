@@ -31,6 +31,9 @@
             <div class="thumbnail">
                 <a href="{{ url_for('main.show_image', filepath=image.path) }}">
                     <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy">
+                    {% if image.path.endswith('.mp4') %}
+                    <div class="video-badge">▶</div>
+                    {% endif %}
                     {% if show_similarity and image.similarity %}
                     <div class="similarity-badge">
                         {{ "%.0f"|format(image.similarity * 100) }}%

@@ -98,7 +98,7 @@ def scan_and_remove_duplicates(dry_run=True):
     images_scanned = 0
     for root, _, files in os.walk(STATIC_IMAGES):
         for file in files:
-            if not file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+            if not file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4')):
                 continue
             full_path = os.path.join(root, file)
             rel_path = os.path.relpath(full_path, STATIC_IMAGES)

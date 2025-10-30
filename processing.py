@@ -210,18 +210,40 @@ def get_md5(filepath):
 def ensure_thumbnail(filepath, image_dir="./static/images"):
     rel_path = os.path.relpath(filepath, image_dir)
     thumb_path = os.path.join(THUMB_DIR, os.path.splitext(rel_path)[0] + '.webp')
-    
+
     if not os.path.exists(thumb_path):
         os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
         try:
-            with Image.open(filepath) as img:
-                if img.mode in ('RGBA', 'LA', 'P'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    if img.mode == 'P': img = img.convert('RGBA')
-                    background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
-                    img = background
-                img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
-                img.save(thumb_path, 'WEBP', quality=85, method=6)
+            # Check if this is a video file
+            if filepath.lower().endswith('.mp4'):
+                # Extract first frame from video using ffmpeg
+                import subprocess
+                import tempfile
+                with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
+                    temp_frame_path = temp_frame.name
+                try:
+                    # Extract frame at 1 seconds
+                    subprocess.run([
+                        'ffmpeg', '-i', filepath, '-ss', '1', '-vframes', '1',
+                        '-y', temp_frame_path
+                    ], check=True, capture_output=True)
+                    # Now process the extracted frame as an image
+                    with Image.open(temp_frame_path) as img:
+                        img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
+                        img.save(thumb_path, 'WEBP', quality=85, method=6)
+                finally:
+                    if os.path.exists(temp_frame_path):
+                        os.unlink(temp_frame_path)
+            else:
+                # Regular image processing
+                with Image.open(filepath) as img:
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P': img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                        img = background
+                    img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
+                    img.save(thumb_path, 'WEBP', quality=85, method=6)
         except Exception as e:
             print(f"Thumbnail error for {filepath}: {e}")
 
