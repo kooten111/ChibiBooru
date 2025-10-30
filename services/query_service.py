@@ -368,6 +368,7 @@ def perform_search(search_query):
     extension_filter = None
     relationship_filter = None
     pool_filter = None
+    metadata_filter = None
     category_filters = {}  # {category: [tags]}
     general_terms = []
     negative_terms = []
@@ -383,6 +384,8 @@ def perform_search(search_query):
             filename_filter = token.split(':', 1)[1].strip()
         elif token.startswith('pool:'):
             pool_filter = token.split(':', 1)[1].strip()
+        elif token.startswith('metadata:'):
+            metadata_filter = token.split(':', 1)[1].strip()
         elif token.startswith('.'):
             extension_filter = token[1:]
         elif token.startswith('has:'):
@@ -458,6 +461,38 @@ def perform_search(search_query):
 
         if filename_filter:
             results = [img for img in results if filename_filter in img['filepath'].lower()]
+
+        if metadata_filter:
+            # Handle metadata:missing - images that don't have any source data
+            if metadata_filter == 'missing':
+                with get_db_connection() as conn:
+                    # Get images that have no source records or only local_tagger
+                    # Need to join through images table to get image_id
+                    local_tagger_id = conn.execute("SELECT id FROM sources WHERE name = 'local_tagger'").fetchone()
+                    local_tagger_id = local_tagger_id[0] if local_tagger_id else None
+
+                    filtered_results = []
+                    for img in results:
+                        # Get image_id for this filepath
+                        img_row = conn.execute("SELECT id FROM images WHERE filepath = ?", (img['filepath'],)).fetchone()
+                        if not img_row:
+                            continue
+
+                        image_id = img_row[0]
+
+                        # Check if image has any sources other than local_tagger
+                        has_other_sources = conn.execute(
+                            "SELECT 1 FROM image_sources WHERE image_id = ? AND source_id != ? LIMIT 1",
+                            (image_id, local_tagger_id)
+                        ).fetchone() if local_tagger_id else conn.execute(
+                            "SELECT 1 FROM image_sources WHERE image_id = ? LIMIT 1",
+                            (image_id,)
+                        ).fetchone()
+
+                        if not has_other_sources:
+                            filtered_results.append(img)
+
+                    results = filtered_results
 
         # Apply category filters (e.g., character:holo)
         if category_filters:
