@@ -162,6 +162,8 @@ def edit_tags_service():
             # Selective reload: only update this image and tag counts
             models.reload_single_image(filepath)
             models.reload_tag_counts()
+            from repositories.data_access import get_image_details
+            get_image_details.cache_clear()
             return jsonify({"status": "success"})
         else:
             return jsonify({"error": "Failed to update tags in the database"}), 500
@@ -503,6 +505,8 @@ def saucenao_apply_service():
             rel_path = os.path.relpath(path_to_process, "static/images").replace('\\', '/')
             models.reload_single_image(rel_path)
             models.reload_tag_counts()
+            from repositories.data_access import get_image_details
+            get_image_details.cache_clear()
             return jsonify({
                 "status": "success",
                 "redirect_url": redirect_url
@@ -757,6 +761,8 @@ def retry_tagging_service():
         # Reload the image data in memory
         models.reload_single_image(filepath)
         models.reload_tag_counts()
+        from repositories.data_access import get_image_details
+        get_image_details.cache_clear()
 
         print(f"[Retry Tagging] Successfully updated tags for {filepath} (new source: {source_name})")
 
@@ -1002,6 +1008,8 @@ def bulk_retry_tagging_service():
         print(f"[Bulk Retry Tagging] Reloading data...")
         models.reload_single_image(None)  # Reload all
         models.reload_tag_counts()
+        from repositories.data_access import get_image_details
+        get_image_details.cache_clear()
 
         print(f"[Bulk Retry Tagging] Complete: {success_count} success, {still_local_count} still local, {failed_count} failed")
 
