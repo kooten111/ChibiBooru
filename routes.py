@@ -16,8 +16,6 @@ main_blueprint = Blueprint('main', __name__)
 api_blueprint = Blueprint('api', __name__)
 
 
-# --- Login and Protection ---
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -43,8 +41,6 @@ def logout():
     flash('You have been logged out.', 'info')
     return redirect(url_for('main.login'))
 
-
-# --- Main Page Routes ---
 
 @main_blueprint.route('/')
 @login_required
@@ -302,7 +298,6 @@ def upload_image():
         random_tags=[],
         app_name=config.APP_NAME
     )
-# --- API Routes ---
 
 @api_blueprint.route('/images')
 def get_images():
@@ -450,7 +445,6 @@ def switch_source():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# --- Pool API Routes ---
 
 @api_blueprint.route('/pools/create', methods=['POST'])
 def create_pool():
@@ -580,8 +574,6 @@ def get_all_pools():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
-# --- Tag Implication API Routes ---
 
 @api_blueprint.route('/implications/suggestions', methods=['GET'])
 def get_implication_suggestions():

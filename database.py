@@ -27,8 +27,7 @@ def initialize_database():
             active_source TEXT
         )
         """)
-        
-        # --- SCHEMA MIGRATION: Add categorized tag columns if they don't exist ---
+
         columns_to_add = {
             'tags_character': 'TEXT',
             'tags_copyright': 'TEXT',
@@ -94,7 +93,6 @@ def initialize_database():
         )
         """)
 
-        # --- NEW: Pools Tables ---
         cur.execute("""
         CREATE TABLE IF NOT EXISTS pools (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,7 +112,6 @@ def initialize_database():
         )
         """)
 
-        # --- NEW: Tag Implications Table ---
         cur.execute("""
         CREATE TABLE IF NOT EXISTS tag_implications (
             source_tag_id INTEGER,
@@ -142,8 +139,6 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_implications_source ON tag_implications(source_tag_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_implications_status ON tag_implications(status)")
 
-        # --- NEW: Tag Delta Tracking Table ---
-        # This table preserves manual tag modifications across database rebuilds
         cur.execute("""
         CREATE TABLE IF NOT EXISTS tag_deltas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -156,46 +151,30 @@ def initialize_database():
         )
         """)
 
-        # Index for faster lookups during delta reapplication
         cur.execute("""
         CREATE INDEX IF NOT EXISTS idx_tag_deltas_md5
         ON tag_deltas(image_md5)
         """)
 
-        # --- Performance Indexes ---
-        # Index on images table for common lookups
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_filepath ON images(filepath)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_md5 ON images(md5)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_post_id ON images(post_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_parent_id ON images(parent_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_has_children ON images(has_children)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_active_source ON images(active_source)")
-
-        # Composite index for relationship queries (parent_id + has_children filtering)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_relationships ON images(parent_id, has_children)")
-
-        # Index on tags table for faster tag lookups
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")
-
-        # Index on image_tags for join performance
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag_id ON image_tags(tag_id)")
-
-        # Index on image_sources for source filtering
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_image_id ON image_sources(image_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_source_id ON image_sources(source_id)")
-
-        # Index on raw_metadata for faster metadata lookups
         cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_metadata_image_id ON raw_metadata(image_id)")
 
-        # --- FTS5 Full-Text Search Table ---
-        # Check if FTS table exists first
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='images_fts'")
         fts_exists = cur.fetchone()
 
         if not fts_exists:
-            # Virtual table for fast full-text search across all searchable fields
             cur.execute("""
             CREATE VIRTUAL TABLE images_fts USING fts5(
                 filepath,
@@ -209,8 +188,6 @@ def initialize_database():
             )
             """)
 
-        # Triggers to keep FTS table in sync with images table
-        # Insert trigger
         cur.execute("""
         CREATE TRIGGER IF NOT EXISTS images_fts_insert AFTER INSERT ON images
         BEGIN
@@ -233,7 +210,6 @@ def initialize_database():
         END
         """)
 
-        # Update trigger
         cur.execute("""
         CREATE TRIGGER IF NOT EXISTS images_fts_update AFTER UPDATE ON images
         BEGIN
@@ -257,7 +233,6 @@ def initialize_database():
         END
         """)
 
-        # Delete trigger
         cur.execute("""
         CREATE TRIGGER IF NOT EXISTS images_fts_delete AFTER DELETE ON images
         BEGIN

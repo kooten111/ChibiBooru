@@ -1,33 +1,22 @@
 """
 Cache Manager Module
 
-This module manages the in-memory caches for ChibiBooru:
+Manages the in-memory caches for ChibiBooru:
 - tag_counts: Dictionary mapping tag names to their usage counts
 - image_data: List of all images with their tags
 - post_id_to_md5: Cross-source mapping of post IDs to MD5 hashes
 - data_lock: Thread-safe access to cache data
-
-Extracted from models.py to improve code organization.
 """
 
 import json
 import threading
 from database import get_db_connection
 
-# ============================================================================
-# GLOBAL CACHE VARIABLES
-# ============================================================================
-
-# In-memory caches
 tag_counts = {}
 image_data = []
 post_id_to_md5 = {}
 data_lock = threading.Lock()
 
-
-# ============================================================================
-# CACHE LOADING FUNCTIONS
-# ============================================================================
 
 def load_data_from_db():
     """Load or reload data from the database into the in-memory caches."""
@@ -63,9 +52,8 @@ def load_data_from_db():
             image_data.clear()
             image_data.extend([dict(row) for row in conn.execute(image_data_query).fetchall()])
 
-            # Build post_id → MD5 mapping for ALL sources
             print("Building cross-source post_id index...")
-            post_id_to_md5.clear()  # Clear existing mapping
+            post_id_to_md5.clear()
             cursor.execute("""
                 SELECT i.md5, rm.data
                 FROM images i
@@ -117,10 +105,6 @@ def remove_image_from_cache(filepath):
     with data_lock:
         image_data[:] = [img for img in image_data if img['filepath'] != filepath]
 
-
-# ============================================================================
-# CACHE ACCESS FUNCTIONS
-# ============================================================================
 
 def get_image_data():
     """Get all image data from the in-memory cache."""

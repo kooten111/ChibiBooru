@@ -5,8 +5,6 @@ class StatsTabs {
         this.panels = document.querySelectorAll('.stat-panel');
         this.panelsContainer = document.getElementById('statsPanelsContainer');
         this.currentOpenPanel = null;
-
-        // NEW: Add toggle for image page
         this.headerContainer = document.querySelector('.header-container');
         this.tabsToggleButton = document.getElementById('tabs-toggle-button');
 
@@ -21,32 +19,26 @@ class StatsTabs {
             });
         });
 
-        // NEW: Click handler for the toggle button
         if (this.tabsToggleButton) {
             this.tabsToggleButton.addEventListener('click', () => {
                 this.headerContainer.classList.toggle('tabs-expanded');
             });
         }
-        
-        // Close panel when clicking outside
+
         document.addEventListener('click', (e) => {
-            // FIX: Changed check from .stats-tabs-bar (full width) to .stat-tab-button (just the button)
-            // This allows the panel to close when clicking the empty space to the left or right of it.
             if (this.currentOpenPanel && 
                 !e.target.closest('.stats-panels-container') && 
                 !e.target.closest('.stat-tab-button')) {
                 this.closeCurrentPanel();
             }
         });
-        
-        // Prevent clicks inside panels from closing
+
         if (this.panelsContainer) {
             this.panelsContainer.addEventListener('click', (e) => {
                 e.stopPropagation();
             });
         }
-        
-        // Restore last opened tab
+
         this.restoreLastTab();
     }
     

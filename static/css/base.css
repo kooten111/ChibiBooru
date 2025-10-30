@@ -229,7 +229,6 @@ body {
     font-weight: var(--font-weight-normal);
 }
 
-/* IMPORTANT: Gallery uses masonry layout with dynamic grid-row spans set by JS */
 .gallery {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -248,7 +247,6 @@ body {
     animation: scaleIn var(--anim-smooth) ease-out backwards;
 }
 
-/* IMPORTANT: Base sizing overridden by JS based on image aspect ratio */
 .thumbnail {
     grid-row: span 20;
 }

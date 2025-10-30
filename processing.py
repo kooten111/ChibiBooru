@@ -199,7 +199,6 @@ def extract_tag_data(data, source):
         "width": width, "height": height, "file_size": file_size
     }
 
-# --- Helper Functions, Booru Search, etc. ---
 def get_md5(filepath):
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:

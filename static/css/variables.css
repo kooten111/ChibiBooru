@@ -4,8 +4,6 @@
     --primary-blue: #87ceeb;
     --primary-blue-dark: #4a9eff;
     --primary-blue-darker: #357abd;
-
-    /* IMPORTANT: Streamlined opacity variants replacing multiple specific values */
     --primary-blue-light: rgba(135, 206, 235, 0.15);
     --primary-blue-medium: rgba(135, 206, 235, 0.3);
     --primary-blue-strong: rgba(135, 206, 235, 0.5);

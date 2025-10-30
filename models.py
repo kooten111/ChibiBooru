@@ -6,9 +6,6 @@ from tqdm import tqdm
 from database import get_db_connection
 from functools import lru_cache
 
-# --- Cache Management ---
-# Cache variables and functions have been moved to core/cache_manager.py
-# Import here to maintain backward compatibility
 from core.cache_manager import (
     tag_counts,
     image_data,
@@ -21,7 +18,6 @@ from core.cache_manager import (
     get_tag_counts,
 )
 
-# Tag management functions re-exported from tag_repository
 from repositories.tag_repository import (
     reload_tag_counts,
     get_all_tags_sorted,
@@ -29,8 +25,6 @@ from repositories.tag_repository import (
     rebuild_categorized_tags_from_relations,
 )
 
-
-# Data access functions re-exported from repositories.data_access
 from repositories.data_access import (
     md5_exists,
     get_image_count,
@@ -86,7 +80,6 @@ def repopulate_from_database():
             source_name = None
             available_sources = metadata.get('sources', {})
 
-            # *** CORRECTED LOGIC: Use BOORU_PRIORITY from config ***
             for src in config.BOORU_PRIORITY:
                 if src in available_sources:
                     primary_source_data = available_sources[src]
@@ -174,17 +167,11 @@ def get_related_images(post_id, parent_id):
     return _get_related_images(post_id, parent_id, post_id_to_md5)
 
 
-# Tag update functions re-exported from tag_repository
 from repositories.tag_repository import (
     update_image_tags,
     update_image_tags_categorized,
 )
 
-# --- NEW: Pool Management Functions ---
-
-# --- Pool Functions (Re-exported from repositories.pool_repository) ---
-# These functions have been extracted to repositories/pool_repository.py
-# for better code organization and maintainability.
 from repositories.pool_repository import (
     create_pool,
     get_all_pools,
@@ -199,24 +186,11 @@ from repositories.pool_repository import (
     search_images_by_pool,
 )
 
-# ============================================================================
-# TAG IMPLICATION FUNCTIONS (Re-exported from repositories.tag_repository)
-# ============================================================================
-# These functions have been extracted to repositories/tag_repository.py
-# for better code organization and maintainability.
-
 from repositories.tag_repository import (
     add_implication,
     get_implications_for_tag,
     apply_implications_for_image,
 )
-
-
-# ============================================================================
-# DELTA TRACKING FUNCTIONS (Re-exported from repositories.delta_tracker)
-# ============================================================================
-# These functions have been extracted to repositories/delta_tracker.py
-# for better code organization and maintainability.
 
 from repositories.delta_tracker import (
     record_tag_delta,
@@ -224,5 +198,3 @@ from repositories.delta_tracker import (
     apply_tag_deltas,
     get_image_deltas,
 )
-
-# Old delta tracking functions have been moved to repositories/delta_tracker.py

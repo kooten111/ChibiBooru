@@ -1,10 +1,7 @@
 """
 Pool Repository - Database operations for pool management.
 
-Extracted from models.py as part of refactoring effort to split monolithic
-data access layer into focused, maintainable modules.
-
-This module handles all pool-related database operations:
+Handles all pool-related database operations:
 - Pool CRUD (Create, Read, Update, Delete)
 - Pool membership (adding/removing images)
 - Pool searching and querying

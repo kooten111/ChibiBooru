@@ -1,12 +1,9 @@
 """
 Delta Tracker - Tag modification tracking across database rebuilds.
 
-Extracted from models.py as part of refactoring effort to split monolithic
-data access layer into focused, maintainable modules.
-
-This module tracks manual tag modifications (additions/removals) that users make
-and preserves them across database rebuilds. The delta tracking system ensures
-that manual changes aren't lost when refreshing metadata from external sources.
+Tracks manual tag modifications (additions/removals) that users make
+and preserves them across database rebuilds. Ensures manual changes
+aren't lost when refreshing metadata from external sources.
 
 Key Features:
 - Records tag additions and removals per image (by MD5)
@@ -160,7 +157,6 @@ def compute_tag_deltas(filepath, new_categorized_tags):
 def apply_tag_deltas():
     """
     Apply all recorded tag deltas after a database rebuild.
-    This should be called at the end of repopulate_from_database().
 
     Returns:
         bool: True if successful, False otherwise
@@ -171,10 +167,6 @@ def apply_tag_deltas():
         3. Get or create the tag
         4. Apply the operation (add or remove)
         5. Rebuild categorized tags
-
-    Note:
-        This function depends on rebuild_categorized_tags_from_relations
-        from models.py to update the denormalized tag columns.
     """
     try:
         with get_db_connection() as conn:
@@ -249,8 +241,6 @@ def apply_tag_deltas():
             conn.commit()
             print(f"Successfully applied {applied} tag deltas.")
 
-            # Rebuild categorized tags after applying deltas
-            # Import here to avoid circular dependency
             from models import rebuild_categorized_tags_from_relations
             rebuild_categorized_tags_from_relations()
 
@@ -266,7 +256,6 @@ def apply_tag_deltas():
 def get_image_deltas(filepath):
     """
     Get all tag deltas for a specific image.
-    Returns a dict with 'added' and 'removed' tag lists.
 
     Args:
         filepath (str): Image filepath
@@ -279,10 +268,6 @@ def get_image_deltas(filepath):
     Example:
         >>> get_image_deltas('image.png')
         {'added': [{'name': 'new_tag', 'category': 'general'}], 'removed': []}
-
-    Note:
-        Processes deltas in order and computes net changes.
-        If a tag is added then removed, it won't appear in either list.
     """
     try:
         with get_db_connection() as conn:
@@ -307,9 +292,7 @@ def get_image_deltas(filepath):
 
             deltas = cursor.fetchall()
 
-            # Track net changes: process all deltas in order
-            # and calculate what the final state is
-            tag_states = {}  # tag_name -> (operation, category)
+            tag_states = {}
 
             for delta in deltas:
                 tag_name = delta['tag_name']
@@ -317,18 +300,13 @@ def get_image_deltas(filepath):
                 operation = delta['operation']
 
                 if operation == 'add':
-                    # Adding a tag
                     tag_states[tag_name] = ('add', tag_category)
                 elif operation == 'remove':
-                    # Removing a tag
                     if tag_name in tag_states and tag_states[tag_name][0] == 'add':
-                        # If we previously added this tag, cancel it out
                         del tag_states[tag_name]
                     else:
-                        # Otherwise mark it as removed
                         tag_states[tag_name] = ('remove', tag_category)
 
-            # Convert net changes to lists
             added = []
             removed = []
 

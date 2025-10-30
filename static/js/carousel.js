@@ -35,16 +35,12 @@ class ImageCarousel {
         this.track.addEventListener('mouseup', () => this.handleMouseUp());
         this.track.addEventListener('mousemove', (e) => this.handleMouseMove(e));
 
-        // --- NEW: Prevent default browser image dragging ---
         this.track.querySelectorAll('img').forEach(img => {
             img.addEventListener('dragstart', (e) => e.preventDefault());
         });
-        // --- END OF NEW CODE ---
-        
-        // Initial button state
+
         this.updateButtons();
-        
-        // Keyboard navigation
+
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
     }
     
@@ -53,7 +49,6 @@ class ImageCarousel {
         this.track.classList.add('active');
         this.startX = e.pageX - this.track.offsetLeft;
         this.scrollLeft = this.track.scrollLeft;
-        // Prevent default text selection behavior
         e.preventDefault(); 
     }
 
@@ -71,12 +66,12 @@ class ImageCarousel {
         if (!this.isDown) return;
         e.preventDefault();
         const x = e.pageX - this.track.offsetLeft;
-        const walk = (x - this.startX) * 2; // Multiply by 2 for faster scrolling
+        const walk = (x - this.startX) * 2;
         this.track.scrollLeft = this.scrollLeft - walk;
     }
 
     scroll(direction) {
-        const scrollAmount = this.track.clientWidth * 0.8; 
+        const scrollAmount = this.track.clientWidth * 0.8;
         this.track.scrollBy({
             left: direction * scrollAmount,
             behavior: 'smooth'

@@ -1,6 +1,5 @@
 /* PAGE-SPECIFIC OVERRIDES - Only for page-specific styles that don't fit in components */
 
-/* IMPORTANT: Remove max-height on related thumbnails for mobile to allow horizontal expansion */
 @media (max-width: 1200px) {
     .image-page .related-thumb img {
         max-height: none;
