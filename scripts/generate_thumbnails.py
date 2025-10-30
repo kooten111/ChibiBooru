@@ -25,7 +25,7 @@ def generate_thumbnail(image_path, thumb_path):
                 subprocess.run([
                     'ffmpeg', '-i', image_path, '-ss', '1', '-vframes', '1',
                     '-y', temp_frame_path
-                ], check=True, capture_output=True, stderr=subprocess.DEVNULL)
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 # Now process the extracted frame as an image
                 with Image.open(temp_frame_path) as img:
                     img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
