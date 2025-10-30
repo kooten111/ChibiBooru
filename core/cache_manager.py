@@ -50,7 +50,8 @@ def load_data_from_db():
                 return False
 
             tag_counts_query = "SELECT name, COUNT(image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
-            tag_counts = {row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()}
+            tag_counts.clear()
+            tag_counts.update({row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()})
 
             image_data_query = """
             SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
@@ -59,11 +60,12 @@ def load_data_from_db():
             LEFT JOIN tags t ON it.tag_id = t.id
             GROUP BY i.id
             """
-            image_data = [dict(row) for row in conn.execute(image_data_query).fetchall()]
+            image_data.clear()
+            image_data.extend([dict(row) for row in conn.execute(image_data_query).fetchall()])
 
             # Build post_id → MD5 mapping for ALL sources
             print("Building cross-source post_id index...")
-            post_id_to_md5 = {}
+            post_id_to_md5.clear()  # Clear existing mapping
             cursor.execute("""
                 SELECT i.md5, rm.data
                 FROM images i
@@ -138,4 +140,5 @@ def reload_tag_counts():
     with data_lock:
         with get_db_connection() as conn:
             tag_counts_query = "SELECT name, COUNT(image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
-            tag_counts = {row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()}
+            tag_counts.clear()
+            tag_counts.update({row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()})
