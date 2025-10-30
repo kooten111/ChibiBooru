@@ -219,7 +219,10 @@
                             {% elif source_name == 'yandere' %}
                                 <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank" rel="noopener">Yandere</a>
                             {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
-                                <span class="text-success">AI Tagged ({{ source_data.tagger_name or 'CamieTagger' }})</span>
+                                <a href="javascript:void(0)" onclick="confirmRetryTagging()" class="ai-tagged-link" title="Click to retry tagging from online sources">
+                                    <span class="text-success">AI Tagged ({{ source_data.tagger_name or 'CamieTagger' }})</span>
+                                    <span class="retry-icon">🔄</span>
+                                </a>
                             {% endif %}
                                 {% if not loop.last %} • {% endif %}
                             {% endfor %}

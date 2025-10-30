@@ -368,6 +368,14 @@ def edit_tags():
 def delete_image():
     return api_service.delete_image_service()
 
+@api_blueprint.route('/retry_tagging', methods=['POST'])
+def retry_tagging():
+    return api_service.retry_tagging_service()
+
+@api_blueprint.route('/bulk_retry_tagging', methods=['POST'])
+def bulk_retry_tagging():
+    return api_service.bulk_retry_tagging_service()
+
 @api_blueprint.route('/tags/fetch')
 def fetch_tags():
     """API endpoint for fetching tags with pagination and filtering."""

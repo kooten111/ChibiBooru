@@ -270,6 +270,63 @@ function systemCleanOrphans(event) {
     });
 }
 
+function systemBulkRetryTagging(event) {
+    if (event) event.preventDefault();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-confirm-overlay';
+    overlay.innerHTML = `
+        <div class="custom-confirm-modal" style="max-width: 550px;">
+            <h3 style="margin: 0 0 15px 0; color: #87ceeb;">🔄 Bulk Retry Tagging Options</h3>
+            <p style="margin: 0 0 20px 0; color: #d0d0d0; line-height: 1.5;">
+                This will retry tagging for all locally-tagged images. Choose your preferred method:
+            </p>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
+                <button class="retry-option-btn" data-option="online-only" style="padding: 15px; background: rgba(74, 158, 255, 0.2); border: 2px solid rgba(74, 158, 255, 0.4); border-radius: 8px; color: #87ceeb; cursor: pointer; text-align: left; transition: all 0.2s;">
+                    <div style="font-weight: 600; margin-bottom: 5px;">🌐 Online Sources Only</div>
+                    <div style="font-size: 0.85em; opacity: 0.8;">Try Danbooru, e621, and SauceNao. Keep current tags if nothing found.</div>
+                </button>
+                <button class="retry-option-btn" data-option="with-fallback" style="padding: 15px; background: rgba(251, 146, 60, 0.2); border: 2px solid rgba(251, 146, 60, 0.4); border-radius: 8px; color: #ff9966; cursor: pointer; text-align: left; transition: all 0.2s;">
+                    <div style="font-weight: 600; margin-bottom: 5px;">🤖 With Local AI Fallback</div>
+                    <div style="font-size: 0.85em; opacity: 0.8;">Try online sources first, then re-run local AI tagger if nothing found.</div>
+                </button>
+            </div>
+            <div class="button-group">
+                <button class="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const modal = overlay.querySelector('.custom-confirm-modal');
+    const btnCancel = modal.querySelector('.btn-cancel');
+    const optionBtns = modal.querySelectorAll('.retry-option-btn');
+
+    // Add hover effects
+    optionBtns.forEach(btn => {
+        btn.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-2px)';
+            this.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+        });
+        btn.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = 'none';
+        });
+        btn.addEventListener('click', function() {
+            const option = this.dataset.option;
+            overlay.remove();
+            const skipLocalFallback = option === 'online-only';
+            systemAction('/api/bulk_retry_tagging', event.target, 'Bulk Retry Tagging', { skip_local_fallback: skipLocalFallback });
+        });
+    });
+
+    btnCancel.onclick = () => overlay.remove();
+    overlay.onclick = (e) => {
+        if (e.target === overlay) overlay.remove();
+    };
+}
+
 function systemStartMonitor(event) {
     if (event) event.preventDefault();
     systemAction('/api/system/monitor/start', event.target, 'Start Monitor');

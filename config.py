@@ -51,7 +51,7 @@ LOCAL_TAGGER_MODEL_PATH = "./models/Tagger/model.onnx"
 LOCAL_TAGGER_METADATA_PATH = "./models/Tagger/metadata.json"
 
 # Model behavior
-LOCAL_TAGGER_THRESHOLD = 0.5  # Confidence threshold for tag predictions
+LOCAL_TAGGER_THRESHOLD = 0.6  # Confidence threshold for tag predictions
 LOCAL_TAGGER_TARGET_SIZE = 512  # Input image size for model
 
 # Display name - this is what shows in metadata and UI
