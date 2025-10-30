@@ -9,7 +9,7 @@ Extracted from models.py to improve code organization and separation of concerns
 
 import json
 from database import get_db_connection
-
+from functools import lru_cache
 
 # ============================================================================
 # STATISTICS QUERIES
@@ -85,6 +85,7 @@ def get_all_filepaths():
     with get_db_connection() as conn:
         return {row['filepath'] for row in conn.execute("SELECT filepath FROM images").fetchall()}
 
+@lru_cache(maxsize=10000)
 
 def get_image_details(filepath):
     """Get detailed information about a specific image including all tags and metadata."""
