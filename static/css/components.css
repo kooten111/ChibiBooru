@@ -4004,14 +4004,15 @@ body.ui-hidden::after {
     transition: opacity 0.3s ease-in-out, filter 0.3s ease-in-out;
 }
 
-/* While loading full image, add subtle blur to thumbnail */
-.progressive-loading .progressive-image {
-    filter: blur(2px);
-    opacity: 0.95;
+/* While loading full image, add subtle visual indicator */
+.progressive-loading {
+    filter: blur(1px);
+    opacity: 0.92;
+    position: relative;
 }
 
 /* During transition from thumbnail to full image */
-.progressive-transitioning .progressive-image {
+.progressive-transitioning {
     animation: progressive-fade-in 0.3s ease-in-out;
 }
 

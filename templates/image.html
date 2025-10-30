@@ -9,8 +9,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=10' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 
+    {# Preload main image with high priority - start loading ASAP #}
+    {% if not filepath.endswith('.mp4') %}
+    <link rel="preload" href="{{ url_for('static', filename=filepath) }}" as="image" fetchpriority="high">
+    {% endif %}
+
+    {# Prefetch related images with lower priority - don't compete with main image #}
+    {# Limit to first 3 to avoid bandwidth competition #}
     {% if related_images %}
-        {% for related in related_images %}
+        {% for related in related_images[:3] %}
         <link rel="prefetch" href="{{ url_for('static', filename=related.path) }}" as="image">
         {% endfor %}
     {% endif %}
@@ -339,10 +346,12 @@
                         Your browser does not support the video tag.
                     </video>
                     {% else %}
-                    <img src="{{ url_for('static', filename=thumbnail_path if thumbnail_path and thumbnail_path != filepath else filepath) }}"
+                    {# Always show thumbnail first if it exists and differs from full image #}
+                    {% set use_progressive = thumbnail_path and thumbnail_path != filepath %}
+                    <img src="{{ url_for('static', filename=thumbnail_path if use_progressive else filepath) }}"
                          alt="Image"
-                         class="progressive-image"
-                         data-full-src="{{ url_for('static', filename=filepath) }}">
+                         class="progressive-image{% if use_progressive %} needs-progressive-load{% endif %}"
+                         {% if use_progressive %}data-full-src="{{ filepath }}"{% endif %}>
                     {% endif %}
                 </div>
 
@@ -519,13 +528,35 @@
 <script>
 // Initialize progressive image loading for the main image
 document.addEventListener('DOMContentLoaded', () => {
-    const container = document.getElementById('imageViewContainer');
-    if (container) {
-        const fullPath = container.dataset.fullImage;
-        const thumbPath = container.dataset.thumbnail;
-        if (fullPath && thumbPath && thumbPath !== fullPath) {
-            window.progressiveLoader.loadProgressively(container, fullPath, thumbPath);
-        }
+    const img = document.querySelector('.needs-progressive-load');
+    if (img && img.dataset.fullSrc) {
+        const fullPath = img.dataset.fullSrc;
+
+        // Add loading class
+        img.classList.add('progressive-loading');
+
+        // Preload full image
+        const fullImg = new Image();
+        fullImg.onload = () => {
+            // Smooth transition to full image
+            img.classList.add('progressive-transitioning');
+            img.src = '/static/' + fullPath;
+            img.dataset.loaded = 'true';
+
+            // Remove loading classes after transition
+            setTimeout(() => {
+                img.classList.remove('progressive-loading', 'progressive-transitioning');
+            }, 300);
+        };
+
+        fullImg.onerror = () => {
+            console.warn('Failed to load full image:', fullPath);
+            img.classList.remove('progressive-loading');
+        };
+
+        // Start loading immediately with high priority
+        fullImg.fetchPriority = 'high';
+        fullImg.src = '/static/' + fullPath;
     }
 });
 </script>
