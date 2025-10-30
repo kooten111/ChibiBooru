@@ -80,39 +80,36 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
     ```
 
 3.  **Configuration:**
-    Create a `.env` file in the root of the project:
+    Copy the example environment file and customize it:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Then edit `.env` with your settings. Key values to configure:
 
     ```env
-    # Application Settings
-    APP_NAME="ChibiBooru"
+    # REQUIRED: Security settings - change these!
     APP_PASSWORD="your-secure-password"
-    SECRET_KEY="your-secret-key-for-sessions"
+    SECRET_KEY="your-secret-key-for-sessions"  # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
     RELOAD_SECRET="a-very-secret-string"
 
-    # Required for reverse image search
-    SAUCENAO_API_KEY="your_saucenao_api_key"
-
-    # Optional: Gelbooru API for authenticated requests
+    # OPTIONAL: API keys for enhanced metadata fetching
+    SAUCENAO_API_KEY="your_saucenao_api_key"  # Recommended for reverse image search
     GELBOORU_API_KEY=""
     GELBOORU_USER_ID=""
 
-    # Optional: Name for the local AI tagger
+    # OPTIONAL: Customization
+    APP_NAME="ChibiBooru"
     LOCAL_TAGGER_NAME="CamieTagger"
-
-    # Optional: Similarity calculation method ('jaccard' or 'weighted')
-    SIMILARITY_METHOD="weighted"
-
-    # Optional: Flask server settings
-    FLASK_HOST="0.0.0.0"
-    FLASK_PORT="5000"
-    FLASK_DEBUG="False"
+    SIMILARITY_METHOD="weighted"  # Options: 'jaccard' or 'weighted'
     ```
 
     **Important Security Notes:**
-    - Change `APP_PASSWORD` to a strong password to protect your instance
-    - Set `SECRET_KEY` to a long random string for secure sessions
-    - Change `RELOAD_SECRET` for system management access
-    - Never commit your `.env` file to version control
+    - **REQUIRED:** Change `APP_PASSWORD`, `SECRET_KEY`, and `RELOAD_SECRET` before first use
+    - Generate a secure `SECRET_KEY` using: `python -c "import secrets; print(secrets.token_hex(32))"`
+    - Never commit your `.env` file to version control (it's already in `.gitignore`)
+    - See `.env.example` for full configuration options and documentation
 
 4.  **Place your images:**
     Move your image collection into the `static/images/` directory. You can create subdirectories to organize them.
