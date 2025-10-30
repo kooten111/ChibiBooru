@@ -571,7 +571,7 @@ def perform_search(search_query):
 
     return results, should_shuffle
 
-
+@lru_cache(maxsize=10000)
 def find_related_by_tags(filepath, limit=20):
     """Find related images by weighted tag similarity using the database."""
     details = models.get_image_details(filepath.replace("images/", "", 1))

@@ -143,7 +143,7 @@ def delete_image(filepath):
 # ============================================================================
 # RELATIONSHIP QUERIES
 # ============================================================================
-
+@lru_cache(maxsize=10000)
 def get_related_images(post_id, parent_id, post_id_to_md5_mapping):
     """Find parent and child images using pre-computed cross-source mapping."""
     related = []
