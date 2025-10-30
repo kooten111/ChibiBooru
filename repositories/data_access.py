@@ -86,7 +86,6 @@ def get_all_filepaths():
         return {row['filepath'] for row in conn.execute("SELECT filepath FROM images").fetchall()}
 
 @lru_cache(maxsize=10000)
-
 def get_image_details(filepath):
     """Get detailed information about a specific image including all tags and metadata."""
     with get_db_connection() as conn:
@@ -143,7 +142,7 @@ def delete_image(filepath):
 # ============================================================================
 # RELATIONSHIP QUERIES
 # ============================================================================
-@lru_cache(maxsize=10000)
+
 def get_related_images(post_id, parent_id, post_id_to_md5_mapping):
     """Find parent and child images using pre-computed cross-source mapping."""
     related = []
