@@ -4,6 +4,7 @@ import json
 import sqlite3
 from tqdm import tqdm
 from database import get_db_connection
+from functools import lru_cache
 
 # --- Cache Management ---
 # Cache variables and functions have been moved to core/cache_manager.py
@@ -166,6 +167,7 @@ def repopulate_from_database():
 
     print("Database rebuild complete.")
 
+@lru_cache(maxsize=10000)
 def get_related_images(post_id, parent_id):
     """Find parent and child images using pre-computed cross-source mapping."""
     from repositories.data_access import get_related_images as _get_related_images
