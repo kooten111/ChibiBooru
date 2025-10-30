@@ -16,14 +16,90 @@ def scan_and_process_service():
     secret = request.args.get('secret', '') or request.form.get('secret', '')
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     try:
+        # First, process new images
         processed_count = monitor_service.run_scan()
-        if processed_count > 0:
-            return jsonify({"status": "success", "message": f"Processed {processed_count} new images.", "processed": processed_count})
+
+        # Then, clean orphaned image_tags entries (broken foreign keys)
+        print("Checking for orphaned image_tags entries...")
+        from database import get_db_connection
+        orphaned_tags_count = 0
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) FROM image_tags it
+                LEFT JOIN images i ON it.image_id = i.id
+                WHERE i.id IS NULL
+            """)
+            orphaned_tags_count = cursor.fetchone()[0]
+
+            if orphaned_tags_count > 0:
+                print(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
+                cursor.execute("""
+                    DELETE FROM image_tags
+                    WHERE image_id NOT IN (SELECT id FROM images)
+                """)
+                conn.commit()
+                print(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
+
+        # Then, clean orphaned image records for manually deleted files
+        print("Checking for orphaned image records...")
+        db_filepaths = models.get_all_filepaths()
+        print(f"Database has {len(db_filepaths)} image records")
+
+        disk_filepaths = set()
+        for root, _, files in os.walk("static/images"):
+            for file in files:
+                full_path = os.path.join(root, file)
+                rel_path = os.path.relpath(full_path, "static/images").replace('\\', '/')
+                disk_filepaths.add(rel_path)
+        print(f"Disk has {len(disk_filepaths)} files")
+
+        orphans = db_filepaths - disk_filepaths
+        cleaned_count = 0
+        print(f"Found {len(orphans)} orphaned image records")
+
+        if orphans:
+            print(f"Cleaning {len(orphans)} orphaned image records...")
+            for orphan_path in orphans:
+                if models.delete_image(orphan_path):
+                    cleaned_count += 1
+            print(f"Cleaned {cleaned_count} orphaned image records")
         else:
-            return jsonify({"status": "success", "message": "No new images found to process.", "processed": 0})
+            print("No orphaned image records to clean")
+
+        # Reload data to update tag counts after cleaning
+        if cleaned_count > 0 or orphaned_tags_count > 0:
+            print(f"Reloading data to update tag counts...")
+            models.load_data_from_db()
+            print("Data reload complete")
+
+        # Build response message
+        messages = []
+        if processed_count > 0:
+            messages.append(f"Processed {processed_count} new images")
+        else:
+            messages.append("No new images found")
+
+        if cleaned_count > 0:
+            messages.append(f"cleaned {cleaned_count} orphaned image records")
+
+        if orphaned_tags_count > 0:
+            messages.append(f"cleaned {orphaned_tags_count} orphaned tag entries")
+
+        message = ", ".join(messages) + "."
+
+        return jsonify({
+            "status": "success",
+            "message": message,
+            "processed": processed_count,
+            "cleaned": cleaned_count,
+            "orphaned_tags_cleaned": orphaned_tags_count
+        })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 def rebuild_service():
@@ -139,11 +215,37 @@ def clean_orphans_service():
     secret = request.args.get('secret', '') or request.form.get('secret', '')
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     data = request.json or {}
     dry_run = data.get('dry_run', True)
 
     try:
+        # First, clean orphaned image_tags entries (broken foreign keys)
+        print("Checking for orphaned image_tags entries...")
+        from database import get_db_connection
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Count orphaned image_tags
+            cursor.execute("""
+                SELECT COUNT(*) FROM image_tags it
+                LEFT JOIN images i ON it.image_id = i.id
+                WHERE i.id IS NULL
+            """)
+            orphaned_tags_count = cursor.fetchone()[0]
+
+            if orphaned_tags_count > 0:
+                print(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
+                if not dry_run:
+                    cursor.execute("""
+                        DELETE FROM image_tags
+                        WHERE image_id NOT IN (SELECT id FROM images)
+                    """)
+                    conn.commit()
+                    print(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
+
+        # Then, find and remove image records for deleted files
+        print("Checking for orphaned image records...")
         db_filepaths = models.get_all_filepaths()
 
         disk_filepaths = set()
@@ -156,9 +258,12 @@ def clean_orphans_service():
         orphans = db_filepaths - disk_filepaths
 
         if dry_run:
+            message = f"Found {len(orphans)} orphaned image records and {orphaned_tags_count} orphaned tag entries (dry run - not removed)."
             return jsonify({
                 "status": "success",
+                "message": message,
                 "orphans_found": len(orphans),
+                "orphaned_tags": orphaned_tags_count,
                 "orphans": sorted(list(orphans)),
                 "cleaned": 0
             })
@@ -167,15 +272,26 @@ def clean_orphans_service():
             for orphan_path in orphans:
                 if models.delete_image(orphan_path):
                     cleaned_count += 1
-            
-            if cleaned_count > 0:
+
+            # Always reload data after cleaning to update tag counts and image cache
+            if cleaned_count > 0 or orphaned_tags_count > 0:
+                print(f"Cleaned {cleaned_count} orphaned image records and {orphaned_tags_count} orphaned tag entries.")
+                print("Reloading data to update tag counts...")
                 models.load_data_from_db()
+                print("Tag counts updated after orphan cleanup.")
+                message = f"Cleaned {cleaned_count} orphaned images and {orphaned_tags_count} orphaned tag entries. Tag counts updated."
+            else:
+                message = f"No orphaned entries found. Database is clean!"
 
             return jsonify({
                 "status": "success",
+                "message": message,
                 "orphans_found": len(orphans),
+                "orphaned_tags": orphaned_tags_count,
                 "orphans": sorted(list(orphans)),
                 "cleaned": cleaned_count
             })
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
