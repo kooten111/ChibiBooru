@@ -197,17 +197,31 @@ Booru/
 │   ├── css/            # Stylesheets
 │   ├── js/             # JavaScript files
 │   ├── images/         # Your image collection goes here
-│   └── thumbnails/     # Auto-generated thumbnails
+│   ├── thumbnails/     # Auto-generated thumbnails
+│   └── favicon.svg     # Application icon
 ├── templates/          # Flask HTML templates
 ├── services/           # Service layer for business logic
-│   ├── api_service.py       # API integration services
-│   ├── implication_service.py  # Tag implication detection
-│   ├── monitor_service.py   # Background file monitoring
-│   ├── query_service.py     # Search and similarity calculations
-│   └── system_service.py    # System management operations
-├── utils/              # Utility scripts
+│   ├── api_service.py           # API integration services
+│   ├── implication_service.py   # Tag implication detection
+│   ├── monitor_service.py       # Background file monitoring
+│   ├── query_service.py         # Search and similarity calculations
+│   ├── switch_source_db.py      # Source switching utilities
+│   └── system_service.py        # System management operations
+├── repositories/       # Data access layer
+│   ├── data_access.py       # Core data access functions
+│   ├── delta_tracker.py     # Tag modification tracking
+│   ├── pool_repository.py   # Pool data operations
+│   └── tag_repository.py    # Tag data operations
+├── core/               # Core infrastructure
+│   └── cache_manager.py     # Cache management system
+├── events/             # Event handling
+│   └── cache_events.py      # Cache invalidation events
+├── utils/              # Utility functions
 │   ├── deduplication.py     # Duplicate detection
 │   └── file_utils.py        # File handling utilities
+├── scripts/            # Maintenance scripts
+│   ├── cleanup_deltas.py        # Clean tag delta history
+│   └── generate_thumbnails.py   # Batch thumbnail generation
 ├── models/             # AI tagging models (place ONNX models here)
 ├── app.py              # Main Flask application
 ├── config.py           # Centralized configuration
@@ -215,6 +229,8 @@ Booru/
 ├── models.py           # Database models and data access layer
 ├── processing.py       # Core image processing and metadata fetching
 ├── routes.py           # Flask routes and web endpoints
+├── .env                # Your configuration (create from .env.example)
+├── .env.example        # Example configuration file
 └── booru.db            # SQLite database (created automatically)
 ```
 
