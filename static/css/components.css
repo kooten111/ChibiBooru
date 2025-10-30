@@ -1410,7 +1410,6 @@ body.image-page {
 .image-page .related-thumb img {
     width: 100%;
     height: auto;
-    max-height: 400px;
     object-fit: contain;
     display: block;
     transition: transform var(--transition-smooth);
