@@ -256,9 +256,11 @@ def show_raw_data(filepath):
 @login_required
 def upload_image():
     if request.method == 'POST':
+        from utils.file_utils import ensure_bucket_dir, get_bucketed_path
+
         if 'file' not in request.files:
             return jsonify({"error": "No file part"}), 400
-        
+
         files = request.files.getlist('file')
         if not files or files[0].filename == '':
             return jsonify({"error": "No selected file"}), 400
@@ -268,13 +270,19 @@ def upload_image():
         for file in files:
             if file and file.filename:
                 filename = secure_filename(file.filename)
-                filepath = os.path.join(config.IMAGE_DIRECTORY, filename)
+
+                # Save to bucketed directory
+                bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
+                filepath = os.path.join(bucket_dir, filename)
                 file.save(filepath)
 
-                if processing.process_image_file(filepath):
+                # Process the file (already in bucketed location, so don't move)
+                if processing.process_image_file(filepath, move_from_ingest=False):
                     processed_count += 1
                     # Keep track of the last successfully processed image's path
-                    last_processed_path = f'images/{filename}'
+                    # Use bucketed path for URL
+                    bucketed_path = get_bucketed_path(filename, "images")
+                    last_processed_path = bucketed_path
 
         if processed_count > 0:
             models.load_data_from_db()
@@ -289,7 +297,7 @@ def upload_image():
             "message": f"Successfully processed {processed_count} image(s).",
             "redirect_url": redirect_url
         })
-    
+
     # GET request renders the upload page
     return render_template(
         'upload.html',

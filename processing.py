@@ -207,8 +207,19 @@ def get_md5(filepath):
     return hash_md5.hexdigest()
 
 def ensure_thumbnail(filepath, image_dir="./static/images"):
-    rel_path = os.path.relpath(filepath, image_dir)
-    thumb_path = os.path.join(THUMB_DIR, os.path.splitext(rel_path)[0] + '.webp')
+    """
+    Create a thumbnail for an image.
+    Handles both bucketed and legacy flat paths.
+    """
+    from utils.file_utils import get_hash_bucket
+
+    # Get just the filename
+    filename = os.path.basename(filepath)
+    base_name = os.path.splitext(filename)[0]
+
+    # Use bucketed structure for thumbnails
+    bucket = get_hash_bucket(filename)
+    thumb_path = os.path.join(THUMB_DIR, bucket, base_name + '.webp')
 
     if not os.path.exists(thumb_path):
         os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
@@ -339,14 +350,59 @@ def fetch_by_post_id(source, post_id):
         print(f"Error fetching {source} post {post_id}: {e}")
     return None
 
-def process_image_file(filepath):
+def process_image_file(filepath, move_from_ingest=False):
+    """
+    Process an image file, fetch metadata, and add to database.
+
+    Args:
+        filepath: Path to the image file
+        move_from_ingest: If True, move file from ingest folder to bucketed structure
+
+    Returns:
+        Boolean indicating success
+    """
+    from utils.file_utils import ensure_bucket_dir, get_bucketed_path
+    import shutil
+
     print(f"Processing: {filepath}")
-    rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+
+    # Get filename
+    filename = os.path.basename(filepath)
+
+    # Calculate MD5 before any moves
     md5 = get_md5(filepath)
+
+    # Determine final destination path
+    if move_from_ingest:
+        # Move from ingest to bucketed structure
+        bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
+        dest_filepath = os.path.join(bucket_dir, filename)
+
+        # Move the file
+        shutil.move(filepath, dest_filepath)
+        filepath = dest_filepath
+        print(f"Moved to bucketed location: {dest_filepath}")
+
+    # Get relative path for database (relative to static/)
+    if filepath.startswith("./static/"):
+        rel_path = filepath[9:]  # Remove "./static/"
+    elif filepath.startswith("static/"):
+        rel_path = filepath[7:]  # Remove "static/"
+    else:
+        rel_path = os.path.relpath(filepath, "./static")
+
+    # Normalize to forward slashes
+    rel_path = rel_path.replace('\\', '/')
+
+    # Remove "images/" prefix if present for storage
+    if rel_path.startswith("images/"):
+        db_path = rel_path[7:]  # Store without "images/" prefix
+    else:
+        db_path = rel_path
 
     if models.md5_exists(md5):
         print(f"Duplicate detected (MD5: {md5}). Removing redundant file: {filepath}")
-        remove_duplicate(rel_path)
+        remove_duplicate(db_path)
         return False
 
     all_results = search_all_sources(md5)
@@ -355,7 +411,7 @@ def process_image_file(filepath):
     used_local_tagger = False
 
     if not all_results:
-        print(f"MD5 lookup failed for {rel_path}, trying SauceNao...")
+        print(f"MD5 lookup failed for {db_path}, trying SauceNao...")
         saucenao_response = search_saucenao(filepath)
         used_saucenao = True
         if saucenao_response and 'results' in saucenao_response:
@@ -380,7 +436,7 @@ def process_image_file(filepath):
                     break
 
     if not all_results:
-        print(f"All online searches failed for {rel_path}, trying local AI tagger...")
+        print(f"All online searches failed for {db_path}, trying local AI tagger...")
         local_tagger_result = tag_with_local_tagger(filepath)
         used_local_tagger = True
         if local_tagger_result:
@@ -388,7 +444,7 @@ def process_image_file(filepath):
             print(f"Tagged with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
 
     if not all_results:
-        print(f"No metadata found for {rel_path}")
+        print(f"No metadata found for {db_path}")
         return False
 
     primary_source_data = None
@@ -440,7 +496,7 @@ def process_image_file(filepath):
         parent_id = primary_source_data.get('relationships', {}).get('parent_id')
 
     image_info = {
-        'filepath': rel_path,
+        'filepath': db_path,
         'md5': md5,
         'post_id': primary_source_data.get('id'),
         'parent_id': parent_id,
@@ -450,7 +506,7 @@ def process_image_file(filepath):
 
     raw_metadata_to_save = {
         "md5": md5,
-        "relative_path": rel_path,
+        "relative_path": db_path,
         "saucenao_lookup": used_saucenao,
         "saucenao_response": saucenao_response,
         "local_tagger_lookup": used_local_tagger,
@@ -468,6 +524,6 @@ def process_image_file(filepath):
         ensure_thumbnail(filepath)
         return True
     else:
-        print(f"Failed to add image {rel_path} to DB. It might be a duplicate from a concurrent process. Removing file.")
+        print(f"Failed to add image {db_path} to DB. It might be a duplicate from a concurrent process. Removing file.")
         remove_duplicate(filepath)
         return False

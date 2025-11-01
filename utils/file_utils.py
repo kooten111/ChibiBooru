@@ -2,14 +2,95 @@ import os
 import hashlib
 
 
+def get_hash_bucket(filename, bucket_chars=3):
+    """
+    Generate hash bucket directory for a filename.
+    Uses MD5 hash of the filename to ensure uniform distribution.
+
+    Args:
+        filename: The filename to hash
+        bucket_chars: Number of hex chars to use (default 3 = 4096 buckets)
+
+    Returns:
+        Bucket directory name (e.g., "a3f")
+    """
+    hash_hex = hashlib.md5(filename.encode()).hexdigest()
+    return hash_hex[:bucket_chars]
+
+
+def get_bucketed_path(filename, base_dir="images"):
+    """
+    Get the full bucketed path for a file.
+
+    Args:
+        filename: The filename
+        base_dir: Base directory (e.g., "images" or "thumbnails")
+
+    Returns:
+        Full path like "images/a3f/filename.jpg"
+    """
+    bucket = get_hash_bucket(filename)
+    return f"{base_dir}/{bucket}/{filename}"
+
+
+def get_bucketed_filepath_on_disk(filename, base_dir="./static/images"):
+    """
+    Get the full filesystem path for a bucketed file.
+
+    Args:
+        filename: The filename
+        base_dir: Base directory on disk
+
+    Returns:
+        Full path like "./static/images/a3f/filename.jpg"
+    """
+    bucket = get_hash_bucket(filename)
+    return os.path.join(base_dir, bucket, filename)
+
+
+def ensure_bucket_dir(filename, base_dir="./static/images"):
+    """
+    Ensure the bucket directory exists for a file.
+
+    Args:
+        filename: The filename
+        base_dir: Base directory on disk
+
+    Returns:
+        The bucket directory path
+    """
+    bucket = get_hash_bucket(filename)
+    bucket_dir = os.path.join(base_dir, bucket)
+    os.makedirs(bucket_dir, exist_ok=True)
+    return bucket_dir
+
+
 def get_thumbnail_path(image_path):
-    """Convert image path to thumbnail path"""
+    """
+    Convert image path to thumbnail path.
+    Handles both legacy flat structure and new bucketed structure.
+    """
+    # Remove "images/" prefix if present
     rel_path = image_path.replace("images/", "", 1)
-    thumb_path = os.path.splitext(rel_path)[0] + '.webp'
-    full_thumb_path = f"thumbnails/{thumb_path}"
-    
-    if os.path.exists(f"static/{full_thumb_path}"):
-        return full_thumb_path
+
+    # Extract just the filename (handles both flat and bucketed paths)
+    filename = os.path.basename(rel_path)
+
+    # Generate thumbnail name
+    thumb_filename = os.path.splitext(filename)[0] + '.webp'
+
+    # Try bucketed path first
+    bucket = get_hash_bucket(filename)
+    bucketed_thumb = f"thumbnails/{bucket}/{thumb_filename}"
+    if os.path.exists(f"static/{bucketed_thumb}"):
+        return bucketed_thumb
+
+    # Fall back to legacy flat thumbnail path
+    legacy_thumb = f"thumbnails/{thumb_filename}"
+    if os.path.exists(f"static/{legacy_thumb}"):
+        return legacy_thumb
+
+    # Return original image path as last resort
     return image_path
 
 

@@ -17,6 +17,9 @@ IMAGE_DIRECTORY = "./static/images"
 THUMB_DIR = "./static/thumbnails"
 THUMB_SIZE = 1000  # Max dimension for thumbnails
 
+# Ingest folder - drop images here and they'll be processed automatically
+INGEST_DIRECTORY = "./ingest"
+
 # Data storage
 TAGS_FILE = "./tags.json"
 METADATA_DIR = "./metadata"
@@ -126,22 +129,30 @@ SIMILARITY_CATEGORY_WEIGHTS = {
 def validate_config():
     """Validate configuration and warn about issues"""
     warnings = []
-    
+
     if not os.path.exists(IMAGE_DIRECTORY):
         warnings.append(f"Image directory not found: {IMAGE_DIRECTORY}")
-    
+
+    # Create ingest directory if it doesn't exist
+    if not os.path.exists(INGEST_DIRECTORY):
+        try:
+            os.makedirs(INGEST_DIRECTORY, exist_ok=True)
+            print(f"✓ Created ingest directory: {INGEST_DIRECTORY}")
+        except Exception as e:
+            warnings.append(f"Failed to create ingest directory: {e}")
+
     if ENABLE_LOCAL_TAGGER:
         if not os.path.exists(LOCAL_TAGGER_MODEL_PATH):
             warnings.append(f"Local tagger model not found: {LOCAL_TAGGER_MODEL_PATH}")
         if not os.path.exists(LOCAL_TAGGER_METADATA_PATH):
             warnings.append(f"Local tagger metadata not found: {LOCAL_TAGGER_METADATA_PATH}")
-    
+
     if RELOAD_SECRET == 'change-this-secret':
         warnings.append("RELOAD_SECRET is set to default value - change this for production!")
-    
+
     if APP_PASSWORD == 'default-password':
         warnings.append("APP_PASSWORD is set to default value - change this for security!")
-        
+
     if SECRET_KEY == 'dev-secret-key-change-for-production':
         warnings.append("SECRET_KEY is set to default value - change this for production!")
 
@@ -150,7 +161,7 @@ def validate_config():
         for warning in warnings:
             print(f"  - {warning}")
         print()
-    
+
     return len(warnings) == 0
 
 # ==================== HELPER FUNCTIONS ====================

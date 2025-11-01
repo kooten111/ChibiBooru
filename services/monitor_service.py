@@ -37,12 +37,13 @@ def add_log(message, type='info'):
 class ImageFileHandler(FileSystemEventHandler):
     """Handles filesystem events for new image files."""
 
-    def __init__(self):
+    def __init__(self, watch_ingest=False):
         super().__init__()
         self.processing_lock = threading.Lock()
         # Debounce: track recently processed files to avoid duplicates
         self.recently_processed = {}
         self.debounce_seconds = 2
+        self.watch_ingest = watch_ingest
 
     def is_image_file(self, filepath):
         """Check if file is an image or video."""
@@ -78,40 +79,80 @@ class ImageFileHandler(FileSystemEventHandler):
         time.sleep(0.5)
 
         with self.processing_lock:
-            # Check if already in database
-            rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
-            if rel_path in models.get_all_filepaths():
-                return
+            import config
+            from utils.file_utils import get_bucketed_path
 
-            try:
-                add_log(f"New file detected: {os.path.basename(filepath)}", 'info')
-                if processing.process_image_file(filepath):
-                    monitor_status["last_scan_found"] = 1
-                    monitor_status["total_processed"] += 1
-                    # Selective reload
-                    models.reload_single_image(rel_path)
-                    models.reload_tag_counts()
-                    add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
-                else:
-                    add_log(f"Skipped (duplicate): {os.path.basename(filepath)}", 'warning')
-            except Exception as e:
-                add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
+            # Normalize paths for comparison
+            abs_filepath = os.path.abspath(filepath)
+            abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+
+            # Determine if this is from ingest folder
+            is_from_ingest = self.watch_ingest and abs_filepath.startswith(abs_ingest)
+
+            if is_from_ingest:
+                # File from ingest - will be moved to bucketed structure
+                filename = os.path.basename(filepath)
+                try:
+                    add_log(f"New file detected in ingest: {filename}", 'info')
+                    if processing.process_image_file(filepath, move_from_ingest=True):
+                        monitor_status["last_scan_found"] = 1
+                        monitor_status["total_processed"] += 1
+                        # Reload with bucketed path
+                        bucketed_rel_path = get_bucketed_path(filename, "images").replace("images/", "", 1)
+                        models.reload_single_image(bucketed_rel_path)
+                        models.reload_tag_counts()
+                        add_log(f"Successfully processed from ingest: {filename}", 'success')
+                    else:
+                        add_log(f"Skipped (duplicate): {filename}", 'warning')
+                except Exception as e:
+                    add_log(f"Error processing {filename}: {e}", 'error')
+            else:
+                # File directly in images directory - already in bucketed location
+                # Check if already in database
+                rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+                if rel_path in models.get_all_filepaths():
+                    return
+
+                try:
+                    add_log(f"New file detected: {os.path.basename(filepath)}", 'info')
+                    if processing.process_image_file(filepath, move_from_ingest=False):
+                        monitor_status["last_scan_found"] = 1
+                        monitor_status["total_processed"] += 1
+                        # Selective reload
+                        models.reload_single_image(rel_path)
+                        models.reload_tag_counts()
+                        add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
+                    else:
+                        add_log(f"Skipped (duplicate): {os.path.basename(filepath)}", 'warning')
+                except Exception as e:
+                    add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
 
 # --- Core Monitor Logic ---
 
 def find_unprocessed_images():
     """Finds image files on disk that are not in the database."""
+    import config
+
     db_filepaths = models.get_all_filepaths()
-    disk_filepaths = []
+    unprocessed_files = []
+
+    # Check static/images directory
     for root, _, files in os.walk("static/images"):
         for file in files:
             if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
-                disk_filepaths.append(os.path.join(root, file))
+                filepath = os.path.join(root, file)
+                rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+                if rel_path not in db_filepaths:
+                    unprocessed_files.append(filepath)
 
-    unprocessed_files = [
-        fp for fp in disk_filepaths
-        if os.path.relpath(fp, "static/images").replace('\\', '/') not in db_filepaths
-    ]
+    # Check ingest directory
+    if os.path.exists(config.INGEST_DIRECTORY):
+        for file in os.listdir(config.INGEST_DIRECTORY):
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
+                filepath = os.path.join(config.INGEST_DIRECTORY, file)
+                if os.path.isfile(filepath):
+                    unprocessed_files.append(filepath)
+
     return unprocessed_files
 
 def run_scan():
@@ -119,6 +160,9 @@ def run_scan():
     Finds and processes all new images.
     Returns the number of images processed.
     """
+    import config
+    from utils.file_utils import get_bucketed_path
+
     unprocessed_files = find_unprocessed_images()
     if not unprocessed_files:
         add_log("No new images found.")
@@ -127,8 +171,13 @@ def run_scan():
     add_log(f"Found {len(unprocessed_files)} new images to process.")
     processed_count = 0
     for f in unprocessed_files:
+        # Determine if file is in ingest folder
+        abs_filepath = os.path.abspath(f)
+        abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+        is_from_ingest = abs_filepath.startswith(abs_ingest)
+
         try:
-            if processing.process_image_file(f):
+            if processing.process_image_file(f, move_from_ingest=is_from_ingest):
                 processed_count += 1
                 add_log(f"Successfully processed: {os.path.basename(f)}", 'success')
             else:
@@ -137,16 +186,8 @@ def run_scan():
             add_log(f"Error processing {os.path.basename(f)}: {e}", 'error')
 
     # For bulk operations, full reload is acceptable
-    # But we could optimize this for single files in the future
     if processed_count > 0:
-        if processed_count == 1:
-            # Single file - selective reload
-            rel_path = os.path.relpath(unprocessed_files[0], "static/images").replace('\\', '/')
-            models.reload_single_image(rel_path)
-            models.reload_tag_counts()
-        else:
-            # Multiple files - full reload is fine
-            models.load_data_from_db()
+        models.load_data_from_db()
 
     return processed_count
 
@@ -175,6 +216,7 @@ def monitor_loop():
 def start_monitor():
     """Starts the background monitoring thread with watchdog."""
     global monitor_thread, observer
+    import config
 
     if monitor_status["running"]:
         return False
@@ -184,9 +226,15 @@ def start_monitor():
     if monitor_status["mode"] == "watchdog":
         # Use watchdog for real-time filesystem monitoring
         try:
-            event_handler = ImageFileHandler()
+            event_handler = ImageFileHandler(watch_ingest=True)
             observer = Observer()
             observer.schedule(event_handler, "static/images", recursive=True)
+
+            # Also watch ingest folder if it exists
+            if os.path.exists(config.INGEST_DIRECTORY):
+                observer.schedule(event_handler, config.INGEST_DIRECTORY, recursive=False)
+                add_log(f"Watching ingest folder: {config.INGEST_DIRECTORY}")
+
             observer.start()
             add_log("Background monitor started (watchdog mode - real-time detection).")
 
