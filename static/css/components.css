@@ -3606,35 +3606,6 @@ body.ui-hidden::after {
     flex: 1;
 }
 
-.tag-suggestions {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--bg-panel);
-    border: var(--border-width) solid var(--border-color);
-    border-top: none;
-    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-    max-height: 200px;
-    overflow-y: auto;
-    z-index: var(--z-dropdown);
-    display: none;
-}
-
-.tag-suggestions.active {
-    display: block;
-}
-
-.tag-suggestion {
-    padding: var(--spacing-sm) var(--spacing-md);
-    cursor: pointer;
-    border-bottom: var(--border-width) solid var(--border-color);
-    transition: background var(--transition-normal);
-}
-
-.tag-suggestion:hover {
-    background: var(--bg-hover);
-}
 
 .preview-section {
     background: var(--bg-panel);
