@@ -213,11 +213,109 @@ function initCollapsibleSections() {
 }
 
 
+/**
+ * Initialize swipe gestures for mobile navigation between related images
+ */
+function initSwipeNavigation() {
+    // Get all related image links
+    const relatedLinks = Array.from(document.querySelectorAll('.related-thumb'));
+    if (relatedLinks.length === 0) return; // No related images
+
+    // Find current image index or default to -1 (navigate to first related)
+    const currentPath = document.getElementById('imageFilepath')?.value;
+    let currentIndex = -1;
+
+    // Touch event state
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+    let isSwiping = false;
+
+    // Minimum swipe distance (in pixels)
+    const minSwipeDistance = 50;
+    // Maximum vertical movement allowed for horizontal swipe
+    const maxVerticalMovement = 100;
+
+    // Get the main content area for swipe detection
+    const imageContainer = document.querySelector('.image-view') || document.querySelector('.main-content');
+    if (!imageContainer) return;
+
+    // Touch start handler
+    imageContainer.addEventListener('touchstart', (e) => {
+        // Only start tracking if touching the image area directly (not buttons or links)
+        if (e.target.closest('.actions-bar') || e.target.closest('button') || e.target.closest('a')) {
+            return;
+        }
+
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+        isSwiping = false;
+    }, { passive: true });
+
+    // Touch move handler
+    imageContainer.addEventListener('touchmove', (e) => {
+        if (touchStartX === 0) return;
+
+        const currentX = e.changedTouches[0].screenX;
+        const currentY = e.changedTouches[0].screenY;
+        const diffX = Math.abs(currentX - touchStartX);
+        const diffY = Math.abs(currentY - touchStartY);
+
+        // If horizontal movement is greater than vertical, we're swiping
+        if (diffX > diffY && diffX > 10) {
+            isSwiping = true;
+        }
+    }, { passive: true });
+
+    // Touch end handler
+    imageContainer.addEventListener('touchend', (e) => {
+        if (touchStartX === 0) return;
+
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+
+        handleSwipe();
+
+        // Reset
+        touchStartX = 0;
+        touchStartY = 0;
+        touchEndX = 0;
+        touchEndY = 0;
+        isSwiping = false;
+    }, { passive: true });
+
+    function handleSwipe() {
+        const horizontalDistance = touchEndX - touchStartX;
+        const verticalDistance = Math.abs(touchEndY - touchStartY);
+
+        // Check if it's a valid horizontal swipe
+        if (Math.abs(horizontalDistance) < minSwipeDistance) return;
+        if (verticalDistance > maxVerticalMovement) return;
+        if (!isSwiping) return;
+
+        // Swipe left = next image (first related image)
+        if (horizontalDistance < 0 && relatedLinks.length > 0) {
+            // Navigate to first related image
+            window.location.href = relatedLinks[0].href;
+        }
+        // Swipe right = previous image (last related image)
+        else if (horizontalDistance > 0 && relatedLinks.length > 0) {
+            // Navigate to last related image
+            window.location.href = relatedLinks[relatedLinks.length - 1].href;
+        }
+    }
+}
+
+
 // --- Main Page Initialization ---
 // This ensures all scripts are loaded before we try to attach event listeners.
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize collapsible sections for mobile
     initCollapsibleSections();
+
+    // Initialize swipe navigation for mobile
+    initSwipeNavigation();
 
     // Attach event listener for the delete button
     const deleteBtn = document.getElementById('deleteImageBtn');
