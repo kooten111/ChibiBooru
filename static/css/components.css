@@ -10,10 +10,14 @@
 
 .header {
     position: relative;
+    min-height: auto !important;
 }
 
 .header-content {
     position: relative;
+    min-height: auto !important;
+    justify-content: flex-start !important;
+    gap: var(--spacing-lg) !important;
 }
 
 .stats-tabs-bar {
@@ -420,16 +424,6 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
 }
 
 /* SEARCH & AUTOCOMPLETE - Enhanced Search Styles */
-
-.header {
-    min-height: auto !important;
-}
-
-.header-content {
-    min-height: auto !important;
-    justify-content: flex-start !important;
-    gap: var(--spacing-lg) !important;
-}
 
 .header-mascot {
     flex-shrink: 0;
