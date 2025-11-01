@@ -1,4 +1,13 @@
-document.addEventListener('DOMContentLoaded', function() {
+// Store active event listeners for cleanup
+let imageViewerCleanup = null;
+
+function initImageViewer() {
+    // Clean up previous event listeners if they exist
+    if (imageViewerCleanup) {
+        imageViewerCleanup();
+        imageViewerCleanup = null;
+    }
+
     const imageView = document.querySelector('.image-view');
     const body = document.body;
     const img = imageView?.querySelector('img');
@@ -35,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Single click to toggle fullscreen
-    img.addEventListener('click', function(event) {
+    const imgClickHandler = function(event) {
         if (scale === 1) {
             event.stopPropagation();
             body.classList.toggle('ui-hidden');
@@ -44,10 +53,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 resetZoom();
             }
         }
-    });
+    };
+    img.addEventListener('click', imgClickHandler);
 
     // Mouse wheel to zoom (only in fullscreen mode)
-    imageView.addEventListener('wheel', function(event) {
+    const wheelHandler = function(event) {
         if (!body.classList.contains('ui-hidden')) return;
 
         event.preventDefault();
@@ -77,10 +87,11 @@ document.addEventListener('DOMContentLoaded', function() {
             updateTransform();
             updateCursor();
         }
-    }, { passive: false });
+    };
+    imageView.addEventListener('wheel', wheelHandler, { passive: false });
 
     // Mouse drag to pan when zoomed in
-    img.addEventListener('mousedown', function(event) {
+    const mouseDownHandler = function(event) {
         if (scale > 1) {
             event.preventDefault();
             isDragging = true;
@@ -88,49 +99,72 @@ document.addEventListener('DOMContentLoaded', function() {
             startY = event.clientY - translateY;
             updateCursor();
         }
-    });
+    };
+    img.addEventListener('mousedown', mouseDownHandler);
 
-    document.addEventListener('mousemove', function(event) {
+    const mouseMoveHandler = function(event) {
         if (isDragging) {
             translateX = event.clientX - startX;
             translateY = event.clientY - startY;
             updateTransform();
         }
-    });
+    };
+    document.addEventListener('mousemove', mouseMoveHandler);
 
-    document.addEventListener('mouseup', function() {
+    const mouseUpHandler = function() {
         if (isDragging) {
             isDragging = false;
             updateCursor();
         }
-    });
+    };
+    document.addEventListener('mouseup', mouseUpHandler);
 
     // Prevent context menu when dragging
-    img.addEventListener('contextmenu', function(event) {
+    const contextMenuHandler = function(event) {
         if (scale > 1) {
             event.preventDefault();
         }
-    });
+    };
+    img.addEventListener('contextmenu', contextMenuHandler);
 
     // ESC key to exit fullscreen and reset zoom
-    document.addEventListener('keydown', function(event) {
+    const keydownHandler = function(event) {
         if (event.key === 'Escape' && body.classList.contains('ui-hidden')) {
             body.classList.remove('ui-hidden');
             resetZoom();
             updateCursor();
         }
-    });
+    };
+    document.addEventListener('keydown', keydownHandler);
 
     // Click outside image to exit fullscreen and reset zoom
-    imageView.addEventListener('click', function(event) {
+    const imageViewClickHandler = function(event) {
         // Check if click was on imageView (background) and not on the img itself
         if (event.target === imageView && body.classList.contains('ui-hidden')) {
             body.classList.remove('ui-hidden');
             resetZoom();
             updateCursor();
         }
-    });
+    };
+    imageView.addEventListener('click', imageViewClickHandler);
 
     // Initial cursor
     updateCursor();
-});
+
+    // Return cleanup function
+    imageViewerCleanup = function() {
+        img.removeEventListener('click', imgClickHandler);
+        imageView.removeEventListener('wheel', wheelHandler);
+        img.removeEventListener('mousedown', mouseDownHandler);
+        document.removeEventListener('mousemove', mouseMoveHandler);
+        document.removeEventListener('mouseup', mouseUpHandler);
+        img.removeEventListener('contextmenu', contextMenuHandler);
+        document.removeEventListener('keydown', keydownHandler);
+        imageView.removeEventListener('click', imageViewClickHandler);
+    };
+}
+
+document.addEventListener('DOMContentLoaded', initImageViewer);
+
+// Make initImageViewer globally accessible for re-initialization
+window.initImageViewer = initImageViewer;

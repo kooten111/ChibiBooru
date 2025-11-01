@@ -573,6 +573,11 @@ function initSwipeNavigation() {
                 deleteBtn.addEventListener('click', confirmDelete);
             }
 
+            // Re-initialize image viewer (fullscreen/zoom functionality)
+            if (typeof window.initImageViewer === 'function') {
+                window.initImageViewer();
+            }
+
             // Reload pools for the new image
             if (typeof loadPoolsForImage === 'function') {
                 loadPoolsForImage();
@@ -621,6 +626,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (deleteBtn) {
         deleteBtn.addEventListener('click', confirmDelete);
     }
+
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', () => {
+        // When the user clicks back/forward, reload the page to show correct content
+        window.location.reload();
+    });
 
     // You can initialize other image-page-specific components here in the future
 });
