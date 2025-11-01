@@ -165,7 +165,7 @@ def view_pool(pool_id):
         app_name=config.APP_NAME
     )
 
-@main_blueprint.route('/image/<path:filepath>')
+@main_blueprint.route('/view/<path:filepath>')
 @login_required
 def show_image(filepath):
     lookup_path = filepath.replace("images/", "", 1)

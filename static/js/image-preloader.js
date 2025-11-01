@@ -11,8 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const href = link.getAttribute('href');
         if (!href) return;
         
-        // Extract filepath from URL (assumes format: /image/images/path/to/image.jpg)
-        const match = href.match(/\/image\/(images\/.+)$/);
+        // Extract filepath from URL (assumes format: /view/images/path/to/image.jpg)
+        const match = href.match(/\/view\/(images\/.+)$/);
         if (!match) return;
         
         const imagePath = match[1];

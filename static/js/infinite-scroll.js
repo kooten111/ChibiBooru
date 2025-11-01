@@ -167,7 +167,7 @@ class InfiniteScroll {
             thumbnail.style.animationDelay = `${index * 0.02}s`;
             
             thumbnail.innerHTML = `
-                <a href="/image/${img.path}">
+                <a href="/view/${img.path}">
                     <img src="/static/${img.thumb}" alt="Image" loading="lazy">
                 </a>
             `;
