@@ -1128,6 +1128,12 @@ body.image-page {
     flex: 2 1 0;
     overflow-y: auto;
     min-height: 0;
+    transition: flex 0.3s ease-in-out;
+}
+
+/* When tags panel is collapsed, remove flex space */
+.image-page .tags-list:has(.panel-header.collapsed) {
+    flex: 0 0 auto;
 }
 
 .image-page .tag-deltas {
@@ -1135,16 +1141,34 @@ body.image-page {
     overflow-y: auto;
 }
 
+/* Hide pools section by default - JavaScript will show it if there are pools */
+#pools-content {
+    display: none;
+}
+
 .image-page .pool-management {
     flex: 0 0 auto;
     overflow-y: auto;
     max-height: 300px;
+    transition: flex 0.3s ease-in-out, max-height 0.3s ease-in-out;
+}
+
+/* When pool-management panel is collapsed, remove flex space */
+.image-page .pool-management:has(.panel-header.collapsed) {
+    flex: 0 0 auto;
+    max-height: auto; /* Only show header height */
 }
 
 .image-page .metadata-info {
     flex: 1 1 0;
     overflow-y: auto;
     min-height: 0;
+    transition: flex 0.3s ease-in-out;
+}
+
+/* When metadata-info panel is collapsed, remove flex space */
+.image-page .metadata-info:has(.panel-header.collapsed) {
+    flex: 0 0 auto;
 }
 
 /* Tag Categories */
@@ -1371,6 +1395,12 @@ body.image-page {
     flex: 1;
     overflow-y: auto;
     min-height: 0;
+    transition: flex 0.3s ease-in-out;
+}
+
+/* When related-images panel is collapsed, remove flex space */
+.image-page .related-images-vertical:has(.panel-header.collapsed) {
+    flex: 0 0 auto;
 }
 
 .image-page .related-images-vertical h3 {
@@ -1724,7 +1754,7 @@ body.ui-hidden::after {
 }
 
 /* Mobile/Desktop Toggle Visibility */
-.mobile-toggle {
+.mobile-toggle:not(.panel-header) {
     display: none !important;
 }
 
@@ -1739,7 +1769,7 @@ body.ui-hidden::after {
 /* Panel Header for integrated collapse functionality */
 .panel-header {
     width: 100%;
-    display: none; /* Hidden on desktop, shown on mobile */
+    display: flex; /* Show on both desktop and mobile */
     align-items: center;
     gap: var(--spacing-md);
     padding: 15px var(--spacing-lg);
@@ -1769,14 +1799,65 @@ body.ui-hidden::after {
     transform: rotate(-90deg);
 }
 
+/* Desktop: Hide the standalone h3 titles when panel-header is present */
+.panel:has(.panel-header) .desktop-only {
+    display: none !important;
+}
+
+/* Desktop: Make panels collapsible */
+.panel:has(.panel-header) {
+    padding: 0;
+    margin-bottom: var(--spacing-md);
+    transition: all var(--transition-smooth);
+}
+
+.panel:has(.panel-header) .panel-collapsible-content {
+    padding: var(--spacing-lg);
+    max-height: 5000px; /* Large enough for content */
+    overflow-y: auto;
+    transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out, opacity 0.2s ease-in-out;
+    opacity: 1;
+}
+
+.panel:has(.panel-header.collapsed) .panel-collapsible-content {
+    max-height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out, opacity 0.2s ease-in-out;
+}
+
 /* Section content - transparent wrapper on desktop, functional on mobile */
 .section-content {
     display: contents; /* Makes the wrapper transparent on desktop */
 }
 
-/* Mobile-only collapsible sections */
+/* When section-content contains a collapsed panel, change to flex column and collapse */
+.section-content:has(.panel-header.collapsed) {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    transition: flex 0.3s ease-in-out;
+}
+
+/* Ensure the child panel inside section-content also gets flex behavior */
+.section-content:has(.panel-header.collapsed) > .panel {
+    flex: 0 0 auto;
+    width: 100%;
+}
+
+/* Related images should extend fully without scrollbar */
+.panel:has(.panel-header) #related-images-content {
+    max-height: none;
+    overflow-y: visible;
+}
+
+/* Mobile-only adjustments */
 @media (max-width: 1200px) {
-    .mobile-toggle {
+    .mobile-toggle:not(.panel-header) {
         display: flex !important;
     }
 
@@ -1786,38 +1867,6 @@ body.ui-hidden::after {
 
     .desktop-only {
         display: none !important;
-    }
-
-    /* Show panel headers on mobile */
-    .panel-header {
-        display: flex;
-    }
-
-    /* Panel with integrated header - adjust styles */
-    .panel:has(.panel-header) {
-        padding: 0;
-        margin-bottom: var(--spacing-md);
-    }
-
-    .panel:has(.panel-header) .panel-collapsible-content {
-        padding: var(--spacing-lg);
-        max-height: 2000px;
-        overflow-y: auto;
-        transition: max-height var(--transition-smooth), padding var(--transition-smooth), opacity var(--transition-smooth);
-        opacity: 1;
-    }
-
-    /* Related images should extend fully on mobile without scrollbar */
-    .panel:has(.panel-header) #related-images-content {
-        max-height: none;
-        overflow-y: visible;
-    }
-
-    .panel:has(.panel-header.collapsed) .panel-collapsible-content {
-        max-height: 0 !important;
-        padding: 0 !important;
-        overflow: hidden;
-        opacity: 0;
     }
 
     /* Collapsible section styles - only on mobile */

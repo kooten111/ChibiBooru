@@ -162,15 +162,19 @@ function retryTagging(skipLocalFallback = false) {
 
 
 /**
- * Initialize collapsible sections for mobile-friendly UI
- * Handles the collapse/expand behavior of sidebar sections on mobile
+ * Initialize collapsible sections for desktop and mobile
+ * Handles the collapse/expand behavior of sidebar sections
  * Supports both standalone section headers and integrated panel headers
+ * Pools and Information sections are collapsed by default
  */
 function initCollapsibleSections() {
     const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
 
     // Load saved states from localStorage
     const savedStates = JSON.parse(localStorage.getItem('imageSectionStates') || '{}');
+
+    // Sections that should be collapsed by default
+    const defaultCollapsed = ['pools-panel-content', 'metadata-panel-content'];
 
     sectionHeaders.forEach(header => {
         const sectionId = header.dataset.section;
@@ -181,8 +185,14 @@ function initCollapsibleSections() {
         // Check if this is a panel header (integrated) or section header (standalone)
         const isPanelHeader = header.classList.contains('panel-header');
 
-        // Restore saved state or default to expanded on first visit
-        const isCollapsed = savedStates[sectionId] !== undefined ? savedStates[sectionId] : false;
+        // Restore saved state, or use default collapsed state for specific sections
+        let isCollapsed;
+        if (savedStates[sectionId] !== undefined) {
+            isCollapsed = savedStates[sectionId];
+        } else {
+            // Default to collapsed for pools and metadata, expanded for others
+            isCollapsed = defaultCollapsed.includes(sectionId);
+        }
 
         if (isCollapsed) {
             header.classList.add('collapsed');
@@ -519,11 +529,37 @@ function initSwipeNavigation() {
         // Update page title
         document.title = newDoc.title;
 
+        // Load saved states from localStorage before replacing content
+        const savedStates = JSON.parse(localStorage.getItem('imageSectionStates') || '{}');
+        const defaultCollapsed = ['pools-panel-content', 'metadata-panel-content'];
+
         // Replace main content areas
         const container = document.querySelector('.container');
         const newContainer = newDoc.querySelector('.container');
         if (container && newContainer) {
             container.innerHTML = newContainer.innerHTML;
+
+            // Immediately apply collapsed states to prevent visual jumping
+            const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
+            sectionHeaders.forEach(header => {
+                const sectionId = header.dataset.section;
+                const isPanelHeader = header.classList.contains('panel-header');
+
+                let isCollapsed;
+                if (savedStates[sectionId] !== undefined) {
+                    isCollapsed = savedStates[sectionId];
+                } else {
+                    isCollapsed = defaultCollapsed.includes(sectionId);
+                }
+
+                if (isCollapsed) {
+                    header.classList.add('collapsed');
+                    if (!isPanelHeader) {
+                        const content = document.getElementById(sectionId);
+                        if (content) content.classList.add('collapsed');
+                    }
+                }
+            });
         }
 
         // Re-initialize the navigation after content is replaced
@@ -535,6 +571,11 @@ function initSwipeNavigation() {
             const deleteBtn = document.getElementById('deleteImageBtn');
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', confirmDelete);
+            }
+
+            // Reload pools for the new image
+            if (typeof loadPoolsForImage === 'function') {
+                loadPoolsForImage();
             }
         }, 50);
 

@@ -8,6 +8,7 @@ async function loadPoolsForImage() {
     const filepath = document.getElementById('imageFilepath').value;
     const poolsList = document.getElementById('poolsList');
     const poolsPanel = document.querySelector('.pool-management.panel');
+    const poolsContent = document.getElementById('pools-content');
 
     if (!filepath || !poolsList) return;
 
@@ -17,12 +18,18 @@ async function loadPoolsForImage() {
 
         if (response.ok && data.pools) {
             if (data.pools.length === 0) {
-                // Hide the entire pools panel when not in any pools
+                // Hide the entire pools section when not in any pools
+                if (poolsContent) {
+                    poolsContent.style.display = 'none';
+                }
                 if (poolsPanel) {
                     poolsPanel.style.display = 'none';
                 }
             } else {
-                // Show the panel and populate with pools
+                // Show the section and panel, then populate with pools
+                if (poolsContent) {
+                    poolsContent.style.display = 'contents';
+                }
                 if (poolsPanel) {
                     poolsPanel.style.display = 'block';
                 }
@@ -35,6 +42,9 @@ async function loadPoolsForImage() {
             }
         } else {
             // On error, show the panel with error message
+            if (poolsContent) {
+                poolsContent.style.display = 'contents';
+            }
             if (poolsPanel) {
                 poolsPanel.style.display = 'block';
             }
@@ -43,6 +53,9 @@ async function loadPoolsForImage() {
     } catch (error) {
         console.error('Error loading pools:', error);
         // On error, show the panel with error message
+        if (poolsContent) {
+            poolsContent.style.display = 'contents';
+        }
         if (poolsPanel) {
             poolsPanel.style.display = 'block';
         }
