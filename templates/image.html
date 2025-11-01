@@ -490,8 +490,8 @@
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
 <script src="{{ url_for('static', filename='js/progressive-image-loader.js', v='1.0') }}"></script>
 <script src="{{ url_for('static', filename='js/modal.js', v='1.3') }}"></script>
-<script src="{{ url_for('static', filename='js/autocomplete.js', v='1.g') }}"></script>
-<script src="{{ url_for('static', filename='js/tag-editor.js', v='1.7') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/autocomplete.js', v='1.g') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/tag-editor.js', v='1.7') }}"></script>
 <script src="{{ url_for('static', filename='js/image-viewer.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/saucenao-fetch.js', v='1.3') }}"></script>
 <script src="{{ url_for('static', filename='js/header.js', v='1.3') }}"></script>

@@ -1,3 +1,5 @@
+import { escapeHtml, formatCount } from './utils/helpers.js';
+
 class TagEditor {
     constructor() {
         this.tags = {}; // Organized by category
@@ -174,7 +176,7 @@ class TagEditor {
         return `
             <div class="edit-tag-row" data-category="${category}" data-index="${idx}">
                 <button class="remove-tag-btn" data-category="${category}" data-index="${idx}">✖</button>
-                <span class="tag-name">${this.escapeHtml(tag)}</span>
+                <span class="tag-name">${escapeHtml(tag)}</span>
                 ${countText ? `<span class="tag-count">${countText}</span>` : ''}
             </div>
         `;
@@ -341,14 +343,14 @@ class TagEditor {
 
                 filteredItems.forEach(item => {
                     const displayText = item.display || item.tag;
-                    const countText = item.count ? this.formatCount(item.count) : '';
+                    const countText = item.count ? formatCount(item.count) : '';
                     const icon = this.getCategoryIcon(item.category || 'general');
 
                     html += `
-                        <div class="autocomplete-item" data-tag="${this.escapeHtml(item.tag)}">
+                        <div class="autocomplete-item" data-tag="${escapeHtml(item.tag)}">
                             <div class="autocomplete-left">
                                 <span class="autocomplete-icon">${icon}</span>
-                                <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
+                                <span class="autocomplete-tag">${escapeHtml(displayText)}</span>
                             </div>
                             ${countText ? `<span class="autocomplete-count">${countText}</span>` : ''}
                         </div>
@@ -571,17 +573,6 @@ class TagEditor {
         this.showNotification('Changes cancelled', 'info');
     }
 
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    formatCount(count) {
-        if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
-        if (count >= 1000) return (count / 1000).toFixed(1) + 'k';
-        return count;
-    }
 
     showNotification(message, type = 'info') {
         const notification = document.createElement('div');
@@ -661,6 +652,10 @@ document.addEventListener('click', (e) => {
         window.tagEditor.cancelEdit();
     }
 });
+
+// Expose functions globally for onclick handlers
+window.toggleTagEditor = toggleTagEditor;
+window.saveTags = saveTags;
 
 // Legacy function for compatibility
 function saveTags() {

@@ -1,4 +1,6 @@
 // static/js/autocomplete.js
+import { escapeHtml, formatCount } from './utils/helpers.js';
+
 class Autocomplete {
     constructor(chipInputId = 'chipTextInput', suggestionsId = 'autocompleteSuggestions') {
         this.chipTextInput = document.getElementById(chipInputId);
@@ -183,7 +185,7 @@ class Autocomplete {
         this.chipInputChips.innerHTML = this.chips.map((chip, index) => `
             <div class="search-chip ${chip.type}" data-index="${index}">
                 <span class="search-chip-icon">${chip.icon}</span>
-                <span class="search-chip-text">${this.escapeHtml(chip.display)}</span>
+                <span class="search-chip-text">${escapeHtml(chip.display)}</span>
             </div>
         `).join('');
     }
@@ -220,20 +222,20 @@ class Autocomplete {
 
             group.items.forEach(item => {
                 const displayText = item.display || item.tag;
-                const countText = item.count ? this.formatCount(item.count) : '';
+                const countText = item.count ? formatCount(item.count) : '';
                 const icon = item.category ? this.getCategoryIcon(item.category) : '🏷️';
                 const typeClass = item.type || 'tag';
                 const categoryBadge = item.category ? `<span class="category-badge ${item.category}">${item.category}</span>` : '';
 
                 html += `
                     <div class="autocomplete-item ${typeClass}"
-                         data-tag="${this.escapeHtml(item.tag)}"
-                         data-category="${this.escapeHtml(item.category || '')}"
+                         data-tag="${escapeHtml(item.tag)}"
+                         data-category="${escapeHtml(item.category || '')}"
                          data-index="${itemIndex}"
                          style="animation-delay: ${itemIndex * 0.01}s">
                         <div class="autocomplete-left">
                             <span class="autocomplete-icon">${icon}</span>
-                            <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
+                            <span class="autocomplete-tag">${escapeHtml(displayText)}</span>
                             ${categoryBadge}
                         </div>
                         ${countText ? `<span class="autocomplete-count">${countText}</span>` : ''}
@@ -286,10 +288,10 @@ class Autocomplete {
             const typeClass = item.type || 'tag';
 
             return `
-                <div class="autocomplete-item ${typeClass}" data-tag="${this.escapeHtml(item.tag)}" data-index="${idx}" style="animation-delay: ${idx * 0.01}s">
+                <div class="autocomplete-item ${typeClass}" data-tag="${escapeHtml(item.tag)}" data-index="${idx}" style="animation-delay: ${idx * 0.01}s">
                     <div class="autocomplete-left">
                         <span class="autocomplete-icon">${icon}</span>
-                        <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
+                        <span class="autocomplete-tag">${escapeHtml(displayText)}</span>
                     </div>
                     ${countText ? `<span class="autocomplete-count">${countText}</span>` : ''}
                 </div>
@@ -316,17 +318,6 @@ class Autocomplete {
         });
     }
 
-    formatCount(count) {
-        if (count >= 1000000) return (count / 1000000).toFixed(1) + 'M';
-        if (count >= 1000) return (count / 1000).toFixed(1) + 'k';
-        return count.toString();
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
 
     updateSelection(direction) {
         const items = this.suggestions.querySelectorAll('.autocomplete-item');

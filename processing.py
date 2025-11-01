@@ -76,7 +76,10 @@ def load_local_tagger():
 
     except Exception as e:
         print(f"[Local Tagger] ERROR: Failed to load model files: {e}")
-        local_tagger_session, local_tagger_metadata = None, None, {}, {}
+        local_tagger_session = None
+        local_tagger_metadata = None
+        idx_to_tag_map = {}
+        tag_to_category_map = {}
 
 
 def preprocess_image_for_local_tagger(image_path):
