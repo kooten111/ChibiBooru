@@ -232,6 +232,69 @@ def delete_image_service():
         print(f"Error deleting image {filepath}: {e}")
         return jsonify({"error": "An unexpected error occurred during deletion."}), 500
 
+def delete_images_bulk_service():
+    """Service to delete multiple images at once."""
+    data = request.json
+    filepaths = data.get('filepaths', [])
+
+    if not filepaths or not isinstance(filepaths, list):
+        return jsonify({"error": "filepaths array is required"}), 400
+
+    results = {
+        "total": len(filepaths),
+        "deleted": 0,
+        "failed": 0,
+        "errors": []
+    }
+
+    for filepath in filepaths:
+        # The filepath from the frontend is 'images/folder/image.jpg'
+        # We need the path relative to the 'static/images' directory
+        clean_filepath = filepath.replace('images/', '', 1)
+
+        try:
+            # Remove from database
+            db_success = models.delete_image(clean_filepath)
+
+            # Construct file paths
+            full_image_path = os.path.join("static/images", clean_filepath)
+            thumb_path = os.path.join("static/thumbnails", os.path.splitext(clean_filepath)[0] + '.webp')
+
+            # Delete files
+            image_deleted = False
+            thumb_deleted = False
+
+            if os.path.exists(full_image_path):
+                os.remove(full_image_path)
+                image_deleted = True
+
+            if os.path.exists(thumb_path):
+                os.remove(thumb_path)
+                thumb_deleted = True
+
+            # Update cache
+            if db_success or image_deleted or thumb_deleted:
+                models.remove_image_from_cache(clean_filepath)
+                results["deleted"] += 1
+            else:
+                results["failed"] += 1
+                results["errors"].append(f"{clean_filepath}: Not found in database or filesystem")
+
+        except Exception as e:
+            results["failed"] += 1
+            results["errors"].append(f"{clean_filepath}: {str(e)}")
+            print(f"Error deleting image {clean_filepath}: {e}")
+
+    # Reload tag counts once after all deletions
+    if results["deleted"] > 0:
+        models.reload_tag_counts()
+
+    return jsonify({
+        "status": "success" if results["failed"] == 0 else "partial",
+        "message": f"Deleted {results['deleted']} of {results['total']} images",
+        "results": results
+    })
+
 # --- THIS IS THE CORRECTED SAUCENAO BLOCK ---
 
 def saucenao_search_service():

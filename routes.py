@@ -371,6 +371,10 @@ def edit_tags():
 def delete_image():
     return api_service.delete_image_service()
 
+@api_blueprint.route('/delete_images_bulk', methods=['POST'])
+def delete_images_bulk():
+    return api_service.delete_images_bulk_service()
+
 @api_blueprint.route('/retry_tagging', methods=['POST'])
 def retry_tagging():
     return api_service.retry_tagging_service()

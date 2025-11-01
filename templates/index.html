@@ -23,12 +23,18 @@
         {% if query and total_results is defined %}
         <div class="results-info">
             Found {{ total_results }} result{% if total_results != 1 %}s{% endif %}
+            <div class="bulk-actions">
+                <button id="enable-selection-btn" class="btn btn-secondary">Enable Selection</button>
+                <button id="select-all-btn" class="btn btn-secondary" style="display: none;">Select All</button>
+                <button id="delete-selected-btn" class="btn btn-danger" style="display: none;">Delete Selected (<span id="selected-count">0</span>)</button>
+            </div>
         </div>
         {% endif %}
 
         <div class="gallery">
             {% for image in images %}
-            <div class="thumbnail">
+            <div class="thumbnail" data-image-path="{{ image.path }}">
+                <input type="checkbox" class="image-select-checkbox" data-image-path="{{ image.path }}" style="position: absolute; top: 8px; left: 8px; width: 20px; height: 20px; cursor: pointer; z-index: 10; display: none;">
                 <a href="{{ url_for('main.show_image', filepath=image.path) }}">
                     <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy">
                     {% if image.path.endswith('.mp4') %}
@@ -52,5 +58,6 @@
     <script src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
     <script src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/bulk-delete.js') }}"></script>
 </body>
 </html>

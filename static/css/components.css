@@ -4107,3 +4107,35 @@ body.ui-hidden::after {
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 }
+
+/* BULK DELETE ACTIONS */
+.bulk-actions {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: center;
+    margin-top: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+.bulk-actions .btn {
+    font-size: var(--font-size-sm);
+}
+
+/* Checkbox styling on thumbnails */
+.thumbnail {
+    position: relative;
+}
+
+.image-select-checkbox {
+    accent-color: var(--primary-blue);
+    transform: scale(1.2);
+}
+
+.image-select-checkbox:checked {
+    accent-color: var(--success);
+}
+
+.thumbnail:has(.image-select-checkbox:checked) {
+    outline: 3px solid var(--primary-blue);
+    outline-offset: -3px;
+}
