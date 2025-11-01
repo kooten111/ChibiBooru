@@ -1807,6 +1807,12 @@ body.ui-hidden::after {
         opacity: 1;
     }
 
+    /* Related images should extend fully on mobile without scrollbar */
+    .panel:has(.panel-header) #related-images-content {
+        max-height: none;
+        overflow-y: visible;
+    }
+
     .panel:has(.panel-header.collapsed) .panel-collapsible-content {
         max-height: 0 !important;
         padding: 0 !important;
