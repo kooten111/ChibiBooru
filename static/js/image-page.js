@@ -1,4 +1,28 @@
 // static/js/image-page.js
+import { showNotification } from './utils/notifications.js';
+
+/**
+ * Finds the next image to navigate to from the carousel
+ * Prioritizes images from the related images carousel
+ */
+function findNextImageUrl() {
+    // Try to get the first image from the carousel (similar/related images)
+    const carouselImages = document.querySelectorAll('.carousel-track a[href^="/view/"]');
+
+    if (carouselImages.length > 0) {
+        // Return the first carousel image as the next destination
+        return carouselImages[0].href;
+    }
+
+    // Fallback: check if there's a referrer in session storage or document.referrer
+    const referrer = document.referrer;
+    if (referrer && referrer.includes(window.location.origin)) {
+        return referrer;
+    }
+
+    // Last resort: return null to go to homepage
+    return null;
+}
 
 /**
  * Handles the deletion of the current image after user confirmation.
@@ -8,39 +32,45 @@ function confirmDelete() {
     const filepath = document.getElementById('imageFilepath')?.value;
     if (!filepath) {
         console.error('No filepath found');
-        // Use the notification system from the tag editor if available, otherwise a simple alert.
-        const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
-        notifier.showNotification('Error: No filepath found to delete', 'error');
+        showNotification('Error: No filepath found to delete', 'error');
         return;
     }
 
     // The showConfirm function is globally available from modal.js
     showConfirm('Are you sure you want to permanently delete this image?', () => {
+        console.log('[DELETE] Starting deletion for:', filepath);
         fetch('/api/delete_image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filepath: filepath })
         })
         .then(res => {
+            console.log('[DELETE] Response status:', res.status);
             if (!res.ok) {
                  return res.json().then(err => { throw new Error(err.error || 'Server error') });
             }
             return res.json();
         })
         .then(data => {
+            console.log('[DELETE] Response data:', data);
             if (data.status === 'success') {
-                const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
-                notifier.showNotification('Image deleted!', 'success');
-                // Redirect to home page after a short delay
-                setTimeout(() => { window.location.href = '/'; }, 500);
+                showNotification('Image deleted!', 'success');
+
+                // Try to navigate to the next related image
+                const nextUrl = findNextImageUrl();
+                console.log('[DELETE] Next URL:', nextUrl);
+
+                setTimeout(() => {
+                    console.log('[DELETE] Redirecting to:', nextUrl || '/');
+                    window.location.href = nextUrl || '/';
+                }, 500);
             } else {
                 throw new Error(data.error || 'Delete failed');
             }
         })
         .catch(err => {
-            console.error('Delete error:', err);
-            const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
-            notifier.showNotification('Failed to delete: ' + err.message, 'error');
+            console.error('[DELETE] Error:', err);
+            showNotification('Failed to delete: ' + err.message, 'error');
         });
     });
 }

@@ -180,15 +180,19 @@ def delete_image_service():
     # We need the path relative to the 'static/images' directory, which is 'folder/image.jpg'
     filepath = data.get('filepath', '').replace('images/', '', 1)
 
+    print(f"[DELETE] Received filepath from frontend: {data.get('filepath')}")
+    print(f"[DELETE] Processed filepath for deletion: {filepath}")
+
     if not filepath:
         return jsonify({"error": "Filepath is required"}), 400
 
     try:
         # First, remove the database entry.
         db_success = models.delete_image(filepath)
+        print(f"[DELETE] Database deletion result: {db_success}")
         if not db_success:
             # This isn't a fatal error; the file might still exist on disk without a DB entry.
-            print(f"Info: delete_image_service called for {filepath}, but it was not in the database.")
+            print(f"[DELETE] WARNING: Image {filepath} was not found in the database.")
 
         # Construct the full path to the image file.
         full_image_path = os.path.join("static/images", filepath)

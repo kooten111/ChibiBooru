@@ -23,6 +23,11 @@ from repositories.tag_repository import (
     get_all_tags_sorted,
     recategorize_misplaced_tags,
     rebuild_categorized_tags_from_relations,
+    update_image_tags,
+    update_image_tags_categorized,
+    add_implication,
+    get_implications_for_tag,
+    apply_implications_for_image,
 )
 
 from repositories.data_access import (
@@ -167,10 +172,6 @@ def get_related_images(post_id, parent_id):
     return _get_related_images(post_id, parent_id, post_id_to_md5)
 
 
-from repositories.tag_repository import (
-    update_image_tags,
-    update_image_tags_categorized,
-)
 
 from repositories.pool_repository import (
     create_pool,
@@ -186,11 +187,6 @@ from repositories.pool_repository import (
     search_images_by_pool,
 )
 
-from repositories.tag_repository import (
-    add_implication,
-    get_implications_for_tag,
-    apply_implications_for_image,
-)
 
 from repositories.delta_tracker import (
     record_tag_delta,

@@ -1,4 +1,5 @@
 // static/js/saucenao-fetch.js
+import { showNotification } from './utils/notifications.js';
 
 var SYSTEM_SECRET = localStorage.getItem('system_secret');
 var saucenaoResults = [];
@@ -12,6 +13,14 @@ function formatFileSize(bytes) {
     }
     return bytes + ' bytes';
 }
+
+// Expose functions to global scope for onclick handlers
+window.showSauceNaoFetcher = showSauceNaoFetcher;
+window.closeSauceNaoModal = closeSauceNaoModal;
+window.selectSauceNaoResult = selectSauceNaoResult;
+window.selectMetadataSource = selectMetadataSource;
+window.applySauceNaoMetadata = applySauceNaoMetadata;
+window.displaySauceNaoResults = displaySauceNaoResults;
 
 function showSauceNaoFetcher() {
     if (!SYSTEM_SECRET) {
@@ -700,30 +709,3 @@ async function applySauceNaoMetadata() {
     }
 }
 
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.textContent = message;
-    notification.style.cssText = `
-        position: fixed;
-        top: 100px;
-        right: 30px;
-        padding: 15px 25px;
-        background: ${type === 'error' ? 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)' : 
-                     type === 'success' ? 'linear-gradient(135deg, #51cf66 0%, #37b24d 100%)' :
-                     'linear-gradient(135deg, #4a9eff 0%, #357abd 100%)'};
-        color: white;
-        border-radius: 10px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-        z-index: 10002;
-        font-weight: 600;
-        max-width: 400px;
-        animation: slideInRight 0.3s ease-out;
-    `;
-    
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-        notification.style.animation = 'slideOutRight 0.3s ease-out';
-        setTimeout(() => notification.remove(), 300);
-    }, 4000);
-}

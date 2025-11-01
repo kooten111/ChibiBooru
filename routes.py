@@ -432,8 +432,6 @@ def saucenao_apply():
 
 @api_blueprint.route('/switch_source', methods=['POST'])
 def switch_source():
-    from switch_source_db import switch_metadata_source_db
-
     try:
         data = request.json
         filepath = data.get('filepath')

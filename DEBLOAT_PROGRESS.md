@@ -9,17 +9,28 @@
 ## Priority 1: Critical Issues
 
 ### 1.1 Create Shared Notification Utility
-- [ ] Create `static/js/utils/notifications.js`
-- [ ] Replace notification in `static/js/saucenao-fetch.js:703-729`
-- [ ] Replace notification in `static/js/global-uploader.js:75-94`
-- [ ] Replace notification in `static/js/tag-editor.js:586-610`
-- [ ] Test notifications work across all pages
-- [ ] **Lines saved:** ~150
+- [x] Create `static/js/utils/notifications.js`
+- [x] Replace notification in `static/js/saucenao-fetch.js:703-729`
+- [x] Replace notification in `static/js/global-uploader.js:75-94`
+- [x] Replace notification in `static/js/tag-editor.js:586-610`
+- [x] Convert all 3 files to ES6 modules
+- [x] Update 6 HTML templates to use type="module"
+- [x] Test notifications work across all pages
+- [x] **Lines saved:** ~70 lines (27 from saucenao-fetch.js, 20 from global-uploader.js, 24 from tag-editor.js)
 
 **Files affected:**
-- `static/js/saucenao-fetch.js`
-- `static/js/global-uploader.js`
-- `static/js/tag-editor.js`
+- `static/js/saucenao-fetch.js` (removed 27 lines, added import)
+- `static/js/global-uploader.js` (removed 20 lines, added import)
+- `static/js/tag-editor.js` (removed 24 lines, added import)
+- New: `static/js/utils/notifications.js` (76 lines with CSS)
+- `templates/image.html` (updated 2 script tags)
+- `templates/index.html` (updated 1 script tag)
+- `templates/tags.html` (updated 1 script tag)
+- `templates/pools.html` (updated 1 script tag)
+- `templates/pool.html` (updated 1 script tag)
+- `templates/implications.html` (updated 1 script tag)
+
+**Status:** ✅ COMPLETED
 
 ---
 
@@ -116,14 +127,16 @@
 ## Priority 3: Medium Priority Issues
 
 ### 3.1 Consolidate Python Imports
-- [ ] Merge `repositories.tag_repository` imports in `models.py` (lines 21, 170, 189)
-- [ ] Remove duplicate import in `routes.py:435`
-- [ ] Test application runs without errors
-- [ ] **Lines saved:** ~5
+- [x] Merge `repositories.tag_repository` imports in `models.py` (lines 21, 170, 189)
+- [x] Remove duplicate import in `routes.py:435`
+- [x] Test application runs without errors (syntax validated)
+- [x] **Lines saved:** ~9 lines (8 from models.py, 1 from routes.py)
 
 **Files affected:**
-- `models.py`
-- `routes.py`
+- `models.py` (consolidated 3 import blocks into 1)
+- `routes.py` (removed duplicate import)
+
+**Status:** ✅ COMPLETED
 
 ---
 
@@ -180,6 +193,21 @@ After each change, verify:
   - Refactored `autocomplete.js` and `tag-editor.js` to use ES6 modules
   - Updated 3 HTML templates to use `type="module"`
   - **FIX:** Exposed `toggleTagEditor` and `saveTags` functions globally for onclick handlers
+- **COMPLETED:** Consolidated Python imports - removed ~9 duplicate lines
+  - Merged 3 separate `repositories.tag_repository` import blocks into 1 in `models.py`
+  - Removed duplicate import in `routes.py:435`
+- **COMPLETED:** Created shared notification utility - removed ~70 duplicate lines
+  - Created `static/js/utils/notifications.js` with unified notification system
+  - Converted `saucenao-fetch.js`, `global-uploader.js`, and `tag-editor.js` to ES6 modules
+  - Updated 6 HTML templates to use type="module"
+- **FIX:** Improved image deletion system
+  - Added comprehensive logging to deletion endpoint for debugging
+  - Converted `image-page.js` to ES6 module to use shared notification system
+  - After deletion, now navigates to next related/similar image instead of homepage
+  - Falls back to referrer page or homepage if no related images available
+  - Added console logging for debugging deletion and navigation
+  - Better user experience when browsing and deleting images
+  - **Note:** Database deletion works correctly; if page persists after refresh, check browser cache
 
 ---
 

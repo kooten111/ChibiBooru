@@ -1,4 +1,5 @@
 import { escapeHtml, formatCount } from './utils/helpers.js';
+import { showNotification } from './utils/notifications.js';
 
 class TagEditor {
     constructor() {
@@ -406,21 +407,21 @@ class TagEditor {
         }
 
         if (this.tags[category].includes(tag)) {
-            this.showNotification('Tag already exists in this category', 'warning');
+            showNotification('Tag already exists in this category', 'warning');
             return;
         }
 
         // Check if tag exists in other categories
         for (let cat of this.categories) {
             if (cat !== category && this.tags[cat] && this.tags[cat].includes(tag)) {
-                this.showNotification(`Tag exists in ${cat} category. Remove it there first.`, 'warning');
+                showNotification(`Tag exists in ${cat} category. Remove it there first.`, 'warning');
                 return;
             }
         }
 
         this.tags[category].push(tag);
         this.refreshCategoryTags(category);
-        this.showNotification(`Added to ${category}`, 'info');
+        showNotification(`Added to ${category}`, 'info');
     }
 
     removeTag(category, index) {
@@ -430,7 +431,7 @@ class TagEditor {
             setTimeout(() => {
                 this.tags[category].splice(index, 1);
                 this.refreshCategoryTags(category);
-                this.showNotification('Tag removed', 'info');
+                showNotification('Tag removed', 'info');
             }, 150);
         }
     }
@@ -508,7 +509,7 @@ class TagEditor {
         const filepath = document.getElementById('imageFilepath')?.value;
         if (!filepath) {
             console.error('No filepath found');
-            this.showNotification('Error: No filepath', 'error');
+            showNotification('Error: No filepath', 'error');
             return;
         }
 
@@ -549,7 +550,7 @@ class TagEditor {
         })
         .then(data => {
             if (data.status === 'success') {
-                this.showNotification('Tags saved!', 'success');
+                showNotification('Tags saved!', 'success');
                 this.renderViewMode();
                 setTimeout(() => location.reload(), 500);
             } else {
@@ -558,7 +559,7 @@ class TagEditor {
         })
         .catch(err => {
             console.error('Save error:', err);
-            this.showNotification('Failed to save: ' + err.message, 'error');
+            showNotification('Failed to save: ' + err.message, 'error');
             if (editBtn) {
                 editBtn.textContent = '💾 Save Tags';
                 editBtn.disabled = false;
@@ -570,35 +571,10 @@ class TagEditor {
         console.log('Cancelling edit');
         this.tags = JSON.parse(JSON.stringify(this.originalTags));
         this.renderViewMode();
-        this.showNotification('Changes cancelled', 'info');
+        showNotification('Changes cancelled', 'info');
     }
 
 
-    showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.textContent = message;
-        notification.className = 'editor-notification ' + type;
-        notification.style.cssText = `
-            position: fixed;
-            top: 100px;
-            right: 30px;
-            padding: 12px 20px;
-            background: ${type === 'error' ? '#ff6b6b' : type === 'warning' ? '#ff9966' : type === 'success' ? '#4caf50' : '#4a9eff'};
-            color: white;
-            border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-            z-index: 10000;
-            font-weight: 600;
-            animation: slideIn 0.2s ease-out;
-        `;
-
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.style.animation = 'slideOut 0.2s ease-out';
-            setTimeout(() => notification.remove(), 200);
-        }, 2000);
-    }
 }
 
 // Add animations

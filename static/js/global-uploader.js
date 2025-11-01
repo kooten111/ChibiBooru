@@ -1,4 +1,5 @@
 // static/js/global-uploader.js
+import { showNotification } from './utils/notifications.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const dropZone = document.getElementById('global-drop-zone');
@@ -46,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const imageCount = formData.getAll('file').length;
         if (imageCount === 0) return;
 
-        showUploadNotification(`Uploading ${imageCount} image(s)...`, 'info');
+        showNotification(`Uploading ${imageCount} image(s)...`, 'info');
 
         fetch('/upload', {
             method: 'POST',
@@ -55,7 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(res => res.json())
         .then(data => {
             if (data.status === 'success') {
-                showUploadNotification(data.message, 'success');
+                showNotification(data.message, 'success');
                 // If the server sent a redirect URL, go there after a delay
                 if (data.redirect_url) {
                     setTimeout(() => {
@@ -67,29 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         })
         .catch(err => {
-            showUploadNotification(`Upload failed: ${err.message}`, 'error');
+            showNotification(`Upload failed: ${err.message}`, 'error');
             console.error('Upload error:', err);
         });
     }
 
-    function showUploadNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed; top: 100px; right: 30px; padding: 15px 25px;
-            background: ${type === 'error' ? 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)' : 
-                         type === 'success' ? 'linear-gradient(135deg, #51cf66 0%, #37b24d 100%)' :
-                         'linear-gradient(135deg, #4a9eff 0%, #357abd 100%)'};
-            color: white; border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-            z-index: 10002; font-weight: 600; max-width: 400px;
-            animation: slideInRight 0.3s ease-out;
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.style.animation = 'slideOutRight 0.3s ease-out';
-            setTimeout(() => notification.remove(), 300);
-        }, 4000);
-    }
 });
