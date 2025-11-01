@@ -31,12 +31,8 @@ def main():
         print(f"Ingest folder not found: {config.INGEST_DIRECTORY}")
         return
 
-    # Count files in ingest
-    ingest_files = [
-        f for f in os.listdir(config.INGEST_DIRECTORY)
-        if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4'))
-        and os.path.isfile(os.path.join(config.INGEST_DIRECTORY, f))
-    ]
+    # Find all files in ingest (use helper function)
+    ingest_files = monitor_service.find_ingest_files()
 
     if not ingest_files:
         print("✓ No files in ingest folder. All clear!")
@@ -44,7 +40,9 @@ def main():
 
     print(f"Found {len(ingest_files)} files to process:")
     for f in ingest_files[:10]:
-        print(f"  - {f}")
+        # Show relative path from ingest directory for better readability
+        rel_path = os.path.relpath(f, config.INGEST_DIRECTORY)
+        print(f"  - {rel_path}")
     if len(ingest_files) > 10:
         print(f"  ... and {len(ingest_files) - 10} more")
 
@@ -57,12 +55,8 @@ def main():
     print("-" * 70)
     print(f"\n✓ Processed {count} files")
 
-    # Check if anything is left
-    remaining = [
-        f for f in os.listdir(config.INGEST_DIRECTORY)
-        if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4'))
-        and os.path.isfile(os.path.join(config.INGEST_DIRECTORY, f))
-    ]
+    # Check if anything is left (use helper function)
+    remaining = monitor_service.find_ingest_files()
 
     if remaining:
         print(f"\n⚠ {len(remaining)} files still in ingest (likely duplicates)")

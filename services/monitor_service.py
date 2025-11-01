@@ -129,10 +129,24 @@ class ImageFileHandler(FileSystemEventHandler):
 
 # --- Core Monitor Logic ---
 
-def find_unprocessed_images():
-    """Finds image files on disk that are not in the database."""
+def find_ingest_files():
+    """
+    Finds all image files in the ingest directory (recursively).
+    Returns a list of absolute file paths.
+    """
     import config
 
+    ingest_files = []
+    if os.path.exists(config.INGEST_DIRECTORY):
+        for root, _, files in os.walk(config.INGEST_DIRECTORY):
+            for file in files:
+                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
+                    filepath = os.path.join(root, file)
+                    ingest_files.append(filepath)
+    return ingest_files
+
+def find_unprocessed_images():
+    """Finds image files on disk that are not in the database."""
     db_filepaths = models.get_all_filepaths()
     unprocessed_files = []
 
@@ -145,13 +159,8 @@ def find_unprocessed_images():
                 if rel_path not in db_filepaths:
                     unprocessed_files.append(filepath)
 
-    # Check ingest directory
-    if os.path.exists(config.INGEST_DIRECTORY):
-        for file in os.listdir(config.INGEST_DIRECTORY):
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
-                filepath = os.path.join(config.INGEST_DIRECTORY, file)
-                if os.path.isfile(filepath):
-                    unprocessed_files.append(filepath)
+    # Check ingest directory (use helper function)
+    unprocessed_files.extend(find_ingest_files())
 
     return unprocessed_files
 
@@ -230,10 +239,10 @@ def start_monitor():
             observer = Observer()
             observer.schedule(event_handler, "static/images", recursive=True)
 
-            # Also watch ingest folder if it exists
+            # Also watch ingest folder if it exists (recursively to support folder structures)
             if os.path.exists(config.INGEST_DIRECTORY):
-                observer.schedule(event_handler, config.INGEST_DIRECTORY, recursive=False)
-                add_log(f"Watching ingest folder: {config.INGEST_DIRECTORY}")
+                observer.schedule(event_handler, config.INGEST_DIRECTORY, recursive=True)
+                add_log(f"Watching ingest folder (recursively): {config.INGEST_DIRECTORY}")
 
             observer.start()
             add_log("Background monitor started (watchdog mode - real-time detection).")
