@@ -186,10 +186,16 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
                 # So we'll use quotes and rely on tokenization
                 fts_query_parts.append(f'^"{clean_term_escaped}"')
             else:
-                # Freetext term - use wildcard for prefix matching
-                # This allows "fellini" to match "pulchra_fellini"
-                fts_query_parts.append(f'{clean_term_escaped}*')
-                # Also track for filepath substring matching
+                # Freetext term - check if it contains special characters that FTS5 can't handle well
+                # For terms with hyphens or special chars, skip FTS and rely on filepath LIKE matching
+                if '-' in clean_term or any(c in clean_term for c in [':', '(', ')', '{', '}', '[', ']']):
+                    # Don't add to FTS query - will be handled by filepath LIKE matching
+                    pass
+                else:
+                    # Use wildcard for prefix matching
+                    # This allows "fellini" to match "pulchra_fellini"
+                    fts_query_parts.append(f'{clean_term_escaped}*')
+                # Always track for filepath substring matching
                 freetext_filepath_terms.append(clean_term)
 
         # Add negative terms
