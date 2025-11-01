@@ -2331,190 +2331,131 @@ body.ui-hidden::after {
     font-size: var(--font-size-lg);
 }
 
-/* Category Selector */
-.category-selector {
-    display: flex;
-    gap: var(--spacing-sm);
-    margin-bottom: 15px;
-    flex-wrap: wrap;
-}
-
-.category-btn {
-    padding: var(--spacing-sm) 14px;
-    background: var(--primary-blue-light);
-    border: var(--border-width) solid var(--border-color);
-    border-radius: var(--radius-md);
-    color: var(--text-muted);
-    cursor: pointer;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    transition: all var(--transition-normal);
-}
-
-.category-btn:hover {
-    background: var(--primary-blue-medium);
-    border-color: var(--border-color-hover);
-    color: var(--text-secondary);
-}
-
-.category-btn.active {
-    background: var(--blue-accent-medium);
-    border-color: var(--border-color-focus);
-    color: var(--primary-blue);
-    box-shadow: 0 0 10px var(--primary-blue-medium);
-}
-
-.editable-tags-list {
+/* Editable categories list */
+.editable-categories-list {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-sm);
-    margin-bottom: 15px;
-    max-height: 400px;
+    gap: var(--spacing-lg);
     overflow-y: auto;
-    padding: 10px;
+    flex: 1;
+}
+
+/* Category section */
+.edit-category-section {
     background: rgba(0, 0, 0, 0.2);
-    border-radius: var(--radius-md);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
 }
 
-/* Custom scrollbar for tag list - uses shared scrollbar variables */
-.editable-tags-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-.editable-tags-list::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: var(--radius-xs);
-}
-
-.editable-tags-list::-webkit-scrollbar-thumb {
-    background: var(--primary-blue-medium);
-    border-radius: var(--radius-xs);
-}
-
-.editable-tags-list::-webkit-scrollbar-thumb:hover {
-    background: var(--primary-blue-strong);
-}
-
-.no-tags-message {
-    text-align: center;
-    padding: var(--spacing-xl);
-    color: var(--primary-blue);
-    font-style: italic;
-    opacity: 0.6;
-}
-
-.editable-tag-item {
+.edit-category-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 18px;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
+    border-bottom: var(--border-width) solid var(--border-color-hover);
+}
+
+.edit-category-header .category-icon {
+    font-size: var(--font-size-lg);
+}
+
+.edit-category-header .category-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    color: var(--primary-blue);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Tag rows */
+.edit-category-tags {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
+}
+
+.edit-tag-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm);
     background: var(--primary-blue-light);
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-md);
     transition: all var(--transition-normal);
-    animation: slideIn var(--transition-normal) ease-out;
-    gap: 10px;
-    overflow: hidden;
 }
 
-.editable-tag-item:hover {
+.edit-tag-row:hover {
     background: var(--primary-blue-medium);
     border-color: var(--border-color-hover);
-    transform: translateX(3px);
 }
 
-.tag-text {
-    color: var(--text-secondary);
-    font-size: var(--font-size-base);
-    flex: 1;
-    min-width: 0;
-    overflow-wrap: break-word;
-    word-break: break-all;
-    line-height: 1.4;
-}
-
-.tag-category-badge {
-    padding: 3px var(--spacing-sm);
-    background: var(--tag-general-bg);
-    border: var(--border-width) solid var(--tag-general-border);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    color: var(--tag-general);
-    font-weight: var(--font-weight-medium);
-    text-transform: uppercase;
-}
-
-/* Category-specific badge colors */
-.tag-category-badge.character {
-    background: var(--tag-character-bg);
-    border-color: var(--tag-character-border);
-    color: var(--tag-character);
-}
-
-.tag-category-badge.copyright {
-    background: var(--tag-copyright-bg);
-    border-color: var(--tag-copyright-border);
-    color: var(--tag-copyright);
-}
-
-.tag-category-badge.artist {
-    background: var(--tag-artist-bg);
-    border-color: var(--tag-artist-border);
-    color: var(--tag-artist);
-}
-
-.tag-category-badge.species {
-    background: var(--tag-species-bg);
-    border-color: var(--tag-species-border);
-    color: var(--tag-species);
-}
-
-.tag-category-badge.meta {
-    background: var(--tag-meta-bg);
-    border-color: var(--tag-meta-border);
-    color: var(--tag-meta);
-}
-
-.tag-remove-btn {
-    background: rgba(255, 107, 107, 0.3);
-    border: var(--border-width) solid rgba(255, 107, 107, 0.5);
+.edit-tag-row .remove-tag-btn {
+    background: transparent;
+    border: none;
     color: var(--danger);
-    padding: var(--spacing-xs) 10px;
-    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: var(--font-size-sm);
-    font-weight: bold;
+    font-size: var(--font-size-base);
+    padding: 2px 6px;
     transition: all var(--transition-normal);
     flex-shrink: 0;
 }
 
-.tag-remove-btn:hover {
-    background: rgba(255, 107, 107, 0.5);
-    color: white;
-    transform: scale(1.1);
+.edit-tag-row .remove-tag-btn:hover {
+    color: #ff6b6b;
+    transform: scale(1.2);
 }
 
-.add-tag-section {
-    position: relative;
-    margin-top: 15px;
-    z-index: var(--z-overlay);
-}
-
-.add-tag-input {
-    width: 100%;
-    padding: var(--spacing-md) 15px;
-    background: rgba(20, 20, 30, 0.6);
-    border: var(--border-width) solid var(--border-color-hover);
-    border-radius: var(--radius-md);
+.edit-tag-row .tag-name {
+    flex: 1;
     color: var(--text-secondary);
     font-size: var(--font-size-base);
+}
+
+.edit-tag-row .tag-count {
+    color: var(--primary-blue);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    flex-shrink: 0;
+}
+
+/* Add tag button */
+.add-tag-btn {
+    width: 100%;
+    padding: var(--spacing-sm);
+    background: var(--primary-blue-light);
+    border: var(--border-width) dashed var(--border-color-hover);
+    border-radius: var(--radius-md);
+    color: var(--primary-blue);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
     transition: all var(--transition-normal);
 }
 
-.add-tag-input:focus {
+.add-tag-btn:hover {
+    background: var(--primary-blue-medium);
+    border-color: var(--primary-blue);
+    color: var(--text-secondary);
+}
+
+/* Input row for adding tags */
+.add-tag-input-row {
+    background: var(--primary-blue-medium) !important;
+    border-color: var(--border-color-focus) !important;
+}
+
+.add-tag-input-row .new-tag-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
     outline: none;
-    border-color: var(--border-color-focus);
-    box-shadow: 0 0 0 3px var(--primary-blue-light);
+    padding: 0;
 }
 
 .tag-suggestions {
@@ -2561,6 +2502,52 @@ body.ui-hidden::after {
     color: var(--primary-blue);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
+}
+
+/* Editing mode - expand tag editor to full height */
+.sidebar-left.editing-mode {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.sidebar-left.editing-mode #tags-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-left.editing-mode .inline-tag-editor {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 0;
+    overflow: hidden;
+}
+
+.sidebar-left.editing-mode .editable-categories-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+/* Custom scrollbar for categories list */
+.editable-categories-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.editable-categories-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-xs);
+}
+
+.editable-categories-list::-webkit-scrollbar-thumb {
+    background: var(--primary-blue-medium);
+    border-radius: var(--radius-xs);
+}
+
+.editable-categories-list::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-blue-strong);
 }
 
 

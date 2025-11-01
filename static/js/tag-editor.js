@@ -1,17 +1,16 @@
 class TagEditor {
     constructor() {
-        this.tags = {}; // Now organized by category
+        this.tags = {}; // Organized by category
         this.isEditing = false;
         this.originalTags = {};
-        this.suggestions = null;
         this.debounceTimer = null;
-        this.categories = ['character', 'copyright', 'artist', 'species', 'meta', 'general'];
-        this.selectedCategory = 'general'; // Default category
+        this.categories = ['artist', 'copyright', 'character', 'species', 'general', 'meta'];
+        this.activeInputCategory = null;
     }
 
     toggleEditMode() {
         console.log('toggleEditMode called, current state:', this.isEditing);
-        
+
         if (!this.isEditing) {
             this.startEditing();
         } else {
@@ -21,24 +20,24 @@ class TagEditor {
 
     startEditing() {
         console.log('Starting edit mode');
-        
+
         // Get current tags from the page
         this.loadCurrentTags();
         this.originalTags = JSON.parse(JSON.stringify(this.tags)); // Deep copy
         this.isEditing = true;
-        
+
         console.log('Current tags:', this.tags);
-        
+
         // Transform the display
         this.renderEditMode();
-        
+
         // Update button
         const editBtn = document.querySelector('.actions-bar .btn-primary');
         if (editBtn) {
             editBtn.textContent = '💾 Save Tags';
             editBtn.classList.add('editing-mode');
         }
-        
+
         // Add cancel button if it doesn't exist
         let cancelBtn = document.getElementById('cancelEditBtn');
         if (!cancelBtn) {
@@ -53,12 +52,12 @@ class TagEditor {
     loadCurrentTags() {
         // Load tags from the categorized display
         this.tags = {
-            character: [],
-            copyright: [],
             artist: [],
+            copyright: [],
+            character: [],
             species: [],
-            meta: [],
-            general: []
+            general: [],
+            meta: []
         };
 
         // Try to parse from the existing tag categories on the page
@@ -89,40 +88,46 @@ class TagEditor {
             console.error('tags-list not found');
             return;
         }
-        
+
+        // Hide all panels in left sidebar except where we'll place the editor
+        const sidebarLeft = document.getElementById('sidebarLeft');
+        if (sidebarLeft) {
+            sidebarLeft.classList.add('editing-mode');
+            // Hide all other sections in sidebar
+            const sections = sidebarLeft.querySelectorAll('.section-content');
+            sections.forEach(section => {
+                if (section.id !== 'tags-content') {
+                    section.style.display = 'none';
+                }
+            });
+        }
+
+        // Hide right sidebar completely
+        const sidebarRight = document.getElementById('sidebarRight');
+        if (sidebarRight) {
+            sidebarRight.style.display = 'none';
+        }
+
         // Hide the normal tag display
         tagsList.style.display = 'none';
-        
+
         // Remove existing editor if present
         const existing = document.getElementById('inlineTagEditor');
         if (existing) {
             existing.remove();
         }
-        
+
         // Create editing interface
         const editContainer = document.createElement('div');
         editContainer.className = 'inline-tag-editor panel';
         editContainer.id = 'inlineTagEditor';
         editContainer.innerHTML = `
             <h3>Editing Tags</h3>
-            <div class="category-selector">
-                ${this.categories.map(cat => `
-                    <button class="category-btn ${cat === this.selectedCategory ? 'active' : ''}" 
-                            data-category="${cat}">
-                        ${this.getCategoryIcon(cat)} ${this.capitalize(cat)}
-                    </button>
-                `).join('')}
-            </div>
-            <div class="editable-tags-list" id="editableTagsList"></div>
-            <div class="add-tag-section">
-                <input type="text"
-                       id="addTagInput"
-                       class="add-tag-input"
-                       placeholder="Type to add a ${this.selectedCategory} tag..."
-                       autocomplete="off">
+            <div class="editable-categories-list" id="editableCategoriesList">
+                ${this.renderCategoriesHTML()}
             </div>
         `;
-        
+
         tagsList.after(editContainer);
 
         // Create suggestions dropdown as a fixed element
@@ -134,86 +139,317 @@ class TagEditor {
             document.body.appendChild(suggestionsEl);
         }
 
-        // Attach category button handlers
-        editContainer.querySelectorAll('.category-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const category = btn.getAttribute('data-category');
-                this.selectCategory(category);
-            });
-        });
-
-        this.renderTags();
         this.attachEditEvents();
 
         console.log('Edit mode rendered');
     }
 
+    renderCategoriesHTML() {
+        return this.categories.map(category => {
+            const categoryTags = this.tags[category] || [];
+            const categoryTitle = this.getCategoryTitle(category);
+            const categoryIcon = this.getCategoryIcon(category);
+
+            return `
+                <div class="edit-category-section" data-category="${category}">
+                    <div class="edit-category-header">
+                        <span class="category-icon">${categoryIcon}</span>
+                        <span class="category-title">${categoryTitle}</span>
+                    </div>
+                    <div class="edit-category-tags" id="tags-${category}">
+                        ${categoryTags.map((tag, idx) => this.renderTagItemHTML(tag, category, idx)).join('')}
+                    </div>
+                    <button class="add-tag-btn" data-category="${category}">
+                        + ADD
+                    </button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    renderTagItemHTML(tag, category, idx) {
+        // Get tag count if available
+        const countText = this.getTagCount(tag);
+
+        return `
+            <div class="edit-tag-row" data-category="${category}" data-index="${idx}">
+                <button class="remove-tag-btn" data-category="${category}" data-index="${idx}">✖</button>
+                <span class="tag-name">${this.escapeHtml(tag)}</span>
+                ${countText ? `<span class="tag-count">${countText}</span>` : ''}
+            </div>
+        `;
+    }
+
+    getTagCount(tag) {
+        // Try to find the tag count from the original page display
+        const tagItems = document.querySelectorAll('.tag-item a');
+        for (let item of tagItems) {
+            if (item.textContent.trim() === tag) {
+                const countSpan = item.parentElement.querySelector('.tag-count');
+                if (countSpan) {
+                    return countSpan.textContent;
+                }
+            }
+        }
+        return '';
+    }
+
+    getCategoryTitle(category) {
+        const titles = {
+            artist: 'Artist',
+            copyright: 'Copyright',
+            character: 'Character',
+            species: 'Species',
+            general: 'General',
+            meta: 'Meta'
+        };
+        return titles[category] || category.charAt(0).toUpperCase() + category.slice(1);
+    }
+
     getCategoryIcon(category) {
         const icons = {
-            character: '👤',
-            copyright: '©️',
             artist: '🎨',
+            copyright: '©️',
+            character: '👤',
             species: '🐾',
-            meta: '⚙️',
-            general: '🏷️'
+            general: '🏷️',
+            meta: '⚙️'
         };
         return icons[category] || '🏷️';
     }
 
-    capitalize(str) {
-        return str.charAt(0).toUpperCase() + str.slice(1);
+    attachEditEvents() {
+        const editContainer = document.getElementById('inlineTagEditor');
+        if (!editContainer) return;
+
+        // Add button click handlers
+        editContainer.querySelectorAll('.add-tag-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const category = btn.getAttribute('data-category');
+                this.showAddTagInput(category);
+            });
+        });
+
+        // Remove button click handlers
+        editContainer.querySelectorAll('.remove-tag-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const category = btn.getAttribute('data-category');
+                const index = parseInt(btn.getAttribute('data-index'));
+                this.removeTag(category, index);
+            });
+        });
     }
 
-    selectCategory(category) {
-        this.selectedCategory = category;
-        
-        // Update button states
-        document.querySelectorAll('.category-btn').forEach(btn => {
-            if (btn.getAttribute('data-category') === category) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
+    showAddTagInput(category) {
+        // Remove any existing input rows first
+        document.querySelectorAll('.add-tag-input-row').forEach(row => row.remove());
+
+        const tagsContainer = document.getElementById(`tags-${category}`);
+        if (!tagsContainer) return;
+
+        // Create input row
+        const inputRow = document.createElement('div');
+        inputRow.className = 'add-tag-input-row edit-tag-row';
+        inputRow.innerHTML = `
+            <input type="text"
+                   class="new-tag-input"
+                   data-category="${category}"
+                   placeholder="Type tag name..."
+                   autocomplete="off">
+        `;
+
+        tagsContainer.appendChild(inputRow);
+
+        const input = inputRow.querySelector('.new-tag-input');
+        input.focus();
+
+        this.activeInputCategory = category;
+
+        // Input event for autocomplete
+        input.addEventListener('input', (e) => this.handleTagInput(e, category));
+
+        // Keydown for Enter and Escape
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const tag = input.value.trim();
+                if (tag) {
+                    this.addTag(tag, category);
+                    inputRow.remove();
+                }
+            } else if (e.key === 'Escape') {
+                inputRow.remove();
+                this.hideSuggestions();
             }
         });
-        
-        // Update placeholder
-        const input = document.getElementById('addTagInput');
-        if (input) {
-            input.placeholder = `Type to add a ${category} tag...`;
-            input.focus();
-        }
-        
-        this.renderTags();
+
+        // Blur to remove input if clicking outside
+        input.addEventListener('blur', (e) => {
+            // Delay to allow clicking suggestions
+            setTimeout(() => {
+                if (!document.activeElement?.closest('.tag-suggestions')) {
+                    inputRow.remove();
+                    this.hideSuggestions();
+                }
+            }, 200);
+        });
     }
 
-    renderTags() {
-        const list = document.getElementById('editableTagsList');
-        if (!list) {
-            console.error('editableTagsList not found');
+    handleTagInput(e, category) {
+        clearTimeout(this.debounceTimer);
+        const query = e.target.value.trim();
+
+        if (query.length < 2) {
+            this.hideSuggestions();
             return;
         }
-        
-        const categoryTags = this.tags[this.selectedCategory] || [];
-        
-        if (categoryTags.length === 0) {
-            list.innerHTML = `<div class="no-tags-message">No ${this.selectedCategory} tags yet</div>`;
-        } else {
-            list.innerHTML = categoryTags.map((tag, idx) => `
-                <div class="editable-tag-item" data-index="${idx}" data-category="${this.selectedCategory}">
-                    <span class="tag-text">${this.escapeHtml(tag)}</span>
-                    <span class="tag-category-badge">${this.selectedCategory}</span>
-                    <button class="tag-remove-btn" data-index="${idx}" title="Remove">✖</button>
-                </div>
-            `).join('');
-            
-            // Attach remove handlers
-            list.querySelectorAll('.tag-remove-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const index = parseInt(e.target.getAttribute('data-index'));
-                    this.removeTag(this.selectedCategory, index);
+
+        this.debounceTimer = setTimeout(() => {
+            this.fetchSuggestions(query, category);
+        }, 150);
+    }
+
+    fetchSuggestions(query, category) {
+        fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                // Filter suggestions by category
+                if (data.groups && data.groups.length > 0) {
+                    this.displaySuggestions(data, category);
+                } else {
+                    this.hideSuggestions();
+                }
+            })
+            .catch(err => console.error('Autocomplete error:', err));
+    }
+
+    displaySuggestions(data, filterCategory) {
+        const suggestionsEl = document.getElementById('tagSuggestions');
+        if (!suggestionsEl) return;
+
+        let html = '';
+
+        if (data.groups) {
+            // Find tags group
+            const tagsGroup = data.groups.find(g => g.name === 'Tags');
+            if (tagsGroup) {
+                // Filter by category
+                const filteredItems = tagsGroup.items.filter(item => {
+                    const itemCategory = item.category || 'general';
+                    return itemCategory === filterCategory;
                 });
-            });
+
+                filteredItems.forEach(item => {
+                    const displayText = item.display || item.tag;
+                    const countText = item.count ? this.formatCount(item.count) : '';
+                    const icon = this.getCategoryIcon(item.category || 'general');
+
+                    html += `
+                        <div class="autocomplete-item" data-tag="${this.escapeHtml(item.tag)}">
+                            <div class="autocomplete-left">
+                                <span class="autocomplete-icon">${icon}</span>
+                                <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
+                            </div>
+                            ${countText ? `<span class="autocomplete-count">${countText}</span>` : ''}
+                        </div>
+                    `;
+                });
+            }
         }
+
+        if (!html) {
+            this.hideSuggestions();
+            return;
+        }
+
+        suggestionsEl.innerHTML = html;
+
+        // Position below the input
+        const input = document.querySelector('.new-tag-input');
+        if (input) {
+            const rect = input.getBoundingClientRect();
+            suggestionsEl.style.top = `${rect.bottom + 8}px`;
+            suggestionsEl.style.left = `${rect.left}px`;
+            suggestionsEl.style.width = `${rect.width}px`;
+        }
+
+        // Attach click handlers
+        suggestionsEl.querySelectorAll('.autocomplete-item').forEach(item => {
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault(); // Prevent input blur
+                const tag = item.getAttribute('data-tag');
+                this.addTag(tag, filterCategory);
+                document.querySelector('.add-tag-input-row')?.remove();
+                this.hideSuggestions();
+            });
+        });
+
+        suggestionsEl.classList.add('active');
+    }
+
+    hideSuggestions() {
+        const suggestionsEl = document.getElementById('tagSuggestions');
+        if (suggestionsEl) {
+            suggestionsEl.classList.remove('active');
+        }
+    }
+
+    addTag(tag, category) {
+        tag = tag.trim().toLowerCase().replace(/\s+/g, '_');
+
+        if (!tag) return;
+
+        if (!this.tags[category]) {
+            this.tags[category] = [];
+        }
+
+        if (this.tags[category].includes(tag)) {
+            this.showNotification('Tag already exists in this category', 'warning');
+            return;
+        }
+
+        // Check if tag exists in other categories
+        for (let cat of this.categories) {
+            if (cat !== category && this.tags[cat] && this.tags[cat].includes(tag)) {
+                this.showNotification(`Tag exists in ${cat} category. Remove it there first.`, 'warning');
+                return;
+            }
+        }
+
+        this.tags[category].push(tag);
+        this.refreshCategoryTags(category);
+        this.showNotification(`Added to ${category}`, 'info');
+    }
+
+    removeTag(category, index) {
+        const row = document.querySelector(`[data-category="${category}"][data-index="${index}"].edit-tag-row`);
+        if (row) {
+            row.style.animation = 'fadeOut 0.2s ease-out';
+            setTimeout(() => {
+                this.tags[category].splice(index, 1);
+                this.refreshCategoryTags(category);
+                this.showNotification('Tag removed', 'info');
+            }, 150);
+        }
+    }
+
+    refreshCategoryTags(category) {
+        const tagsContainer = document.getElementById(`tags-${category}`);
+        if (!tagsContainer) return;
+
+        const categoryTags = this.tags[category] || [];
+        tagsContainer.innerHTML = categoryTags.map((tag, idx) =>
+            this.renderTagItemHTML(tag, category, idx)
+        ).join('');
+
+        // Re-attach event handlers for this category's remove buttons
+        tagsContainer.querySelectorAll('.remove-tag-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const cat = btn.getAttribute('data-category');
+                const idx = parseInt(btn.getAttribute('data-index'));
+                this.removeTag(cat, idx);
+            });
+        });
     }
 
     renderViewMode() {
@@ -227,6 +463,23 @@ class TagEditor {
         const tagsList = document.querySelector('.tags-list');
         if (tagsList) {
             tagsList.style.display = 'block';
+        }
+
+        // Restore left sidebar panels
+        const sidebarLeft = document.getElementById('sidebarLeft');
+        if (sidebarLeft) {
+            sidebarLeft.classList.remove('editing-mode');
+            // Show all sections in sidebar again
+            const sections = sidebarLeft.querySelectorAll('.section-content');
+            sections.forEach(section => {
+                section.style.display = '';
+            });
+        }
+
+        // Restore right sidebar
+        const sidebarRight = document.getElementById('sidebarRight');
+        if (sidebarRight) {
+            sidebarRight.style.display = '';
         }
 
         // Reset button
@@ -243,240 +496,20 @@ class TagEditor {
 
         this.isEditing = false;
 
-        // Clean up suggestions dropdown
-        if (this.suggestions) {
-            this.suggestions.classList.remove('active');
-            this.suggestions.remove();
-            this.suggestions = null;
-        }
-
-        // Remove event handlers
-        if (this.clickOutsideHandler) {
-            document.removeEventListener('click', this.clickOutsideHandler);
-        }
-        if (this.scrollHandler) {
-            document.removeEventListener('scroll', this.scrollHandler, true);
-        }
-        if (this.resizeHandler) {
-            window.removeEventListener('resize', this.resizeHandler);
-        }
-    }
-
-    attachEditEvents() {
-        const input = document.getElementById('addTagInput');
-        if (!input) {
-            console.error('addTagInput not found');
-            return;
-        }
-
-        this.suggestions = document.getElementById('tagSuggestions');
-
-        input.addEventListener('input', (e) => this.handleInput(e));
-        input.addEventListener('keydown', (e) => this.handleKeydown(e));
-
-        // Click outside to close suggestions
-        const closeHandler = (e) => {
-            if (!e.target.closest('.add-tag-section') && !e.target.closest('#tagSuggestions')) {
-                this.suggestions?.classList.remove('active');
-            }
-        };
-
-        // Remove old handler if exists
-        document.removeEventListener('click', this.clickOutsideHandler);
-        this.clickOutsideHandler = closeHandler;
-        document.addEventListener('click', closeHandler);
-
-        // Reposition on scroll/resize
-        const repositionHandler = () => {
-            if (this.suggestions?.classList.contains('active')) {
-                this.repositionSuggestions();
-            }
-        };
-
-        // Remove old handlers if exist
-        document.removeEventListener('scroll', this.scrollHandler, true);
-        window.removeEventListener('resize', this.resizeHandler);
-
-        this.scrollHandler = repositionHandler;
-        this.resizeHandler = repositionHandler;
-
-        document.addEventListener('scroll', repositionHandler, true);
-        window.addEventListener('resize', repositionHandler);
-    }
-
-    repositionSuggestions() {
-        const input = document.getElementById('addTagInput');
-        if (input && this.suggestions) {
-            const rect = input.getBoundingClientRect();
-            this.suggestions.style.top = `${rect.bottom + 8}px`;
-            this.suggestions.style.left = `${rect.left}px`;
-            this.suggestions.style.width = `${rect.width}px`;
-            this.suggestions.style.minWidth = '300px';
-        }
-    }
-
-    handleInput(e) {
-        clearTimeout(this.debounceTimer);
-        const query = e.target.value.trim();
-        
-        if (query.length < 2) {
-            this.suggestions?.classList.remove('active');
-            return;
-        }
-        
-        this.debounceTimer = setTimeout(() => {
-            this.fetchSuggestions(query);
-        }, 150);
-    }
-
-    handleKeydown(e) {
-        const input = e.target;
-        
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            const tag = input.value.trim();
-            if (tag) {
-                this.addTag(tag, this.selectedCategory);
-            }
-        } else if (e.key === 'Escape') {
-            this.suggestions?.classList.remove('active');
-            input.blur();
-        }
-    }
-
-    fetchSuggestions(query) {
-        fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`)
-            .then(res => res.json())
-            .then(data => {
-                // Handle new grouped format
-                if (data.groups && data.groups.length > 0) {
-                    this.displaySuggestions(data);
-                } else {
-                    this.suggestions?.classList.remove('active');
-                }
-            })
-            .catch(err => console.error('Autocomplete error:', err));
-    }
-
-    displaySuggestions(data) {
-        if (!this.suggestions) return;
-
-        // Handle grouped autocomplete response
-        let html = '';
-
-        if (data.groups) {
-            // New grouped format
-            data.groups.forEach(group => {
-                if (group.items.length === 0) return;
-
-                // Only show tags group in tag editor (skip filters)
-                if (group.name === 'Tags') {
-                    group.items.forEach(item => {
-                        const displayText = item.display || item.tag;
-                        const countText = item.count ? this.formatCount(item.count) : '';
-                        const icon = this.getCategoryIcon(item.category || 'general');
-
-                        html += `
-                            <div class="autocomplete-item" data-tag="${this.escapeHtml(item.tag)}" data-category="${this.escapeHtml(item.category || '')}">
-                                <div class="autocomplete-left">
-                                    <span class="autocomplete-icon">${icon}</span>
-                                    <span class="autocomplete-tag">${this.escapeHtml(displayText)}</span>
-                                </div>
-                                ${countText ? `<span class="autocomplete-count">${countText}</span>` : ''}
-                            </div>
-                        `;
-                    });
-                }
-            });
-        }
-
-        if (!html) {
-            this.suggestions?.classList.remove('active');
-            return;
-        }
-
-        this.suggestions.innerHTML = html;
-
-        // Position the fixed dropdown below the input
-        const input = document.getElementById('addTagInput');
-        if (input) {
-            const rect = input.getBoundingClientRect();
-            this.suggestions.style.top = `${rect.bottom + 8}px`;
-            this.suggestions.style.left = `${rect.left}px`;
-            this.suggestions.style.width = `${rect.width}px`;
-        }
-
-        // Attach click handlers
-        this.suggestions.querySelectorAll('.autocomplete-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const tag = item.getAttribute('data-tag');
-                const category = item.getAttribute('data-category');
-                // Use the suggested category if available, otherwise use selected category
-                const targetCategory = category && category !== '' ? category : this.selectedCategory;
-                this.addTag(tag, targetCategory);
-            });
-        });
-
-        this.suggestions.classList.add('active');
-    }
-
-    addTag(tag, category) {
-        tag = tag.trim().toLowerCase().replace(/\s+/g, '_');
-        
-        if (!tag) return;
-        
-        if (!this.tags[category]) {
-            this.tags[category] = [];
-        }
-        
-        if (this.tags[category].includes(tag)) {
-            this.showNotification('Tag already exists in this category', 'warning');
-            return;
-        }
-        
-        // Check if tag exists in other categories
-        for (let cat of this.categories) {
-            if (cat !== category && this.tags[cat] && this.tags[cat].includes(tag)) {
-                this.showNotification(`Tag exists in ${cat} category. Remove it there first.`, 'warning');
-                return;
-            }
-        }
-        
-        this.tags[category].push(tag);
-        this.renderTags();
-        
-        const input = document.getElementById('addTagInput');
-        if (input) {
-            input.value = '';
-        }
-        this.suggestions?.classList.remove('active');
-        input?.focus();
-        
-        this.showNotification(`Added to ${category}`, 'info');
-    }
-
-    removeTag(category, index) {
-        const item = document.querySelector(`[data-category="${category}"][data-index="${index}"]`);
-        if (item) {
-            item.style.animation = 'fadeOut 0.2s ease-out';
-            setTimeout(() => {
-                this.tags[category].splice(index, 1);
-                this.renderTags();
-                this.showNotification('Tag removed', 'info');
-            }, 150);
-        }
+        // Clean up suggestions
+        this.hideSuggestions();
     }
 
     saveTags() {
         console.log('Saving tags:', this.tags);
-        
+
         const filepath = document.getElementById('imageFilepath')?.value;
         if (!filepath) {
             console.error('No filepath found');
             this.showNotification('Error: No filepath', 'error');
             return;
         }
-        
+
         const editBtn = document.querySelector('.actions-bar .btn-primary');
         if (editBtn) {
             editBtn.textContent = 'Saving...';
@@ -485,12 +518,12 @@ class TagEditor {
 
         // Prepare categorized tags for backend
         const categorizedTags = {
-            tags_character: this.tags.character.join(' '),
-            tags_copyright: this.tags.copyright.join(' '),
             tags_artist: this.tags.artist.join(' '),
+            tags_copyright: this.tags.copyright.join(' '),
+            tags_character: this.tags.character.join(' '),
             tags_species: this.tags.species.join(' '),
-            tags_meta: this.tags.meta.join(' '),
-            tags_general: this.tags.general.join(' ')
+            tags_general: this.tags.general.join(' '),
+            tags_meta: this.tags.meta.join(' ')
         };
 
         fetch('/api/edit_tags', {
@@ -502,7 +535,6 @@ class TagEditor {
             })
         })
         .then(res => {
-            // Check if response is actually JSON
             const contentType = res.headers.get('content-type');
             if (!contentType || !contentType.includes('application/json')) {
                 console.error('Response is not JSON, got:', contentType);
@@ -516,7 +548,6 @@ class TagEditor {
         .then(data => {
             if (data.status === 'success') {
                 this.showNotification('Tags saved!', 'success');
-                // Exit edit mode and reload
                 this.renderViewMode();
                 setTimeout(() => location.reload(), 500);
             } else {
@@ -535,7 +566,7 @@ class TagEditor {
 
     cancelEdit() {
         console.log('Cancelling edit');
-        this.tags = JSON.parse(JSON.stringify(this.originalTags)); // Deep copy
+        this.tags = JSON.parse(JSON.stringify(this.originalTags));
         this.renderViewMode();
         this.showNotification('Changes cancelled', 'info');
     }
@@ -569,9 +600,9 @@ class TagEditor {
             font-weight: 600;
             animation: slideIn 0.2s ease-out;
         `;
-        
+
         document.body.appendChild(notification);
-        
+
         setTimeout(() => {
             notification.style.animation = 'slideOut 0.2s ease-out';
             setTimeout(() => notification.remove(), 200);
@@ -588,14 +619,14 @@ style.textContent = `
             transform: scale(0.8);
         }
     }
-    
+
     @keyframes slideIn {
         from {
             opacity: 0;
             transform: translateX(100px);
         }
     }
-    
+
     @keyframes slideOut {
         to {
             opacity: 0;
@@ -605,13 +636,13 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// Create instance and expose it globally for other scripts to use
+// Create instance and expose it globally
 window.tagEditor = new TagEditor();
 
 // Global function for the button
 function toggleTagEditor() {
     console.log('toggleTagEditor called');
-    
+
     if (window.tagEditor.isEditing) {
         const editBtn = document.querySelector('.actions-bar .btn-primary');
         if (editBtn && editBtn.classList.contains('editing-mode')) {
@@ -636,4 +667,4 @@ function saveTags() {
     window.tagEditor.saveTags();
 }
 
-console.log('Tag editor with categories loaded');
+console.log('Tag editor loaded');
