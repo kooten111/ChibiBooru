@@ -215,15 +215,12 @@ function initCollapsibleSections() {
 
 /**
  * Initialize swipe gestures for mobile navigation between related images
+ * With preloading and smooth crossfade transitions
  */
 function initSwipeNavigation() {
     // Get all related image links
     const relatedLinks = Array.from(document.querySelectorAll('.related-thumb'));
     if (relatedLinks.length === 0) return; // No related images
-
-    // Find current image index or default to -1 (navigate to first related)
-    const currentPath = document.getElementById('imageFilepath')?.value;
-    let currentIndex = -1;
 
     // Touch event state
     let touchStartX = 0;
@@ -231,6 +228,7 @@ function initSwipeNavigation() {
     let touchEndX = 0;
     let touchEndY = 0;
     let isSwiping = false;
+    let isTransitioning = false;
 
     // Minimum swipe distance (in pixels)
     const minSwipeDistance = 50;
@@ -241,12 +239,79 @@ function initSwipeNavigation() {
     const imageContainer = document.querySelector('.image-view') || document.querySelector('.main-content');
     if (!imageContainer) return;
 
+    // Preload next and previous images
+    const preloadedImages = new Map();
+
+    function preloadImage(url) {
+        if (preloadedImages.has(url)) return preloadedImages.get(url);
+
+        return fetch(url)
+            .then(response => response.text())
+            .then(html => {
+                // Parse the HTML to extract the image src
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const imgElement = doc.querySelector('.image-view img, .image-view video');
+                const videoElement = doc.querySelector('.image-view video source');
+
+                if (imgElement) {
+                    const imgSrc = videoElement ? videoElement.src : imgElement.src;
+                    // Preload the actual image
+                    const img = new Image();
+                    img.src = imgSrc;
+                    preloadedImages.set(url, { html, imgSrc, isVideo: !!videoElement });
+                    return { html, imgSrc, isVideo: !!videoElement };
+                }
+                return null;
+            })
+            .catch(err => {
+                console.error('Failed to preload:', url, err);
+                return null;
+            });
+    }
+
+    // Preload first and last related images
+    if (relatedLinks.length > 0) {
+        preloadImage(relatedLinks[0].href);
+        if (relatedLinks.length > 1) {
+            preloadImage(relatedLinks[relatedLinks.length - 1].href);
+        }
+    }
+
+    // Add click handlers to all related image links for crossfade navigation
+    relatedLinks.forEach((link, index) => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (isTransitioning) return;
+
+            const targetUrl = link.href;
+
+            // Start preloading if not already preloaded
+            if (!preloadedImages.has(targetUrl)) {
+                preloadImage(targetUrl).then(() => {
+                    navigateWithCrossfade(targetUrl);
+                });
+            } else {
+                navigateWithCrossfade(targetUrl);
+            }
+        });
+
+        // Preload on hover for desktop
+        link.addEventListener('mouseenter', () => {
+            if (!preloadedImages.has(link.href)) {
+                preloadImage(link.href);
+            }
+        });
+    });
+
     // Touch start handler
     imageContainer.addEventListener('touchstart', (e) => {
         // Only start tracking if touching the image area directly (not buttons or links)
         if (e.target.closest('.actions-bar') || e.target.closest('button') || e.target.closest('a')) {
             return;
         }
+
+        if (isTransitioning) return;
 
         touchStartX = e.changedTouches[0].screenX;
         touchStartY = e.changedTouches[0].screenY;
@@ -255,7 +320,7 @@ function initSwipeNavigation() {
 
     // Touch move handler
     imageContainer.addEventListener('touchmove', (e) => {
-        if (touchStartX === 0) return;
+        if (touchStartX === 0 || isTransitioning) return;
 
         const currentX = e.changedTouches[0].screenX;
         const currentY = e.changedTouches[0].screenY;
@@ -270,7 +335,7 @@ function initSwipeNavigation() {
 
     // Touch end handler
     imageContainer.addEventListener('touchend', (e) => {
-        if (touchStartX === 0) return;
+        if (touchStartX === 0 || isTransitioning) return;
 
         touchEndX = e.changedTouches[0].screenX;
         touchEndY = e.changedTouches[0].screenY;
@@ -294,16 +359,209 @@ function initSwipeNavigation() {
         if (verticalDistance > maxVerticalMovement) return;
         if (!isSwiping) return;
 
+        let targetUrl = null;
+
         // Swipe left = next image (first related image)
         if (horizontalDistance < 0 && relatedLinks.length > 0) {
-            // Navigate to first related image
-            window.location.href = relatedLinks[0].href;
+            targetUrl = relatedLinks[0].href;
         }
         // Swipe right = previous image (last related image)
         else if (horizontalDistance > 0 && relatedLinks.length > 0) {
-            // Navigate to last related image
-            window.location.href = relatedLinks[relatedLinks.length - 1].href;
+            targetUrl = relatedLinks[relatedLinks.length - 1].href;
         }
+
+        if (targetUrl) {
+            navigateWithCrossfade(targetUrl);
+        }
+    }
+
+    function navigateWithCrossfade(targetUrl) {
+        if (isTransitioning) return;
+        isTransitioning = true;
+
+        // Check if we have preloaded data
+        const preloadedData = preloadedImages.get(targetUrl);
+
+        if (preloadedData) {
+            performCrossfade(targetUrl, preloadedData);
+        } else {
+            // Fallback: show loading and navigate normally
+            showLoadingOverlay();
+            window.location.href = targetUrl;
+        }
+    }
+
+    function performCrossfade(targetUrl, preloadedData) {
+        // Find the current image container
+        const currentImageView = document.querySelector('.image-view');
+        const currentImage = currentImageView?.querySelector('img, video');
+
+        if (!currentImageView || !currentImage) {
+            // Fallback if we can't find the image
+            showLoadingOverlay();
+            window.location.href = targetUrl;
+            return;
+        }
+
+        // Fetch the full page HTML to replace content
+        fetch(targetUrl)
+            .then(response => response.text())
+            .then(html => {
+                // Parse the new page
+                const parser = new DOMParser();
+                const newDoc = parser.parseFromString(html, 'text/html');
+
+                // Make the image container position relative if it isn't already
+                const originalPosition = currentImageView.style.position;
+                if (!originalPosition || originalPosition === 'static') {
+                    currentImageView.style.position = 'relative';
+                }
+
+                // Lock the container's current height to prevent jumping
+                const currentHeight = currentImageView.offsetHeight;
+                currentImageView.style.height = currentHeight + 'px';
+                currentImageView.style.transition = 'height 0.3s ease-in-out';
+
+                // Add fade-out to current image
+                currentImage.style.transition = 'opacity 0.3s ease-in-out';
+                currentImage.style.opacity = '0';
+
+                // Create overlay for new image
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 100;
+                    opacity: 0;
+                    transition: opacity 0.3s ease-in-out;
+                `;
+
+                // Create new image element
+                let newMediaElement;
+                if (preloadedData.isVideo) {
+                    newMediaElement = document.createElement('video');
+                    newMediaElement.controls = true;
+                    newMediaElement.loop = true;
+                    const source = document.createElement('source');
+                    source.src = preloadedData.imgSrc;
+                    source.type = 'video/mp4';
+                    newMediaElement.appendChild(source);
+                } else {
+                    newMediaElement = document.createElement('img');
+                    newMediaElement.src = preloadedData.imgSrc;
+                    newMediaElement.alt = 'Image';
+                }
+
+                // Style new image to match container
+                newMediaElement.style.cssText = `
+                    max-width: 100%;
+                    max-height: 100%;
+                    width: auto;
+                    height: auto;
+                    object-fit: contain;
+                    display: block;
+                `;
+
+                overlay.appendChild(newMediaElement);
+                currentImageView.appendChild(overlay);
+
+                // Wait for new image to load to get its dimensions
+                const onMediaReady = () => {
+                    // Calculate new height based on loaded image
+                    const newHeight = newMediaElement.offsetHeight;
+                    if (newHeight > 0) {
+                        currentImageView.style.height = newHeight + 'px';
+                    }
+
+                    // Trigger crossfade
+                    requestAnimationFrame(() => {
+                        overlay.style.opacity = '1';
+                    });
+
+                    // After fade, replace page content without reload
+                    setTimeout(() => {
+                        replacePageContent(newDoc, targetUrl);
+                    }, 300);
+                };
+
+                // Handle image vs video loading
+                if (preloadedData.isVideo) {
+                    newMediaElement.addEventListener('loadedmetadata', onMediaReady, { once: true });
+                    // Fallback if already loaded
+                    if (newMediaElement.readyState >= 1) {
+                        onMediaReady();
+                    }
+                } else {
+                    if (newMediaElement.complete) {
+                        onMediaReady();
+                    } else {
+                        newMediaElement.addEventListener('load', onMediaReady, { once: true });
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Failed to load page:', err);
+                // Fallback to regular navigation
+                window.location.href = targetUrl;
+            });
+    }
+
+    function replacePageContent(newDoc, newUrl) {
+        // Update the URL without reloading
+        window.history.pushState({}, '', newUrl);
+
+        // Update page title
+        document.title = newDoc.title;
+
+        // Replace main content areas
+        const container = document.querySelector('.container');
+        const newContainer = newDoc.querySelector('.container');
+        if (container && newContainer) {
+            container.innerHTML = newContainer.innerHTML;
+        }
+
+        // Re-initialize the navigation after content is replaced
+        setTimeout(() => {
+            initSwipeNavigation();
+            initCollapsibleSections();
+
+            // Re-attach delete button handler
+            const deleteBtn = document.getElementById('deleteImageBtn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', confirmDelete);
+            }
+        }, 50);
+
+        isTransitioning = false;
+    }
+
+    function showLoadingOverlay() {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary, #0a0a0f);
+            z-index: 10000;
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        `;
+        overlay.innerHTML = '<div style="color: #87ceeb; font-size: 1.2em;">Loading...</div>';
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => {
+            overlay.style.opacity = '1';
+        });
     }
 }
 
