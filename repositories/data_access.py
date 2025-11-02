@@ -76,6 +76,7 @@ def get_all_images_with_tags():
         LEFT JOIN image_tags it ON i.id = it.image_id
         LEFT JOIN tags t ON it.tag_id = t.id
         GROUP BY i.id
+        ORDER BY RANDOM()
         """
         return [dict(row) for row in conn.execute(query).fetchall()]
 
