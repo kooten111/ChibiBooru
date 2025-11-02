@@ -29,7 +29,7 @@ def login():
     if request.method == 'POST':
         if request.form.get('password') == config.APP_PASSWORD:
             session['logged_in'] = True
-            session.permanent = True # Make session last for a long time
+            session.permanent = True # Session timeout configured in app.py (4 hours)
             return redirect(url_for('main.home'))
         else:
             flash('Incorrect password.', 'error')

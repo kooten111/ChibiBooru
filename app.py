@@ -1,6 +1,7 @@
 import config
 from flask import Flask
 from dotenv import load_dotenv
+from datetime import timedelta
 
 load_dotenv(override=True)
 
@@ -15,6 +16,7 @@ def create_app():
     # Flask config
     app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
     app.config['SECRET_KEY'] = config.SECRET_KEY
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
     
     # Ensure the database file and tables exist.
     initialize_database()
