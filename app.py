@@ -8,18 +8,23 @@ load_dotenv(override=True)
 from routes import main_blueprint, api_blueprint
 import models
 from database import initialize_database
+from priority_monitor import check_and_apply_priority_changes
 
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
-    
+
     # Flask config
     app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
     app.config['SECRET_KEY'] = config.SECRET_KEY
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
-    
+
     # Ensure the database file and tables exist.
     initialize_database()
+
+    # Check if BOORU_PRIORITY changed and auto-apply if needed
+    # This must happen before loading data from DB
+    check_and_apply_priority_changes()
 
     with app.app_context():
         models.load_data_from_db()

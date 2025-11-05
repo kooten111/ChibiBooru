@@ -231,18 +231,29 @@ def apply_implications_for_image(image_id):
 # ============================================================================
 
 def update_image_tags(filepath, new_tags_str):
-    """Update the tags for a specific image."""
+    """Update the tags for a specific image (legacy uncategorized format)."""
+    from repositories.delta_tracker import compute_tag_deltas, record_tag_delta
+
     new_tags = set(tag.strip() for tag in new_tags_str.lower().split())
 
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            cursor.execute("SELECT id FROM images WHERE filepath = ?", (filepath,))
+            cursor.execute("SELECT id, md5 FROM images WHERE filepath = ?", (filepath,))
             result = cursor.fetchone()
             if not result:
                 return False
             image_id = result['id']
+            image_md5 = result['md5']
+
+            # Compute deltas before making changes (treats all as general tags)
+            categorized_tags = {'tags_general': new_tags_str}
+            deltas = compute_tag_deltas(filepath, categorized_tags)
+
+            # Record each delta
+            for tag_name, tag_category, operation in deltas:
+                record_tag_delta(image_md5, tag_name, tag_category, operation)
 
             cursor.execute("DELETE FROM image_tags WHERE image_id = ?", (image_id,))
 
@@ -271,7 +282,7 @@ def update_image_tags(filepath, new_tags_str):
 def update_image_tags_categorized(filepath, categorized_tags):
     """Update image tags by category in the database."""
     # Import delta tracking from the repository
-    from repositories.delta_tracker import compute_tag_deltas
+    from repositories.delta_tracker import compute_tag_deltas, record_tag_delta
 
     # Normalize filepath
     if filepath.startswith('images/'):
@@ -296,6 +307,10 @@ def update_image_tags_categorized(filepath, categorized_tags):
             # Compute deltas before making changes
             deltas = compute_tag_deltas(filepath, categorized_tags)
             print(f"Computed {len(deltas)} tag deltas for {filepath}")
+
+            # Record each delta in the tag_deltas table
+            for tag_name, tag_category, operation in deltas:
+                record_tag_delta(image_md5, tag_name, tag_category, operation)
 
             # Update the categorized tag columns in images table
             cursor.execute("""
