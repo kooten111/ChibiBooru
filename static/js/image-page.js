@@ -1,33 +1,20 @@
 // static/js/image-page.js
 import { showNotification } from './utils/notifications.js';
 
-/**
- * Finds the next image to navigate to from the carousel
- * Prioritizes images from the related images carousel
- */
 function findNextImageUrl() {
-    // Try to get the first image from the carousel (similar/related images)
     const carouselImages = document.querySelectorAll('.carousel-track a[href^="/view/"]');
-
     if (carouselImages.length > 0) {
-        // Return the first carousel image as the next destination
         return carouselImages[0].href;
     }
 
-    // Fallback: check if there's a referrer in session storage or document.referrer
     const referrer = document.referrer;
     if (referrer && referrer.includes(window.location.origin)) {
         return referrer;
     }
 
-    // Last resort: return null to go to homepage
     return null;
 }
 
-/**
- * Handles the deletion of the current image after user confirmation.
- * This relies on the modal logic defined in modal.js
- */
 function confirmDelete() {
     const filepath = document.getElementById('imageFilepath')?.value;
     if (!filepath) {
@@ -36,32 +23,23 @@ function confirmDelete() {
         return;
     }
 
-    // The showConfirm function is globally available from modal.js
     showConfirm('Are you sure you want to permanently delete this image?', () => {
-        console.log('[DELETE] Starting deletion for:', filepath);
         fetch('/api/delete_image', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filepath: filepath })
         })
         .then(res => {
-            console.log('[DELETE] Response status:', res.status);
             if (!res.ok) {
                  return res.json().then(err => { throw new Error(err.error || 'Server error') });
             }
             return res.json();
         })
         .then(data => {
-            console.log('[DELETE] Response data:', data);
             if (data.status === 'success') {
                 showNotification('Image deleted!', 'success');
-
-                // Try to navigate to the next related image
                 const nextUrl = findNextImageUrl();
-                console.log('[DELETE] Next URL:', nextUrl);
-
                 setTimeout(() => {
-                    console.log('[DELETE] Redirecting to:', nextUrl || '/');
                     window.location.href = nextUrl || '/';
                 }, 500);
             } else {
@@ -69,16 +47,13 @@ function confirmDelete() {
             }
         })
         .catch(err => {
-            console.error('[DELETE] Error:', err);
+            console.error(err);
             showNotification('Failed to delete: ' + err.message, 'error');
         });
     });
 }
 
 
-/**
- * Shows options dialog for retry tagging
- */
 function confirmRetryTagging() {
     const overlay = document.createElement('div');
     overlay.className = 'custom-confirm-overlay';
@@ -121,9 +96,8 @@ function confirmRetryTagging() {
             this.style.boxShadow = 'none';
         });
         btn.addEventListener('click', function() {
-            const option = this.dataset.option;
             overlay.remove();
-            retryTagging(option === 'online-only');
+            retryTagging(this.dataset.option === 'online-only');
         });
     });
 
@@ -133,10 +107,6 @@ function confirmRetryTagging() {
     };
 }
 
-/**
- * Handles retrying the tagging process for images that were tagged with local_tagger.
- * @param {boolean} skipLocalFallback - If true, only try online sources and keep current tags if nothing found
- */
 function retryTagging(skipLocalFallback = false) {
     const filepath = document.getElementById('imageFilepath')?.value;
     if (!filepath) {
@@ -146,7 +116,6 @@ function retryTagging(skipLocalFallback = false) {
         return;
     }
 
-    // Show loading notification
     const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
     notifier.showNotification('Retrying tagging...', 'info');
 
@@ -166,11 +135,8 @@ function retryTagging(skipLocalFallback = false) {
     })
     .then(data => {
         if (data.status === 'success') {
-            const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
-            const message = `Successfully retagged! Source: ${data.new_source} (${data.tag_count} tags)`;
-            notifier.showNotification(message, 'success');
-
-            // Reload the page to show updated tags
+                const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
+            notifier.showNotification(`Successfully retagged! Source: ${data.new_source} (${data.tag_count} tags)`, 'success');
             setTimeout(() => {
                 window.location.reload();
             }, 1500);
@@ -191,61 +157,35 @@ function retryTagging(skipLocalFallback = false) {
 }
 
 
-/**
- * Initialize collapsible sections for desktop and mobile
- * Handles the collapse/expand behavior of sidebar sections
- * Supports both standalone section headers and integrated panel headers
- * Pools and Information sections are collapsed by default
- */
 function initCollapsibleSections() {
     const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
-
-    // Load saved states from localStorage
     const savedStates = JSON.parse(localStorage.getItem('imageSectionStates') || '{}');
-
-    // Sections that should be collapsed by default
     const defaultCollapsed = ['pools-panel-content', 'metadata-panel-content'];
 
     sectionHeaders.forEach(header => {
         const sectionId = header.dataset.section;
         const content = document.getElementById(sectionId);
-
         if (!content) return;
 
-        // Check if this is a panel header (integrated) or section header (standalone)
         const isPanelHeader = header.classList.contains('panel-header');
-
-        // Restore saved state, or use default collapsed state for specific sections
-        let isCollapsed;
-        if (savedStates[sectionId] !== undefined) {
-            isCollapsed = savedStates[sectionId];
-        } else {
-            // Default to collapsed for pools and metadata, expanded for others
-            isCollapsed = defaultCollapsed.includes(sectionId);
-        }
+        const isCollapsed = savedStates[sectionId] !== undefined ? savedStates[sectionId] : defaultCollapsed.includes(sectionId);
 
         if (isCollapsed) {
             header.classList.add('collapsed');
             if (!isPanelHeader) {
-                // For standalone section headers, collapse the content wrapper
                 content.classList.add('collapsed');
             }
         }
 
-        // Add click handler
         header.addEventListener('click', (e) => {
             e.preventDefault();
             const isCurrentlyCollapsed = header.classList.contains('collapsed');
-
-            // Toggle collapsed state on header
             header.classList.toggle('collapsed');
 
-            // For standalone section headers, also toggle content wrapper
             if (!isPanelHeader) {
                 content.classList.toggle('collapsed');
             }
 
-            // Save state to localStorage
             savedStates[sectionId] = !isCurrentlyCollapsed;
             localStorage.setItem('imageSectionStates', JSON.stringify(savedStates));
         });
@@ -253,16 +193,10 @@ function initCollapsibleSections() {
 }
 
 
-/**
- * Initialize swipe gestures for mobile navigation between related images
- * With preloading and smooth crossfade transitions
- */
 function initSwipeNavigation() {
-    // Get all related image links
     const relatedLinks = Array.from(document.querySelectorAll('.related-thumb'));
-    if (relatedLinks.length === 0) return; // No related images
+    if (relatedLinks.length === 0) return;
 
-    // Touch event state
     let touchStartX = 0;
     let touchStartY = 0;
     let touchEndX = 0;
@@ -270,16 +204,12 @@ function initSwipeNavigation() {
     let isSwiping = false;
     let isTransitioning = false;
 
-    // Minimum swipe distance (in pixels)
     const minSwipeDistance = 50;
-    // Maximum vertical movement allowed for horizontal swipe
     const maxVerticalMovement = 100;
 
-    // Get the main content area for swipe detection
     const imageContainer = document.querySelector('.image-view') || document.querySelector('.main-content');
     if (!imageContainer) return;
 
-    // Preload next and previous images
     const preloadedImages = new Map();
 
     function preloadImage(url) {
@@ -288,7 +218,6 @@ function initSwipeNavigation() {
         return fetch(url)
             .then(response => response.text())
             .then(html => {
-                // Parse the HTML to extract the image src
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 const imgElement = doc.querySelector('.image-view img, .image-view video');
@@ -296,7 +225,6 @@ function initSwipeNavigation() {
 
                 if (imgElement) {
                     const imgSrc = videoElement ? videoElement.src : imgElement.src;
-                    // Preload the actual image
                     const img = new Image();
                     img.src = imgSrc;
                     preloadedImages.set(url, { html, imgSrc, isVideo: !!videoElement });
@@ -310,7 +238,6 @@ function initSwipeNavigation() {
             });
     }
 
-    // Preload first and last related images
     if (relatedLinks.length > 0) {
         preloadImage(relatedLinks[0].href);
         if (relatedLinks.length > 1) {
@@ -318,15 +245,12 @@ function initSwipeNavigation() {
         }
     }
 
-    // Add click handlers to all related image links for crossfade navigation
-    relatedLinks.forEach((link, index) => {
+    relatedLinks.forEach((link) => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             if (isTransitioning) return;
 
             const targetUrl = link.href;
-
-            // Start preloading if not already preloaded
             if (!preloadedImages.has(targetUrl)) {
                 preloadImage(targetUrl).then(() => {
                     navigateWithCrossfade(targetUrl);
@@ -336,7 +260,6 @@ function initSwipeNavigation() {
             }
         });
 
-        // Preload on hover for desktop
         link.addEventListener('mouseenter', () => {
             if (!preloadedImages.has(link.href)) {
                 preloadImage(link.href);
@@ -344,13 +267,10 @@ function initSwipeNavigation() {
         });
     });
 
-    // Touch start handler
     imageContainer.addEventListener('touchstart', (e) => {
-        // Only start tracking if touching the image area directly (not buttons or links)
         if (e.target.closest('.actions-bar') || e.target.closest('button') || e.target.closest('a')) {
             return;
         }
-
         if (isTransitioning) return;
 
         touchStartX = e.changedTouches[0].screenX;
@@ -358,7 +278,6 @@ function initSwipeNavigation() {
         isSwiping = false;
     }, { passive: true });
 
-    // Touch move handler
     imageContainer.addEventListener('touchmove', (e) => {
         if (touchStartX === 0 || isTransitioning) return;
 
@@ -367,13 +286,11 @@ function initSwipeNavigation() {
         const diffX = Math.abs(currentX - touchStartX);
         const diffY = Math.abs(currentY - touchStartY);
 
-        // If horizontal movement is greater than vertical, we're swiping
         if (diffX > diffY && diffX > 10) {
             isSwiping = true;
         }
     }, { passive: true });
 
-    // Touch end handler
     imageContainer.addEventListener('touchend', (e) => {
         if (touchStartX === 0 || isTransitioning) return;
 
@@ -382,7 +299,6 @@ function initSwipeNavigation() {
 
         handleSwipe();
 
-        // Reset
         touchStartX = 0;
         touchStartY = 0;
         touchEndX = 0;
@@ -394,19 +310,14 @@ function initSwipeNavigation() {
         const horizontalDistance = touchEndX - touchStartX;
         const verticalDistance = Math.abs(touchEndY - touchStartY);
 
-        // Check if it's a valid horizontal swipe
         if (Math.abs(horizontalDistance) < minSwipeDistance) return;
         if (verticalDistance > maxVerticalMovement) return;
         if (!isSwiping) return;
 
         let targetUrl = null;
-
-        // Swipe left = next image (first related image)
         if (horizontalDistance < 0 && relatedLinks.length > 0) {
             targetUrl = relatedLinks[0].href;
-        }
-        // Swipe right = previous image (last related image)
-        else if (horizontalDistance > 0 && relatedLinks.length > 0) {
+        } else if (horizontalDistance > 0 && relatedLinks.length > 0) {
             targetUrl = relatedLinks[relatedLinks.length - 1].href;
         }
 
@@ -419,54 +330,42 @@ function initSwipeNavigation() {
         if (isTransitioning) return;
         isTransitioning = true;
 
-        // Check if we have preloaded data
         const preloadedData = preloadedImages.get(targetUrl);
-
         if (preloadedData) {
             performCrossfade(targetUrl, preloadedData);
         } else {
-            // Fallback: show loading and navigate normally
             showLoadingOverlay();
             window.location.href = targetUrl;
         }
     }
 
     function performCrossfade(targetUrl, preloadedData) {
-        // Find the current image container
         const currentImageView = document.querySelector('.image-view');
         const currentImage = currentImageView?.querySelector('img, video');
 
         if (!currentImageView || !currentImage) {
-            // Fallback if we can't find the image
             showLoadingOverlay();
             window.location.href = targetUrl;
             return;
         }
 
-        // Fetch the full page HTML to replace content
         fetch(targetUrl)
             .then(response => response.text())
             .then(html => {
-                // Parse the new page
                 const parser = new DOMParser();
                 const newDoc = parser.parseFromString(html, 'text/html');
 
-                // Make the image container position relative if it isn't already
                 const originalPosition = currentImageView.style.position;
                 if (!originalPosition || originalPosition === 'static') {
                     currentImageView.style.position = 'relative';
                 }
 
-                // Lock the container's current height to prevent jumping
-                const currentHeight = currentImageView.offsetHeight;
-                currentImageView.style.height = currentHeight + 'px';
-                currentImageView.style.transition = 'height 0.3s ease-in-out';
+                const containerWidth = currentImageView.clientWidth;
+                const containerHeight = currentImageView.clientHeight;
 
-                // Add fade-out to current image
                 currentImage.style.transition = 'opacity 0.3s ease-in-out';
                 currentImage.style.opacity = '0';
 
-                // Create overlay for new image
                 const overlay = document.createElement('div');
                 overlay.style.cssText = `
                     position: absolute;
@@ -480,9 +379,9 @@ function initSwipeNavigation() {
                     z-index: 100;
                     opacity: 0;
                     transition: opacity 0.3s ease-in-out;
+                    padding: var(--spacing-lg);
                 `;
 
-                // Create new image element
                 let newMediaElement;
                 if (preloadedData.isVideo) {
                     newMediaElement = document.createElement('video');
@@ -498,7 +397,6 @@ function initSwipeNavigation() {
                     newMediaElement.alt = 'Image';
                 }
 
-                // Style new image to match container
                 newMediaElement.style.cssText = `
                     max-width: 100%;
                     max-height: 100%;
@@ -506,34 +404,44 @@ function initSwipeNavigation() {
                     height: auto;
                     object-fit: contain;
                     display: block;
+                    border-radius: var(--radius-xl);
+                    box-shadow: var(--shadow-2xl);
+                    border: var(--border-width) solid var(--border-color);
+                    opacity: 0;
                 `;
 
                 overlay.appendChild(newMediaElement);
                 currentImageView.appendChild(overlay);
 
-                // Wait for new image to load to get its dimensions
                 const onMediaReady = () => {
-                    // Calculate new height based on loaded image
-                    const newHeight = newMediaElement.offsetHeight;
-                    if (newHeight > 0) {
-                        currentImageView.style.height = newHeight + 'px';
+                    const naturalWidth = preloadedData.isVideo ? newMediaElement.videoWidth : newMediaElement.naturalWidth;
+                    const naturalHeight = preloadedData.isVideo ? newMediaElement.videoHeight : newMediaElement.naturalHeight;
+
+                    if (naturalWidth && naturalHeight) {
+                        const scaleX = containerWidth / naturalWidth;
+                        const scaleY = containerHeight / naturalHeight;
+                        const scale = Math.min(scaleX, scaleY, 1);
+
+                        const displayWidth = Math.floor(naturalWidth * scale);
+                        const displayHeight = Math.floor(naturalHeight * scale);
+
+                        newMediaElement.style.width = displayWidth + 'px';
+                        newMediaElement.style.height = displayHeight + 'px';
                     }
 
-                    // Trigger crossfade
+                    newMediaElement.style.opacity = '1';
+
                     requestAnimationFrame(() => {
                         overlay.style.opacity = '1';
                     });
 
-                    // After fade, replace page content without reload
                     setTimeout(() => {
                         replacePageContent(newDoc, targetUrl);
                     }, 300);
                 };
 
-                // Handle image vs video loading
                 if (preloadedData.isVideo) {
                     newMediaElement.addEventListener('loadedmetadata', onMediaReady, { once: true });
-                    // Fallback if already loaded
                     if (newMediaElement.readyState >= 1) {
                         onMediaReady();
                     }
@@ -547,40 +455,27 @@ function initSwipeNavigation() {
             })
             .catch(err => {
                 console.error('Failed to load page:', err);
-                // Fallback to regular navigation
                 window.location.href = targetUrl;
             });
     }
 
     function replacePageContent(newDoc, newUrl) {
-        // Update the URL without reloading
         window.history.pushState({}, '', newUrl);
-
-        // Update page title
         document.title = newDoc.title;
 
-        // Load saved states from localStorage before replacing content
         const savedStates = JSON.parse(localStorage.getItem('imageSectionStates') || '{}');
         const defaultCollapsed = ['pools-panel-content', 'metadata-panel-content'];
 
-        // Replace main content areas
         const container = document.querySelector('.container');
         const newContainer = newDoc.querySelector('.container');
         if (container && newContainer) {
             container.innerHTML = newContainer.innerHTML;
 
-            // Immediately apply collapsed states to prevent visual jumping
             const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
             sectionHeaders.forEach(header => {
                 const sectionId = header.dataset.section;
                 const isPanelHeader = header.classList.contains('panel-header');
-
-                let isCollapsed;
-                if (savedStates[sectionId] !== undefined) {
-                    isCollapsed = savedStates[sectionId];
-                } else {
-                    isCollapsed = defaultCollapsed.includes(sectionId);
-                }
+                const isCollapsed = savedStates[sectionId] !== undefined ? savedStates[sectionId] : defaultCollapsed.includes(sectionId);
 
                 if (isCollapsed) {
                     header.classList.add('collapsed');
@@ -592,23 +487,19 @@ function initSwipeNavigation() {
             });
         }
 
-        // Re-initialize the navigation after content is replaced
         setTimeout(() => {
             initSwipeNavigation();
             initCollapsibleSections();
 
-            // Re-attach delete button handler
             const deleteBtn = document.getElementById('deleteImageBtn');
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', confirmDelete);
             }
 
-            // Re-initialize image viewer (fullscreen/zoom functionality)
             if (typeof window.initImageViewer === 'function') {
                 window.initImageViewer();
             }
 
-            // Reload pools for the new image
             if (typeof loadPoolsForImage === 'function') {
                 loadPoolsForImage();
             }
@@ -642,26 +533,16 @@ function initSwipeNavigation() {
 }
 
 
-// --- Main Page Initialization ---
-// This ensures all scripts are loaded before we try to attach event listeners.
 document.addEventListener('DOMContentLoaded', () => {
-    // Initialize collapsible sections for mobile
     initCollapsibleSections();
-
-    // Initialize swipe navigation for mobile
     initSwipeNavigation();
 
-    // Attach event listener for the delete button
     const deleteBtn = document.getElementById('deleteImageBtn');
     if (deleteBtn) {
         deleteBtn.addEventListener('click', confirmDelete);
     }
 
-    // Handle browser back/forward buttons
     window.addEventListener('popstate', () => {
-        // When the user clicks back/forward, reload the page to show correct content
         window.location.reload();
     });
-
-    // You can initialize other image-page-specific components here in the future
 });
