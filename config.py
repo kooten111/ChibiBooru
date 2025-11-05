@@ -83,8 +83,8 @@ RATE_LIMIT_DELAY = 0.5  # seconds between requests
 # Order matters - first match wins for primary source
 # Used for determining which source provides categorized tags
 BOORU_PRIORITY = [
-    "e621",         # Good specific categorization
     "danbooru",     # Best general categorization
+    "e621",         # Good specific categorization
     "gelbooru",     # Tags only
     "yandere",      # Tags only
     "local_tagger"  # AI fallback
@@ -116,7 +116,7 @@ SIMILARITY_METHOD = os.environ.get('SIMILARITY_METHOD', 'jaccard')
 # Category weights for weighted similarity
 # Higher values mean matching tags in that category contributes more to similarity
 SIMILARITY_CATEGORY_WEIGHTS = {
-    'character': 5.0,   # Character matches are very significant
+    'character': 6.0,   # Character matches are very significant
     'copyright': 3.0,   # Same series/franchise is important
     'artist': 2.0,      # Same artist style matters
     'species': 2.5,     # Species tags
