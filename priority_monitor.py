@@ -12,9 +12,20 @@ import json
 from database import get_db_connection
 
 
-def get_priority_hash(priority_list):
-    """Generate a hash of the current priority list."""
-    priority_str = json.dumps(priority_list)
+def get_priority_hash(priority_list, version=1):
+    """
+    Generate a hash of the current priority list and version.
+
+    Args:
+        priority_list: The BOORU_PRIORITY list
+        version: The BOORU_PRIORITY_VERSION number
+    """
+    # Include version in the hash so version bumps trigger re-tagging
+    priority_data = {
+        'version': version,
+        'priority': priority_list
+    }
+    priority_str = json.dumps(priority_data, sort_keys=True)
     return hashlib.sha256(priority_str.encode()).hexdigest()
 
 
@@ -71,8 +82,11 @@ def check_and_apply_priority_changes():
     # Ensure config_store table exists
     ensure_config_store_table()
 
-    # Calculate current priority hash
-    current_hash = get_priority_hash(config.BOORU_PRIORITY)
+    # Get version from config (default to 1 for backwards compatibility)
+    version = getattr(config, 'BOORU_PRIORITY_VERSION', 1)
+
+    # Calculate current priority hash (includes version)
+    current_hash = get_priority_hash(config.BOORU_PRIORITY, version)
 
     # Get stored hash
     stored_hash = get_stored_priority_hash()
@@ -80,6 +94,7 @@ def check_and_apply_priority_changes():
     # First run - just store the hash
     if stored_hash is None:
         print("📝 First run: storing current BOORU_PRIORITY")
+        print(f"   Version: {version}")
         print(f"   Priority: {' → '.join(config.BOORU_PRIORITY)}")
         store_priority_hash(current_hash)
         return False
@@ -89,7 +104,8 @@ def check_and_apply_priority_changes():
         print("\n" + "=" * 70)
         print("🔄 BOORU_PRIORITY has changed!")
         print("=" * 70)
-        print("\nCurrent priority:")
+        print(f"\nVersion: {version}")
+        print("Current priority:")
         for i, source in enumerate(config.BOORU_PRIORITY, 1):
             print(f"  {i}. {source}")
         print("\n⚙️  Automatically re-tagging all images...")
@@ -116,12 +132,14 @@ def check_and_apply_priority_changes():
 if __name__ == "__main__":
     # For testing
     import config
-    print("Current BOORU_PRIORITY:")
+
+    version = getattr(config, 'BOORU_PRIORITY_VERSION', 1)
+    print(f"Current BOORU_PRIORITY (version {version}):")
     for i, source in enumerate(config.BOORU_PRIORITY, 1):
         print(f"  {i}. {source}")
     print()
 
-    current_hash = get_priority_hash(config.BOORU_PRIORITY)
+    current_hash = get_priority_hash(config.BOORU_PRIORITY, version)
     stored_hash = get_stored_priority_hash()
 
     print(f"Current hash: {current_hash[:16]}...")

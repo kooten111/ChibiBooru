@@ -82,6 +82,11 @@ RATE_LIMIT_DELAY = 0.5  # seconds between requests
 
 # Order matters - first match wins for primary source
 # Used for determining which source provides categorized tags
+#
+# IMPORTANT: When you change BOORU_PRIORITY, increment BOORU_PRIORITY_VERSION
+# This ensures remote systems detect the change and re-tag automatically
+BOORU_PRIORITY_VERSION = 1  # Increment this when changing priority order
+
 BOORU_PRIORITY = [
     "danbooru",     # Best general categorization
     "e621",         # Good specific categorization
