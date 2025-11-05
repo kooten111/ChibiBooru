@@ -14,6 +14,9 @@ class StatsTabs {
     init() {
         this.buttons.forEach(button => {
             button.addEventListener('click', (e) => {
+                if (button.tagName === 'A') {
+                    return;
+                }
                 e.stopPropagation();
                 this.handleTabClick(button);
             });
