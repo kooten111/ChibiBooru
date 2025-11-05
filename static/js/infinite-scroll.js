@@ -7,14 +7,14 @@ class InfiniteScroll {
         this.hasMore = true;
         this.query = new URLSearchParams(window.location.search).get('query') || '';
         this.perPage = parseInt(new URLSearchParams(window.location.search).get('per_page')) || 50;
-        
+
         // Cache for prefetched pages
         this.pageCache = new Map();
         this.prefetchQueue = [];
         this.prefetchInProgress = false;
-        
+
         this.PREFETCH_AHEAD = 3; // Number of pages to prefetch ahead
-        
+
         this.init();
     }
     
@@ -73,24 +73,17 @@ class InfiniteScroll {
             try {
                 const data = await this.fetchPage(pageNum);
                 this.pageCache.set(pageNum, data);
-                
-                // Update hasMore based on latest fetch
-                if (!data.has_more) {
-                    this.hasMore = false;
-                }
-                
-                // Queue next page if we should keep prefetching
+
                 const nextPage = pageNum + 1;
-                if (data.has_more && 
-                    nextPage <= this.displayedPage + this.PREFETCH_AHEAD && 
+                if (data.has_more &&
+                    nextPage <= this.displayedPage + this.PREFETCH_AHEAD &&
                     !this.pageCache.has(nextPage) &&
                     !this.prefetchQueue.includes(nextPage)) {
                     this.prefetchQueue.push(nextPage);
                 }
-                
+
             } catch (error) {
                 console.error(`Error prefetching page ${pageNum}:`, error);
-                // Don't stop prefetching on error, just skip this page
             }
         }
         
@@ -102,34 +95,31 @@ class InfiniteScroll {
             page: pageNum,
             per_page: this.perPage
         });
-        
+
         if (this.query) {
             params.append('query', this.query);
         }
-        
+
         const response = await fetch(`/api/images?${params}`);
         if (!response.ok) throw new Error('Network error');
-        
+
         return await response.json();
     }
     
     async displayNextPage() {
         if (this.loading || !this.hasMore) return;
-        
+
         const nextPage = this.displayedPage + 1;
-        
-        // Check if page is already cached
+
         if (this.pageCache.has(nextPage)) {
             this.loading = true;
             const data = this.pageCache.get(nextPage);
             this.appendImages(data.images);
             this.displayedPage = nextPage;
+            this.hasMore = data.has_more;
             this.loading = false;
-            
-            // Check if we need to display more immediately
+
             setTimeout(() => this.checkIfNeedMore(), 100);
-            
-            // Continue prefetching
             this.startPrefetching();
         } else {
             // Not cached yet, fetch it now with loading indicator
