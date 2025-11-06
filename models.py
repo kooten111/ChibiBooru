@@ -149,8 +149,16 @@ def repopulate_from_database():
             for category, tags_list in categorized_tags.items():
                 for tag_name in tags_list:
                     if not tag_name: continue
-                    cur.execute("INSERT INTO tags (name, category) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET category=excluded.category", (tag_name, category))
-                    cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+
+                    # Normalize tag name (e.g., rating_explicit -> rating:explicit)
+                    from repositories.tag_repository import normalize_tag_name, get_tag_category
+                    normalized_tag_name = normalize_tag_name(tag_name)
+
+                    # Determine correct category (rating tags override category)
+                    final_category = get_tag_category(normalized_tag_name) or category
+
+                    cur.execute("INSERT INTO tags (name, category) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET category=excluded.category", (normalized_tag_name, final_category))
+                    cur.execute("SELECT id FROM tags WHERE name = ?", (normalized_tag_name,))
                     tag_id = cur.fetchone()['id']
                     cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
 

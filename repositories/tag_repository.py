@@ -52,6 +52,53 @@ def get_all_tags_sorted():
 
 
 # ============================================================================
+# TAG NORMALIZATION
+# ============================================================================
+
+def normalize_tag_name(tag_name):
+    """
+    Normalize tag names, specifically converting rating tags from underscore
+    to colon format.
+
+    Examples:
+        rating_explicit -> rating:explicit
+        rating_general -> rating:general
+
+    Args:
+        tag_name: The tag name to normalize
+
+    Returns:
+        Normalized tag name
+    """
+    # Define rating tag mappings
+    rating_mappings = {
+        'rating_explicit': 'rating:explicit',
+        'rating_general': 'rating:general',
+        'rating_questionable': 'rating:questionable',
+        'rating_sensitive': 'rating:sensitive'
+    }
+
+    return rating_mappings.get(tag_name, tag_name)
+
+
+def get_tag_category(tag_name):
+    """
+    Determine the correct category for a tag based on its name.
+
+    Args:
+        tag_name: The tag name
+
+    Returns:
+        The category string ('meta', 'general', etc.) or None
+    """
+    # Rating tags always go to meta
+    if tag_name.startswith('rating:'):
+        return 'meta'
+
+    return None  # Let caller decide default
+
+
+# ============================================================================
 # TAG CATEGORIZATION
 # ============================================================================
 
@@ -59,6 +106,7 @@ def recategorize_misplaced_tags():
     """
     Check all general tags and move them to correct categories if they exist
     as categorized tags elsewhere in the database.
+    Also normalizes rating tags from underscore to colon format and moves them to meta.
     """
     print("Recategorizing misplaced tags...")
 
@@ -79,6 +127,78 @@ def recategorize_misplaced_tags():
             cur.execute("SELECT DISTINCT name FROM tags WHERE category = ?", (category,))
             known_categorized[category].update(row['name'] for row in cur.fetchall())
 
+        # Handle rating tag normalization first
+        rating_mappings = {
+            'rating_explicit': 'rating:explicit',
+            'rating_general': 'rating:general',
+            'rating_questionable': 'rating:questionable',
+            'rating_sensitive': 'rating:sensitive'
+        }
+
+        rating_changes = 0
+        for old_name, new_name in rating_mappings.items():
+            # Check if the old tag exists in ANY category
+            cur.execute("SELECT id, category FROM tags WHERE name = ?", (old_name,))
+            old_tag = cur.fetchone()
+
+            if not old_tag:
+                continue
+
+            old_tag_id = old_tag['id']
+
+            # Check if the new tag already exists
+            cur.execute("SELECT id FROM tags WHERE name = ?", (new_name,))
+            new_tag = cur.fetchone()
+
+            if new_tag:
+                new_tag_id = new_tag['id']
+                # Migrate all image associations from old to new tag
+                cur.execute("""
+                    SELECT image_id, source
+                    FROM image_tags
+                    WHERE tag_id = ?
+                """, (old_tag_id,))
+                old_associations = cur.fetchall()
+
+                for assoc in old_associations:
+                    image_id = assoc['image_id']
+                    source = assoc['source']
+
+                    # Check if image already has the new tag
+                    cur.execute("""
+                        SELECT 1 FROM image_tags
+                        WHERE image_id = ? AND tag_id = ?
+                    """, (image_id, new_tag_id))
+
+                    if not cur.fetchone():
+                        # Update the tag_id to point to the new tag
+                        cur.execute("""
+                            UPDATE image_tags
+                            SET tag_id = ?
+                            WHERE image_id = ? AND tag_id = ?
+                        """, (new_tag_id, image_id, old_tag_id))
+                    else:
+                        # Image already has the new tag, just remove the old association
+                        cur.execute("""
+                            DELETE FROM image_tags
+                            WHERE image_id = ? AND tag_id = ?
+                        """, (image_id, old_tag_id))
+
+                # Delete the old tag
+                cur.execute("DELETE FROM tags WHERE id = ?", (old_tag_id,))
+                rating_changes += 1
+            else:
+                # New tag doesn't exist, just rename and recategorize
+                cur.execute("""
+                    UPDATE tags
+                    SET name = ?, category = 'meta'
+                    WHERE id = ?
+                """, (new_name, old_tag_id))
+                rating_changes += 1
+
+        if rating_changes > 0:
+            print(f"Normalized {rating_changes} rating tags")
+
         # Find all general tags that should be recategorized
         cur.execute("SELECT DISTINCT name FROM tags WHERE category = 'general'")
         general_tags = [row['name'] for row in cur.fetchall()]
@@ -95,8 +215,9 @@ def recategorize_misplaced_tags():
 
         conn.commit()
 
-    print(f"Recategorized {changes} tags")
-    return changes
+    total_changes = changes + rating_changes
+    print(f"Recategorized {total_changes} tags ({changes} regular, {rating_changes} ratings)")
+    return total_changes
 
 
 def rebuild_categorized_tags_from_relations():
@@ -260,12 +381,18 @@ def update_image_tags(filepath, new_tags_str):
             for tag_name in new_tags:
                 if not tag_name: continue
 
-                cursor.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, 'general'))
+                # Normalize tag name (e.g., rating_explicit -> rating:explicit)
+                normalized_tag_name = normalize_tag_name(tag_name)
 
-                cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+                # Determine correct category
+                category = get_tag_category(normalized_tag_name) or 'general'
+
+                cursor.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (normalized_tag_name, category))
+
+                cursor.execute("SELECT id FROM tags WHERE name = ?", (normalized_tag_name,))
                 tag_id_result = cursor.fetchone()
                 if not tag_id_result:
-                    print(f"Failed to get or create tag_id for: {tag_name}")
+                    print(f"Failed to get or create tag_id for: {normalized_tag_name}")
                     continue
                 tag_id = tag_id_result['id']
 
@@ -345,16 +472,25 @@ def update_image_tags_categorized(filepath, categorized_tags):
 
                 tags = [t.strip() for t in tags_str.split() if t.strip()]
                 for tag_name in tags:
+                    # Normalize tag name (e.g., rating_explicit -> rating:explicit)
+                    normalized_tag_name = normalize_tag_name(tag_name)
+
+                    # Determine correct category (rating tags override category_name)
+                    final_category = get_tag_category(normalized_tag_name) or category_name
+
                     # Get or create tag with proper category
-                    cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+                    cursor.execute("SELECT id FROM tags WHERE name = ?", (normalized_tag_name,))
                     tag_row = cursor.fetchone()
 
                     if tag_row:
                         tag_id = tag_row['id']
+                        # Update category if it's wrong (e.g., rating tag in general)
+                        cursor.execute("UPDATE tags SET category = ? WHERE id = ? AND category != ?",
+                                       (final_category, tag_id, final_category))
                     else:
                         # Create new tag with proper category
                         cursor.execute("INSERT INTO tags (name, category) VALUES (?, ?)",
-                                       (tag_name, category_name))
+                                       (normalized_tag_name, final_category))
                         tag_id = cursor.lastrowid
 
                     # Insert image-tag relationship
