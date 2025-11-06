@@ -34,16 +34,19 @@ if (!document.getElementById('notification-styles')) {
             position: fixed;
             top: 100px;
             right: 30px;
-            padding: 15px 25px;
+            padding: 16px 28px;
             color: white;
-            border-radius: 10px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.1);
             z-index: 10002;
             font-weight: 600;
+            font-size: 15px;
             max-width: 400px;
             opacity: 0;
-            transform: translateX(400px);
-            transition: all 0.3s ease-out;
+            transform: translateX(420px);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
 
         .notification-show {
@@ -53,23 +56,28 @@ if (!document.getElementById('notification-styles')) {
 
         .notification-hide {
             opacity: 0;
-            transform: translateX(400px);
+            transform: translateX(420px);
+            transition: all 0.3s ease-in;
         }
 
         .notification-error {
-            background: linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%);
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
+            border-color: rgba(248, 113, 113, 0.3);
         }
 
         .notification-success {
-            background: linear-gradient(135deg, #51cf66 0%, #37b24d 100%);
+            background: linear-gradient(135deg, rgba(52, 211, 153, 0.95) 0%, rgba(16, 185, 129, 0.95) 100%);
+            border-color: rgba(110, 231, 183, 0.3);
         }
 
         .notification-warning {
-            background: linear-gradient(135deg, #ff9966 0%, #ff6633 100%);
+            background: linear-gradient(135deg, rgba(251, 146, 60, 0.95) 0%, rgba(249, 115, 22, 0.95) 100%);
+            border-color: rgba(253, 186, 116, 0.3);
         }
 
         .notification-info {
-            background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.95) 0%, rgba(59, 130, 246, 0.95) 100%);
+            border-color: rgba(147, 197, 253, 0.3);
         }
     `;
     document.head.appendChild(style);

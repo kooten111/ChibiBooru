@@ -65,6 +65,18 @@ def initialize_database():
         )
         """)
 
+        # Add 'source' column to image_tags if it doesn't exist (for rating inference)
+        cur.execute("PRAGMA table_info(image_tags);")
+        image_tags_columns = [row['name'] for row in cur.fetchall()]
+
+        if 'source' not in image_tags_columns:
+            print("Adding 'source' column to 'image_tags' table...")
+            cur.execute("""
+                ALTER TABLE image_tags
+                ADD COLUMN source TEXT DEFAULT 'original'
+                CHECK(source IN ('original', 'user', 'ai_inference'))
+            """)
+
         # Sources table
         cur.execute("""
         CREATE TABLE IF NOT EXISTS sources (
@@ -156,6 +168,76 @@ def initialize_database():
         ON tag_deltas(image_md5)
         """)
 
+        # ===================================================================
+        # Rating Inference Tables
+        # ===================================================================
+
+        # Individual tag weights for ratings
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS rating_tag_weights (
+            tag_name TEXT NOT NULL,
+            rating TEXT NOT NULL,
+            weight REAL NOT NULL,
+            sample_count INTEGER NOT NULL,
+            PRIMARY KEY (tag_name, rating)
+        )
+        """)
+
+        # Tag pair weights for context-aware predictions
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS rating_tag_pair_weights (
+            tag1 TEXT NOT NULL,
+            tag2 TEXT NOT NULL,
+            rating TEXT NOT NULL,
+            weight REAL NOT NULL,
+            co_occurrence_count INTEGER NOT NULL,
+            PRIMARY KEY (tag1, tag2, rating),
+            CHECK (tag1 < tag2)
+        )
+        """)
+
+        # Inference configuration
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS rating_inference_config (
+            key TEXT PRIMARY KEY,
+            value REAL NOT NULL
+        )
+        """)
+
+        # Initialize default config if empty
+        cur.execute("SELECT COUNT(*) as cnt FROM rating_inference_config")
+        if cur.fetchone()['cnt'] == 0:
+            print("Initializing rating inference config with defaults...")
+            default_config = [
+                ('threshold_general', 0.5),
+                ('threshold_sensitive', 0.6),
+                ('threshold_questionable', 0.7),
+                ('threshold_explicit', 0.8),
+                ('min_confidence', 0.4),
+                ('pair_weight_multiplier', 1.5),
+                ('min_training_samples', 50),
+                ('min_pair_cooccurrence', 5),
+                ('min_tag_frequency', 10),
+                ('max_pair_count', 10000),
+            ]
+            cur.executemany(
+                "INSERT INTO rating_inference_config (key, value) VALUES (?, ?)",
+                default_config
+            )
+
+        # Model training metadata
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS rating_model_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """)
+
+        # ===================================================================
+        # Indexes
+        # ===================================================================
+
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_filepath ON images(filepath)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_md5 ON images(md5)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_post_id ON images(post_id)")
@@ -167,9 +249,17 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag_id ON image_tags(tag_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_source ON image_tags(source)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_image_id ON image_sources(image_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_source_id ON image_sources(source_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_metadata_image_id ON raw_metadata(image_id)")
+
+        # Rating inference indexes
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_weights_rating ON rating_tag_weights(rating)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_weights_weight ON rating_tag_weights(weight DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_rating ON rating_tag_pair_weights(rating)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_weight ON rating_tag_pair_weights(weight DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_tags ON rating_tag_pair_weights(tag1, tag2)")
 
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='images_fts'")
         fts_exists = cur.fetchone()

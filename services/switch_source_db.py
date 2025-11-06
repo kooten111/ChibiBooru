@@ -5,7 +5,7 @@ def extract_tags_from_source(source_data, source_name):
     """Extract tag data from a specific source"""
     if not source_data or not isinstance(source_data, dict):
         return None
-    
+
     tags_dict = {
         "character": "",
         "copyright": "",
@@ -14,13 +14,38 @@ def extract_tags_from_source(source_data, source_name):
         "meta": "",
         "general": ""
     }
-    
+
     all_tags = set()
     parent_id = source_data.get("parent_id")
     if source_name == 'e621':
         parent_id = source_data.get('relationships', {}).get('parent_id')
     has_children = source_data.get("has_children", False)
     post_id = source_data.get("id")
+
+    # Extract rating if present (danbooru, e621, etc.)
+    rating = None
+    rating_source = None
+    if 'rating' in source_data:
+        rating_char = source_data.get('rating', '').lower()
+        # Map single-letter ratings to full tag names
+        rating_map = {
+            'g': 'rating:general',
+            's': 'rating:sensitive',
+            'q': 'rating:questionable',
+            'e': 'rating:explicit'
+        }
+        rating = rating_map.get(rating_char)
+
+        # Determine source trust level
+        # danbooru and e621 are authoritative (original)
+        # local_tagger is 50/50 (treat as ai_inference)
+        # others default to original
+        if source_name in ['danbooru', 'e621']:
+            rating_source = 'original'  # Trusted source
+        elif source_name in ['local_tagger', 'camie_tagger']:
+            rating_source = 'ai_inference'  # Less trusted
+        else:
+            rating_source = 'original'  # Default to original for other sources
     
     if source_name == "danbooru":
         tags_dict["character"] = source_data.get("tag_string_character", "")
@@ -66,8 +91,8 @@ def extract_tags_from_source(source_data, source_name):
     for category_tags in tags_dict.values():
         if category_tags:
             all_tags.update(category_tags.split())
-    
-    return {
+
+    result = {
         "tags": " ".join(sorted(all_tags)),
         "tags_character": tags_dict["character"],
         "tags_copyright": tags_dict["copyright"],
@@ -80,6 +105,13 @@ def extract_tags_from_source(source_data, source_name):
         "has_children": has_children,
         "active_source": source_name
     }
+
+    # Add rating information if extracted
+    if rating:
+        result["rating"] = rating
+        result["rating_source"] = rating_source
+
+    return result
 
 def switch_metadata_source_db(filepath, source_name):
     """Switch the active metadata source for an image using database"""
@@ -144,23 +176,44 @@ def switch_metadata_source_db(filepath, source_name):
                     for tag_name in tags_str.split():
                         if not tag_name:
                             continue
-                        
+
                         # Insert or update tag
                         cursor.execute("""
                             INSERT INTO tags (name, category) VALUES (?, ?)
                             ON CONFLICT(name) DO UPDATE SET category = excluded.category
                         """, (tag_name, category))
-                        
+
                         # Get tag ID
                         cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
                         tag_id = cursor.fetchone()['id']
-                        
+
                         # Link tag to image
                         cursor.execute("""
-                            INSERT OR IGNORE INTO image_tags (image_id, tag_id) 
+                            INSERT OR IGNORE INTO image_tags (image_id, tag_id)
                             VALUES (?, ?)
                         """, (image_id, tag_id))
-            
+
+            # Insert rating tag if present
+            if tag_data.get("rating"):
+                rating_tag = tag_data["rating"]
+                rating_source = tag_data.get("rating_source", "original")
+
+                # Insert or update rating tag
+                cursor.execute("""
+                    INSERT INTO tags (name, category) VALUES (?, 'meta')
+                    ON CONFLICT(name) DO UPDATE SET category = 'meta'
+                """, (rating_tag,))
+
+                # Get tag ID
+                cursor.execute("SELECT id FROM tags WHERE name = ?", (rating_tag,))
+                tag_id = cursor.fetchone()['id']
+
+                # Link rating tag to image with appropriate source
+                cursor.execute("""
+                    INSERT OR REPLACE INTO image_tags (image_id, tag_id, source)
+                    VALUES (?, ?, ?)
+                """, (image_id, tag_id, rating_source))
+
             # *** FIX: Update the cached tag columns in the images table ***
             cursor.execute("""
                 UPDATE images 

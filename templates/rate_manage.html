@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rating Management - {{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/rating.css') + '?v=2' }}">
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner">⏳</div>
+            <div id="loadingMessage">Processing...</div>
+        </div>
+    </div>
+
+    <div class="rate-container">
+        <a href="{{ url_for('main.home') }}" class="back-link">← Back to Home</a>
+
+        <div class="page-header">
+            <h1>Rating Management</h1>
+            <p>Train and manage the automatic rating inference system</p>
+        </div>
+
+        <!-- Model Status Section -->
+        <div class="section">
+            <h2>Model Status</h2>
+            <div class="model-status" id="modelStatus">
+                <div class="stat-box">
+                    <div class="stat-label">Status</div>
+                    <div class="stat-value small" id="trainedStatus">Loading...</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Last Trained</div>
+                    <div class="stat-value small" id="lastTrained">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Training Samples</div>
+                    <div class="stat-value" id="trainingSamples">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Unique Tags</div>
+                    <div class="stat-value" id="uniqueTags">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Tag Pairs</div>
+                    <div class="stat-value" id="tagPairs">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Unrated Images</div>
+                    <div class="stat-value" id="unratedCount">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Section -->
+        <div class="section">
+            <h2>Actions</h2>
+            <div class="action-buttons">
+                <button class="action-btn action-btn-success" onclick="trainModel()">
+                    🎓 Train Model
+                </button>
+                <button class="action-btn action-btn-primary" onclick="inferRatings()">
+                    🔮 Infer All Ratings
+                </button>
+                <button class="action-btn action-btn-warning" onclick="clearAI()">
+                    🗑️ Clear AI Ratings
+                </button>
+                <button class="action-btn action-btn-danger" onclick="retrainAll()">
+                    ♻️ Retrain & Reapply All
+                </button>
+            </div>
+
+            <div class="log-output" id="actionLog" style="margin-top: 20px; display: none;">
+                <strong>Action Log:</strong>
+                <pre id="actionLogContent"></pre>
+            </div>
+        </div>
+
+        <!-- Rating Distribution Section -->
+        <div class="section">
+            <h2>Rating Distribution</h2>
+            <div class="distribution-grid" id="distributionGrid">
+                <!-- Will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Configuration Section -->
+        <div class="section">
+            <h2>Configuration</h2>
+            <div class="config-grid" id="configGrid">
+                <!-- Will be populated by JavaScript -->
+            </div>
+            <button class="action-btn action-btn-primary" onclick="saveConfig()" style="margin-top: 20px;">
+                💾 Save Configuration
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentStats = null;
+
+        function showLoading(message) {
+            document.getElementById('loadingMessage').textContent = message;
+            document.getElementById('loadingOverlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').classList.remove('active');
+        }
+
+        function showLog(message) {
+            document.getElementById('actionLog').style.display = 'block';
+            document.getElementById('actionLogContent').textContent += message + '\n';
+        }
+
+        function clearLog() {
+            document.getElementById('actionLog').style.display = 'none';
+            document.getElementById('actionLogContent').textContent = '';
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/rate/stats');
+                currentStats = await response.json();
+
+                // Update model status
+                document.getElementById('trainedStatus').textContent =
+                    currentStats.model_trained ? '✅ Trained' : '❌ Not Trained';
+
+                const metadata = currentStats.metadata || {};
+                document.getElementById('lastTrained').textContent =
+                    metadata.last_trained ? new Date(metadata.last_trained).toLocaleString() : 'Never';
+                document.getElementById('trainingSamples').textContent =
+                    metadata.training_sample_count || '0';
+                document.getElementById('uniqueTags').textContent =
+                    metadata.unique_tags_used || '0';
+                document.getElementById('tagPairs').textContent =
+                    metadata.unique_pairs_used || '0';
+                document.getElementById('unratedCount').textContent =
+                    currentStats.unrated_images || '0';
+
+                // Update distribution
+                updateDistribution(currentStats.rating_distribution);
+
+                // Update config
+                updateConfig(currentStats.config);
+
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                showNotification('Error loading statistics: ' + error.message, 'error');
+            }
+        }
+
+        function updateDistribution(distribution) {
+            const grid = document.getElementById('distributionGrid');
+            const ratings = [
+                {key: 'rating:general', label: 'General', color: '#4ade80'},
+                {key: 'rating:sensitive', label: 'Sensitive', color: '#60a5fa'},
+                {key: 'rating:questionable', label: 'Questionable', color: '#fb923c'},
+                {key: 'rating:explicit', label: 'Explicit', color: '#f87171'}
+            ];
+
+            const maxCount = Math.max(...ratings.map(r => distribution[r.key]?.total || 0));
+
+            grid.innerHTML = ratings.map(rating => {
+                const data = distribution[rating.key] || {total: 0, ai: 0, user: 0, original: 0};
+                const percentage = maxCount > 0 ? (data.total / maxCount) * 100 : 0;
+
+                return `
+                    <div class="distribution-row">
+                        <div class="rating-label">${rating.label}</div>
+                        <div class="rating-bar">
+                            <div class="rating-bar-fill" style="width: ${percentage}%; background: ${rating.color};"></div>
+                            <div class="rating-bar-text">${data.total} images</div>
+                        </div>
+                        <div class="rating-count">
+                            ${data.user} user<br>
+                            ${data.ai} AI<br>
+                            ${data.original} original
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateConfig(config) {
+            const grid = document.getElementById('configGrid');
+
+            const configItems = [
+                {key: 'threshold_general', label: 'General Threshold', min: 0, max: 1, step: 0.05},
+                {key: 'threshold_sensitive', label: 'Sensitive Threshold', min: 0, max: 1, step: 0.05},
+                {key: 'threshold_questionable', label: 'Questionable Threshold', min: 0, max: 1, step: 0.05},
+                {key: 'threshold_explicit', label: 'Explicit Threshold', min: 0, max: 1, step: 0.05},
+                {key: 'min_confidence', label: 'Min Confidence', min: 0, max: 1, step: 0.05},
+                {key: 'pair_weight_multiplier', label: 'Pair Weight Multiplier', min: 0.5, max: 3, step: 0.1},
+                {key: 'min_training_samples', label: 'Min Training Samples', min: 10, max: 200, step: 10},
+                {key: 'min_pair_cooccurrence', label: 'Min Pair Co-occurrence', min: 2, max: 20, step: 1},
+            ];
+
+            grid.innerHTML = configItems.map(item => {
+                const value = config[item.key] || 0;
+                return `
+                    <div class="config-item">
+                        <label for="config_${item.key}">${item.label}</label>
+                        <input type="number" id="config_${item.key}" value="${value}"
+                               min="${item.min}" max="${item.max}" step="${item.step}">
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function trainModel() {
+            showConfirm('Train the model on all manually-rated images?', async () => {
+                clearLog();
+                showLoading('Training model...');
+
+                try {
+                    const response = await fetch('/api/rate/train', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({})
+                    });
+                    const result = await response.json();
+
+                    hideLoading();
+
+                    if (result.success) {
+                        showLog('✅ Training complete!');
+                        showLog(JSON.stringify(result.stats, null, 2));
+                        showNotification('Model trained successfully!', 'success');
+                        loadStats();
+                    } else {
+                        showLog('❌ Training failed: ' + result.error);
+                        showNotification('Training failed: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    hideLoading();
+                    showLog('❌ Error: ' + error.message);
+                    showNotification('Error: ' + error.message, 'error');
+                }
+            });
+        }
+
+        async function inferRatings() {
+            showConfirm('Run inference on all unrated images?', async () => {
+                clearLog();
+                showLoading('Running inference...');
+
+                try {
+                    const response = await fetch('/api/rate/infer', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({})
+                    });
+                    const result = await response.json();
+
+                    hideLoading();
+
+                    if (result.success) {
+                        showLog('✅ Inference complete!');
+                        showLog(JSON.stringify(result.stats, null, 2));
+                        showNotification(`Inference complete! Rated ${result.stats.rated} images.`, 'success');
+                        loadStats();
+                    } else {
+                        showLog('❌ Inference failed: ' + result.error);
+                        showNotification('Inference failed: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    hideLoading();
+                    showLog('❌ Error: ' + error.message);
+                    showNotification('Error: ' + error.message, 'error');
+                }
+            });
+        }
+
+        async function clearAI() {
+            showConfirm('Clear all AI-inferred ratings? This cannot be undone.', async () => {
+                clearLog();
+                showLoading('Clearing AI ratings...');
+
+                try {
+                    const response = await fetch('/api/rate/clear_ai', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({})
+                    });
+                    const result = await response.json();
+
+                    hideLoading();
+
+                    if (result.success) {
+                        showLog(`✅ Cleared ${result.deleted_count} AI ratings`);
+                        showNotification(`Cleared ${result.deleted_count} AI ratings`, 'success');
+                        loadStats();
+                    } else {
+                        showLog('❌ Failed: ' + result.error);
+                        showNotification('Failed: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    hideLoading();
+                    showLog('❌ Error: ' + error.message);
+                    showNotification('Error: ' + error.message, 'error');
+                }
+            });
+        }
+
+        async function retrainAll() {
+            showConfirm('Clear AI ratings, retrain model, and re-infer everything? This will take a while.', async () => {
+                clearLog();
+                showLoading('Retraining and reapplying...');
+
+                try {
+                    const response = await fetch('/api/rate/retrain_all', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({})
+                    });
+                    const result = await response.json();
+
+                    hideLoading();
+
+                    if (result.success) {
+                        showLog('✅ Retrain complete!');
+                        showLog('Cleared: ' + result.cleared);
+                        showLog('Training: ' + JSON.stringify(result.training_stats, null, 2));
+                        showLog('Inference: ' + JSON.stringify(result.inference_stats, null, 2));
+                        showNotification('Retrain and reapply complete!', 'success');
+                        loadStats();
+                    } else {
+                        showLog('❌ Failed: ' + result.error);
+                        showNotification('Failed: ' + result.error, 'error');
+                    }
+                } catch (error) {
+                    hideLoading();
+                    showLog('❌ Error: ' + error.message);
+                    showNotification('Error: ' + error.message, 'error');
+                }
+            });
+        }
+
+        async function saveConfig() {
+            const configData = {};
+
+            const inputs = document.querySelectorAll('[id^="config_"]');
+            inputs.forEach(input => {
+                const key = input.id.replace('config_', '');
+                configData[key] = parseFloat(input.value);
+            });
+
+            showLoading('Saving configuration...');
+
+            try {
+                const response = await fetch('/api/rate/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(configData)
+                });
+
+                const result = await response.json();
+
+                hideLoading();
+
+                if (result.success) {
+                    showNotification('Configuration saved!', 'success');
+                } else {
+                    showNotification('Failed to save configuration: ' + result.error, 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showNotification('Error saving configuration: ' + error.message, 'error');
+            }
+        }
+
+        // Load stats on page load
+        loadStats();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadStats, 30000);
+    </script>
+    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script type="module">
+        import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
+        window.showNotification = showNotification;
+    </script>
+</body>
+</html>

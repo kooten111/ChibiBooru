@@ -419,7 +419,31 @@ def perform_search(search_query):
                 general_terms.append(token)
         else:
             general_terms.append(token)
-    
+
+    # Normalize rating tags: convert rating_X to rating:X format
+    # Also handle incorrectly formatted searches like general:rating_X
+    normalized_general_terms = []
+    for term in general_terms:
+        # Handle rating_X -> rating:X
+        if term.startswith('rating_'):
+            term = term.replace('rating_', 'rating:', 1)
+        # Handle general:rating_X -> rating:X (common mistake)
+        if term.startswith('general:rating_') or term.startswith('meta:rating_'):
+            parts = term.split(':', 1)
+            if len(parts) == 2:
+                term = parts[1].replace('rating_', 'rating:', 1)
+        normalized_general_terms.append(term)
+    general_terms = normalized_general_terms
+
+    # Normalize category filters too
+    for category in category_filters:
+        normalized_tags = []
+        for tag in category_filters[category]:
+            if tag.startswith('rating_'):
+                tag = tag.replace('rating_', 'rating:', 1)
+            normalized_tags.append(tag)
+        category_filters[category] = normalized_tags
+
     # Decide whether to use FTS5 or tag-based search
     # Don't use FTS for very short terms or terms with underscores in the middle (infix matches)
     use_fts = freetext_mode or (general_terms and _should_use_fts(general_terms))

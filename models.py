@@ -153,6 +153,34 @@ def repopulate_from_database():
                     cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
                     tag_id = cur.fetchone()['id']
                     cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
+
+            # Extract and insert rating if present
+            if 'rating' in primary_source_data:
+                rating_char = primary_source_data.get('rating', '').lower()
+                # Map single-letter ratings to full tag names
+                rating_map = {
+                    'g': 'rating:general',
+                    's': 'rating:sensitive',
+                    'q': 'rating:questionable',
+                    'e': 'rating:explicit'
+                }
+                rating_tag = rating_map.get(rating_char)
+
+                if rating_tag:
+                    # Determine source trust level
+                    if source_name in ['danbooru', 'e621']:
+                        rating_source = 'original'  # Trusted source
+                    elif source_name in ['local_tagger', 'camie_tagger']:
+                        rating_source = 'ai_inference'  # Less trusted
+                    else:
+                        rating_source = 'original'  # Default
+
+                    # Insert rating tag
+                    cur.execute("INSERT INTO tags (name, category) VALUES (?, 'meta') ON CONFLICT(name) DO UPDATE SET category='meta'", (rating_tag,))
+                    cur.execute("SELECT id FROM tags WHERE name = ?", (rating_tag,))
+                    tag_id = cur.fetchone()['id']
+                    cur.execute("INSERT OR REPLACE INTO image_tags (image_id, tag_id, source) VALUES (?, ?, ?)", (image_id, tag_id, rating_source))
+
         con.commit()
 
     print("Repopulation complete.")

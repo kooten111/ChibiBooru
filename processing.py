@@ -145,6 +145,10 @@ def tag_with_local_tagger(filepath):
             idx_str = str(idx)
             tag_name = idx_to_tag_map.get(idx_str)
             if tag_name:
+                # Skip rating tags - these should only come from the rating inference system
+                if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
+                    continue
+
                 category = tag_to_category_map.get(tag_name, "general")
                 if category in tags_by_category:
                     tags_by_category[category].append(tag_name)
