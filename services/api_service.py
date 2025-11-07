@@ -439,7 +439,8 @@ def autocomplete():
         ]
 
         for tag, display, keyword in filters:
-            if keyword in search_token or search_token in keyword:
+            # Match if: keyword matches search, OR search matches keyword, OR search matches start of tag
+            if keyword in search_token or search_token in keyword or tag.startswith(search_token):
                 groups["Filters"].append({
                     "tag": tag,
                     "display": display,
