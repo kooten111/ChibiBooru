@@ -431,7 +431,11 @@ def autocomplete():
             ("source:local_tagger", "Locally tagged images", "local"),
             ("has:parent", "Images with parent", "parent"),
             ("has:child", "Images with children", "child"),
-            ("pool:", "Search pools", "pool")
+            ("pool:", "Search pools", "pool"),
+            ("order:new", "Newest first", "order"),
+            ("order:newest", "Newest first", "newest"),
+            ("order:old", "Oldest first", "old"),
+            ("order:oldest", "Oldest first", "oldest")
         ]
 
         for tag, display, keyword in filters:

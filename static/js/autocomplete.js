@@ -117,6 +117,10 @@ class Autocomplete {
             type = 'pool';
             display = token.split(':')[1];
             icon = '📚';
+        } else if (token.startsWith('order:')) {
+            type = 'filter';
+            display = token;
+            icon = '🔢';
         } else if (token.startsWith('has:')) {
             type = 'filter';
             display = token;
