@@ -1420,12 +1420,11 @@ body.image-page {
     border-radius: var(--radius-lg);
     overflow: hidden;
     border: var(--border-width-thick) solid var(--border-color);
-    transition: all var(--transition-smooth);
+    transition: border-color var(--transition-smooth), box-shadow var(--transition-smooth);
     background: rgba(20, 20, 30, 0.5);
 }
 
 .image-page .related-thumb:hover {
-    transform: scale(1.03);
     border-color: var(--border-color-hover);
     box-shadow: 0 8px 20px var(--primary-blue-medium);
     z-index: var(--z-base) + 1;
@@ -1444,7 +1443,7 @@ body.image-page {
 }
 
 .image-page .related-thumb:hover img {
-    transform: scale(1.05);
+    transform: scale(1.05) translateZ(0);
 }
 
 .image-page .related-thumb .label {
@@ -1460,12 +1459,12 @@ body.image-page {
     backdrop-filter: var(--blur-sm);
     box-shadow: var(--shadow-md);
     color: #fff;
-    /* Prevent blurriness during transforms */
+    /* Prevent blurriness - keep label crisp */
     transform: translateZ(0);
     backface-visibility: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    will-change: transform;
+    pointer-events: none;
 }
 
 .image-page .related-thumb .label.parent {
