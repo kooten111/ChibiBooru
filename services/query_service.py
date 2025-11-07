@@ -147,7 +147,7 @@ def _should_use_fts(general_terms):
     return False
 
 def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
-               extension_filter, relationship_filter, pool_filter):
+               extension_filter, relationship_filter, pool_filter, order_filter=None):
     """
     Perform full-text search using FTS5 and apply filters.
     Returns results ranked by relevance.
@@ -351,6 +351,38 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
                         'tags': row['tags']
                     })
 
+            # Apply ordering if specified
+            if order_filter and order_filter in ['new', 'ingested', 'newest', 'recent']:
+                # Sort by ingested_at (newest first)
+                filepath_to_timestamp = {}
+                for img in results:
+                    cursor = conn.execute(
+                        "SELECT ingested_at FROM images WHERE filepath = ?",
+                        (img['filepath'],)
+                    )
+                    row = cursor.fetchone()
+                    if row and row['ingested_at']:
+                        filepath_to_timestamp[img['filepath']] = row['ingested_at']
+                    else:
+                        filepath_to_timestamp[img['filepath']] = '0000-00-00 00:00:00'
+
+                results = sorted(results, key=lambda x: filepath_to_timestamp.get(x['filepath'], '0000-00-00 00:00:00'), reverse=True)
+            elif order_filter and order_filter in ['old', 'oldest']:
+                # Sort by ingested_at (oldest first)
+                filepath_to_timestamp = {}
+                for img in results:
+                    cursor = conn.execute(
+                        "SELECT ingested_at FROM images WHERE filepath = ?",
+                        (img['filepath'],)
+                    )
+                    row = cursor.fetchone()
+                    if row and row['ingested_at']:
+                        filepath_to_timestamp[img['filepath']] = row['ingested_at']
+                    else:
+                        filepath_to_timestamp[img['filepath']] = '9999-12-31 23:59:59'
+
+                results = sorted(results, key=lambda x: filepath_to_timestamp.get(x['filepath'], '9999-12-31 23:59:59'))
+
             return results
         except Exception as e:
             print(f"FTS search error: {e}")
@@ -375,6 +407,7 @@ def perform_search(search_query):
     relationship_filter = None
     pool_filter = None
     metadata_filter = None
+    order_filter = None
     category_filters = {}  # {category: [tags]}
     general_terms = []
     negative_terms = []
@@ -392,6 +425,8 @@ def perform_search(search_query):
             pool_filter = token.split(':', 1)[1].strip()
         elif token.startswith('metadata:'):
             metadata_filter = token.split(':', 1)[1].strip()
+        elif token.startswith('order:'):
+            order_filter = token.split(':', 1)[1].strip()
         elif token.startswith('.'):
             extension_filter = token[1:]
         elif token.startswith('has:'):
@@ -460,7 +495,7 @@ def perform_search(search_query):
     if use_fts and (general_terms or negative_terms):
         # Use FTS5 for freetext search
         results = _fts_search(general_terms, negative_terms, source_filters, filename_filter,
-                             extension_filter, relationship_filter, pool_filter)
+                             extension_filter, relationship_filter, pool_filter, order_filter)
         should_shuffle = False  # FTS results are ranked by relevance
     else:
         # Use traditional tag-based search
@@ -598,6 +633,47 @@ def perform_search(search_query):
             results = filtered_results
 
         should_shuffle = bool(general_terms) and not (source_filters or filename_filter or extension_filter)
+
+    # Apply ordering if specified
+    if order_filter and order_filter in ['new', 'ingested', 'newest', 'recent']:
+        # Sort by ingested_at (newest first)
+        with get_db_connection() as conn:
+            # Get ingested_at timestamps for all results
+            filepath_to_timestamp = {}
+            for img in results:
+                cursor = conn.execute(
+                    "SELECT ingested_at FROM images WHERE filepath = ?",
+                    (img['filepath'],)
+                )
+                row = cursor.fetchone()
+                if row and row['ingested_at']:
+                    filepath_to_timestamp[img['filepath']] = row['ingested_at']
+                else:
+                    # Put images without timestamp at the end
+                    filepath_to_timestamp[img['filepath']] = '0000-00-00 00:00:00'
+
+            # Sort results by timestamp (descending - newest first)
+            results = sorted(results, key=lambda x: filepath_to_timestamp.get(x['filepath'], '0000-00-00 00:00:00'), reverse=True)
+            should_shuffle = False  # Don't shuffle when explicitly ordered
+    elif order_filter and order_filter in ['old', 'oldest']:
+        # Sort by ingested_at (oldest first)
+        with get_db_connection() as conn:
+            filepath_to_timestamp = {}
+            for img in results:
+                cursor = conn.execute(
+                    "SELECT ingested_at FROM images WHERE filepath = ?",
+                    (img['filepath'],)
+                )
+                row = cursor.fetchone()
+                if row and row['ingested_at']:
+                    filepath_to_timestamp[img['filepath']] = row['ingested_at']
+                else:
+                    # Put images without timestamp at the end
+                    filepath_to_timestamp[img['filepath']] = '9999-12-31 23:59:59'
+
+            # Sort results by timestamp (ascending - oldest first)
+            results = sorted(results, key=lambda x: filepath_to_timestamp.get(x['filepath'], '9999-12-31 23:59:59'))
+            should_shuffle = False  # Don't shuffle when explicitly ordered
 
     return results, should_shuffle
 

@@ -36,14 +36,24 @@ def initialize_database():
             'tags_meta': 'TEXT',
             'tags_general': 'TEXT'
         }
-        
+
         cur.execute("PRAGMA table_info(images);")
         existing_columns = [row['name'] for row in cur.fetchall()]
-        
+
         for col, col_type in columns_to_add.items():
             if col not in existing_columns:
                 print(f"Adding column '{col}' to 'images' table...")
                 cur.execute(f"ALTER TABLE images ADD COLUMN {col} {col_type}")
+
+        # Handle ingested_at column separately (requires special handling for CURRENT_TIMESTAMP)
+        if 'ingested_at' not in existing_columns:
+            print("Adding 'ingested_at' column to 'images' table...")
+            # SQLite doesn't support DEFAULT CURRENT_TIMESTAMP in ALTER TABLE
+            # Add without default, then update existing rows
+            cur.execute("ALTER TABLE images ADD COLUMN ingested_at TIMESTAMP")
+            # Set a default timestamp for existing rows (use current time)
+            cur.execute("UPDATE images SET ingested_at = CURRENT_TIMESTAMP WHERE ingested_at IS NULL")
+            print("Updated existing images with current timestamp")
 
         # Tags table
         cur.execute("""
@@ -245,6 +255,7 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_has_children ON images(has_children)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_active_source ON images(active_source)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_relationships ON images(parent_id, has_children)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_ingested_at ON images(ingested_at DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")

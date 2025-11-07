@@ -430,8 +430,8 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
 
             # 1. Insert the image record
             cursor.execute("""
-                INSERT INTO images (filepath, md5, post_id, parent_id, has_children, saucenao_lookup)
-                VALUES (:filepath, :md5, :post_id, :parent_id, :has_children, :saucenao_lookup)
+                INSERT INTO images (filepath, md5, post_id, parent_id, has_children, saucenao_lookup, ingested_at)
+                VALUES (:filepath, :md5, :post_id, :parent_id, :has_children, :saucenao_lookup, CURRENT_TIMESTAMP)
             """, image_info)
             image_id = cursor.lastrowid
 
