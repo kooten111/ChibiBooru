@@ -85,7 +85,7 @@ RATE_LIMIT_DELAY = 0.5  # seconds between requests
 #
 # IMPORTANT: When you change BOORU_PRIORITY, increment BOORU_PRIORITY_VERSION
 # This ensures remote systems detect the change and re-tag automatically
-BOORU_PRIORITY_VERSION = 1  # Increment this when changing priority order
+BOORU_PRIORITY_VERSION = 3  # Increment this when changing priority order
 
 BOORU_PRIORITY = [
     "danbooru",     # Best general categorization
@@ -116,7 +116,7 @@ ENABLE_DEDUPLICATION = True  # MD5-based duplicate detection
 
 # Similarity calculation method
 # Options: 'jaccard' (basic set intersection/union), 'weighted' (IDF + category weights)
-SIMILARITY_METHOD = os.environ.get('SIMILARITY_METHOD', 'jaccard')
+SIMILARITY_METHOD = os.environ.get('SIMILARITY_METHOD', 'weighted')
 
 # Category weights for weighted similarity
 # Higher values mean matching tags in that category contributes more to similarity
