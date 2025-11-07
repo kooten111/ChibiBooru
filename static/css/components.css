@@ -1437,6 +1437,10 @@ body.image-page {
     object-fit: contain;
     display: block;
     transition: transform var(--transition-smooth);
+    /* Improve rendering quality during transforms */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    will-change: transform;
 }
 
 .image-page .related-thumb:hover img {
@@ -1456,6 +1460,12 @@ body.image-page {
     backdrop-filter: var(--blur-sm);
     box-shadow: var(--shadow-md);
     color: #fff;
+    /* Prevent blurriness during transforms */
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    will-change: transform;
 }
 
 .image-page .related-thumb .label.parent {
