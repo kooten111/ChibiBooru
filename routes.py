@@ -227,19 +227,30 @@ def show_image(filepath):
     # Get thumbnail path for progressive loading
     thumbnail_path = get_thumbnail_path(filepath)
 
+    # Extract image dimensions for layout stability
+    img_width = None
+    img_height = None
+    raw_metadata = data.get('raw_metadata')
+    if raw_metadata and raw_metadata.get('sources'):
+        first_source = next(iter(raw_metadata['sources'].values()))
+        img_width = first_source.get('image_width') or (first_source.get('file', {}).get('width'))
+        img_height = first_source.get('image_height') or (first_source.get('file', {}).get('height'))
+
     return render_template(
         'image.html',
         filepath=filepath,
         thumbnail_path=thumbnail_path,
         tags=tags_with_counts,
         categorized_tags=categorized_tags,
-        metadata=data.get('raw_metadata'),
+        metadata=raw_metadata,
         related_images=combined_related,
         stats=stats,
         random_tags=[],
         data=data,
         app_name=config.APP_NAME,
-        tag_deltas=tag_deltas
+        tag_deltas=tag_deltas,
+        img_width=img_width,
+        img_height=img_height
     )
 
 @main_blueprint.route('/similar/<path:filepath>')
