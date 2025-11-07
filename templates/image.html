@@ -357,14 +357,19 @@
         
         <div class="main-content">
             <div class="image-and-actions-container">
-                <div class="image-view" id="imageViewContainer">
+                {% if metadata.sources %}
+                    {% set first_source = metadata.sources.values()|list|first %}
+                    {% set img_width = first_source.image_width or (first_source.file.width if first_source.file else none) %}
+                    {% set img_height = first_source.image_height or (first_source.file.height if first_source.file else none) %}
+                {% endif %}
+                <div class="image-view" id="imageViewContainer"{% if img_width and img_height %} style="min-height: {{ (img_height / img_width * 100)|round(2) }}vw; max-height: 90vh;"{% endif %}>
                     {% if filepath.endswith('.mp4') %}
                     <video controls loop>
                         <source src="{{ url_for('static', filename=filepath) }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                     {% else %}
-                    <img src="{{ url_for('static', filename=filepath) }}" alt="Image">
+                    <img src="{{ url_for('static', filename=filepath) }}" alt="Image"{% if img_width and img_height %} width="{{ img_width }}" height="{{ img_height }}"{% endif %}>
                     {% endif %}
                 </div>
 
