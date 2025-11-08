@@ -401,6 +401,10 @@ class Autocomplete {
                     this.addChipFromText(currentText);
                     this.chipTextInput.value = '';
                     this.suggestions.classList.remove('active');
+                    // Automatically submit the form after creating the chip
+                    if (this.searchForm) {
+                        this.searchForm.submit();
+                    }
                 }
                 // If empty and has chips, allow form submission
             }
