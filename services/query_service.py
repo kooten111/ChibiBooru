@@ -190,13 +190,13 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
                 # For terms with hyphens or special chars, skip FTS and rely on filepath LIKE matching
                 if '-' in clean_term or any(c in clean_term for c in [':', '(', ')', '{', '}', '[', ']']):
                     # Don't add to FTS query - will be handled by filepath LIKE matching
-                    pass
+                    # Track for filepath substring matching
+                    freetext_filepath_terms.append(clean_term)
                 else:
                     # Use wildcard for prefix matching
                     # This allows "fellini" to match "pulchra_fellini"
                     fts_query_parts.append(f'{clean_term_escaped}*')
-                # Always track for filepath substring matching
-                freetext_filepath_terms.append(clean_term)
+                    # Don't add to freetext_filepath_terms - FTS will handle it
 
         # Add negative terms
         for term in negative_terms:
