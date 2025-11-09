@@ -131,15 +131,15 @@ def tag_with_local_tagger(filepath):
         if img_numpy is None:
             return None
         input_name = local_tagger_session.get_inputs()[0].name
-        
+
         raw_outputs = local_tagger_session.run(None, {input_name: img_numpy})
-        
+
         # Use refined predictions if available (output index 1)
         logits = raw_outputs[1] if len(raw_outputs) > 1 else raw_outputs[0]
         probs = 1.0 / (1.0 + np.exp(-logits))
-        
+
         tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": []}
-        
+
         indices = np.where(probs[0] >= tagger_config['threshold'])[0]
         for idx in indices:
             idx_str = str(idx)
@@ -154,7 +154,7 @@ def tag_with_local_tagger(filepath):
                     tags_by_category[category].append(tag_name)
                 else:
                     tags_by_category["general"].append(tag_name)
-        
+
         return {
             "source": "local_tagger",
             "data": {
@@ -164,6 +164,120 @@ def tag_with_local_tagger(filepath):
         }
     except Exception as e:
         print(f"[Local Tagger] ERROR during analysis for {filepath}: {e}")
+        return None
+
+
+def tag_video_with_frames(video_filepath, num_frames=5):
+    """
+    Tag a video by extracting multiple frames and merging the tags.
+
+    Args:
+        video_filepath: Path to the video file
+        num_frames: Number of frames to extract and analyze (default: 5)
+
+    Returns:
+        Dictionary with source and merged tag data, or None on failure
+    """
+    load_local_tagger()
+    if not local_tagger_session:
+        print("[Video Tagger] Local tagger not available, cannot process video.")
+        return None
+
+    import subprocess
+    import tempfile
+
+    print(f"[Video Tagger] Extracting {num_frames} frames from: {os.path.basename(video_filepath)}")
+
+    try:
+        # Get video duration first
+        duration_cmd = [
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1', video_filepath
+        ]
+        duration_result = subprocess.run(duration_cmd, capture_output=True, text=True, check=True)
+        duration = float(duration_result.stdout.strip())
+
+        # Extract frames at evenly spaced intervals
+        frame_times = [duration * (i + 1) / (num_frames + 1) for i in range(num_frames)]
+
+        # Store all tags from all frames with their confidence scores
+        all_tags_with_scores = {}
+
+        for i, timestamp in enumerate(frame_times):
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
+                temp_frame_path = temp_frame.name
+
+            try:
+                # Extract frame at timestamp
+                subprocess.run([
+                    'ffmpeg', '-ss', str(timestamp), '-i', video_filepath,
+                    '-vframes', '1', '-y', temp_frame_path
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+                # Process frame with tagger
+                img_numpy = preprocess_image_for_local_tagger(temp_frame_path)
+                if img_numpy is None:
+                    continue
+
+                input_name = local_tagger_session.get_inputs()[0].name
+                raw_outputs = local_tagger_session.run(None, {input_name: img_numpy})
+
+                # Use refined predictions if available
+                logits = raw_outputs[1] if len(raw_outputs) > 1 else raw_outputs[0]
+                probs = 1.0 / (1.0 + np.exp(-logits))
+
+                # Collect tags with their probabilities
+                indices = np.where(probs[0] >= tagger_config['threshold'])[0]
+                for idx in indices:
+                    idx_str = str(idx)
+                    tag_name = idx_to_tag_map.get(idx_str)
+                    if tag_name and not (tag_name.startswith('rating:') or tag_name.startswith('rating_')):
+                        category = tag_to_category_map.get(tag_name, "general")
+                        key = (tag_name, category)
+                        prob = float(probs[0][idx])
+
+                        # Keep track of max probability and count
+                        if key in all_tags_with_scores:
+                            all_tags_with_scores[key]['count'] += 1
+                            all_tags_with_scores[key]['max_prob'] = max(all_tags_with_scores[key]['max_prob'], prob)
+                        else:
+                            all_tags_with_scores[key] = {'count': 1, 'max_prob': prob}
+
+            finally:
+                if os.path.exists(temp_frame_path):
+                    os.unlink(temp_frame_path)
+
+        if not all_tags_with_scores:
+            print("[Video Tagger] No tags found in any frame.")
+            return None
+
+        # Merge tags: Keep tags that appear in at least 2 frames OR have very high confidence
+        tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": [], "species": []}
+
+        for (tag_name, category), scores in all_tags_with_scores.items():
+            # Include tag if it appears in multiple frames or has very high confidence
+            if scores['count'] >= 2 or scores['max_prob'] >= 0.8:
+                if category in tags_by_category:
+                    tags_by_category[category].append(tag_name)
+                else:
+                    tags_by_category["general"].append(tag_name)
+
+        total_tags = sum(len(tags) for tags in tags_by_category.values())
+        print(f"[Video Tagger] Merged tags from {num_frames} frames: {total_tags} tags found.")
+
+        return {
+            "source": "local_tagger",
+            "data": {
+                "tags": tags_by_category,
+                "tagger_name": tagger_config.get('name', 'Unknown') + " (video)"
+            }
+        }
+
+    except subprocess.CalledProcessError as e:
+        print(f"[Video Tagger] ERROR extracting frames: {e}")
+        return None
+    except Exception as e:
+        print(f"[Video Tagger] ERROR during video analysis: {e}")
         return None
 
 def extract_tag_data(data, source):
@@ -232,7 +346,7 @@ def ensure_thumbnail(filepath, image_dir="./static/images"):
         os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
         try:
             # Check if this is a video file
-            if filepath.lower().endswith('.mp4'):
+            if filepath.lower().endswith(('.mp4', '.webm')):
                 # Extract first frame from video using ffmpeg
                 import subprocess
                 import tempfile
@@ -375,6 +489,7 @@ def process_image_file(filepath, move_from_ingest=False):
 
     # Get filename
     filename = os.path.basename(filepath)
+    is_video = filepath.lower().endswith(('.mp4', '.webm'))
 
     # Calculate MD5 before any moves
     md5 = get_md5(filepath)
@@ -417,38 +532,48 @@ def process_image_file(filepath, move_from_ingest=False):
     used_saucenao = False
     used_local_tagger = False
 
-    if not all_results:
-        print(f"MD5 lookup failed for {db_path}, trying SauceNao...")
-        saucenao_response = search_saucenao(filepath)
-        used_saucenao = True
-        if saucenao_response and 'results' in saucenao_response:
-            for result in saucenao_response.get('results', []):
-                if float(result['header']['similarity']) > 80:
-                    for url in result['data'].get('ext_urls', []):
-                        post_id, source = None, None
-                        if 'danbooru.donmai.us' in url:
-                            post_id = url.split('/posts/')[-1].split('?')[0]
-                            source = 'danbooru'
-                        elif 'e621.net' in url:
-                            post_id = url.split('/posts/')[-1].split('?')[0]
-                            source = 'e621'
-                        
-                        if post_id and source:
-                            print(f"Found high-confidence match on {source} via SauceNao.")
-                            fetched_data = fetch_by_post_id(source, post_id)
-                            if fetched_data:
-                                all_results[fetched_data['source']] = fetched_data['data']
-                                break
-                if all_results:
-                    break
-
-    if not all_results:
-        print(f"All online searches failed for {db_path}, trying local AI tagger...")
-        local_tagger_result = tag_with_local_tagger(filepath)
+    # Videos: Skip online searches since boorus don't host videos, go straight to local tagging
+    if is_video:
+        print(f"Video file detected, using frame extraction for tagging...")
+        local_tagger_result = tag_video_with_frames(filepath)
         used_local_tagger = True
         if local_tagger_result:
             all_results[local_tagger_result['source']] = local_tagger_result['data']
-            print(f"Tagged with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+            print(f"Tagged video with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+    else:
+        # Images: Try online sources first
+        if not all_results:
+            print(f"MD5 lookup failed for {db_path}, trying SauceNao...")
+            saucenao_response = search_saucenao(filepath)
+            used_saucenao = True
+            if saucenao_response and 'results' in saucenao_response:
+                for result in saucenao_response.get('results', []):
+                    if float(result['header']['similarity']) > 80:
+                        for url in result['data'].get('ext_urls', []):
+                            post_id, source = None, None
+                            if 'danbooru.donmai.us' in url:
+                                post_id = url.split('/posts/')[-1].split('?')[0]
+                                source = 'danbooru'
+                            elif 'e621.net' in url:
+                                post_id = url.split('/posts/')[-1].split('?')[0]
+                                source = 'e621'
+
+                            if post_id and source:
+                                print(f"Found high-confidence match on {source} via SauceNao.")
+                                fetched_data = fetch_by_post_id(source, post_id)
+                                if fetched_data:
+                                    all_results[fetched_data['source']] = fetched_data['data']
+                                    break
+                    if all_results:
+                        break
+
+        if not all_results:
+            print(f"All online searches failed for {db_path}, trying local AI tagger...")
+            local_tagger_result = tag_with_local_tagger(filepath)
+            used_local_tagger = True
+            if local_tagger_result:
+                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                print(f"Tagged with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
 
     if not all_results:
         print(f"No metadata found for {db_path}")

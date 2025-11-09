@@ -16,7 +16,7 @@ def generate_thumbnail(image_path, thumb_path):
     """Generate a WebP thumbnail maintaining aspect ratio"""
     try:
         # Check if this is a video file
-        if image_path.lower().endswith('.mp4'):
+        if image_path.lower().endswith(('.mp4', '.webm')):
             # Extract first frame from video using ffmpeg
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
                 temp_frame_path = temp_frame.name
@@ -60,7 +60,7 @@ def main():
     image_files = []
     for root, _, files in os.walk(IMAGE_DIR):
         for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm')):
                 image_files.append(os.path.join(root, file))
     
     for img_path in tqdm(image_files, desc="Generating thumbnails"):

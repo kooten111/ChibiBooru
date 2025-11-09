@@ -37,7 +37,7 @@
                 <input type="checkbox" class="image-select-checkbox" data-image-path="{{ image.path }}" style="position: absolute; top: 8px; left: 8px; width: 20px; height: 20px; cursor: pointer; z-index: 10; display: none;">
                 <a href="{{ url_for('main.show_image', filepath=image.path) }}">
                     <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy">
-                    {% if image.path.endswith('.mp4') %}
+                    {% if image.path.endswith('.mp4') or image.path.endswith('.webm') %}
                     <div class="video-badge">▶</div>
                     {% endif %}
                     {% if show_similarity and image.similarity %}

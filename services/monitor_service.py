@@ -47,7 +47,7 @@ class ImageFileHandler(FileSystemEventHandler):
 
     def is_image_file(self, filepath):
         """Check if file is an image or video."""
-        return filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4'))
+        return filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm'))
 
     def should_process(self, filepath):
         """Check if we should process this file (debouncing)."""
@@ -140,7 +140,7 @@ def find_ingest_files():
     if os.path.exists(config.INGEST_DIRECTORY):
         for root, _, files in os.walk(config.INGEST_DIRECTORY):
             for file in files:
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
+                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm')):
                     filepath = os.path.join(root, file)
                     ingest_files.append(filepath)
     return ingest_files
@@ -153,7 +153,7 @@ def find_unprocessed_images():
     # Check static/images directory
     for root, _, files in os.walk("static/images"):
         for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.mp4')):
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm')):
                 filepath = os.path.join(root, file)
                 rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
                 if rel_path not in db_filepaths:

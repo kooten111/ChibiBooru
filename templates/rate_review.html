@@ -135,9 +135,10 @@
             const progress = `Image ${currentIndex + 1} / ${currentImages.length}`;
             document.getElementById('rateProgress').textContent = progress;
 
-            const isVideo = image.path.endsWith('.mp4');
+            const isVideo = image.path.endsWith('.mp4') || image.path.endsWith('.webm');
+            const videoType = image.path.endsWith('.webm') ? 'video/webm' : 'video/mp4';
             const mediaTag = isVideo
-                ? `<video src="/static/images/${image.path}" controls autoplay loop></video>`
+                ? `<video controls autoplay loop><source src="/static/images/${image.path}" type="${videoType}"></video>`
                 : `<img src="/static/images/${image.path}" alt="Image to rate">`;
 
             let aiSuggestion = '';
