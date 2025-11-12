@@ -1,5 +1,5 @@
 # services/api_service.py
-from flask import request, jsonify, url_for
+from quart import request, jsonify, url_for
 import models
 import random
 import sys

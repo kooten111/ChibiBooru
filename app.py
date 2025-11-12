@@ -1,5 +1,5 @@
 import config
-from flask import Flask
+from quart import Quart
 from dotenv import load_dotenv
 from datetime import timedelta
 
@@ -11,10 +11,10 @@ from database import initialize_database
 from priority_monitor import check_and_apply_priority_changes
 
 def create_app():
-    """Create and configure the Flask application."""
-    app = Flask(__name__)
+    """Create and configure the Quart application."""
+    app = Quart(__name__)
 
-    # Flask config
+    # Quart config
     app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
     app.config['SECRET_KEY'] = config.SECRET_KEY
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
@@ -26,8 +26,8 @@ def create_app():
     # This must happen before loading data from DB
     check_and_apply_priority_changes()
 
-    with app.app_context():
-        models.load_data_from_db()
+    # Load data from DB on startup (no app context needed in Quart)
+    models.load_data_from_db()
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(api_blueprint, url_prefix='/api')
@@ -35,5 +35,6 @@ def create_app():
     return app
 
 if __name__ == '__main__':
+    import uvicorn
     app = create_app()
-    app.run(host=config.FLASK_HOST, port=config.FLASK_PORT, debug=config.FLASK_DEBUG)
+    uvicorn.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, log_level="info")

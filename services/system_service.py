@@ -1,6 +1,6 @@
 # services/system_service.py
 import os
-from flask import request, jsonify
+from quart import request, jsonify
 import models
 import scripts.generate_thumbnails as generate_thumbnails
 import processing
