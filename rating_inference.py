@@ -23,13 +23,25 @@ RATINGS = [
     'rating:explicit'
 ]
 
+# Model database configuration
+USE_SEPARATE_MODEL_DB = True
+
+
+def get_model_connection():
+    """Get connection to model database (separate or main DB)."""
+    if USE_SEPARATE_MODEL_DB:
+        from rating_model_db import get_model_db_connection
+        return get_model_db_connection()
+    else:
+        return get_db_connection()
+
 # ============================================================================
 # Configuration Management
 # ============================================================================
 
 def get_config() -> Dict[str, float]:
     """Get current inference configuration from database."""
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
         cur.execute("SELECT key, value FROM rating_inference_config")
         return {row['key']: row['value'] for row in cur.fetchall()}
@@ -37,7 +49,7 @@ def get_config() -> Dict[str, float]:
 
 def update_config(key: str, value: float) -> None:
     """Update a single config value."""
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
         cur.execute(
             "UPDATE rating_inference_config SET value = ? WHERE key = ?",
@@ -61,7 +73,7 @@ def reset_config_to_defaults() -> None:
         'max_pair_count': 10000,
     }
 
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
         for key, value in defaults.items():
             cur.execute(
@@ -406,7 +418,7 @@ def train_model() -> Dict:
     print(f"Calculated weights for {len(pair_weights)} pair-rating combinations")
 
     # Store weights in database
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
 
         # Clear old weights
@@ -485,7 +497,7 @@ def load_weights() -> Tuple[Dict, Dict]:
             tag_weights: {(tag, rating): weight}
             pair_weights: {(tag1, tag2, rating): weight}
     """
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
 
         # Load tag weights
@@ -746,7 +758,7 @@ def set_image_rating(image_id: int, rating: Optional[str],
         old_rating_row = cur.fetchone()
         old_rating = old_rating_row['name'] if old_rating_row else None
 
-        # Remove all existing rating tags
+        # Remove all existing rating tags and rating-source tags
         if old_rating:
             cur.execute("""
                 DELETE FROM image_tags
@@ -755,6 +767,15 @@ def set_image_rating(image_id: int, rating: Optional[str],
                       SELECT id FROM tags WHERE name IN ({})
                   )
             """.format(','.join('?' * len(RATINGS))), [image_id] + RATINGS)
+
+        # Remove old rating-source tags
+        cur.execute("""
+            DELETE FROM image_tags
+            WHERE image_id = ?
+              AND tag_id IN (
+                  SELECT id FROM tags WHERE name LIKE 'rating-source:%'
+              )
+        """, (image_id,))
 
         # Add new rating if provided
         if rating:
@@ -774,6 +795,19 @@ def set_image_rating(image_id: int, rating: Optional[str],
                 (image_id, tag_id, source)
             )
 
+            # Add rating-source tag for searchability
+            source_tag_name = f'rating-source:{source.replace("_", "-")}'
+            cur.execute(
+                "INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)",
+                (source_tag_name, 'meta')
+            )
+            cur.execute("SELECT id FROM tags WHERE name = ?", (source_tag_name,))
+            source_tag_id = cur.fetchone()['id']
+            cur.execute(
+                "INSERT OR REPLACE INTO image_tags (image_id, tag_id, source) VALUES (?, ?, ?)",
+                (image_id, source_tag_id, source)
+            )
+
             # Record in tag_deltas if user-initiated
             if source == 'user':
                 cur.execute("""
@@ -791,8 +825,13 @@ def set_image_rating(image_id: int, rating: Optional[str],
                         WHERE id = ?
                     """, (old_rating, image_id))
 
-                # Increment pending corrections counter
-                cur.execute("""
+        conn.commit()
+
+        # Increment pending corrections counter in model DB if user-initiated
+        if source == 'user' and rating:
+            with get_model_connection() as model_conn:
+                model_cur = model_conn.cursor()
+                model_cur.execute("""
                     INSERT OR REPLACE INTO rating_model_metadata (key, value, updated_at)
                     VALUES ('pending_user_corrections',
                             COALESCE((SELECT CAST(value AS INTEGER) + 1
@@ -800,8 +839,7 @@ def set_image_rating(image_id: int, rating: Optional[str],
                                      WHERE key = 'pending_user_corrections'), 1),
                             ?)
                 """, (datetime.now(),))
-
-        conn.commit()
+                model_conn.commit()
 
         return {'old_rating': old_rating, 'new_rating': rating}
 
@@ -864,7 +902,7 @@ def get_model_stats() -> Dict:
     Returns:
         dict: Model metadata, config, rating distribution, etc.
     """
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
 
         # Get metadata
@@ -941,7 +979,7 @@ def get_top_weighted_tags(rating: str, limit: int = 50) -> Dict:
     Returns:
         dict: {'tags': [...], 'pairs': [...]}
     """
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
 
         # Get top individual tags
@@ -991,7 +1029,7 @@ def update_model_metadata(updates: Dict) -> None:
     Args:
         updates: {key: value} pairs to update
     """
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
 
         for key, value in updates.items():
@@ -1010,7 +1048,7 @@ def get_pending_corrections_count() -> int:
     Returns:
         int: Number of tag_deltas entries since last_trained timestamp
     """
-    with get_db_connection() as conn:
+    with get_model_connection() as conn:
         cur = conn.cursor()
 
         # Try to get from metadata first
@@ -1026,13 +1064,19 @@ def get_pending_corrections_count() -> int:
             except (ValueError, TypeError):
                 pass
 
-        # Fallback: count tag_deltas since last training
-        cur.execute("""
-            SELECT value FROM rating_model_metadata
-            WHERE key = 'last_trained'
-        """)
+    # Fallback: count tag_deltas since last training from main DB
+    with get_db_connection() as conn:
+        cur = conn.cursor()
 
-        last_trained_row = cur.fetchone()
+        # Get last_trained from model DB first
+        with get_model_connection() as model_conn:
+            model_cur = model_conn.cursor()
+            model_cur.execute("""
+                SELECT value FROM rating_model_metadata
+                WHERE key = 'last_trained'
+            """)
+            last_trained_row = model_cur.fetchone()
+
         if not last_trained_row:
             return 0
 

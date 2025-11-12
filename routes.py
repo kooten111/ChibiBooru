@@ -1081,22 +1081,23 @@ async def api_get_images_for_rating():
                 tags = [t['name'] for t in all_tags if not t['name'].startswith('rating:')]
                 rating_tags = [t for t in all_tags if t['name'].startswith('rating:')]
 
-                # Check if has AI rating
-                ai_rating = None
-                ai_confidence = None
+                # Get rating info
+                rating = None
+                rating_source = None
                 for rt in rating_tags:
-                    if rt['source'] == 'ai_inference':
-                        ai_rating = rt['name']
-                        # Note: confidence not stored yet, placeholder
-                        ai_confidence = 0.7
-                        break
+                    rating = rt['name']
+                    rating_source = rt['source']
+                    break
 
                 images.append({
                     'id': image_id,
-                    'path': filepath,
+                    'filepath': filepath,
+                    'rating': rating,
+                    'rating_source': rating_source,
+                    'tag_count': len(tags),
                     'tags': tags,
-                    'ai_rating': ai_rating,
-                    'ai_confidence': ai_confidence
+                    'ai_rating': rating if rating_source == 'ai_inference' else None,
+                    'ai_confidence': 0.7 if rating_source == 'ai_inference' else None  # Placeholder
                 })
 
             return jsonify({

@@ -86,6 +86,9 @@
             <div class="distribution-grid" id="distributionGrid">
                 <!-- Will be populated by JavaScript -->
             </div>
+            <button class="action-btn action-btn-primary" onclick="scrollToReview()" style="margin-top: 20px;">
+                📋 Review AI-Inferred Ratings
+            </button>
         </div>
 
         <!-- Configuration Section -->
@@ -97,6 +100,36 @@
             <button class="action-btn action-btn-primary" onclick="saveConfig()" style="margin-top: 20px;">
                 💾 Save Configuration
             </button>
+        </div>
+
+        <!-- AI-Inferred Images Browser Section -->
+        <div class="section">
+            <h2>Review AI-Inferred Ratings</h2>
+            <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
+                <div>
+                    <label for="imageFilter" style="margin-right: 10px;">Filter:</label>
+                    <select id="imageFilter" onchange="loadImages()" style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel);">
+                        <option value="ai_predicted">🤖 AI-Inferred Only</option>
+                        <option value="unrated">❓ Unrated Only</option>
+                        <option value="all">📋 All Images</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="imageLimit" style="margin-right: 10px;">Limit:</label>
+                    <input type="number" id="imageLimit" value="50" min="10" max="500" step="10"
+                           onchange="loadImages()" style="width: 80px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel);">
+                </div>
+                <button onclick="loadImages()" class="action-btn action-btn-primary">
+                    🔄 Refresh
+                </button>
+                <div style="margin-left: auto;">
+                    <span id="imageCount" style="color: #888; font-size: 0.9em;">0 images loaded</span>
+                </div>
+            </div>
+
+            <div id="imagesContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                <!-- Will be populated by JavaScript -->
+            </div>
         </div>
     </div>
 
@@ -199,6 +232,8 @@
                 {key: 'pair_weight_multiplier', label: 'Pair Weight Multiplier', min: 0.5, max: 3, step: 0.1},
                 {key: 'min_training_samples', label: 'Min Training Samples', min: 10, max: 200, step: 10},
                 {key: 'min_pair_cooccurrence', label: 'Min Pair Co-occurrence', min: 2, max: 20, step: 1},
+                {key: 'min_tag_frequency', label: 'Min Tag Frequency', min: 5, max: 50, step: 5},
+                {key: 'max_pair_count', label: 'Max Tag Pairs', min: 5000, max: 200000, step: 5000},
             ];
 
             grid.innerHTML = configItems.map(item => {
@@ -375,10 +410,105 @@
             }
         }
 
-        // Load stats on page load
-        loadStats();
+        async function loadImages() {
+            const filter = document.getElementById('imageFilter').value;
+            const limit = document.getElementById('imageLimit').value;
+            const container = document.getElementById('imagesContainer');
 
-        // Auto-refresh every 30 seconds
+            showLoading('Loading images...');
+
+            try {
+                const response = await fetch(`/api/rate/images?filter=${filter}&limit=${limit}`);
+                const data = await response.json();
+
+                hideLoading();
+
+                // Update count
+                document.getElementById('imageCount').textContent = `${data.images.length} images loaded`;
+
+                if (!data.images || data.images.length === 0) {
+                    container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #888;">No images found</div>';
+                    document.getElementById('imageCount').textContent = '0 images loaded';
+                    return;
+                }
+
+                container.innerHTML = data.images.map(img => {
+                    const rating = img.rating || 'unrated';
+                    const ratingClass = rating.replace('rating:', '');
+                    const ratingColor = {
+                        'general': '#4ade80',
+                        'sensitive': '#60a5fa',
+                        'questionable': '#fb923c',
+                        'explicit': '#f87171',
+                        'unrated': '#888'
+                    }[ratingClass] || '#888';
+
+                    const ratingLabel = rating === 'unrated' ? 'Unrated' : rating.replace('rating:', '').toUpperCase();
+                    const sourceLabel = img.rating_source === 'ai_inference' ? '🤖 AI' :
+                                       img.rating_source === 'user' ? '👤 User' :
+                                       img.rating_source === 'original' ? '📦 Original' : '';
+
+                    return `
+                        <div class="image-card" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-panel);">
+                            <a href="/view/${img.filepath}" target="_blank" style="display: block;">
+                                <img src="/static/thumbnails/${img.filepath}"
+                                     alt="Image ${img.id}"
+                                     style="width: 100%; height: 200px; object-fit: cover; display: block;"
+                                     onerror="this.src='/static/images/${img.filepath}'">
+                            </a>
+                            <div style="padding: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                    <span style="font-weight: bold; color: ${ratingColor};">${ratingLabel}</span>
+                                    <span style="font-size: 0.85em; color: #888;">${sourceLabel}</span>
+                                </div>
+                                <div style="font-size: 0.85em; color: #888; margin-bottom: 8px;">
+                                    ID: ${img.id} • ${img.tag_count} tags
+                                </div>
+                                <div style="display: flex; gap: 5px;">
+                                    <button onclick="viewImage('${img.filepath}')" class="action-btn action-btn-primary" style="flex: 1; padding: 5px; font-size: 0.85em;">
+                                        View
+                                    </button>
+                                    ${img.rating_source === 'ai_inference' ? `
+                                    <button onclick="correctRating('${img.filepath}')" class="action-btn action-btn-warning" style="flex: 1; padding: 5px; font-size: 0.85em;">
+                                        Correct
+                                    </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                hideLoading();
+                container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #f87171;">Error loading images: ${error.message}</div>`;
+                console.error('Error loading images:', error);
+            }
+        }
+
+        function viewImage(filepath) {
+            window.open(`/view/${filepath}`, '_blank');
+        }
+
+        function correctRating(filepath) {
+            showConfirm(`Open image in a new tab to correct the rating?`, () => {
+                window.open(`/view/${filepath}`, '_blank');
+            });
+        }
+
+        function scrollToReview() {
+            document.getElementById('imagesContainer').parentElement.scrollIntoView({ behavior: 'smooth' });
+            // Load images if not already loaded
+            if (document.getElementById('imagesContainer').children.length === 0) {
+                loadImages();
+            }
+        }
+
+        // Load stats and images on page load
+        loadStats();
+        loadImages();
+
+        // Auto-refresh stats every 30 seconds
         setInterval(loadStats, 30000);
     </script>
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>

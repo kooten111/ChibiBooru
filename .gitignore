@@ -19,6 +19,7 @@ requirements-dev.txt
 # Specific files to ignore
 booru.db
 database.db
+rating_model.db
 tags.json
 todo.txt
 todo.md
