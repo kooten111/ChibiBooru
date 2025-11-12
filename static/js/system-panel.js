@@ -270,6 +270,20 @@ function systemCleanOrphans(event) {
     });
 }
 
+function systemApplyMergedSources(event) {
+    if (event) event.preventDefault();
+    showConfirm('This will merge tags from all available sources for images with multiple sources. Continue?', () => {
+        systemAction('/api/system/apply_merged_sources', event.target, 'Apply Merged Sources');
+    });
+}
+
+function systemRecountTags(event) {
+    if (event) event.preventDefault();
+    showConfirm('This will recount all tag usage statistics. Continue?', () => {
+        systemAction('/api/system/recount_tags', event.target, 'Recount Tags');
+    });
+}
+
 function systemBulkRetryTagging(event) {
     if (event) event.preventDefault();
 

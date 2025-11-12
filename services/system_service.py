@@ -134,18 +134,130 @@ def rebuild_categorized_service():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+def apply_merged_sources_service():
+    """Service to apply merged sources to all images with multiple sources."""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    try:
+        import config
+        from database import get_db_connection
+        from services.switch_source_db import merge_all_sources
+
+        # Get all images with multiple sources
+        merged_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT i.filepath, COUNT(DISTINCT s.id) as source_count
+                FROM images i
+                JOIN image_sources isrc ON i.id = isrc.image_id
+                JOIN sources s ON isrc.source_id = s.id
+                GROUP BY i.id, i.filepath
+                HAVING source_count > 1
+            """)
+
+            multi_source_images = cursor.fetchall()
+            total = len(multi_source_images)
+
+            if total == 0:
+                monitor_service.add_log("No images with multiple sources found", "info")
+                return jsonify({
+                    "status": "success",
+                    "message": "No images with multiple sources found.",
+                    "merged": 0,
+                    "skipped": 0,
+                    "errors": 0
+                })
+
+            monitor_service.add_log(f"Starting merge for {total} images with multiple sources", "info")
+
+            for idx, row in enumerate(multi_source_images, 1):
+                filepath = row['filepath']
+
+                # Log progress every 10% or for small batches, every item
+                if total <= 10 or idx % max(1, total // 10) == 0:
+                    progress_pct = int((idx / total) * 100)
+                    monitor_service.add_log(f"Progress: {idx}/{total} ({progress_pct}%) - {merged_count} merged, {error_count} errors", "info")
+
+                # Check if we should use merged based on config
+                if config.USE_MERGED_SOURCES_BY_DEFAULT:
+                    result = merge_all_sources(filepath)
+                    if result.get("status") == "success":
+                        merged_count += 1
+                    else:
+                        error_count += 1
+                        monitor_service.add_log(f"Error merging {filepath}: {result.get('error', 'Unknown')}", "error")
+                else:
+                    skipped_count += 1
+
+        # Refresh cache and recount tags
+        monitor_service.add_log("Refreshing cache...", "info")
+        models.load_data_from_db()
+
+        monitor_service.add_log("Recounting tags...", "info")
+        models.reload_tag_counts()
+
+        message = f"✓ Processed {total} images: {merged_count} merged"
+        if skipped_count > 0:
+            message += f", {skipped_count} skipped (config disabled)"
+        if error_count > 0:
+            message += f", {error_count} errors"
+
+        monitor_service.add_log(message, "success")
+
+        return jsonify({
+            "status": "success",
+            "message": message,
+            "merged": merged_count,
+            "skipped": skipped_count,
+            "errors": error_count,
+            "total": total
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        monitor_service.add_log(f"Fatal error during merge: {str(e)}", "error")
+        return jsonify({"error": str(e)}), 500
         
+def recount_tags_service():
+    """Service to recount all tag usage counts."""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        monitor_service.add_log("Recounting all tags...", "info")
+        models.reload_tag_counts()
+
+        # Get total tag count for confirmation
+        tag_count = len(models.get_tag_counts())
+
+        monitor_service.add_log(f"✓ Recounted {tag_count} tags", "success")
+        return jsonify({
+            "status": "success",
+            "message": f"Recounted {tag_count} tags",
+            "tag_count": tag_count
+        })
+    except Exception as e:
+        monitor_service.add_log(f"Error recounting tags: {str(e)}", "error")
+        return jsonify({"error": str(e)}), 500
+
 def recategorize_service():
     """Service to recategorize misplaced tags without full rebuild."""
     secret = request.args.get('secret', '') or request.form.get('secret', '')
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     try:
         changes = models.recategorize_misplaced_tags()
         models.load_data_from_db()  # Refresh cache
         return jsonify({
-            "status": "success", 
+            "status": "success",
             "message": f"Recategorized {changes} tags",
             "changes": changes
         })

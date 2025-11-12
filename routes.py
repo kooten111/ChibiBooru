@@ -1,6 +1,6 @@
 # routes.py
 from quart import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
-from services.switch_source_db import switch_metadata_source_db
+from services.switch_source_db import switch_metadata_source_db, merge_all_sources
 import random
 from functools import wraps
 import os
@@ -370,6 +370,14 @@ async def deduplicate():
 async def clean_orphans():
     return system_service.clean_orphans_service()
 
+@api_blueprint.route('/system/apply_merged_sources', methods=['POST'])
+async def apply_merged_sources():
+    return system_service.apply_merged_sources_service()
+
+@api_blueprint.route('/system/recount_tags', methods=['POST'])
+async def recount_tags():
+    return system_service.recount_tags_service()
+
 @api_blueprint.route('/system/monitor/start', methods=['POST'])
 async def start_monitor():
     if monitor_service.start_monitor():
@@ -459,7 +467,11 @@ async def switch_source():
         if not filepath or not source:
             return jsonify({"error": "Missing filepath or source"}), 400
 
-        result = switch_metadata_source_db(filepath, source)
+        # Handle special "merged" source
+        if source == 'merged':
+            result = merge_all_sources(filepath)
+        else:
+            result = switch_metadata_source_db(filepath, source)
 
         if "error" in result:
             return jsonify(result), 400

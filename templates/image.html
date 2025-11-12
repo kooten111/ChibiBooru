@@ -250,7 +250,8 @@
                             <button class="source-toggle-btn" onclick="openSourceModal()">
                                 <span class="current-source-indicator">
                                     {% set active = data.active_source or (metadata.sources.keys()|list|first) %}
-                                    {% if active == 'danbooru' %}🔵 Danbooru
+                                    {% if active == 'merged' %}🔀 Merged ({{ metadata.sources|length }} sources)
+                                    {% elif active == 'danbooru' %}🔵 Danbooru
                                     {% elif active == 'e621' %}🟢 e621
                                     {% elif active == 'gelbooru' %}🟡 Gelbooru
                                     {% elif active == 'yandere' %}🔴 Yande.re
@@ -443,6 +444,28 @@
         </div>
         <div class="source-options">
             {% set active = data.active_source or (metadata.sources.keys()|list|first) %}
+            <!-- Merge All Sources Option -->
+            <div class="source-option special-option {% if active == 'merged' %}active{% endif %}" onclick="switchSource('merged')">
+                <div class="source-option-header">
+                    <span class="source-emoji">🔀</span>
+                    <span class="source-name">Merge All Sources</span>
+                    {% if active == 'merged' %}
+                    <span class="active-badge">Active</span>
+                    {% endif %}
+                </div>
+                <div class="source-meta">
+                    <span class="meta-badge categorized">Combined from {{ metadata.sources|length }} sources</span>
+                    <span class="meta-badge count">
+                        All tags merged & deduplicated
+                    </span>
+                </div>
+            </div>
+            {% if active == 'merged' %}
+            <div class="source-hint">
+                💡 Select any individual source below to switch back to its tags only
+            </div>
+            {% endif %}
+            <!-- Individual Sources -->
             {% for source_name, source_data in metadata.sources.items() %}
             <div class="source-option {% if source_name == active %}active{% endif %}" onclick="switchSource('{{ source_name }}')">
                 <div class="source-option-header">

@@ -95,6 +95,11 @@ BOORU_PRIORITY = [
     "local_tagger"  # AI fallback
 ]
 
+# Use merged sources as default for new images
+# When True: Images with multiple sources will default to merged view
+# When False: Images will use first available source from BOORU_PRIORITY
+USE_MERGED_SOURCES_BY_DEFAULT = True
+
 # ==================== FLASK APP ====================
 
 # Web server

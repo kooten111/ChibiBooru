@@ -81,16 +81,31 @@ def repopulate_from_database():
             except (json.JSONDecodeError, TypeError):
                 continue
 
+            available_sources = metadata.get('sources', {})
+
+            # Check if we should use merged sources by default
+            use_merged = config.USE_MERGED_SOURCES_BY_DEFAULT and len(available_sources) > 1
+
+            if use_merged:
+                # Use merged mode - import the merge function
+                from services.switch_source_db import merge_all_sources
+                # Get the image filepath
+                cur.execute("SELECT filepath FROM images WHERE id = ?", (image_id,))
+                filepath_row = cur.fetchone()
+                if filepath_row:
+                    merge_all_sources(filepath_row['filepath'])
+                continue
+
+            # Original single-source logic
             primary_source_data = None
             source_name = None
-            available_sources = metadata.get('sources', {})
 
             for src in config.BOORU_PRIORITY:
                 if src in available_sources:
                     primary_source_data = available_sources[src]
                     source_name = src
                     break
-            
+
             # Fallback if no priority source is found
             if not source_name and available_sources:
                 source_name = next(iter(available_sources.keys()), None)

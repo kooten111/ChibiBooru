@@ -39,24 +39,31 @@ function closeSourceModal() {
 
 async function switchSource(sourceName) {
     const filepath = document.getElementById('imageFilepath').value;
-    
+
     if (!filepath) {
         alert('Error: Image filepath not found');
         return;
     }
-    
+
     // Show loading state
     const sourceOption = document.querySelector(`.source-option[onclick="switchSource('${sourceName}')"]`);
     if (sourceOption) {
         sourceOption.classList.add('switching');
         const originalHTML = sourceOption.innerHTML;
-        sourceOption.innerHTML = `
-            <div class="source-option-header">
+
+        // Different message for merged sources
+        const loadingMessage = sourceName === 'merged'
+            ? `<div class="source-option-header">
+                <span class="source-emoji">🔀</span>
+                <span class="source-name">Merging all sources...</span>
+               </div>`
+            : `<div class="source-option-header">
                 <span class="source-emoji">⏳</span>
                 <span class="source-name">Switching...</span>
-            </div>
-        `;
-        
+               </div>`;
+
+        sourceOption.innerHTML = loadingMessage;
+
         // Restore after timeout in case of error
         setTimeout(() => {
             if (sourceOption.classList.contains('switching')) {
