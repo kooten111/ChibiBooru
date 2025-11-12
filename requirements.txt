@@ -71,17 +71,3 @@ watchdog>=6.0.0
 filelock>=3.20.0
 fsspec>=2025.9.0
 packaging>=25.0
-
-# TensorBoard (for model monitoring)
-tb-nightly>=2.21.0
-tensorboard-data-server>=0.7.2
-protobuf>=6.32.1
-Markdown>=3.9
-grpcio>=1.76.0
-absl-py>=2.3.1
-
-# CUDA support (for GPU acceleration)
-nvidia-cuda-runtime-cu12>=12.8.90
-nvidia-cudnn-cu12>=9.10.2.21
-nvidia-cublas-cu12>=12.8.4.1
-triton>=3.5.0
