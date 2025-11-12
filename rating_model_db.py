@@ -27,34 +27,13 @@ def get_model_db_path() -> str:
     return os.environ.get('RATING_MODEL_PATH', DEFAULT_MODEL_PATH)
 
 
-@contextmanager
-def get_model_db_connection():
+def _init_connection(conn: sqlite3.Connection) -> None:
     """
-    Context manager for model database connections.
-
-    Yields:
-        sqlite3.Connection: Database connection with row factory
-    """
-    db_path = get_model_db_path()
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-
-def init_model_database(db_path: Optional[str] = None) -> None:
-    """
-    Initialize a new model database with the required schema.
+    Initialize database schema on an existing connection.
 
     Args:
-        db_path: Path to create database (uses default if None)
+        conn: Open SQLite connection to initialize
     """
-    if db_path is None:
-        db_path = get_model_db_path()
-
-    conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
     # Configuration table
@@ -124,6 +103,56 @@ def init_model_database(db_path: Optional[str] = None) -> None:
     """)
 
     conn.commit()
+
+
+@contextmanager
+def get_model_db_connection():
+    """
+    Context manager for model database connections.
+
+    Auto-initializes the database if it doesn't exist.
+
+    Yields:
+        sqlite3.Connection: Database connection with row factory
+    """
+    db_path = get_model_db_path()
+
+    # Check if database needs initialization
+    needs_init = not os.path.exists(db_path)
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+
+    # Initialize if needed
+    if needs_init:
+        print(f"Initializing model database at {db_path}...")
+        _init_connection(conn)
+    else:
+        # Verify tables exist (in case file exists but is empty/corrupt)
+        try:
+            conn.execute("SELECT 1 FROM rating_inference_config LIMIT 1")
+        except sqlite3.OperationalError:
+            print(f"Model database exists but is missing tables. Re-initializing...")
+            _init_connection(conn)
+
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def init_model_database(db_path: Optional[str] = None) -> None:
+    """
+    Initialize a new model database with the required schema.
+
+    Args:
+        db_path: Path to create database (uses default if None)
+    """
+    if db_path is None:
+        db_path = get_model_db_path()
+
+    conn = sqlite3.connect(db_path)
+    _init_connection(conn)
     conn.close()
 
     print(f"✅ Initialized model database: {db_path}")
