@@ -507,7 +507,7 @@ def perform_search(search_query):
             pool_images = models.search_images_by_pool(pool_filter)
             if pool_images:
                 pool_filepaths = {img['filepath'] for img in pool_images}
-                results = [img for img in results if img['filepath'] in pool_filepaths]
+                results = [img for img in results if img and img['filepath'] in pool_filepaths]
             else:
                 # No pool found with that name, return empty results
                 results = []
@@ -515,17 +515,17 @@ def perform_search(search_query):
         if relationship_filter:
             # This is an expensive operation if not done in the DB
             relationship_images = {img['filepath'] for img in models.search_images_by_relationship(relationship_filter)}
-            results = [img for img in results if img['filepath'] in relationship_images]
+            results = [img for img in results if img and img['filepath'] in relationship_images]
 
         if source_filters:
             # Use optimized SQL query instead of N+1 Python loop
             results = models.search_images_by_multiple_sources(source_filters)
 
         if extension_filter:
-            results = [img for img in results if img['filepath'].lower().endswith(f'.{extension_filter}')]
+            results = [img for img in results if img and img['filepath'].lower().endswith(f'.{extension_filter}')]
 
         if filename_filter:
-            results = [img for img in results if filename_filter in img['filepath'].lower()]
+            results = [img for img in results if img and filename_filter in img['filepath'].lower()]
 
         if metadata_filter:
             # Handle metadata:missing - images that don't have any source data
@@ -538,6 +538,9 @@ def perform_search(search_query):
 
                     filtered_results = []
                     for img in results:
+                        # Skip None values that might have been added by error
+                        if img is None:
+                            continue
                         # Get image_id for this filepath
                         img_row = conn.execute("SELECT id FROM images WHERE filepath = ?", (img['filepath'],)).fetchone()
                         if not img_row:
@@ -564,6 +567,9 @@ def perform_search(search_query):
             with get_db_connection() as conn:
                 filtered_results = []
                 for img in results:
+                    # Skip None values that might have been added by error
+                    if img is None:
+                        continue
                     match = True
 
                     # Check each category filter
@@ -596,10 +602,13 @@ def perform_search(search_query):
         if general_terms:
             filtered_results = []
             for img in results:
+                # Skip None values that might have been added by error
+                if img is None:
+                    continue
                 # Get tag list and filepath for matching
-                tags_str = img.get('tags', '').lower()
+                tags_str = (img.get('tags') or '').lower()
                 tag_list = set(tags_str.split())
-                filepath_lower = img.get('filepath', '').lower()
+                filepath_lower = (img.get('filepath') or '').lower()
 
                 # Check if ALL general terms match
                 match = True
@@ -617,9 +626,12 @@ def perform_search(search_query):
         if negative_terms:
             filtered_results = []
             for img in results:
-                tags_str = img.get('tags', '').lower()
+                # Skip None values that might have been added by error
+                if img is None:
+                    continue
+                tags_str = (img.get('tags') or '').lower()
                 tag_list = set(tags_str.split())
-                filepath_lower = img.get('filepath', '').lower()
+                filepath_lower = (img.get('filepath') or '').lower()
 
                 # Exclude if any negative term matches (exact tag OR filepath substring)
                 exclude = False

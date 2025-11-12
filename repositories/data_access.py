@@ -71,7 +71,7 @@ def get_all_images_with_tags():
     """Get all images with their concatenated tags."""
     with get_db_connection() as conn:
         query = """
-        SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+        SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
         FROM images i
         LEFT JOIN image_tags it ON i.id = it.image_id
         LEFT JOIN tags t ON it.tag_id = t.id
@@ -93,13 +93,13 @@ def get_image_details(filepath):
         query = """
         SELECT
             i.*,
-            (SELECT GROUP_CONCAT(t.name, ' ') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id) as all_tags,
-            (SELECT GROUP_CONCAT(t.name, ' ') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'character') as tags_character,
-            (SELECT GROUP_CONCAT(t.name, ' ') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'copyright') as tags_copyright,
-            (SELECT GROUP_CONCAT(t.name, ' ') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'artist') as tags_artist,
-            (SELECT GROUP_CONCAT(t.name, ' ') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'species') as tags_species,
-            (SELECT GROUP_CONCAT(t.name, ' ') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'meta') as tags_meta,
-            (SELECT GROUP_CONCAT(t.name, ' ') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'general') as tags_general,
+            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id) as all_tags,
+            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'character') as tags_character,
+            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'copyright') as tags_copyright,
+            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'artist') as tags_artist,
+            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'species') as tags_species,
+            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'meta') as tags_meta,
+            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'general') as tags_general,
             rm.data as raw_metadata
         FROM images i
         LEFT JOIN raw_metadata rm ON i.id = rm.image_id
@@ -325,7 +325,7 @@ def search_images_by_relationship(relationship_type):
         if matching_filepaths:
             placeholders = ','.join('?' for _ in matching_filepaths)
             query = f"""
-            SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+            SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
             FROM images i
             LEFT JOIN image_tags it ON i.id = it.image_id
             LEFT JOIN tags t ON it.tag_id = t.id
@@ -345,7 +345,7 @@ def search_images_by_tags(tags_list):
     """Search for images that have ALL specified tags (AND logic)."""
     with get_db_connection() as conn:
         base_query = """
-        SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+        SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
         FROM images i
         JOIN image_tags it ON i.id = it.image_id
         JOIN tags t ON it.tag_id = t.id
@@ -369,7 +369,7 @@ def search_images_by_source(source_name):
     """Search for images from a specific source."""
     with get_db_connection() as conn:
         query = """
-        SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+        SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
         FROM images i
         LEFT JOIN image_tags it ON i.id = it.image_id
         LEFT JOIN tags t ON it.tag_id = t.id
@@ -393,7 +393,7 @@ def search_images_by_multiple_sources(source_names):
         # Build a query that requires the image to have ALL sources
         # Using HAVING COUNT(DISTINCT s.name) = number_of_sources ensures AND logic
         query = """
-        SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+        SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
         FROM images i
         LEFT JOIN image_tags it ON i.id = it.image_id
         LEFT JOIN tags t ON it.tag_id = t.id

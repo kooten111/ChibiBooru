@@ -364,11 +364,11 @@ async def trigger_thumbnails():
 
 @api_blueprint.route('/system/deduplicate', methods=['POST'])
 async def deduplicate():
-    return system_service.deduplicate_service()
+    return await system_service.deduplicate_service()
 
 @api_blueprint.route('/system/clean_orphans', methods=['POST'])
 async def clean_orphans():
-    return system_service.clean_orphans_service()
+    return await system_service.clean_orphans_service()
 
 @api_blueprint.route('/system/apply_merged_sources', methods=['POST'])
 async def apply_merged_sources():
@@ -392,23 +392,23 @@ async def stop_monitor():
 
 @api_blueprint.route('/edit_tags', methods=['POST'])
 async def edit_tags():
-    return api_service.edit_tags_service()
+    return await api_service.edit_tags_service()
 
 @api_blueprint.route('/delete_image', methods=['POST'])
 async def delete_image():
-    return api_service.delete_image_service()
+    return await api_service.delete_image_service()
 
 @api_blueprint.route('/delete_images_bulk', methods=['POST'])
 async def delete_images_bulk():
-    return api_service.delete_images_bulk_service()
+    return await api_service.delete_images_bulk_service()
 
 @api_blueprint.route('/retry_tagging', methods=['POST'])
 async def retry_tagging():
-    return api_service.retry_tagging_service()
+    return await api_service.retry_tagging_service()
 
 @api_blueprint.route('/bulk_retry_tagging', methods=['POST'])
 async def bulk_retry_tagging():
-    return api_service.bulk_retry_tagging_service()
+    return await api_service.bulk_retry_tagging_service()
 
 @api_blueprint.route('/tags/fetch')
 async def fetch_tags():
@@ -447,15 +447,15 @@ async def autocomplete():
 
 @api_blueprint.route('/saucenao/search', methods=['POST'])
 async def saucenao_search():
-    return api_service.saucenao_search_service()
+    return await api_service.saucenao_search_service()
 
 @api_blueprint.route('/saucenao/fetch_metadata', methods=['POST'])
 async def saucenao_fetch_metadata():
-    return api_service.saucenao_fetch_metadata_service()
+    return await api_service.saucenao_fetch_metadata_service()
 
 @api_blueprint.route('/saucenao/apply', methods=['POST'])
 async def saucenao_apply():
-    return api_service.saucenao_apply_service()
+    return await api_service.saucenao_apply_service()
 
 @api_blueprint.route('/switch_source', methods=['POST'])
 async def switch_source():

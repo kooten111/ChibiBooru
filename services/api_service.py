@@ -138,9 +138,9 @@ def update_image_tags_categorized(filepath, categorized_tags):
             conn.rollback()
         return False
 
-def edit_tags_service():
+async def edit_tags_service():
     """Service to update tags for an image with category support."""
-    data = request.json
+    data = await request.json
     filepath = data.get('filepath', '').replace('images/', '', 1)
     
     # Check if we have categorized tags (new format) or plain tags (old format)
@@ -173,9 +173,9 @@ def edit_tags_service():
         return jsonify({"error": str(e)}), 500
 
 
-def delete_image_service():
+async def delete_image_service():
     """Service to delete an image and its data."""
-    data = request.json
+    data = await request.json
     # The filepath from the frontend is 'images/folder/image.jpg'
     # We need the path relative to the 'static/images' directory, which is 'folder/image.jpg'
     filepath = data.get('filepath', '').replace('images/', '', 1)
@@ -236,9 +236,9 @@ def delete_image_service():
         print(f"Error deleting image {filepath}: {e}")
         return jsonify({"error": "An unexpected error occurred during deletion."}), 500
 
-def delete_images_bulk_service():
+async def delete_images_bulk_service():
     """Service to delete multiple images at once."""
-    data = request.json
+    data = await request.json
     filepaths = data.get('filepaths', [])
 
     if not filepaths or not isinstance(filepaths, list):
@@ -301,9 +301,9 @@ def delete_images_bulk_service():
 
 # --- THIS IS THE CORRECTED SAUCENAO BLOCK ---
 
-def saucenao_search_service():
+async def saucenao_search_service():
     """Service to search SauceNao for an image."""
-    data = request.json
+    data = await request.json
     if data.get('secret', '') != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -352,9 +352,9 @@ def saucenao_search_service():
         return jsonify({"error": str(e)}), 500
 
 
-def saucenao_fetch_metadata_service():
+async def saucenao_fetch_metadata_service():
     """Service to fetch full metadata from a booru source."""
-    data = request.json
+    data = await request.json
     if data.get('secret', '') != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -520,9 +520,9 @@ def autocomplete():
     return jsonify({"groups": response_groups})
 
 
-def saucenao_apply_service():
+async def saucenao_apply_service():
     """Service to apply selected metadata and download the new image."""
-    data = request.json
+    data = await request.json
     if data.get('secret', '') != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
@@ -595,9 +595,9 @@ def saucenao_apply_service():
         return jsonify({"error": str(e)}), 500
 
 
-def retry_tagging_service():
+async def retry_tagging_service():
     """Service to retry tagging for an image that was previously tagged with local_tagger."""
-    data = request.json
+    data = await request.json
     filepath = data.get('filepath', '').replace('images/', '', 1)
     skip_local_fallback = data.get('skip_local_fallback', False)
 
@@ -852,9 +852,9 @@ def retry_tagging_service():
         return jsonify({"error": str(e)}), 500
 
 
-def bulk_retry_tagging_service():
+async def bulk_retry_tagging_service():
     """Service to retry tagging for all images that were tagged with local_tagger."""
-    data = request.json or {}
+    data = await request.json or {}
     skip_local_fallback = data.get('skip_local_fallback', False)
 
     try:

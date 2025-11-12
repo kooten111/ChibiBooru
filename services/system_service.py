@@ -305,13 +305,13 @@ def trigger_thumbnails():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def deduplicate_service():
+async def deduplicate_service():
     """Service to run MD5 deduplication scan."""
     secret = request.args.get('secret', '') or request.form.get('secret', '')
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.json or {}
+    data = await request.json or {}
     dry_run = data.get('dry_run', True)
 
     try:
@@ -322,13 +322,13 @@ def deduplicate_service():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def clean_orphans_service():
+async def clean_orphans_service():
     """Service to find and remove database entries for deleted files."""
     secret = request.args.get('secret', '') or request.form.get('secret', '')
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.json or {}
+    data = await request.json or {}
     dry_run = data.get('dry_run', True)
 
     try:

@@ -43,7 +43,7 @@ def load_data_from_db():
             tag_counts.update({row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()})
 
             image_data_query = """
-            SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+            SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
             FROM images i
             LEFT JOIN image_tags it ON i.id = it.image_id
             LEFT JOIN tags t ON it.tag_id = t.id
@@ -82,7 +82,7 @@ def reload_single_image(filepath):
     with data_lock:
         with get_db_connection() as conn:
             query = """
-            SELECT i.filepath, GROUP_CONCAT(t.name, ' ') as tags
+            SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
             FROM images i
             LEFT JOIN image_tags it ON i.id = it.image_id
             LEFT JOIN tags t ON it.tag_id = t.id

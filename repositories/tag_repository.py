@@ -240,7 +240,7 @@ def rebuild_categorized_tags_from_relations():
 
             # Fetch all tags for this image, grouped by category
             query = """
-            SELECT category, GROUP_CONCAT(name, ' ') as tags
+            SELECT category, COALESCE(GROUP_CONCAT(name, ' '), '') as tags
             FROM tags t
             JOIN image_tags it ON t.id = it.tag_id
             WHERE it.image_id = ?
