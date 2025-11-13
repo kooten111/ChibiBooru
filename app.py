@@ -7,7 +7,7 @@ load_dotenv(override=True)
 
 from routes import main_blueprint, api_blueprint
 import models
-from database import initialize_database
+from database import initialize_database, repair_orphaned_image_tags
 from priority_monitor import check_and_apply_priority_changes
 
 def create_app():
@@ -21,6 +21,9 @@ def create_app():
 
     # Ensure the database file and tables exist.
     initialize_database()
+
+    # Auto-repair any orphaned image tags (data integrity check)
+    repair_orphaned_image_tags()
 
     # Check if BOORU_PRIORITY changed and auto-apply if needed
     # This must happen before loading data from DB
@@ -37,4 +40,4 @@ def create_app():
 if __name__ == '__main__':
     import uvicorn
     app = create_app()
-    uvicorn.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, log_level="info")
+    uvicorn.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, log_level="warning")

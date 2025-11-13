@@ -360,12 +360,12 @@
             <div class="image-and-actions-container">
                 <div class="image-view" id="imageViewContainer">
                     {% if filepath.endswith('.mp4') %}
-                    <video controls loop>
+                    <video controls loop preload="metadata">
                         <source src="{{ url_for('static', filename=filepath) }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                     {% elif filepath.endswith('.webm') %}
-                    <video controls loop>
+                    <video controls loop preload="metadata">
                         <source src="{{ url_for('static', filename=filepath) }}" type="video/webm">
                         Your browser does not support the video tag.
                     </video>

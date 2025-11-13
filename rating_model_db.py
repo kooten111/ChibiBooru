@@ -111,6 +111,7 @@ def get_model_db_connection():
     Context manager for model database connections.
 
     Auto-initializes the database if it doesn't exist.
+    Auto-migrates weights from main DB if model DB is empty but main DB has weights.
 
     Yields:
         sqlite3.Connection: Database connection with row factory
@@ -119,6 +120,7 @@ def get_model_db_connection():
 
     # Check if database needs initialization
     needs_init = not os.path.exists(db_path)
+    needs_migration = False
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -127,6 +129,7 @@ def get_model_db_connection():
     if needs_init:
         print(f"Initializing model database at {db_path}...")
         _init_connection(conn)
+        needs_migration = True  # Check for migration after init
     else:
         # Verify tables exist (in case file exists but is empty/corrupt)
         try:
@@ -134,11 +137,95 @@ def get_model_db_connection():
         except sqlite3.OperationalError:
             print(f"Model database exists but is missing tables. Re-initializing...")
             _init_connection(conn)
+            needs_migration = True
+
+    # Auto-migrate from main DB if model DB is empty but main DB has weights
+    if needs_migration:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) as cnt FROM rating_tag_weights")
+            weight_count = cur.fetchone()['cnt']
+
+            if weight_count == 0:
+                # Model DB is empty, check if main DB has weights
+                from database import get_db_connection
+                with get_db_connection() as main_conn:
+                    try:
+                        main_cur = main_conn.cursor()
+                        main_cur.execute("SELECT COUNT(*) as cnt FROM rating_tag_weights")
+                        main_weight_count = main_cur.fetchone()['cnt']
+
+                        if main_weight_count > 0:
+                            print(f"Found {main_weight_count} weights in main DB. Auto-migrating to model DB...")
+                            _migrate_weights_from_main_db(conn, main_conn)
+                    except sqlite3.OperationalError:
+                        # Main DB doesn't have weight tables, that's fine
+                        pass
+        except Exception as e:
+            print(f"Warning: Auto-migration check failed: {e}")
 
     try:
         yield conn
     finally:
         conn.close()
+
+
+def _migrate_weights_from_main_db(model_conn: sqlite3.Connection, main_conn: sqlite3.Connection) -> None:
+    """
+    Internal helper to migrate weights from main DB to model DB.
+
+    Args:
+        model_conn: Open connection to model database
+        main_conn: Open connection to main database
+    """
+    main_cur = main_conn.cursor()
+    model_cur = model_conn.cursor()
+
+    # Copy config
+    try:
+        main_cur.execute("SELECT key, value FROM rating_inference_config")
+        config_data = main_cur.fetchall()
+        for row in config_data:
+            model_cur.execute(
+                "INSERT OR REPLACE INTO rating_inference_config (key, value) VALUES (?, ?)",
+                (row['key'], row['value'])
+            )
+    except sqlite3.OperationalError:
+        pass  # Config table doesn't exist in main DB
+
+    # Copy tag weights
+    main_cur.execute("SELECT tag_name, rating, weight, sample_count FROM rating_tag_weights")
+    tag_weights = main_cur.fetchall()
+    for row in tag_weights:
+        model_cur.execute(
+            "INSERT OR REPLACE INTO rating_tag_weights (tag_name, rating, weight, sample_count) VALUES (?, ?, ?, ?)",
+            (row['tag_name'], row['rating'], row['weight'], row['sample_count'])
+        )
+
+    # Copy pair weights
+    main_cur.execute("SELECT tag1, tag2, rating, weight, co_occurrence_count FROM rating_tag_pair_weights")
+    pair_weights = main_cur.fetchall()
+    for row in pair_weights:
+        model_cur.execute(
+            "INSERT OR REPLACE INTO rating_tag_pair_weights (tag1, tag2, rating, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
+            (row['tag1'], row['tag2'], row['rating'], row['weight'], row['co_occurrence_count'])
+        )
+
+    # Copy metadata
+    try:
+        main_cur.execute("SELECT key, value, updated_at FROM rating_model_metadata")
+        metadata = main_cur.fetchall()
+        for row in metadata:
+            model_cur.execute(
+                "INSERT OR REPLACE INTO rating_model_metadata (key, value, updated_at) VALUES (?, ?, ?)",
+                (row['key'], row['value'], row['updated_at'])
+            )
+    except sqlite3.OperationalError:
+        pass  # Metadata table doesn't exist in main DB
+
+    model_conn.commit()
+
+    print(f"✅ Auto-migrated {len(tag_weights)} tag weights and {len(pair_weights)} pair weights from main DB")
 
 
 def init_model_database(db_path: Optional[str] = None) -> None:

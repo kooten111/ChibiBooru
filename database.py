@@ -344,6 +344,98 @@ def initialize_database():
         conn.commit()
         print("Database initialized successfully.")
 
+
+def repair_orphaned_image_tags():
+    """
+    Auto-repair data integrity: rebuild image_tags for images that have
+    denormalized tags but no entries in image_tags table.
+
+    This handles cases where tags exist in tags_general, tags_species, etc.
+    but haven't been populated into the relational image_tags table.
+    """
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # Find orphaned images
+        cur.execute("""
+            SELECT id,
+                   tags_general,
+                   tags_species,
+                   tags_character,
+                   tags_copyright,
+                   tags_artist,
+                   tags_meta
+            FROM images
+            WHERE id NOT IN (SELECT DISTINCT image_id FROM image_tags)
+              AND (
+                  (tags_general IS NOT NULL AND tags_general != '') OR
+                  (tags_species IS NOT NULL AND tags_species != '') OR
+                  (tags_character IS NOT NULL AND tags_character != '') OR
+                  (tags_copyright IS NOT NULL AND tags_copyright != '') OR
+                  (tags_artist IS NOT NULL AND tags_artist != '') OR
+                  (tags_meta IS NOT NULL AND tags_meta != '')
+              )
+        """)
+
+        orphaned_images = cur.fetchall()
+
+        if not orphaned_images:
+            return 0
+
+        print(f"Found {len(orphaned_images)} images with orphaned tags. Rebuilding relationships...")
+
+        total_tags_added = 0
+
+        for img in orphaned_images:
+            image_id = img['id']
+
+            tag_categories = {
+                'general': img['tags_general'],
+                'species': img['tags_species'],
+                'character': img['tags_character'],
+                'copyright': img['tags_copyright'],
+                'artist': img['tags_artist'],
+                'meta': img['tags_meta']
+            }
+
+            for category, tag_string in tag_categories.items():
+                if not tag_string:
+                    continue
+
+                tags = tag_string.strip().split()
+
+                for tag_name in tags:
+                    if not tag_name:
+                        continue
+
+                    # Insert tag if it doesn't exist
+                    cur.execute(
+                        "INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)",
+                        (tag_name, category)
+                    )
+
+                    # Get tag ID
+                    cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+                    tag_row = cur.fetchone()
+                    if not tag_row:
+                        continue
+
+                    tag_id = tag_row['id']
+
+                    # Create image_tags relationship
+                    cur.execute(
+                        "INSERT OR IGNORE INTO image_tags (image_id, tag_id, source) VALUES (?, ?, ?)",
+                        (image_id, tag_id, 'original')
+                    )
+
+                    total_tags_added += 1
+
+        conn.commit()
+        print(f"✅ Repaired {len(orphaned_images)} images, added {total_tags_added} tag relationships")
+
+        return len(orphaned_images)
+
+
 def populate_fts_table():
     """Populate the FTS table with existing data from images table."""
     with get_db_connection() as conn:

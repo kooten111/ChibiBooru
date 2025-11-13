@@ -139,7 +139,7 @@
             const isVideo = filepath.endsWith('.mp4') || filepath.endsWith('.webm');
             const videoType = filepath.endsWith('.webm') ? 'video/webm' : 'video/mp4';
             const mediaTag = isVideo
-                ? `<video controls autoplay loop><source src="/static/images/${filepath}" type="${videoType}"></video>`
+                ? `<video controls autoplay loop preload="metadata"><source src="/static/images/${filepath}" type="${videoType}"></video>`
                 : `<img src="/static/images/${filepath}" alt="Image to rate">`;
 
             let aiSuggestion = '';
