@@ -123,6 +123,6 @@ def reload_tag_counts():
     global tag_counts
     with data_lock:
         with get_db_connection() as conn:
-            tag_counts_query = "SELECT name, COUNT(image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
+            tag_counts_query = "SELECT name, COUNT(DISTINCT image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
             tag_counts.clear()
-            tag_counts.update({row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()})
+            tag_counts.update({row['name']: row['COUNT(DISTINCT image_id)'] for row in conn.execute(tag_counts_query).fetchall()})

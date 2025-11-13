@@ -17,9 +17,12 @@
 
     {# Prefetch related images with lower priority - don't compete with main image #}
     {# Limit to first 3 to avoid bandwidth competition #}
+    {# Skip videos to prevent aggressive buffering and log spam #}
     {% if related_images %}
         {% for related in related_images[:3] %}
+            {% if not (related.path.endswith('.mp4') or related.path.endswith('.webm')) %}
         <link rel="prefetch" href="{{ url_for('static', filename=related.path) }}" as="image">
+            {% endif %}
         {% endfor %}
     {% endif %}
 </head>

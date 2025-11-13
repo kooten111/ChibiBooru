@@ -34,8 +34,8 @@ def reload_tag_counts():
     from core import cache_manager
     with cache_manager.data_lock:
         with get_db_connection() as conn:
-            tag_counts_query = "SELECT name, COUNT(image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
-            cache_manager.tag_counts = {row['name']: row['COUNT(image_id)'] for row in conn.execute(tag_counts_query).fetchall()}
+            tag_counts_query = "SELECT name, COUNT(DISTINCT image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
+            cache_manager.tag_counts = {row['name']: row['COUNT(DISTINCT image_id)'] for row in conn.execute(tag_counts_query).fetchall()}
 
 
 def get_all_tags_sorted():

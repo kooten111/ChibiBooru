@@ -40,4 +40,4 @@ def create_app():
 if __name__ == '__main__':
     import uvicorn
     app = create_app()
-    uvicorn.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, log_level="warning")
+    uvicorn.run(app, host=config.FLASK_HOST, port=config.FLASK_PORT, log_level="info")

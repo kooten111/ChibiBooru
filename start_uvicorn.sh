@@ -14,9 +14,8 @@ HOST=${FLASK_HOST:-0.0.0.0}
 PORT=${FLASK_PORT:-5000}
 
 # Start uvicorn with hot reload
-# Use --log-level warning to reduce spam from video range requests
 echo "Starting Booru with uvicorn on $HOST:$PORT"
-uvicorn app:create_app --factory --host $HOST --port $PORT --reload --log-level warning
+uvicorn app:create_app --factory --host $HOST --port $PORT --reload
 
 # Alternative without reload (for production):
-# uvicorn app:create_app --factory --host $HOST --port $PORT --workers 4 --log-level warning
+# uvicorn app:create_app --factory --host $HOST --port $PORT --workers 4
