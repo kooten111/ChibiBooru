@@ -44,120 +44,151 @@ idx_to_tag_map = {}
 tag_to_category_map = {}
 
 
-class SauceNAORateLimiter:
+class AdaptiveSauceNAORateLimiter:
     """
-    Rate limiter for SauceNAO API requests.
+    Adaptive rate limiter for SauceNAO API requests.
 
-    SauceNAO limits (free tier):
-    - Short term: 4 requests per 30 seconds
-    - Long term: 5000 requests per 24 hours
+    Automatically learns the rate limits by:
+    - Starting with no limits (unlimited requests)
+    - When hitting 429 error, backs off to conservative limit
+    - Periodically tests if limits can be increased
+    - Adjusts down immediately on 429, adjusts up gradually
     """
 
-    def __init__(self, short_limit=4, short_window=30, long_limit=5000, long_window=86400):
-        """
-        Initialize the rate limiter.
+    def __init__(self):
+        """Initialize the adaptive rate limiter."""
+        # Current rate limit (None = unlimited)
+        self.current_limit = None  # requests per 30 seconds
+        self.window_duration = 30  # seconds
 
-        Args:
-            short_limit: Maximum requests in short window (default: 4)
-            short_window: Short window duration in seconds (default: 30)
-            long_limit: Maximum requests in long window (default: 5000)
-            long_window: Long window duration in seconds (default: 86400 = 24 hours)
-        """
-        self.short_limit = short_limit
-        self.short_window = short_window
-        self.long_limit = long_limit
-        self.long_window = long_window
+        # Track request timestamps in current window
+        self.requests = deque()
 
-        # Track request timestamps
-        self.short_requests = deque()  # timestamps for short window
-        self.long_requests = deque()   # timestamps for long window
+        # Rate limit learning
+        self.last_rate_limit_hit = None  # timestamp of last 429 error
+        self.consecutive_successes = 0   # successful requests since last 429
+        self.test_threshold = 50         # test limit increase every N successful requests
+
+        # Backoff state
+        self.in_backoff = False
+        self.backoff_until = None
 
         # Thread safety
         self.lock = Lock()
 
-    def _clean_old_requests(self, queue, window):
-        """Remove requests older than the window from the queue."""
+    def _clean_old_requests(self):
+        """Remove requests older than the window."""
         current_time = time.time()
-        cutoff_time = current_time - window
+        cutoff_time = current_time - self.window_duration
 
-        while queue and queue[0] < cutoff_time:
-            queue.popleft()
+        while self.requests and self.requests[0] < cutoff_time:
+            self.requests.popleft()
 
-    def get_wait_time(self):
+    def should_wait(self):
         """
-        Calculate how long to wait before making the next request.
+        Check if we should wait before making a request.
 
         Returns:
-            float: Seconds to wait (0 if no wait needed)
+            tuple: (should_wait: bool, wait_time: float)
         """
         with self.lock:
             current_time = time.time()
+
+            # Check if we're in backoff period
+            if self.in_backoff and self.backoff_until:
+                if current_time < self.backoff_until:
+                    return True, self.backoff_until - current_time
+                else:
+                    self.in_backoff = False
+                    self.backoff_until = None
 
             # Clean old requests
-            self._clean_old_requests(self.short_requests, self.short_window)
-            self._clean_old_requests(self.long_requests, self.long_window)
+            self._clean_old_requests()
 
-            # Check short window
-            if len(self.short_requests) >= self.short_limit:
-                oldest_short = self.short_requests[0]
-                wait_short = (oldest_short + self.short_window) - current_time
-            else:
-                wait_short = 0
+            # If no limit set, don't wait
+            if self.current_limit is None:
+                return False, 0
 
-            # Check long window
-            if len(self.long_requests) >= self.long_limit:
-                oldest_long = self.long_requests[0]
-                wait_long = (oldest_long + self.long_window) - current_time
-            else:
-                wait_long = 0
+            # Check if we're at the limit
+            if len(self.requests) >= self.current_limit:
+                oldest_request = self.requests[0]
+                wait_time = (oldest_request + self.window_duration) - current_time
+                return True, max(0, wait_time)
 
-            return max(wait_short, wait_long, 0)
+            return False, 0
 
     def wait_if_needed(self):
-        """
-        Block until a request can be made within rate limits.
-        Prints a message if waiting is required.
-        """
-        wait_time = self.get_wait_time()
+        """Block until a request can be made."""
+        should_wait, wait_time = self.should_wait()
 
-        if wait_time > 0:
-            print(f"[SauceNAO Rate Limiter] Waiting {wait_time:.1f} seconds to respect rate limits...")
+        if should_wait and wait_time > 0:
+            with self.lock:
+                limit_str = f"{self.current_limit}/{self.window_duration}s" if self.current_limit else "unlimited"
+            print(f"[SauceNAO Adaptive] Waiting {wait_time:.1f}s (current limit: {limit_str})")
             time.sleep(wait_time)
 
-    def record_request(self):
-        """Record that a request was made."""
+    def record_success(self):
+        """Record a successful request."""
         with self.lock:
             current_time = time.time()
-            self.short_requests.append(current_time)
-            self.long_requests.append(current_time)
+            self.requests.append(current_time)
+            self.consecutive_successes += 1
+
+            # Periodically test if we can increase the limit
+            if (self.current_limit is not None and
+                self.consecutive_successes >= self.test_threshold and
+                self.last_rate_limit_hit and
+                (current_time - self.last_rate_limit_hit) > 300):  # 5 minutes since last 429
+
+                old_limit = self.current_limit
+                self.current_limit += 1
+                self.consecutive_successes = 0
+                print(f"[SauceNAO Adaptive] Testing higher limit: {old_limit} -> {self.current_limit}")
+
+    def record_rate_limit_hit(self):
+        """Record that we hit a 429 rate limit error."""
+        with self.lock:
+            current_time = time.time()
+            self.last_rate_limit_hit = current_time
+            self.consecutive_successes = 0
+
+            # Clean old requests to see how many we made in the window
+            self._clean_old_requests()
+            requests_in_window = len(self.requests)
+
+            if self.current_limit is None:
+                # First time hitting limit - set conservative limit
+                new_limit = max(1, requests_in_window - 1)
+                print(f"[SauceNAO Adaptive] Rate limit detected! Setting limit to {new_limit}/{self.window_duration}s")
+                self.current_limit = new_limit
+            else:
+                # We hit the limit again - decrease
+                old_limit = self.current_limit
+                self.current_limit = max(1, self.current_limit - 1)
+                print(f"[SauceNAO Adaptive] Rate limit hit again! Reducing: {old_limit} -> {self.current_limit}")
+
+            # Enter backoff period
+            self.in_backoff = True
+            self.backoff_until = current_time + self.window_duration
+            print(f"[SauceNAO Adaptive] Entering {self.window_duration}s cooldown period")
 
     def get_stats(self):
-        """
-        Get current rate limiter statistics.
-
-        Returns:
-            dict: Statistics including request counts and limits
-        """
+        """Get current rate limiter statistics."""
         with self.lock:
-            self._clean_old_requests(self.short_requests, self.short_window)
-            self._clean_old_requests(self.long_requests, self.long_window)
+            self._clean_old_requests()
 
             return {
-                "short_window": {
-                    "current": len(self.short_requests),
-                    "limit": self.short_limit,
-                    "window_seconds": self.short_window
-                },
-                "long_window": {
-                    "current": len(self.long_requests),
-                    "limit": self.long_limit,
-                    "window_seconds": self.long_window
-                }
+                "current_limit": self.current_limit,
+                "requests_in_window": len(self.requests),
+                "window_duration": self.window_duration,
+                "consecutive_successes": self.consecutive_successes,
+                "in_backoff": self.in_backoff,
+                "last_limit_hit": self.last_rate_limit_hit
             }
 
 
-# Global SauceNAO rate limiter instance
-saucenao_rate_limiter = SauceNAORateLimiter()
+# Global adaptive SauceNAO rate limiter instance
+saucenao_rate_limiter = AdaptiveSauceNAORateLimiter()
 
 
 def load_local_tagger():
@@ -546,21 +577,21 @@ def search_saucenao(filepath):
             response.raise_for_status()
 
             # Record successful request
-            saucenao_rate_limiter.record_request()
+            saucenao_rate_limiter.record_success()
 
-            # Print current stats
+            # Print current stats (only every 10 requests to reduce spam)
             stats = saucenao_rate_limiter.get_stats()
-            print(f"[SauceNAO] Request successful. Usage: 30s: {stats['short_window']['current']}/{stats['short_window']['limit']}, "
-                  f"24h: {stats['long_window']['current']}/{stats['long_window']['limit']}")
+            if stats['requests_in_window'] % 10 == 0 or stats['current_limit'] is not None:
+                limit_str = f"{stats['current_limit']}" if stats['current_limit'] else "unlimited"
+                print(f"[SauceNAO Adaptive] OK ({stats['requests_in_window']} in window, limit: {limit_str})")
 
             return response.json()
     except requests.exceptions.HTTPError as e:
         # Check if it's a 429 (Too Many Requests) error
         if e.response.status_code == 429:
             print(f"Saucenao search error: {e}")
-            print("[SauceNAO] Rate limit exceeded despite local limiting. The API may have been used elsewhere.")
-            print("[SauceNAO] Waiting 30 seconds before continuing...")
-            time.sleep(30)  # Wait for the rate limit window to reset
+            # Record the rate limit hit - this will adjust our limits
+            saucenao_rate_limiter.record_rate_limit_hit()
         else:
             print(f"Saucenao search error: {e}")
         return None
