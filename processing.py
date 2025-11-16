@@ -10,6 +10,9 @@ import numpy as np
 import models
 from database import get_db_connection
 from utils.deduplication import remove_duplicate
+import time
+from collections import deque
+from threading import Lock
 
 # Dependencies
 try:
@@ -39,6 +42,122 @@ local_tagger_session = None
 local_tagger_metadata = None
 idx_to_tag_map = {}
 tag_to_category_map = {}
+
+
+class SauceNAORateLimiter:
+    """
+    Rate limiter for SauceNAO API requests.
+
+    SauceNAO limits (free tier):
+    - Short term: 4 requests per 30 seconds
+    - Long term: 5000 requests per 24 hours
+    """
+
+    def __init__(self, short_limit=4, short_window=30, long_limit=5000, long_window=86400):
+        """
+        Initialize the rate limiter.
+
+        Args:
+            short_limit: Maximum requests in short window (default: 4)
+            short_window: Short window duration in seconds (default: 30)
+            long_limit: Maximum requests in long window (default: 5000)
+            long_window: Long window duration in seconds (default: 86400 = 24 hours)
+        """
+        self.short_limit = short_limit
+        self.short_window = short_window
+        self.long_limit = long_limit
+        self.long_window = long_window
+
+        # Track request timestamps
+        self.short_requests = deque()  # timestamps for short window
+        self.long_requests = deque()   # timestamps for long window
+
+        # Thread safety
+        self.lock = Lock()
+
+    def _clean_old_requests(self, queue, window):
+        """Remove requests older than the window from the queue."""
+        current_time = time.time()
+        cutoff_time = current_time - window
+
+        while queue and queue[0] < cutoff_time:
+            queue.popleft()
+
+    def get_wait_time(self):
+        """
+        Calculate how long to wait before making the next request.
+
+        Returns:
+            float: Seconds to wait (0 if no wait needed)
+        """
+        with self.lock:
+            current_time = time.time()
+
+            # Clean old requests
+            self._clean_old_requests(self.short_requests, self.short_window)
+            self._clean_old_requests(self.long_requests, self.long_window)
+
+            # Check short window
+            if len(self.short_requests) >= self.short_limit:
+                oldest_short = self.short_requests[0]
+                wait_short = (oldest_short + self.short_window) - current_time
+            else:
+                wait_short = 0
+
+            # Check long window
+            if len(self.long_requests) >= self.long_limit:
+                oldest_long = self.long_requests[0]
+                wait_long = (oldest_long + self.long_window) - current_time
+            else:
+                wait_long = 0
+
+            return max(wait_short, wait_long, 0)
+
+    def wait_if_needed(self):
+        """
+        Block until a request can be made within rate limits.
+        Prints a message if waiting is required.
+        """
+        wait_time = self.get_wait_time()
+
+        if wait_time > 0:
+            print(f"[SauceNAO Rate Limiter] Waiting {wait_time:.1f} seconds to respect rate limits...")
+            time.sleep(wait_time)
+
+    def record_request(self):
+        """Record that a request was made."""
+        with self.lock:
+            current_time = time.time()
+            self.short_requests.append(current_time)
+            self.long_requests.append(current_time)
+
+    def get_stats(self):
+        """
+        Get current rate limiter statistics.
+
+        Returns:
+            dict: Statistics including request counts and limits
+        """
+        with self.lock:
+            self._clean_old_requests(self.short_requests, self.short_window)
+            self._clean_old_requests(self.long_requests, self.long_window)
+
+            return {
+                "short_window": {
+                    "current": len(self.short_requests),
+                    "limit": self.short_limit,
+                    "window_seconds": self.short_window
+                },
+                "long_window": {
+                    "current": len(self.long_requests),
+                    "limit": self.long_limit,
+                    "window_seconds": self.long_window
+                }
+            }
+
+
+# Global SauceNAO rate limiter instance
+saucenao_rate_limiter = SauceNAORateLimiter()
 
 
 def load_local_tagger():
@@ -417,12 +536,34 @@ def search_saucenao(filepath):
     if not SAUCENAO_API_KEY:
         return None
     try:
+        # Wait for rate limiter before making request
+        saucenao_rate_limiter.wait_if_needed()
+
         with open(filepath, 'rb') as f:
             files = {'file': f}
             params = {'api_key': SAUCENAO_API_KEY, 'output_type': 2, 'numres': 10}
             response = requests.post('https://saucenao.com/search.php', files=files, params=params, timeout=20)
             response.raise_for_status()
+
+            # Record successful request
+            saucenao_rate_limiter.record_request()
+
+            # Print current stats
+            stats = saucenao_rate_limiter.get_stats()
+            print(f"[SauceNAO] Request successful. Usage: 30s: {stats['short_window']['current']}/{stats['short_window']['limit']}, "
+                  f"24h: {stats['long_window']['current']}/{stats['long_window']['limit']}")
+
             return response.json()
+    except requests.exceptions.HTTPError as e:
+        # Check if it's a 429 (Too Many Requests) error
+        if e.response.status_code == 429:
+            print(f"Saucenao search error: {e}")
+            print("[SauceNAO] Rate limit exceeded despite local limiting. The API may have been used elsewhere.")
+            print("[SauceNAO] Waiting 30 seconds before continuing...")
+            time.sleep(30)  # Wait for the rate limit window to reset
+        else:
+            print(f"Saucenao search error: {e}")
+        return None
     except Exception as e:
         print(f"Saucenao search error: {e}")
         return None
