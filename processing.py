@@ -567,10 +567,61 @@ def search_saucenao(filepath):
     if not SAUCENAO_API_KEY:
         return None
     try:
+        # Check file size - SauceNAO has a ~15MB limit
+        file_size = os.path.getsize(filepath)
+        max_size = 15 * 1024 * 1024  # 15MB in bytes
+
+        # For GIFs and very large files, extract a frame or resize
+        import tempfile
+        temp_file = None
+        file_to_upload = filepath
+
+        if filepath.lower().endswith('.gif') or file_size > max_size:
+            try:
+                # Open image and extract first frame or resize
+                img = Image.open(filepath)
+
+                # For GIFs, get first frame
+                if filepath.lower().endswith('.gif'):
+                    img.seek(0)  # Go to first frame
+                    # Convert to RGB if needed
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                        img = background
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
+
+                # Resize if still too large
+                # SauceNAO accepts up to 15MB, but we'll target ~5MB for safety
+                # Reduce quality/size until it fits
+                temp_file = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
+                quality = 95
+                while True:
+                    temp_file.seek(0)
+                    temp_file.truncate()
+                    img.save(temp_file.name, 'JPEG', quality=quality)
+                    temp_size = os.path.getsize(temp_file.name)
+                    if temp_size < max_size or quality <= 50:
+                        break
+                    quality -= 10
+
+                file_to_upload = temp_file.name
+                print(f"[SauceNAO] Converted {os.path.basename(filepath)} ({file_size/1024/1024:.1f}MB) to JPEG ({temp_size/1024/1024:.1f}MB)")
+
+            except Exception as e:
+                print(f"[SauceNAO] Failed to convert {filepath}: {e}")
+                # If file is too large and we can't convert, skip it
+                if file_size > max_size:
+                    print(f"[SauceNAO] File too large ({file_size/1024/1024:.1f}MB), skipping")
+                    return None
+
         # Wait for rate limiter before making request
         saucenao_rate_limiter.wait_if_needed()
 
-        with open(filepath, 'rb') as f:
+        with open(file_to_upload, 'rb') as f:
             files = {'file': f}
             params = {'api_key': SAUCENAO_API_KEY, 'output_type': 2, 'numres': 10}
             response = requests.post('https://saucenao.com/search.php', files=files, params=params, timeout=20)
@@ -592,12 +643,22 @@ def search_saucenao(filepath):
             print(f"Saucenao search error: {e}")
             # Record the rate limit hit - this will adjust our limits
             saucenao_rate_limiter.record_rate_limit_hit()
+        elif e.response.status_code == 413:
+            # Payload too large - shouldn't happen with our pre-check, but handle it anyway
+            print(f"Saucenao search error: File too large for SauceNAO (413)")
         else:
             print(f"Saucenao search error: {e}")
         return None
     except Exception as e:
         print(f"Saucenao search error: {e}")
         return None
+    finally:
+        # Clean up temp file if created
+        if temp_file and os.path.exists(temp_file.name):
+            try:
+                os.unlink(temp_file.name)
+            except:
+                pass
 
 def fetch_by_post_id(source, post_id):
     try:

@@ -75,12 +75,6 @@
                     <button class="btn btn-success" onclick="systemReloadData(event)">
                         ↻ Reload Data
                     </button>
-                    <button class="btn btn-warning" onclick="systemBulkRetryTagging(event)">
-                        🔄 Retry All Local-Tagged Images
-                    </button>
-                    <button class="btn btn-info" onclick="systemDatabaseHealthCheck(event)">
-                        🔍 Database Health Check
-                    </button>
                 </div>
 
                 <h4>Monitor Control</h4>
@@ -98,6 +92,12 @@
                     
                     <div class="debug-options" id="debugOptions">
                         <div class="system-buttons mt-15">
+                            <button class="btn btn-warning" onclick="systemBulkRetryTagging(event)">
+                                🔄 Retry All Local-Tagged Images
+                            </button>
+                            <button class="btn btn-info" onclick="systemDatabaseHealthCheck(event)">
+                                🔍 Database Health Check
+                            </button>
                             <button class="btn btn-danger" onclick="systemRebuildTags(event)">
                                 ⚠️ Rebuild Database from Metadata
                             </button>

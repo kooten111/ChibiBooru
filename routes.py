@@ -410,6 +410,10 @@ async def retry_tagging():
 async def bulk_retry_tagging():
     return await api_service.bulk_retry_tagging_service()
 
+@api_blueprint.route('/task_status', methods=['GET'])
+async def task_status():
+    return await api_service.get_task_status_service()
+
 @api_blueprint.route('/database_health_check', methods=['POST'])
 async def database_health_check():
     return await api_service.database_health_check_service()

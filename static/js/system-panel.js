@@ -206,6 +206,8 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         body: body ? JSON.stringify(body) : null
     };
 
+    let isBackgroundTask = false;
+
     fetch(url, options)
     .then(async res => {
         const contentType = res.headers.get('content-type');
@@ -222,6 +224,11 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
             showNotification(msg, 'success');
             loadLogs();
             loadSystemStatus();
+        } else if (data.status === 'started' && data.task_id) {
+            // Background task started - poll for progress
+            isBackgroundTask = true;
+            showNotification(`${actionName} started in background`, 'info');
+            pollTaskProgress(data.task_id, actionName, buttonElement, originalText);
         } else if (data.error === 'Unauthorized') {
             localStorage.removeItem('system_secret');
             SYSTEM_SECRET = null;
@@ -237,11 +244,70 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         console.error('Full error:', err);
     })
     .finally(() => {
-        if (buttonElement) {
+        // Don't reset button if it's a background task (polling will handle it)
+        if (buttonElement && !isBackgroundTask) {
             buttonElement.innerHTML = originalText;
             buttonElement.disabled = false;
         }
     });
+}
+
+function pollTaskProgress(taskId, actionName, buttonElement, originalText) {
+    const pollInterval = 1000; // Poll every second
+
+    const updateButton = (status) => {
+        if (buttonElement && status.progress !== undefined && status.total !== undefined) {
+            const percentage = status.total > 0 ? Math.round((status.progress / status.total) * 100) : 0;
+            buttonElement.innerHTML = `⏳ ${percentage}% (${status.progress}/${status.total})`;
+        }
+    };
+
+    const poll = () => {
+        fetch(`/api/task_status?task_id=${encodeURIComponent(taskId)}`)
+            .then(res => res.json())
+            .then(status => {
+                console.log('Task status:', status);
+
+                updateButton(status);
+
+                if (status.status === 'completed') {
+                    const msg = status.result?.message || `${actionName} completed successfully`;
+                    showNotification(msg, 'success');
+                    if (buttonElement) {
+                        buttonElement.innerHTML = originalText;
+                        buttonElement.disabled = false;
+                    }
+                    loadLogs();
+                    loadSystemStatus();
+                } else if (status.status === 'failed') {
+                    showNotification(`${actionName} failed: ${status.error}`, 'error');
+                    if (buttonElement) {
+                        buttonElement.innerHTML = originalText;
+                        buttonElement.disabled = false;
+                    }
+                } else if (status.status === 'running' || status.status === 'pending') {
+                    // Continue polling
+                    setTimeout(poll, pollInterval);
+                } else {
+                    // Unknown status
+                    if (buttonElement) {
+                        buttonElement.innerHTML = originalText;
+                        buttonElement.disabled = false;
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Error polling task status:', err);
+                showNotification(`Error checking ${actionName} progress`, 'error');
+                if (buttonElement) {
+                    buttonElement.innerHTML = originalText;
+                    buttonElement.disabled = false;
+                }
+            });
+    };
+
+    // Start polling
+    poll();
 }
 
 function systemScanImages(event) {
