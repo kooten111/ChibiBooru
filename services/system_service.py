@@ -2,7 +2,6 @@
 import os
 from quart import request, jsonify
 import models
-import scripts.generate_thumbnails as generate_thumbnails
 import processing
 from utils.deduplication import scan_and_remove_duplicates
 from . import monitor_service
@@ -300,6 +299,7 @@ def trigger_thumbnails():
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
     try:
+        import scripts.generate_thumbnails as generate_thumbnails
         generate_thumbnails.main()
         return jsonify({"status": "success", "message": "Thumbnails generated"})
     except Exception as e:
