@@ -6,7 +6,7 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=23' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=24' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/saucenao-modal.css') + '?v=1' }}">
 
@@ -534,18 +534,69 @@
 
 <input type="hidden" id="imageFilepath" value="{{ filepath }}">
 <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
+
+<!-- Pool Manager Templates -->
+<template id="pool-error-template">
+    <div class="pool-error-message">Failed to load pools</div>
+</template>
+
+<template id="pool-empty-template">
+    <div class="pool-empty-message">No pools available. Create a pool first!</div>
+</template>
+
+<template id="pool-modal-template">
+    <div class="modal-content">
+        <span class="close" onclick="closeAddToPoolModal()">&times;</span>
+        <h3>Add to Pool</h3>
+        <div class="form-group">
+            <input type="text" id="poolSearchModal" placeholder="Search pools..." style="width: 100%; padding: 10px; margin-bottom: 15px;">
+        </div>
+        <div id="poolSelectorList" class="pool-selector-list">
+            <div class="loading-spinner">Loading pools...</div>
+        </div>
+        <div class="form-actions" style="margin-top: 20px;">
+            <button class="btn-secondary" onclick="closeAddToPoolModal()">Close</button>
+        </div>
+    </div>
+</template>
+
+<!-- Image Page - Retry Tagging Modal Template -->
+<template id="single-image-retry-tagging-template">
+    <div class="custom-confirm-overlay">
+        <div class="custom-confirm-modal" style="max-width: 500px;">
+            <h3 style="margin: 0 0 15px 0; color: #87ceeb;">🔄 Retry Tagging Options</h3>
+            <p style="margin: 0 0 20px 0; color: #d0d0d0; line-height: 1.5;">
+                Choose how to retry tagging for this image:
+            </p>
+            <div class="retry-options">
+                <button class="retry-option-btn online-only" data-option="online-only">
+                    <div class="retry-option-title">🌐 Online Sources Only</div>
+                    <div class="retry-option-desc">Try Danbooru, e621, and SauceNao. Keep current tags if nothing found.</div>
+                </button>
+                <button class="retry-option-btn with-fallback" data-option="with-fallback">
+                    <div class="retry-option-title">🤖 With Local AI Fallback</div>
+                    <div class="retry-option-desc">Try online sources first, then use local AI tagger if nothing found.</div>
+                </button>
+            </div>
+            <div class="button-group">
+                <button class="btn-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+</template>
+
 <script src="{{ url_for('static', filename='js/progressive-image-loader.js', v='1.0') }}"></script>
 <script src="{{ url_for('static', filename='js/modal.js', v='1.3') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/autocomplete.js', v='1.g') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/tag-editor.js', v='1.7') }}"></script>
 <script src="{{ url_for('static', filename='js/image-viewer.js', v='1.3') }}"></script>
-<script type="module" src="{{ url_for('static', filename='js/saucenao-fetch.js', v='1.3') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/saucenao-fetch.js', v='2.0') }}"></script>
 <script src="{{ url_for('static', filename='js/header.js', v='1.3') }}"></script>
-<script src="{{ url_for('static', filename='js/system-panel.js', v='1.3') }}"></script>
+<script src="{{ url_for('static', filename='js/system-panel.js', v='2.0') }}"></script>
 <script src="{{ url_for('static', filename='js/source-selector.js', v='1.3') }}"></script>
-<script type="module" src="{{ url_for('static', filename='js/image-page.js', v='2.9') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/image-page.js', v='3.0') }}"></script>
 <script src="{{ url_for('static', filename='js/carousel.js', v='1.3') }}"></script>
-<script src="{{ url_for('static', filename='js/pool-manager.js', v='1.2') }}"></script>
+<script src="{{ url_for('static', filename='js/pool-manager.js', v='2.0') }}"></script>
 <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
 <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
 </body>

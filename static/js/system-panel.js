@@ -5,36 +5,30 @@ var SYSTEM_SECRET = localStorage.getItem('system_secret');
 function updateSecretUI() {
     const secretSection = document.getElementById('secretSection');
     const actionsSection = document.getElementById('systemActionsSection');
-    
+
     if (!secretSection || !actionsSection) return;
-    
+
+    // Clear existing content
+    secretSection.innerHTML = '';
+
     if (SYSTEM_SECRET) {
-        secretSection.innerHTML = `
-            <div style="display: flex; align-items: center; gap: 10px; padding: 15px; background: rgba(74, 158, 111, 0.2); border-radius: 10px; border: 1px solid rgba(144, 238, 144, 0.3);">
-                <span style="color: #90ee90; font-weight: 600;">✓ System secret configured</span>
-                <button class="btn btn-danger" onclick="clearSystemSecret(event)" style="margin-left: auto; padding: 8px 16px;">
-                    Change Secret
-                </button>
-            </div>
-        `;
+        const template = document.getElementById('secret-configured-template');
+        const clone = template.content.cloneNode(true);
+        secretSection.appendChild(clone);
         actionsSection.style.display = 'block';
     } else {
-        secretSection.innerHTML = `
-            <div style="padding: 20px; background: rgba(255, 107, 107, 0.2); border-radius: 10px; border: 1px solid rgba(255, 107, 107, 0.3);">
-                <h4 style="margin: 0 0 15px 0; color: #ff6b6b; font-size: 1em;">System Secret Required</h4>
-                <p style="margin: 0 0 15px 0; color: #d0d0d0; font-size: 0.9em;">
-                    Enter the RELOAD_SECRET from your environment variables.
-                </p>
-                <div style="display: flex; gap: 10px;">
-                    <input type="password" id="secretInput" placeholder="Enter system secret..." 
-                           style="flex: 1; padding: 12px; background: rgba(20, 20, 30, 0.8); border: 2px solid rgba(135, 206, 235, 0.3); border-radius: 10px; color: #e8e8e8; font-size: 0.95em;"
-                           onkeypress="if(event.key==='Enter') saveSystemSecret()">
-                    <button class="btn btn-success" onclick="saveSystemSecret()" style="padding: 12px 24px;">
-                        Save Secret
-                    </button>
-                </div>
-            </div>
-        `;
+        const template = document.getElementById('secret-required-template');
+        const clone = template.content.cloneNode(true);
+
+        // Add enter key listener to the input after appending
+        secretSection.appendChild(clone);
+        const input = secretSection.querySelector('#secretInput');
+        if (input) {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') saveSystemSecret();
+            });
+        }
+
         actionsSection.style.display = 'none';
     }
 }
@@ -42,13 +36,13 @@ function updateSecretUI() {
 function saveSystemSecret() {
     const input = document.getElementById('secretInput');
     if (!input) return;
-    
+
     const secret = input.value.trim();
     if (!secret) {
         showNotification('Please enter a secret', 'error');
         return;
     }
-    
+
     SYSTEM_SECRET = secret;
     localStorage.setItem('system_secret', secret);
     showNotification('Secret saved successfully', 'success');
@@ -62,7 +56,7 @@ function clearSystemSecret(event) {
         event.stopPropagation();
         event.preventDefault();
     }
-    
+
     showConfirm('Are you sure you want to change the system secret?', () => {
         SYSTEM_SECRET = null;
         localStorage.removeItem('system_secret');
@@ -80,66 +74,77 @@ function loadLogs() {
             const logsDiv = document.getElementById('systemLogs');
             if (!logsDiv) return;
 
+            // Clear existing logs
+            logsDiv.innerHTML = '';
+
             if (logs.length === 0) {
-                logsDiv.innerHTML = '<div class="log-entry info">No recent activity</div>';
+                const entry = createLogEntry('No recent activity', 'info');
+                logsDiv.appendChild(entry);
                 return;
             }
 
-            logsDiv.innerHTML = logs.map(log => `
-                <div class="log-entry ${log.type}">
-                    <span style="color: #87ceeb; margin-right: 10px;">[${log.timestamp}]</span>
-                    ${log.message}
-                </div>
-            `).join('');
+            logs.forEach(log => {
+                const entry = createLogEntry(log.message, log.type, log.timestamp);
+                logsDiv.appendChild(entry);
+            });
         })
         .catch(err => console.error('Error loading logs:', err));
 }
 
+function createLogEntry(message, type, timestamp) {
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+
+    if (timestamp) {
+        const timeSpan = document.createElement('span');
+        timeSpan.style.color = '#87ceeb';
+        timeSpan.style.marginRight = '10px';
+        timeSpan.textContent = `[${timestamp}]`;
+        entry.appendChild(timeSpan);
+    }
+
+    const messageText = document.createTextNode(message);
+    entry.appendChild(messageText);
+
+    return entry;
+}
+
 function loadSystemStatus() {
     if (!SYSTEM_SECRET) return;
-    
+
     fetch('/api/system/status')
         .then(res => res.json())
         .then(data => {
             const statusDiv = document.getElementById('systemStatus');
             if (!statusDiv) return;
-            
+
             const monitor = data.monitor;
             const collection = data.collection;
-            
-            statusDiv.innerHTML = `
-                <div class="status-grid">
-                    <div class="status-item ${monitor.running ? 'active' : 'inactive'}">
-                        <div class="status-label">Monitor Status</div>
-                        <div class="status-value">${monitor.running ? '🟢 Running' : '🔴 Stopped'}</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">Check Interval</div>
-                        <div class="status-value">${monitor.interval_seconds}s</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">Last Check</div>
-                        <div class="status-value">${monitor.last_check || 'Never'}</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">Last Scan Found</div>
-                        <div class="status-value">${monitor.last_scan_found}</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">Total Processed</div>
-                        <div class="status-value">${monitor.total_processed}</div>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-label">Total Images</div>
-                        <div class="status-value">${collection.total_images}</div>
-                    </div>
-                    <div class="status-item ${collection.unprocessed > 0 ? 'warning' : 'inactive'}">
-                        <div class="status-label">Unprocessed</div>
-                        <div class="status-value">${collection.unprocessed}</div>
-                    </div>
-                </div>
-            `;
-            
+
+            // Clear and rebuild status grid
+            statusDiv.innerHTML = '';
+            const grid = document.createElement('div');
+            grid.className = 'status-grid';
+
+            // Create status items
+            grid.appendChild(createStatusItem(
+                'Monitor Status',
+                monitor.running ? '🟢 Running' : '🔴 Stopped',
+                monitor.running ? 'active' : 'inactive'
+            ));
+
+            grid.appendChild(createStatusItem('Check Interval', `${monitor.interval_seconds}s`));
+            grid.appendChild(createStatusItem('Last Check', monitor.last_check || 'Never'));
+            grid.appendChild(createStatusItem('Last Scan Found', monitor.last_scan_found));
+            grid.appendChild(createStatusItem('Total Processed', monitor.total_processed));
+            grid.appendChild(createStatusItem('Total Images', collection.total_images));
+            grid.appendChild(createStatusItem(
+                'Unprocessed',
+                collection.unprocessed,
+                collection.unprocessed > 0 ? 'warning' : 'inactive'
+            ));
+
+            statusDiv.appendChild(grid);
             updateMonitorButton(monitor.running);
         })
         .catch(err => {
@@ -147,10 +152,28 @@ function loadSystemStatus() {
         });
 }
 
+function createStatusItem(label, value, statusClass = '') {
+    const item = document.createElement('div');
+    item.className = `status-item ${statusClass}`;
+
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'status-label';
+    labelDiv.textContent = label;
+
+    const valueDiv = document.createElement('div');
+    valueDiv.className = 'status-value';
+    valueDiv.textContent = value;
+
+    item.appendChild(labelDiv);
+    item.appendChild(valueDiv);
+
+    return item;
+}
+
 function updateMonitorButton(isRunning) {
     const btn = document.getElementById('monitorToggleBtn');
     if (!btn) return;
-    
+
     if (isRunning) {
         btn.className = 'btn btn-danger';
         btn.innerHTML = '⏸️ Stop Monitor';
@@ -167,22 +190,22 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         showNotification('System secret not configured', 'error');
         return;
     }
-    
+
     const originalText = buttonElement ? buttonElement.innerHTML : '';
     if (buttonElement) {
-        buttonElement.innerHTML = `<span style="display: inline-block; animation: spin 1s linear infinite;">⚙️</span> Processing...`;
+        buttonElement.innerHTML = '<span class="processing-spinner">⚙️</span> Processing...';
         buttonElement.disabled = true;
     }
-    
+
     loadLogs();
-    
+
     const url = `${endpoint}?secret=${encodeURIComponent(SYSTEM_SECRET)}`;
     const options = {
         method: 'POST',
         headers: body ? { 'Content-Type': 'application/json' } : {},
         body: body ? JSON.stringify(body) : null
     };
-    
+
     fetch(url, options)
     .then(async res => {
         const contentType = res.headers.get('content-type');
@@ -287,37 +310,15 @@ function systemRecountTags(event) {
 function systemBulkRetryTagging(event) {
     if (event) event.preventDefault();
 
-    const overlay = document.createElement('div');
-    overlay.className = 'custom-confirm-overlay';
-    overlay.innerHTML = `
-        <div class="custom-confirm-modal" style="max-width: 550px;">
-            <h3 style="margin: 0 0 15px 0; color: #87ceeb;">🔄 Bulk Retry Tagging Options</h3>
-            <p style="margin: 0 0 20px 0; color: #d0d0d0; line-height: 1.5;">
-                This will retry tagging for all locally-tagged images. Choose your preferred method:
-            </p>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                <button class="retry-option-btn" data-option="online-only" style="padding: 15px; background: rgba(74, 158, 255, 0.2); border: 2px solid rgba(74, 158, 255, 0.4); border-radius: 8px; color: #87ceeb; cursor: pointer; text-align: left; transition: all 0.2s;">
-                    <div style="font-weight: 600; margin-bottom: 5px;">🌐 Online Sources Only</div>
-                    <div style="font-size: 0.85em; opacity: 0.8;">Try Danbooru, e621, and SauceNao. Keep current tags if nothing found.</div>
-                </button>
-                <button class="retry-option-btn" data-option="with-fallback" style="padding: 15px; background: rgba(251, 146, 60, 0.2); border: 2px solid rgba(251, 146, 60, 0.4); border-radius: 8px; color: #ff9966; cursor: pointer; text-align: left; transition: all 0.2s;">
-                    <div style="font-weight: 600; margin-bottom: 5px;">🤖 With Local AI Fallback</div>
-                    <div style="font-size: 0.85em; opacity: 0.8;">Try online sources first, then re-run local AI tagger if nothing found.</div>
-                </button>
-            </div>
-            <div class="button-group">
-                <button class="btn-cancel">Cancel</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
+    const template = document.getElementById('retry-tagging-modal-template');
+    const clone = template.content.cloneNode(true);
+    const overlay = clone.querySelector('.custom-confirm-overlay');
 
     const modal = overlay.querySelector('.custom-confirm-modal');
     const btnCancel = modal.querySelector('.btn-cancel');
     const optionBtns = modal.querySelectorAll('.retry-option-btn');
 
-    // Add hover effects
+    // Add hover and click handlers
     optionBtns.forEach(btn => {
         btn.addEventListener('mouseenter', function() {
             this.style.transform = 'translateY(-2px)';
@@ -329,16 +330,49 @@ function systemBulkRetryTagging(event) {
         });
         btn.addEventListener('click', function() {
             const option = this.dataset.option;
-            overlay.remove();
+            document.body.removeChild(overlay);
             const skipLocalFallback = option === 'online-only';
             systemAction('/api/bulk_retry_tagging', event.target, 'Bulk Retry Tagging', { skip_local_fallback: skipLocalFallback });
         });
     });
 
-    btnCancel.onclick = () => overlay.remove();
+    btnCancel.onclick = () => document.body.removeChild(overlay);
     overlay.onclick = (e) => {
-        if (e.target === overlay) overlay.remove();
+        if (e.target === overlay) document.body.removeChild(overlay);
     };
+
+    document.body.appendChild(overlay);
+}
+
+function systemDatabaseHealthCheck(event) {
+    if (event) event.preventDefault();
+
+    const template = document.getElementById('health-check-modal-template');
+    const clone = template.content.cloneNode(true);
+    const overlay = clone.querySelector('.custom-confirm-overlay');
+
+    const modal = overlay.querySelector('.custom-confirm-modal');
+    const btnConfirm = modal.querySelector('.btn-confirm');
+    const btnCancel = modal.querySelector('.btn-cancel');
+    const autoFixCheckbox = modal.querySelector('#healthCheckAutoFix');
+    const tagDeltasCheckbox = modal.querySelector('#healthCheckTagDeltas');
+    const thumbnailsCheckbox = modal.querySelector('#healthCheckThumbnails');
+
+    btnConfirm.onclick = () => {
+        document.body.removeChild(overlay);
+        systemAction('/api/database_health_check', event.target, 'Database Health Check', {
+            auto_fix: autoFixCheckbox.checked,
+            include_tag_deltas: tagDeltasCheckbox.checked,
+            include_thumbnails: thumbnailsCheckbox.checked
+        });
+    };
+
+    btnCancel.onclick = () => document.body.removeChild(overlay);
+    overlay.onclick = (e) => {
+        if (e.target === overlay) document.body.removeChild(overlay);
+    };
+
+    document.body.appendChild(overlay);
 }
 
 function systemStartMonitor(event) {
@@ -354,18 +388,26 @@ function systemStopMonitor(event) {
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.textContent = message;
+
+    let gradient;
+    if (type === 'error') {
+        gradient = 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)';
+    } else if (type === 'success') {
+        gradient = 'linear-gradient(135deg, #51cf66 0%, #37b24d 100%)';
+    } else {
+        gradient = 'linear-gradient(135deg, #4a9eff 0%, #357abd 100%)';
+    }
+
     notification.style.cssText = `
         position: fixed; top: 100px; right: 30px; padding: 15px 25px;
-        background: ${type === 'error' ? 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)' : 
-                     type === 'success' ? 'linear-gradient(135deg, #51cf66 0%, #37b24d 100%)' :
-                     'linear-gradient(135deg, #4a9eff 0%, #357abd 100%)'};
+        background: ${gradient};
         color: white; border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
         z-index: 10002; font-weight: 600; max-width: 400px;
         animation: slideInRight 0.3s ease-out;
     `;
-    
+
     document.body.appendChild(notification);
-    
+
     setTimeout(() => {
         notification.style.animation = 'slideOutRight 0.3s ease-out';
         setTimeout(() => notification.remove(), 300);
@@ -393,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-    
+
     const panelsContainer = document.getElementById('statsPanelsContainer');
     if (panelsContainer) {
         observer.observe(panelsContainer, { attributes: true, subtree: true, attributeFilter: ['class'] });
@@ -403,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleDebugOptions() {
     const debugOptions = document.getElementById('debugOptions');
     const toggleButton = document.querySelector('.debug-toggle');
-    
+
     debugOptions.classList.toggle('open');
     toggleButton.classList.toggle('expanded');
 }

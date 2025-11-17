@@ -423,16 +423,27 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
     Returns True on success, False on failure (including duplicate MD5 race condition).
     """
     import sqlite3
+    import config
 
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
+            # Determine active_source based on BOORU_PRIORITY
+            active_source = None
+            for priority_source in config.BOORU_PRIORITY:
+                if priority_source in source_names:
+                    active_source = priority_source
+                    break
+            # If no priority match, use first available source
+            if not active_source and source_names:
+                active_source = source_names[0]
+
             # 1. Insert the image record
             cursor.execute("""
-                INSERT INTO images (filepath, md5, post_id, parent_id, has_children, saucenao_lookup, ingested_at)
-                VALUES (:filepath, :md5, :post_id, :parent_id, :has_children, :saucenao_lookup, CURRENT_TIMESTAMP)
-            """, image_info)
+                INSERT INTO images (filepath, md5, post_id, parent_id, has_children, saucenao_lookup, active_source, ingested_at)
+                VALUES (:filepath, :md5, :post_id, :parent_id, :has_children, :saucenao_lookup, :active_source, CURRENT_TIMESTAMP)
+            """, {**image_info, 'active_source': active_source})
             image_id = cursor.lastrowid
 
             # 2. Link sources

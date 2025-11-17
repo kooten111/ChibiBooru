@@ -22,6 +22,14 @@ window.selectMetadataSource = selectMetadataSource;
 window.applySauceNaoMetadata = applySauceNaoMetadata;
 window.displaySauceNaoResults = displaySauceNaoResults;
 
+// Helper function to create elements
+function createElement(tag, className, content) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (content) el.textContent = content;
+    return el;
+}
+
 function showSauceNaoFetcher() {
     if (!SYSTEM_SECRET) {
         const secret = prompt('Enter system secret to use SauceNao fetch:');
@@ -29,28 +37,35 @@ function showSauceNaoFetcher() {
         SYSTEM_SECRET = secret;
         localStorage.setItem('system_secret', secret);
     }
-    
+
     const modal = document.createElement('div');
     modal.id = 'saucenaoModal';
 
-    modal.innerHTML = `
-        <div class="saucenao-modal-content">
-            <div class="saucenao-modal-header">
-                <h2>🔍 SauceNao Fetch</h2>
-                <button onclick="closeSauceNaoModal()" class="saucenao-close-btn">&times; Close</button>
-            </div>
+    const content = createElement('div', 'saucenao-modal-content');
 
-            <div id="saucenaoContent">
-                <div class="saucenao-loading">
-                    <div class="saucenao-loading-icon">🔍</div>
-                    <div class="saucenao-loading-text">Searching SauceNao...</div>
-                </div>
-            </div>
-        </div>
-    `;
-    
+    const header = createElement('div', 'saucenao-modal-header');
+    const h2 = createElement('h2', null, '🔍 SauceNao Fetch');
+    const closeBtn = createElement('button', 'saucenao-close-btn', '× Close');
+    closeBtn.onclick = closeSauceNaoModal;
+    header.appendChild(h2);
+    header.appendChild(closeBtn);
+
+    const contentDiv = createElement('div');
+    contentDiv.id = 'saucenaoContent';
+
+    const loading = createElement('div', 'saucenao-loading');
+    const loadingIcon = createElement('div', 'saucenao-loading-icon', '🔍');
+    const loadingText = createElement('div', 'saucenao-loading-text', 'Searching SauceNao...');
+    loading.appendChild(loadingIcon);
+    loading.appendChild(loadingText);
+    contentDiv.appendChild(loading);
+
+    content.appendChild(header);
+    content.appendChild(contentDiv);
+    modal.appendChild(content);
+
     document.body.appendChild(modal);
-    
+
     // Start search
     searchSauceNao();
 }
@@ -62,7 +77,7 @@ function closeSauceNaoModal() {
 
 async function searchSauceNao() {
     const filepath = document.getElementById('imageFilepath').value;
-    
+
     try {
         const response = await fetch('/api/saucenao/search', {
             method: 'POST',
@@ -74,7 +89,7 @@ async function searchSauceNao() {
                 secret: SYSTEM_SECRET
             })
         });
-        
+
         // Check if response is JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
@@ -82,9 +97,9 @@ async function searchSauceNao() {
             console.error('Non-JSON response:', text);
             throw new Error('Server returned non-JSON response. Check console for details.');
         }
-        
+
         const data = await response.json();
-        
+
         if (data.error === 'Unauthorized') {
             localStorage.removeItem('system_secret');
             SYSTEM_SECRET = null;
@@ -92,88 +107,123 @@ async function searchSauceNao() {
             closeSauceNaoModal();
             return;
         }
-        
+
         if (!data.found || !data.results || data.results.length === 0) {
-            document.getElementById('saucenaoContent').innerHTML = `
-                <div class="saucenao-no-results">
-                    <div class="saucenao-no-results-icon">😔</div>
-                    <div class="saucenao-no-results-text">No results found on SauceNao</div>
-                    <div class="saucenao-no-results-hint">
-                        Try searching manually on booru sites
-                    </div>
-                </div>
-            `;
+            showNoResults();
             return;
         }
-        
+
         saucenaoResults = data.results;
         displaySauceNaoResults(data.results);
-        
+
     } catch (error) {
-        document.getElementById('saucenaoContent').innerHTML = `
-            <div class="saucenao-error">
-                <div class="saucenao-error-icon">⚠️</div>
-                <div class="saucenao-error-text">Error: ${error.message}</div>
-            </div>
-        `;
+        showError(error.message);
     }
 }
 
+function showNoResults() {
+    const content = document.getElementById('saucenaoContent');
+    content.innerHTML = '';
+
+    const noResults = createElement('div', 'saucenao-no-results');
+    const icon = createElement('div', 'saucenao-no-results-icon', '😔');
+    const text = createElement('div', 'saucenao-no-results-text', 'No results found on SauceNao');
+    const hint = createElement('div', 'saucenao-no-results-hint', 'Try searching manually on booru sites');
+
+    noResults.appendChild(icon);
+    noResults.appendChild(text);
+    noResults.appendChild(hint);
+    content.appendChild(noResults);
+}
+
+function showError(message) {
+    const content = document.getElementById('saucenaoContent');
+    content.innerHTML = '';
+
+    const errorDiv = createElement('div', 'saucenao-error');
+    const icon = createElement('div', 'saucenao-error-icon', '⚠️');
+    const text = createElement('div', 'saucenao-error-text', `Error: ${message}`);
+
+    errorDiv.appendChild(icon);
+    errorDiv.appendChild(text);
+    content.appendChild(errorDiv);
+}
+
 function displaySauceNaoResults(results) {
-    const html = `
-        <div class="saucenao-success-banner">
-            <div class="saucenao-success-title">
-                ✓ Found ${results.length} potential match${results.length !== 1 ? 'es' : ''}
-            </div>
-            <div class="saucenao-success-subtitle">
-                Click on a result to view details and apply metadata
-            </div>
-        </div>
+    const content = document.getElementById('saucenaoContent');
+    content.innerHTML = '';
 
-        <div class="saucenao-results-grid">
-            ${results.map((result, idx) => `
-                <div class="saucenao-result" onclick="selectSauceNaoResult(${idx})">
-                    <div class="saucenao-result-content">
-                        ${result.thumbnail ? `
-                            <img src="${result.thumbnail}" class="saucenao-result-thumbnail">
-                        ` : ''}
-                        <div class="saucenao-result-info">
-                            <div class="saucenao-result-similarity">
-                                ${(result.similarity).toFixed(1)}% Match
-                            </div>
-                            <div class="saucenao-result-sources">
-                                ${result.sources.map(source => `
-                                    <span class="saucenao-source-badge">
-                                        ${source.type}
-                                    </span>
-                                `).join('')}
-                            </div>
-                        </div>
-                        <div class="saucenao-result-arrow">→</div>
-                    </div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    // Success banner
+    const banner = createElement('div', 'saucenao-success-banner');
+    const title = createElement('div', 'saucenao-success-title');
+    title.textContent = `✓ Found ${results.length} potential match${results.length !== 1 ? 'es' : ''}`;
+    const subtitle = createElement('div', 'saucenao-success-subtitle', 'Click on a result to view details and apply metadata');
+    banner.appendChild(title);
+    banner.appendChild(subtitle);
 
-    document.getElementById('saucenaoContent').innerHTML = html;
+    // Results grid
+    const grid = createElement('div', 'saucenao-results-grid');
+    results.forEach((result, idx) => {
+        const resultCard = createResultCard(result, idx);
+        grid.appendChild(resultCard);
+    });
+
+    content.appendChild(banner);
+    content.appendChild(grid);
+}
+
+function createResultCard(result, idx) {
+    const card = createElement('div', 'saucenao-result');
+    card.onclick = () => selectSauceNaoResult(idx);
+
+    const cardContent = createElement('div', 'saucenao-result-content');
+
+    if (result.thumbnail) {
+        const img = document.createElement('img');
+        img.src = result.thumbnail;
+        img.className = 'saucenao-result-thumbnail';
+        cardContent.appendChild(img);
+    }
+
+    const info = createElement('div', 'saucenao-result-info');
+    const similarity = createElement('div', 'saucenao-result-similarity');
+    similarity.textContent = `${result.similarity.toFixed(1)}% Match`;
+
+    const sources = createElement('div', 'saucenao-result-sources');
+    result.sources.forEach(source => {
+        const badge = createElement('span', 'saucenao-source-badge', source.type);
+        sources.appendChild(badge);
+    });
+
+    info.appendChild(similarity);
+    info.appendChild(sources);
+    cardContent.appendChild(info);
+
+    const arrow = createElement('div', 'saucenao-result-arrow', '→');
+    cardContent.appendChild(arrow);
+
+    card.appendChild(cardContent);
+    return card;
 }
 
 async function selectSauceNaoResult(idx) {
     const result = saucenaoResults[idx];
     selectedResult = result;
-    
+
     // Show loading
-    document.getElementById('saucenaoContent').innerHTML = `
-        <div class="saucenao-loading">
-            <div class="saucenao-loading-icon">⚙️</div>
-            <div class="saucenao-loading-text">Loading metadata...</div>
-        </div>
-    `;
-    
+    const content = document.getElementById('saucenaoContent');
+    content.innerHTML = '';
+
+    const loading = createElement('div', 'saucenao-loading');
+    const icon = createElement('div', 'saucenao-loading-icon', '⚙️');
+    const text = createElement('div', 'saucenao-loading-text', 'Loading metadata...');
+    loading.appendChild(icon);
+    loading.appendChild(text);
+    content.appendChild(loading);
+
     try {
         // Fetch metadata from all sources in parallel
-        const metadataPromises = result.sources.map(source => 
+        const metadataPromises = result.sources.map(source =>
             fetch('/api/saucenao/fetch_metadata', {
                 method: 'POST',
                 headers: {
@@ -199,184 +249,260 @@ async function selectSauceNaoResult(idx) {
                 return {status: 'error', error: err.message, source: source.type};
             })
         );
-        
+
         const metadataResults = await Promise.all(metadataPromises);
         console.log('All metadata results:', metadataResults);
         displayMetadataOptions(metadataResults);
-        
+
     } catch (error) {
-        document.getElementById('saucenaoContent').innerHTML = `
-            <div class="saucenao-error">
-                <div class="saucenao-error-icon">⚠️</div>
-                <div class="saucenao-error-text">Error: ${error.message}</div>
-            </div>
-        `;
+        showError(error.message);
     }
 }
 
 function displayMetadataOptions(metadataResults) {
     const validResults = metadataResults.filter(r => r.status === 'success');
     const failedResults = metadataResults.filter(r => r.status !== 'success');
-    
+
     if (validResults.length === 0) {
-        // Show which sources failed and why
-        const failedSources = metadataResults.map(r =>
-            `<div class="saucenao-failed-source">
-                <strong>${r.source}</strong>: ${r.error || 'Unknown error'}
-            </div>`
-        ).join('');
-        
-        document.getElementById('saucenaoContent').innerHTML = `
-            <div class="saucenao-error">
-                <div class="saucenao-error-icon">⚠️</div>
-                <div class="saucenao-error-text">
-                    Failed to fetch metadata from all sources
-                </div>
-                <div style="color: #b0b0b0; margin-bottom: 15px;">Details:</div>
-                ${failedSources}
-                <div style="margin-top: 20px; text-align: center;">
-                    <button onclick="displaySauceNaoResults(saucenaoResults)" class="saucenao-back-btn">← Back to Results</button>
-                </div>
-            </div>
-        `;
+        showAllSourcesFailed(metadataResults);
         return;
     }
-    
-    // Show warning if some sources failed
-    const warningSection = failedResults.length > 0 ? `
-        <div class="saucenao-warning">
-            <div class="saucenao-warning-title">⚠️ Some sources unavailable</div>
-            <div class="saucenao-warning-text">
-                ${failedResults.map(r => r.source).join(', ')} could not be fetched
-            </div>
-        </div>
-    ` : '';
-    
-    // Use first valid result as default
-    const primaryResult = validResults[0];
-    
-    const html = `
-        <div class="saucenao-back-btn-container">
-            <button onclick="displaySauceNaoResults(saucenaoResults)" class="saucenao-back-btn">← Back to Results</button>
-        </div>
 
-        <div class="saucenao-metadata-grid">
-            <div class="saucenao-panel">
-                <h3>Select Source</h3>
-                <div class="saucenao-source-grid">
-                    ${validResults.map((result, idx) => {
-                        const sourceInfo = selectedResult.sources.find(s => s.type === result.source);
-                        return `
-                        <div class="saucenao-source-container">
-                            <button onclick="selectMetadataSource(${idx})" id="sourceBtn${idx}" class="saucenao-source-btn ${idx === 0 ? 'active' : ''}">
-                                ${result.preview_url ? `
-                                    <img src="${result.preview_url}" class="saucenao-source-preview" onerror="this.style.display='none'">
-                                ` : ''}
-                                <div class="saucenao-source-text">
-                                    <div class="saucenao-source-name">${result.source}</div>
-                                    ${result.width && result.height ? `
-                                        <div class="saucenao-source-resolution">${result.width}×${result.height}</div>
-                                    ` : ''}
-                                    ${result.file_size ? `
-                                        <div class="saucenao-source-filesize">
-                                            ${formatFileSize(result.file_size)}
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            </button>
-                            ${sourceInfo && sourceInfo.url ? `
-                                <a href="${sourceInfo.url}" target="_blank" rel="noopener" class="saucenao-source-link">
-                                    <span>🔗</span>
-                                    <span>View on ${result.source}</span>
-                                </a>
-                            ` : ''}
-                        </div>
-                    `}).join('')}
-                </div>
-            </div>
+    const content = document.getElementById('saucenaoContent');
+    content.innerHTML = '';
 
-            <div id="metadataPreview">
-                ${renderMetadataPreview(primaryResult, 0)}
-            </div>
+    // Back button
+    const backBtnContainer = createElement('div', 'saucenao-back-btn-container');
+    const backBtn = createElement('button', 'saucenao-back-btn', '← Back to Results');
+    backBtn.onclick = () => displaySauceNaoResults(saucenaoResults);
+    backBtnContainer.appendChild(backBtn);
+    content.appendChild(backBtnContainer);
 
-            <div class="saucenao-panel">
-                <h3>Apply Options</h3>
+    // Warning if some sources failed
+    if (failedResults.length > 0) {
+        const warning = createElement('div', 'saucenao-warning');
+        const title = createElement('div', 'saucenao-warning-title', '⚠️ Some sources unavailable');
+        const text = createElement('div', 'saucenao-warning-text');
+        text.textContent = `${failedResults.map(r => r.source).join(', ')} could not be fetched`;
+        warning.appendChild(title);
+        warning.appendChild(text);
+        content.appendChild(warning);
+    }
 
-                <label class="saucenao-checkbox-label">
-                    <input type="checkbox" id="downloadImage" class="saucenao-checkbox">
-                    <div>
-                        <div class="saucenao-checkbox-text-title">Download Higher Quality Image</div>
-                        <div class="saucenao-checkbox-text-subtitle">
-                            Replace current image file with booru source
-                        </div>
-                    </div>
-                </label>
+    // Metadata grid
+    const grid = createElement('div', 'saucenao-metadata-grid');
 
-                <div class="saucenao-button-group">
-                    <button onclick="applySauceNaoMetadata()" class="saucenao-apply-btn">
-                        ✓ Apply Metadata
-                    </button>
-                    <button onclick="closeSauceNaoModal()" class="saucenao-cancel-btn">Cancel</button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('saucenaoContent').innerHTML = html;
-    
+    // Source selection panel
+    const sourcePanel = createSourceSelectionPanel(validResults);
+    grid.appendChild(sourcePanel);
+
+    // Metadata preview
+    const previewDiv = createElement('div');
+    previewDiv.id = 'metadataPreview';
+    previewDiv.appendChild(createMetadataPreview(validResults[0], 0));
+    grid.appendChild(previewDiv);
+
+    // Apply options panel
+    const applyPanel = createApplyOptionsPanel();
+    grid.appendChild(applyPanel);
+
+    content.appendChild(grid);
+
     // Store metadata results for later use
     window.currentMetadataResults = validResults;
     window.selectedMetadataIdx = 0;
 }
 
-function renderMetadataPreview(result, idx) {
-    const tags = result.tags || {};
+function showAllSourcesFailed(metadataResults) {
+    const content = document.getElementById('saucenaoContent');
+    content.innerHTML = '';
 
-    return `
-        <div class="saucenao-panel">
-            <h3>Metadata Preview</h3>
+    const errorDiv = createElement('div', 'saucenao-error');
+    const icon = createElement('div', 'saucenao-error-icon', '⚠️');
+    const text = createElement('div', 'saucenao-error-text', 'Failed to fetch metadata from all sources');
 
-            ${result.preview_url ? `
-                <div class="saucenao-preview-image-container">
-                    <img src="${result.preview_url}" class="saucenao-preview-image" onerror="this.style.display='none';">
-                </div>
-            ` : ''}
+    const detailsLabel = createElement('div');
+    detailsLabel.style.color = '#b0b0b0';
+    detailsLabel.style.marginBottom = '15px';
+    detailsLabel.textContent = 'Details:';
 
-            ${result.image_url ? `
-                <div class="saucenao-image-link-container">
-                    <a href="${result.image_url}" target="_blank" class="saucenao-image-link">
-                        🔗 View Full Image
-                    </a>
-                </div>
-            ` : ''}
+    errorDiv.appendChild(icon);
+    errorDiv.appendChild(text);
+    errorDiv.appendChild(detailsLabel);
 
-            ${renderTagCategory('Character', tags.character)}
-            ${renderTagCategory('Copyright', tags.copyright)}
-            ${renderTagCategory('Artist', tags.artist)}
-            ${renderTagCategory('Meta', tags.meta)}
-            ${renderTagCategory('General', tags.general, true)}
-        </div>
-    `;
+    metadataResults.forEach(r => {
+        const failedSource = createElement('div', 'saucenao-failed-source');
+        const strong = createElement('strong', null, r.source);
+        failedSource.appendChild(strong);
+        failedSource.appendChild(document.createTextNode(`: ${r.error || 'Unknown error'}`));
+        errorDiv.appendChild(failedSource);
+    });
+
+    const btnContainer = createElement('div');
+    btnContainer.style.marginTop = '20px';
+    btnContainer.style.textAlign = 'center';
+    const backBtn = createElement('button', 'saucenao-back-btn', '← Back to Results');
+    backBtn.onclick = () => displaySauceNaoResults(saucenaoResults);
+    btnContainer.appendChild(backBtn);
+    errorDiv.appendChild(btnContainer);
+
+    content.appendChild(errorDiv);
 }
 
-function renderTagCategory(name, tagsString, expandable = false) {
-    if (!tagsString || tagsString.trim() === '') return '';
+function createSourceSelectionPanel(validResults) {
+    const panel = createElement('div', 'saucenao-panel');
+    const h3 = createElement('h3', null, 'Select Source');
+    panel.appendChild(h3);
+
+    const grid = createElement('div', 'saucenao-source-grid');
+
+    validResults.forEach((result, idx) => {
+        const sourceInfo = selectedResult.sources.find(s => s.type === result.source);
+        const container = createElement('div', 'saucenao-source-container');
+
+        const btn = createElement('button', `saucenao-source-btn ${idx === 0 ? 'active' : ''}`);
+        btn.id = `sourceBtn${idx}`;
+        btn.onclick = () => selectMetadataSource(idx);
+
+        if (result.preview_url) {
+            const img = document.createElement('img');
+            img.src = result.preview_url;
+            img.className = 'saucenao-source-preview';
+            img.onerror = () => img.style.display = 'none';
+            btn.appendChild(img);
+        }
+
+        const textDiv = createElement('div', 'saucenao-source-text');
+        const name = createElement('div', 'saucenao-source-name', result.source);
+        textDiv.appendChild(name);
+
+        if (result.width && result.height) {
+            const res = createElement('div', 'saucenao-source-resolution', `${result.width}×${result.height}`);
+            textDiv.appendChild(res);
+        }
+
+        if (result.file_size) {
+            const size = createElement('div', 'saucenao-source-filesize', formatFileSize(result.file_size));
+            textDiv.appendChild(size);
+        }
+
+        btn.appendChild(textDiv);
+        container.appendChild(btn);
+
+        if (sourceInfo && sourceInfo.url) {
+            const link = document.createElement('a');
+            link.href = sourceInfo.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.className = 'saucenao-source-link';
+
+            const linkIcon = createElement('span', null, '🔗');
+            const linkText = createElement('span', null, `View on ${result.source}`);
+            link.appendChild(linkIcon);
+            link.appendChild(linkText);
+            container.appendChild(link);
+        }
+
+        grid.appendChild(container);
+    });
+
+    panel.appendChild(grid);
+    return panel;
+}
+
+function createMetadataPreview(result, _idx) {
+    const panel = createElement('div', 'saucenao-panel');
+    const h3 = createElement('h3', null, 'Metadata Preview');
+    panel.appendChild(h3);
+
+    if (result.preview_url) {
+        const imgContainer = createElement('div', 'saucenao-preview-image-container');
+        const img = document.createElement('img');
+        img.src = result.preview_url;
+        img.className = 'saucenao-preview-image';
+        img.onerror = () => img.style.display = 'none';
+        imgContainer.appendChild(img);
+        panel.appendChild(imgContainer);
+    }
+
+    if (result.image_url) {
+        const linkContainer = createElement('div', 'saucenao-image-link-container');
+        const link = document.createElement('a');
+        link.href = result.image_url;
+        link.target = '_blank';
+        link.className = 'saucenao-image-link';
+        link.textContent = '🔗 View Full Image';
+        linkContainer.appendChild(link);
+        panel.appendChild(linkContainer);
+    }
+
+    const tags = result.tags || {};
+
+    if (tags.character) panel.appendChild(createTagCategory('Character', tags.character));
+    if (tags.copyright) panel.appendChild(createTagCategory('Copyright', tags.copyright));
+    if (tags.artist) panel.appendChild(createTagCategory('Artist', tags.artist));
+    if (tags.meta) panel.appendChild(createTagCategory('Meta', tags.meta));
+    if (tags.general) panel.appendChild(createTagCategory('General', tags.general, true));
+
+    return panel;
+}
+
+function createTagCategory(name, tagsString, expandable = false) {
+    if (!tagsString || tagsString.trim() === '') return createElement('div');
 
     const tags = tagsString.split(' ').filter(t => t);
     const displayTags = expandable && tags.length > 20 ? tags.slice(0, 20) : tags;
     const hasMore = expandable && tags.length > 20;
 
-    return `
-        <div class="saucenao-tag-category">
-            <div class="saucenao-tag-category-title">${name} (${tags.length})</div>
-            <div class="saucenao-tag-list">
-                ${displayTags.map(tag => `
-                    <span class="saucenao-tag">${tag}</span>
-                `).join('')}
-                ${hasMore ? `<span class="saucenao-tag-more">+${tags.length - 20} more</span>` : ''}
-            </div>
-        </div>
-    `;
+    const category = createElement('div', 'saucenao-tag-category');
+    const title = createElement('div', 'saucenao-tag-category-title', `${name} (${tags.length})`);
+    category.appendChild(title);
+
+    const tagList = createElement('div', 'saucenao-tag-list');
+    displayTags.forEach(tag => {
+        const tagSpan = createElement('span', 'saucenao-tag', tag);
+        tagList.appendChild(tagSpan);
+    });
+
+    if (hasMore) {
+        const more = createElement('span', 'saucenao-tag-more', `+${tags.length - 20} more`);
+        tagList.appendChild(more);
+    }
+
+    category.appendChild(tagList);
+    return category;
+}
+
+function createApplyOptionsPanel() {
+    const panel = createElement('div', 'saucenao-panel');
+    const h3 = createElement('h3', null, 'Apply Options');
+    panel.appendChild(h3);
+
+    const label = createElement('label', 'saucenao-checkbox-label');
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = 'downloadImage';
+    checkbox.className = 'saucenao-checkbox';
+    label.appendChild(checkbox);
+
+    const textDiv = createElement('div');
+    const titleDiv = createElement('div', 'saucenao-checkbox-text-title', 'Download Higher Quality Image');
+    const subtitleDiv = createElement('div', 'saucenao-checkbox-text-subtitle', 'Replace current image file with booru source');
+    textDiv.appendChild(titleDiv);
+    textDiv.appendChild(subtitleDiv);
+    label.appendChild(textDiv);
+    panel.appendChild(label);
+
+    const btnGroup = createElement('div', 'saucenao-button-group');
+    const applyBtn = createElement('button', 'saucenao-apply-btn', '✓ Apply Metadata');
+    applyBtn.onclick = applySauceNaoMetadata;
+    const cancelBtn = createElement('button', 'saucenao-cancel-btn', 'Cancel');
+    cancelBtn.onclick = closeSauceNaoModal;
+    btnGroup.appendChild(applyBtn);
+    btnGroup.appendChild(cancelBtn);
+    panel.appendChild(btnGroup);
+
+    return panel;
 }
 
 function selectMetadataSource(idx) {
@@ -396,7 +522,9 @@ function selectMetadataSource(idx) {
     });
 
     // Update preview
-    document.getElementById('metadataPreview').innerHTML = renderMetadataPreview(results[idx], idx);
+    const previewDiv = document.getElementById('metadataPreview');
+    previewDiv.innerHTML = '';
+    previewDiv.appendChild(createMetadataPreview(results[idx], idx));
 }
 
 async function applySauceNaoMetadata() {
@@ -404,34 +532,41 @@ async function applySauceNaoMetadata() {
     const selectedMetadata = window.currentMetadataResults[selectedIdx];
     const downloadImage = document.getElementById('downloadImage').checked;
     const filepath = document.getElementById('imageFilepath').value;
-    
+
     // Get the source info
     const sourceInfo = selectedResult.sources.find(s => s.type === selectedMetadata.source);
-    
+
     // Show loading overlay
-    const overlay = document.createElement('div');
-    overlay.className = 'saucenao-loading-overlay';
-    overlay.innerHTML = `
-        <div class="saucenao-loading-overlay-content">
-            <div class="saucenao-loading-overlay-icon">⚙️</div>
-            <div id="applyStatus">Applying metadata...</div>
-            ${downloadImage ? '<div class="saucenao-loading-overlay-download" id="downloadStatus">Preparing download...</div>' : ''}
-        </div>
-    `;
+    const overlay = createElement('div', 'saucenao-loading-overlay');
+    const overlayContent = createElement('div', 'saucenao-loading-overlay-content');
+    const overlayIcon = createElement('div', 'saucenao-loading-overlay-icon', '⚙️');
+    const statusDiv = createElement('div');
+    statusDiv.id = 'applyStatus';
+    statusDiv.textContent = 'Applying metadata...';
+    overlayContent.appendChild(overlayIcon);
+    overlayContent.appendChild(statusDiv);
+
+    if (downloadImage) {
+        const downloadStatus = createElement('div', 'saucenao-loading-overlay-download', 'Preparing download...');
+        downloadStatus.id = 'downloadStatus';
+        overlayContent.appendChild(downloadStatus);
+    }
+
+    overlay.appendChild(overlayContent);
     document.body.appendChild(overlay);
-    
+
     // Client-side timeout (90 seconds)
     const timeoutId = setTimeout(() => {
         overlay.remove();
         showNotification('Operation timed out - check Flask console for details', 'error');
     }, 90000);
-    
+
     try {
         if (downloadImage) {
             const statusEl = document.getElementById('downloadStatus');
             if (statusEl) statusEl.textContent = 'Downloading image...';
         }
-        
+
         const response = await fetch('/api/saucenao/apply', {
             method: 'POST',
             headers: {
@@ -447,9 +582,9 @@ async function applySauceNaoMetadata() {
                 secret: SYSTEM_SECRET
             })
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         // Check if response is JSON
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
@@ -457,9 +592,9 @@ async function applySauceNaoMetadata() {
             console.error('Non-JSON response from apply:', text);
             throw new Error('Server returned non-JSON response. Check console for details.');
         }
-        
+
         const data = await response.json();
-        
+
         if (data.error === 'Unauthorized') {
             localStorage.removeItem('system_secret');
             SYSTEM_SECRET = null;
@@ -468,13 +603,13 @@ async function applySauceNaoMetadata() {
             closeSauceNaoModal();
             return;
         }
-        
+
         if (data.status === 'success') {
             document.getElementById('applyStatus').textContent = 'Success!';
             if (downloadImage && document.getElementById('downloadStatus')) {
                 document.getElementById('downloadStatus').textContent = '✓ Image downloaded';
             }
-            
+
             setTimeout(() => {
                 // Redirect to new URL if filepath changed, otherwise reload
                 if (data.redirect_url) {
@@ -486,7 +621,7 @@ async function applySauceNaoMetadata() {
         } else {
             throw new Error(data.error || 'Unknown error');
         }
-        
+
     } catch (error) {
         clearTimeout(timeoutId);
         overlay.remove();
@@ -494,4 +629,3 @@ async function applySauceNaoMetadata() {
         showNotification('Error: ' + error.message, 'error');
     }
 }
-

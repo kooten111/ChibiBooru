@@ -1025,6 +1025,244 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     transform: rotate(180deg);
 }
 
+/* Secret Section Styles */
+.secret-configured {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px;
+    background: rgba(74, 158, 111, 0.2);
+    border-radius: var(--radius-lg);
+    border: var(--border-width) solid rgba(144, 238, 144, 0.3);
+}
+
+.secret-configured-text {
+    color: #90ee90;
+    font-weight: var(--font-weight-semibold);
+}
+
+.secret-configured .btn {
+    margin-left: auto;
+    padding: 8px 16px;
+}
+
+.secret-required {
+    padding: var(--spacing-lg);
+    background: rgba(255, 107, 107, 0.2);
+    border-radius: var(--radius-lg);
+    border: var(--border-width) solid rgba(255, 107, 107, 0.3);
+}
+
+.secret-required h4 {
+    margin: 0 0 15px 0;
+    color: #ff6b6b;
+    font-size: 1em;
+}
+
+.secret-required p {
+    margin: 0 0 15px 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.secret-input-group {
+    display: flex;
+    gap: 10px;
+}
+
+.secret-input {
+    flex: 1;
+    padding: 12px;
+    background: rgba(20, 20, 30, 0.8);
+    border: 2px solid rgba(135, 206, 235, 0.3);
+    border-radius: var(--radius-lg);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+}
+
+.secret-input:focus {
+    outline: none;
+    border-color: var(--primary-blue);
+}
+
+/* Modal Overlay & Base Styles */
+.custom-confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal);
+    animation: fadeIn var(--anim-fast) ease-out;
+}
+
+.custom-confirm-modal {
+    background: var(--gradient-panel);
+    border: var(--border-width) solid var(--border-color-hover);
+    border-radius: var(--radius-xl);
+    padding: 25px;
+    max-width: 450px;
+    width: 90%;
+    box-shadow: var(--shadow-2xl);
+    animation: scaleIn var(--anim-normal) ease-out;
+}
+
+.custom-confirm-modal h3 {
+    margin: 0 0 15px 0;
+    color: var(--primary-blue);
+}
+
+.custom-confirm-modal p {
+    margin: 0 0 var(--spacing-lg) 0;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.btn-confirm {
+    padding: 10px var(--spacing-lg);
+    background: var(--gradient-primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
+    transition: all var(--transition-smooth);
+}
+
+.btn-confirm:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-cancel {
+    padding: 10px var(--spacing-lg);
+    background: rgba(60, 60, 80, 0.6);
+    color: var(--text-secondary);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: var(--font-weight-semibold);
+    transition: all var(--transition-smooth);
+}
+
+.btn-cancel:hover {
+    background: rgba(70, 70, 90, 0.7);
+}
+
+/* Retry Tagging Modal Styles */
+.retry-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: var(--spacing-lg);
+}
+
+.retry-option-btn {
+    padding: 15px;
+    border: 2px solid;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    text-align: left;
+    transition: all var(--transition-smooth);
+    background: transparent;
+    color: inherit;
+}
+
+.retry-option-btn.online-only {
+    background: rgba(74, 158, 255, 0.2);
+    border-color: rgba(74, 158, 255, 0.4);
+    color: var(--primary-blue);
+}
+
+.retry-option-btn.with-fallback {
+    background: rgba(251, 146, 60, 0.2);
+    border-color: rgba(251, 146, 60, 0.4);
+    color: #ff9966;
+}
+
+.retry-option-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.retry-option-title {
+    font-weight: var(--font-weight-semibold);
+    margin-bottom: 5px;
+}
+
+.retry-option-desc {
+    font-size: var(--font-size-xs);
+    opacity: 0.8;
+}
+
+/* Health Check Modal Styles */
+.health-check-info {
+    background: rgba(135, 206, 235, 0.1);
+    border-left: 3px solid var(--primary-blue);
+    padding: 12px;
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-sm);
+}
+
+.health-check-info strong {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.health-check-info ul {
+    margin: 8px 0 0 0;
+    padding-left: var(--spacing-lg);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.health-check-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: var(--spacing-lg);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+/* Processing Spinner Animation */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.processing-spinner {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+
+/* Status Item Warning */
+.status-item.warning {
+    border-color: rgba(251, 146, 60, 0.5);
+    background: rgba(251, 146, 60, 0.1);
+}
+
 .debug-options {
     max-height: 0;
     overflow: hidden;
@@ -4236,4 +4474,135 @@ body.ui-hidden::after {
 .tag-item a[href*="rating:explicit"] {
     background: rgba(248, 113, 113, 0.15);
     color: var(--red-accent-30);
+}
+
+/* Pool Manager Styles */
+.pool-error-message {
+    color: #ff6b6b;
+    padding: 10px;
+}
+
+.pool-empty-message {
+    padding: var(--spacing-lg);
+    text-align: center;
+    color: #888;
+}
+
+.pool-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    border-bottom: var(--border-width) solid var(--border-color);
+}
+
+.pool-list-item:last-child {
+    border-bottom: none;
+}
+
+.pool-selector-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.pool-selector-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: rgba(40, 40, 60, 0.5);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+}
+
+.pool-selector-item:hover {
+    background: rgba(50, 50, 70, 0.6);
+    transform: translateY(-2px);
+}
+
+.pool-selector-item.in-pool {
+    border-color: var(--success);
+    background: rgba(74, 158, 111, 0.2);
+}
+
+.pool-selector-name {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+}
+
+.pool-selector-desc {
+    font-size: var(--font-size-xs);
+    color: #888;
+    margin-top: 2px;
+}
+
+.pool-selector-badge {
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+}
+
+.pool-selector-item.in-pool .pool-selector-badge {
+    background: var(--success);
+    color: white;
+}
+
+.pool-selector-item:not(.in-pool) .pool-selector-badge {
+    background: var(--primary-blue);
+    color: white;
+}
+
+/* Image Page - Loading Overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-primary, #0a0a0f);
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loading-overlay-content {
+    color: var(--primary-blue);
+    font-size: 1.2em;
+}
+
+/* Image Page - Crossfade Overlay */
+.crossfade-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    padding: var(--spacing-lg);
+}
+
+.crossfade-media {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-2xl);
+    border: var(--border-width) solid var(--border-color);
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
 }

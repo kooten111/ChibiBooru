@@ -1,6 +1,9 @@
 // static/js/image-page.js
 import { showNotification } from './utils/notifications.js';
 
+// Expose to global scope for onclick handlers
+window.confirmRetryTagging = confirmRetryTagging;
+
 function findNextImageUrl() {
     const carouselImages = document.querySelectorAll('.carousel-track a[href^="/view/"]');
     if (carouselImages.length > 0) {
@@ -55,31 +58,9 @@ function confirmDelete() {
 
 
 function confirmRetryTagging() {
-    const overlay = document.createElement('div');
-    overlay.className = 'custom-confirm-overlay';
-    overlay.innerHTML = `
-        <div class="custom-confirm-modal" style="max-width: 500px;">
-            <h3 style="margin: 0 0 15px 0; color: #87ceeb;">🔄 Retry Tagging Options</h3>
-            <p style="margin: 0 0 20px 0; color: #d0d0d0; line-height: 1.5;">
-                Choose how to retry tagging for this image:
-            </p>
-            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;">
-                <button class="retry-option-btn" data-option="online-only" style="padding: 15px; background: rgba(74, 158, 255, 0.2); border: 2px solid rgba(74, 158, 255, 0.4); border-radius: 8px; color: #87ceeb; cursor: pointer; text-align: left; transition: all 0.2s;">
-                    <div style="font-weight: 600; margin-bottom: 5px;">🌐 Online Sources Only</div>
-                    <div style="font-size: 0.85em; opacity: 0.8;">Try Danbooru, e621, and SauceNao. Keep current tags if nothing found.</div>
-                </button>
-                <button class="retry-option-btn" data-option="with-fallback" style="padding: 15px; background: rgba(251, 146, 60, 0.2); border: 2px solid rgba(251, 146, 60, 0.4); border-radius: 8px; color: #ff9966; cursor: pointer; text-align: left; transition: all 0.2s;">
-                    <div style="font-weight: 600; margin-bottom: 5px;">🤖 With Local AI Fallback</div>
-                    <div style="font-size: 0.85em; opacity: 0.8;">Try online sources first, then use local AI tagger if nothing found.</div>
-                </button>
-            </div>
-            <div class="button-group">
-                <button class="btn-cancel">Cancel</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
+    const template = document.getElementById('single-image-retry-tagging-template');
+    const clone = template.content.cloneNode(true);
+    const overlay = clone.querySelector('.custom-confirm-overlay');
 
     const modal = overlay.querySelector('.custom-confirm-modal');
     const btnCancel = modal.querySelector('.btn-cancel');
@@ -96,15 +77,17 @@ function confirmRetryTagging() {
             this.style.boxShadow = 'none';
         });
         btn.addEventListener('click', function() {
-            overlay.remove();
+            document.body.removeChild(overlay);
             retryTagging(this.dataset.option === 'online-only');
         });
     });
 
-    btnCancel.onclick = () => overlay.remove();
+    btnCancel.onclick = () => document.body.removeChild(overlay);
     overlay.onclick = (e) => {
-        if (e.target === overlay) overlay.remove();
+        if (e.target === overlay) document.body.removeChild(overlay);
     };
+
+    document.body.appendChild(overlay);
 }
 
 function retryTagging(skipLocalFallback = false) {
@@ -367,20 +350,7 @@ function initSwipeNavigation() {
                 currentImage.style.opacity = '0';
 
                 const overlay = document.createElement('div');
-                overlay.style.cssText = `
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 100;
-                    opacity: 0;
-                    transition: opacity 0.3s ease-in-out;
-                    padding: var(--spacing-lg);
-                `;
+                overlay.className = 'crossfade-overlay';
 
                 let newMediaElement;
                 if (preloadedData.isVideo) {
@@ -397,19 +367,7 @@ function initSwipeNavigation() {
                     newMediaElement.alt = 'Image';
                 }
 
-                newMediaElement.style.cssText = `
-                    max-width: 100%;
-                    max-height: 100%;
-                    width: auto;
-                    height: auto;
-                    object-fit: contain;
-                    display: block;
-                    border-radius: var(--radius-xl);
-                    box-shadow: var(--shadow-2xl);
-                    border: var(--border-width) solid var(--border-color);
-                    opacity: 0;
-                `;
-
+                newMediaElement.className = 'crossfade-media';
                 overlay.appendChild(newMediaElement);
                 currentImageView.appendChild(overlay);
 
@@ -510,22 +468,15 @@ function initSwipeNavigation() {
 
     function showLoadingOverlay() {
         const overlay = document.createElement('div');
-        overlay.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--bg-primary, #0a0a0f);
-            z-index: 10000;
-            opacity: 0;
-            transition: opacity 0.2s ease-in-out;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        `;
-        overlay.innerHTML = '<div style="color: #87ceeb; font-size: 1.2em;">Loading...</div>';
+        overlay.className = 'loading-overlay';
+
+        const content = document.createElement('div');
+        content.className = 'loading-overlay-content';
+        content.textContent = 'Loading...';
+
+        overlay.appendChild(content);
         document.body.appendChild(overlay);
+
         requestAnimationFrame(() => {
             overlay.style.opacity = '1';
         });

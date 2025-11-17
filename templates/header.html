@@ -78,6 +78,9 @@
                     <button class="btn btn-warning" onclick="systemBulkRetryTagging(event)">
                         🔄 Retry All Local-Tagged Images
                     </button>
+                    <button class="btn btn-info" onclick="systemDatabaseHealthCheck(event)">
+                        🔍 Database Health Check
+                    </button>
                 </div>
 
                 <h4>Monitor Control</h4>
@@ -130,4 +133,89 @@
             </div>
         </div>
     </div>
+
+    <!-- System Panel Templates -->
+    <template id="secret-configured-template">
+        <div class="secret-configured">
+            <span class="secret-configured-text">✓ System secret configured</span>
+            <button class="btn btn-danger" onclick="clearSystemSecret(event)">
+                Change Secret
+            </button>
+        </div>
+    </template>
+
+    <template id="secret-required-template">
+        <div class="secret-required">
+            <h4>System Secret Required</h4>
+            <p>Enter the RELOAD_SECRET from your environment variables.</p>
+            <div class="secret-input-group">
+                <input type="password" id="secretInput" placeholder="Enter system secret..." class="secret-input">
+                <button class="btn btn-success" onclick="saveSystemSecret()">
+                    Save Secret
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <template id="retry-tagging-modal-template">
+        <div class="custom-confirm-overlay">
+            <div class="custom-confirm-modal" style="max-width: 550px;">
+                <h3>🔄 Bulk Retry Tagging Options</h3>
+                <p>This will retry tagging for all locally-tagged images. Choose your preferred method:</p>
+                <div class="retry-options">
+                    <button class="retry-option-btn online-only" data-option="online-only">
+                        <div class="retry-option-title">🌐 Online Sources Only</div>
+                        <div class="retry-option-desc">Try Danbooru, e621, and SauceNao. Keep current tags if nothing found.</div>
+                    </button>
+                    <button class="retry-option-btn with-fallback" data-option="with-fallback">
+                        <div class="retry-option-title">🤖 With Local AI Fallback</div>
+                        <div class="retry-option-desc">Try online sources first, then re-run local AI tagger if nothing found.</div>
+                    </button>
+                </div>
+                <div class="button-group">
+                    <button class="btn-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="health-check-modal-template">
+        <div class="custom-confirm-overlay">
+            <div class="custom-confirm-modal" style="max-width: 550px;">
+                <h3>🔍 Database Health Check</h3>
+                <p>Check and fix database integrity issues. This is safe to run anytime.</p>
+                <div class="health-check-info">
+                    <strong>Checks performed:</strong>
+                    <ul>
+                        <li>Fix NULL active_source values</li>
+                        <li>Update active_source to match current priority</li>
+                        <li>Remove orphaned database entries</li>
+                        <li>Cleanup redundant tag delta operations</li>
+                    </ul>
+                </div>
+                <div class="health-check-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="healthCheckAutoFix" checked>
+                        <span>Auto-fix issues (recommended)</span>
+                    </label>
+                </div>
+                <div class="health-check-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="healthCheckTagDeltas" checked>
+                        <span>Cleanup tag deltas</span>
+                    </label>
+                </div>
+                <div class="health-check-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="healthCheckThumbnails">
+                        <span>Check for missing thumbnails (slow)</span>
+                    </label>
+                </div>
+                <div class="button-group">
+                    <button class="btn-confirm">Run Health Check</button>
+                    <button class="btn-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
 </div>

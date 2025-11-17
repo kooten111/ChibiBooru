@@ -1099,3 +1099,31 @@ async def bulk_retry_tagging_service():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+async def database_health_check_service():
+    """Service to run database health checks and optionally fix issues."""
+    data = await request.json or {}
+    auto_fix = data.get('auto_fix', True)
+    include_thumbnails = data.get('include_thumbnails', False)
+    include_tag_deltas = data.get('include_tag_deltas', True)
+
+    try:
+        import database_health
+
+        results = database_health.run_all_health_checks(
+            auto_fix=auto_fix,
+            include_thumbnails=include_thumbnails,
+            include_tag_deltas=include_tag_deltas
+        )
+
+        return jsonify({
+            "status": "success",
+            "message": f"Health check complete: {results['total_issues_found']} issues found, {results['total_issues_fixed']} fixed",
+            "results": results
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500

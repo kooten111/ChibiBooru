@@ -9,6 +9,7 @@ from routes import main_blueprint, api_blueprint
 import models
 from database import initialize_database, repair_orphaned_image_tags
 from priority_monitor import check_and_apply_priority_changes
+from database_health import startup_health_check
 
 def create_app():
     """Create and configure the Quart application."""
@@ -24,6 +25,9 @@ def create_app():
 
     # Auto-repair any orphaned image tags (data integrity check)
     repair_orphaned_image_tags()
+
+    # Run database health checks and auto-fix critical issues
+    startup_health_check()
 
     # Check if BOORU_PRIORITY changed and auto-apply if needed
     # This must happen before loading data from DB

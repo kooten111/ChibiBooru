@@ -2,18 +2,18 @@
 
 ChibiBooru is a self-hosted web application for organizing and browsing your local image collection, designed to automatically fetch tags and metadata from various online sources, similar to popular image boorus. It combines a user-friendly interface with powerful backend tools to create a rich and searchable media library.
 
-## 🌟 Features
+## Features
 
 ### Core Functionality
-  * **🖼️ Elegant Image Gallery:** A responsive, masonry-style layout for browsing your images with infinite scroll.
-  * **🤖 Automated Tagging:** Automatically fetches detailed, categorized tags for your images from multiple sources:
+  * **Elegant Image Gallery:** A responsive, masonry-style layout for browsing your images with infinite scroll.
+  * **Automated Tagging:** Automatically fetches detailed, categorized tags for your images from multiple sources:
       * **Direct Hash Search:** Finds metadata from **Danbooru** and **e621** using the image's MD5 hash.
       * **Reverse Image Search:** Uses **SauceNao** to find sources and metadata when direct hash matching fails.
       * **AI Tagging:** Includes a local, ONNX-based AI tagger as a fallback to analyze and tag images that have no online matches.
-  * **📂 Comprehensive Metadata:** Gathers rich metadata, including artist, character, copyright, species, and general tags, as well as image dimensions, file size, and original sources.
+  * **Comprehensive Metadata:** Gathers rich metadata, including artist, character, copyright, species, and general tags, as well as image dimensions, file size, and original sources.
 
 ### Search & Discovery
-  * **🔍 Advanced Search System:**
+  * **Advanced Search System:**
       * **Tag Search:** Search by tags with intelligent autocomplete suggestions
       * **Category-Specific Search:** Filter by tag category (e.g., `character:holo`, `copyright:spice_and_wolf`, `artist:name`)
       * **Full-Text Search:** Partial matching and fuzzy search for finding images even when you don't know exact tag names
@@ -22,39 +22,39 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
       * **Source Filtering:** Find images from specific sources (`source:danbooru`)
       * **Relationship Filters:** Find parent/child images (`has:parent`, `has:child`, `has:relationship`)
       * **Pool Search:** Find images in specific collections (`pool:series_name`)
-  * **🎯 Smart Similarity:** Weighted similarity matching that prioritizes rare tags and important categories (characters, copyright) over common descriptive tags
+  * **Smart Similarity:** Weighted similarity matching that prioritizes rare tags and important categories (characters, copyright) over common descriptive tags
 
 ### Tag Management
-  * **✏️ Full Tag Control:**
+  * **Full Tag Control:**
       * Intuitive in-line tag editor to add, remove, and recategorize tags
       * Ability to switch between different metadata sources (e.g., switch from Danbooru's tags to e621's for the same image)
       * Tag delta tracking preserves manual modifications across database rebuilds
-  * **🔗 Tag Implications:** Automatic tag relationship detection and management:
+  * **Tag Implications:** Automatic tag relationship detection and management:
       * **Smart Detection:** Automatically suggests implications based on naming patterns (e.g., `character_(series)` → `series`)
       * **Statistical Analysis:** Detects correlations between tags based on co-occurrence patterns
       * **Manual Control:** Create, approve, or delete implications with a dedicated management interface
       * **Chain Preview:** See the full impact of implications before applying them
 
 ### Organization
-  * **📚 Pools:** Group related images into named collections with custom ordering
-  * **🔗 Image Relationships:** Automatically detects and displays parent/child relationships between images
-  * **🏷️ Tag Browser:** Browse all tags by category with usage counts and quick search access
+  * **Pools:** Group related images into named collections with custom ordering
+  * **Image Relationships:** Automatically detects and displays parent/child relationships between images
+  * **Tag Browser:** Browse all tags by category with usage counts and quick search access
 
 ### System Management
-  * **🔒 Authentication:** Password-protected web interface with session-based login
-  * **📤 Image Upload:** Drag-and-drop interface for adding new images with automatic processing
-  * **⚙️ System Management Panel:** Web UI with powerful tools to manage your library:
+  * **Authentication:** Password-protected web interface with session-based login
+  * **Image Upload:** Drag-and-drop interface for adding new images with automatic processing
+  * **System Management Panel:** Web UI with powerful tools to manage your library:
       * Scan for and process new images
       * Generate thumbnails
       * Find and remove duplicate files
       * Clean the database of orphaned entries
       * Rebuild tag data from source metadata
       * Apply tag implications in bulk
-  * **🔄 Background Monitoring:** Optional service that automatically watches your image directory for new files and processes them in the background
+  * **Background Monitoring:** Optional service that automatically watches your image directory for new files and processes them in the background
 
 -----
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -76,7 +76,7 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
     ```bash
     python -m venv venv
     source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-    pip install Flask Pillow requests numpy onnxruntime torchvision python-dotenv tqdm
+    pip install -r requirements.txt
     ```
 
 3.  **Configuration:**
@@ -116,15 +116,23 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 
 5.  **Run the application:**
 
+    The application uses Quart (async Flask) with Uvicorn as the ASGI server:
+
     ```bash
     python app.py
+    ```
+
+    Or use the provided shell script:
+
+    ```bash
+    ./start_uvicorn.sh
     ```
 
     The application will be available at `http://127.0.0.1:5000` by default.
 
 -----
 
-## 📖 Usage
+## Usage
 
 ### Initial Setup
 
@@ -158,9 +166,9 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 ### Editing Tags
 
 1.  Navigate to an image's detail page.
-2.  Click the **"📝 Edit Tags"** button.
+2.  Click the **"Edit Tags"** button.
 3.  An inline editor will appear, allowing you to add or remove tags within their specific categories.
-4.  Click **"💾 Save Tags"** when you are done.
+4.  Click **"Save Tags"** when you are done.
 5.  Your manual modifications will be preserved even if you rebuild the database.
 
 ### Managing Tag Implications
@@ -189,7 +197,7 @@ ChibiBooru is a self-hosted web application for organizing and browsing your loc
 
 -----
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Booru/
@@ -219,29 +227,34 @@ Booru/
 ├── utils/              # Utility functions
 │   ├── deduplication.py     # Duplicate detection
 │   └── file_utils.py        # File handling utilities
-├── scripts/            # Maintenance scripts
-│   ├── cleanup_deltas.py        # Clean tag delta history
-│   └── generate_thumbnails.py   # Batch thumbnail generation
 ├── models/             # AI tagging models (place ONNX models here)
-├── app.py              # Main Flask application
+├── app.py              # Main application entry point
 ├── config.py           # Centralized configuration
 ├── database.py         # Database schema and initialization
 ├── models.py           # Database models and data access layer
 ├── processing.py       # Core image processing and metadata fetching
-├── routes.py           # Flask routes and web endpoints
+├── routes.py           # Quart routes and web endpoints
+├── rating_inference.py     # AI rating model inference
+├── rating_model_db.py      # Rating model database operations
+├── backfill_rating_sources.py  # Utility to backfill rating sources
+├── priority_monitor.py     # Monitor and respond to priority changes
+├── database_health.py      # Database health check utilities
+├── start_uvicorn.sh        # Script to start Uvicorn server
+├── requirements.txt        # Python dependencies
 ├── .env                # Your configuration (create from .env.example)
 ├── .env.example        # Example configuration file
-└── booru.db            # SQLite database (created automatically)
+├── booru.db            # SQLite database (created automatically)
+└── rating_model.db     # Rating model database (created automatically)
 ```
 
-## 🛠️ Advanced Configuration
+## Advanced Configuration
 
 ### Similarity Calculation Methods
 
 ChibiBooru supports two similarity calculation methods, configurable via the `SIMILARITY_METHOD` environment variable:
 
-- **`jaccard`** (default): Simple set intersection/union calculation. Fast and straightforward.
-- **`weighted`**: Advanced method using Inverse Document Frequency (IDF) and category weights. This method:
+- **`jaccard`**: Simple set intersection/union calculation. Fast and straightforward.
+- **`weighted`** (default): Advanced method using Inverse Document Frequency (IDF) and category weights. This method:
   - Prioritizes rare tags over common ones
   - Weights character and copyright tags higher than general descriptive tags
   - Provides more nuanced similarity matching for better recommendations
@@ -269,7 +282,7 @@ ChibiBooru supports any ONNX-based tagging model with compatible metadata:
 2. Update `LOCAL_TAGGER_NAME` in `.env` to reflect your model
 3. Adjust `LOCAL_TAGGER_THRESHOLD` in `config.py` if needed
 
-## 🔧 Database Management
+## Database Management
 
 The application uses SQLite with several advanced features:
 
@@ -283,18 +296,3 @@ To rebuild the FTS index if needed:
 python database.py
 ```
 
-## 🙏 Acknowledgements
-
-This project relies on several fantastic services for providing tag data:
-
-  * [Danbooru](https://danbooru.donmai.us/)
-  * [e621](https://e621.net/)
-  * [SauceNao](https://saucenao.com/)
-
-Special thanks to the booru communities for maintaining comprehensive tagging systems that make projects like this possible.
-
------
-
-## 📝 License
-
-This project is provided as-is for personal use. Please respect the terms of service of the external APIs used for metadata fetching.

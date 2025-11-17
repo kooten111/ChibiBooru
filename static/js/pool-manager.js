@@ -33,12 +33,13 @@ async function loadPoolsForImage() {
                 if (poolsPanel) {
                     poolsPanel.style.display = 'block';
                 }
-                poolsList.innerHTML = data.pools.map(pool => `
-                    <div class="pool-list-item">
-                        <a href="/pool/${pool.id}">${pool.name}</a>
-                        <button onclick="removeImageFromPool(${pool.id}, '${pool.name}')">Remove</button>
-                    </div>
-                `).join('');
+
+                // Clear and populate pool list
+                poolsList.innerHTML = '';
+                data.pools.forEach(pool => {
+                    const item = createPoolListItem(pool);
+                    poolsList.appendChild(item);
+                });
             }
         } else {
             // On error, show the panel with error message
@@ -48,7 +49,7 @@ async function loadPoolsForImage() {
             if (poolsPanel) {
                 poolsPanel.style.display = 'block';
             }
-            poolsList.innerHTML = '<div style="color: #ff6b6b; padding: 10px;">Failed to load pools</div>';
+            showPoolError(poolsList);
         }
     } catch (error) {
         console.error('Error loading pools:', error);
@@ -59,8 +60,33 @@ async function loadPoolsForImage() {
         if (poolsPanel) {
             poolsPanel.style.display = 'block';
         }
-        poolsList.innerHTML = '<div style="color: #ff6b6b; padding: 10px;">Error loading pools</div>';
+        showPoolError(poolsList);
     }
+}
+
+function createPoolListItem(pool) {
+    const item = document.createElement('div');
+    item.className = 'pool-list-item';
+
+    const link = document.createElement('a');
+    link.href = `/pool/${pool.id}`;
+    link.textContent = pool.name;
+
+    const button = document.createElement('button');
+    button.textContent = 'Remove';
+    button.onclick = () => removeImageFromPool(pool.id, pool.name);
+
+    item.appendChild(link);
+    item.appendChild(button);
+
+    return item;
+}
+
+function showPoolError(container) {
+    const template = document.getElementById('pool-error-template');
+    const clone = template.content.cloneNode(true);
+    container.innerHTML = '';
+    container.appendChild(clone);
 }
 
 async function showAddToPoolModal() {
@@ -70,21 +96,11 @@ async function showAddToPoolModal() {
         modal = document.createElement('div');
         modal.id = 'addToPoolModal';
         modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <span class="close" onclick="closeAddToPoolModal()">&times;</span>
-                <h3>Add to Pool</h3>
-                <div class="form-group">
-                    <input type="text" id="poolSearchModal" placeholder="Search pools..." style="width: 100%; padding: 10px; margin-bottom: 15px;">
-                </div>
-                <div id="poolSelectorList" class="pool-selector-list">
-                    <div class="loading-spinner">Loading pools...</div>
-                </div>
-                <div class="form-actions" style="margin-top: 20px;">
-                    <button class="btn-secondary" onclick="closeAddToPoolModal()">Close</button>
-                </div>
-            </div>
-        `;
+
+        const template = document.getElementById('pool-modal-template');
+        const clone = template.content.cloneNode(true);
+        modal.appendChild(clone);
+
         document.body.appendChild(modal);
     }
 
@@ -116,7 +132,10 @@ async function loadAllPools() {
         const allPoolsData = await allPoolsResponse.json();
 
         if (!allPoolsData.pools || allPoolsData.pools.length === 0) {
-            poolsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">No pools available. Create a pool first!</div>';
+            const template = document.getElementById('pool-empty-template');
+            const clone = template.content.cloneNode(true);
+            poolsList.innerHTML = '';
+            poolsList.appendChild(clone);
             return;
         }
 
@@ -131,27 +150,51 @@ async function loadAllPools() {
         renderPoolList(poolsWithStatus);
     } catch (error) {
         console.error('Error loading pools:', error);
-        poolsList.innerHTML = '<div style="color: #ff6b6b; padding: 20px; text-align: center;">Error loading pools</div>';
+        showPoolError(poolsList);
     }
 }
 
 function renderPoolList(pools) {
     const poolsList = document.getElementById('poolSelectorList');
-    poolsList.innerHTML = pools.map(pool => {
-        const escapedName = pool.name.replace(/'/g, "\\'");
-        return `
-        <div class="pool-selector-item ${pool.inPool ? 'in-pool' : ''}"
-             data-pool-id="${pool.id}"
-             data-pool-name="${pool.name.toLowerCase()}"
-             onclick="togglePoolMembership(${pool.id}, '${escapedName}', ${pool.inPool})">
-            <div style="flex: 1;">
-                <div class="pool-selector-name">${pool.name}</div>
-                ${pool.description ? `<div style="font-size: 0.85em; color: #888; margin-top: 2px;">${pool.description}</div>` : ''}
-            </div>
-            <span class="pool-selector-badge">${pool.inPool ? '✓ In Pool' : '+ Add'}</span>
-        </div>
-    `;
-    }).join('');
+    poolsList.innerHTML = '';
+
+    pools.forEach(pool => {
+        const item = createPoolSelectorItem(pool);
+        poolsList.appendChild(item);
+    });
+}
+
+function createPoolSelectorItem(pool) {
+    const item = document.createElement('div');
+    item.className = `pool-selector-item ${pool.inPool ? 'in-pool' : ''}`;
+    item.dataset.poolId = pool.id;
+    item.dataset.poolName = pool.name.toLowerCase();
+
+    const contentDiv = document.createElement('div');
+    contentDiv.style.flex = '1';
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'pool-selector-name';
+    nameDiv.textContent = pool.name;
+    contentDiv.appendChild(nameDiv);
+
+    if (pool.description) {
+        const descDiv = document.createElement('div');
+        descDiv.className = 'pool-selector-desc';
+        descDiv.textContent = pool.description;
+        contentDiv.appendChild(descDiv);
+    }
+
+    const badge = document.createElement('span');
+    badge.className = 'pool-selector-badge';
+    badge.textContent = pool.inPool ? '✓ In Pool' : '+ Add';
+
+    item.appendChild(contentDiv);
+    item.appendChild(badge);
+
+    item.onclick = () => togglePoolMembership(pool.id, pool.name, pool.inPool);
+
+    return item;
 }
 
 function filterPoolList() {
@@ -169,7 +212,7 @@ function filterPoolList() {
     });
 }
 
-async function togglePoolMembership(poolId, poolName, currentlyInPool) {
+async function togglePoolMembership(poolId, _poolName, currentlyInPool) {
     const filepath = document.getElementById('imageFilepath').value;
     const endpoint = currentlyInPool ? 'remove_image' : 'add_image';
 

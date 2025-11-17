@@ -410,6 +410,10 @@ async def retry_tagging():
 async def bulk_retry_tagging():
     return await api_service.bulk_retry_tagging_service()
 
+@api_blueprint.route('/database_health_check', methods=['POST'])
+async def database_health_check():
+    return await api_service.database_health_check_service()
+
 @api_blueprint.route('/tags/fetch')
 async def fetch_tags():
     """API endpoint for fetching tags with pagination and filtering."""
