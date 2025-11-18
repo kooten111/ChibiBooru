@@ -4074,6 +4074,25 @@ body.ui-hidden::after {
     transform: translateY(-1px);
 }
 
+.btn-info {
+    padding: var(--spacing-sm) 16px;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    transition: all var(--transition-normal);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px);
+}
+
 .btn-small {
     padding: var(--spacing-xs) var(--spacing-md);
     font-size: var(--font-size-xs);

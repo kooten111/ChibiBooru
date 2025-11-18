@@ -64,7 +64,7 @@ def repopulate_from_database():
         cur.execute("DELETE FROM sources")
 
         source_map = {}
-        known_sources = ["danbooru", "e621", "gelbooru", "yandere", "local_tagger"]
+        known_sources = ["danbooru", "e621", "pixiv", "gelbooru", "yandere", "local_tagger"]
         for source_name in known_sources:
             cur.execute("INSERT OR IGNORE INTO sources (name) VALUES (?)", (source_name,))
             cur.execute("SELECT id FROM sources WHERE name = ?", (source_name,))
@@ -93,6 +93,9 @@ def repopulate_from_database():
                 cur.execute("SELECT filepath FROM images WHERE id = ?", (image_id,))
                 filepath_row = cur.fetchone()
                 if filepath_row:
+                    # Commit current transaction before calling merge_all_sources
+                    # to avoid database lock (merge_all_sources opens its own connection)
+                    con.commit()
                     merge_all_sources(filepath_row['filepath'])
                 continue
 

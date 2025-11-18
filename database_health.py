@@ -362,6 +362,60 @@ def cleanup_tag_deltas(auto_fix=True):
     return result
 
 
+def check_merged_images_missing_tags(auto_fix=True):
+    """
+    Check for images with active_source='merged' that have no tags in image_tags table.
+    This can happen if merge_all_sources was called with an old version that didn't
+    properly populate the image_tags table.
+    If auto_fix=True, re-runs merge_all_sources on affected images.
+    """
+    result = HealthCheckResult("Merged images missing tags")
+
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Find images with merged source but no tags
+            cursor.execute("""
+                SELECT i.id, i.filepath
+                FROM images i
+                WHERE i.active_source = 'merged'
+                AND i.id NOT IN (SELECT DISTINCT image_id FROM image_tags)
+            """)
+
+            affected_images = cursor.fetchall()
+            result.issues_found = len(affected_images)
+
+            if result.issues_found == 0:
+                result.add_message("All merged images have tags")
+                return result
+
+            result.add_message(f"Found {result.issues_found} merged images without tags")
+
+            if not auto_fix:
+                return result
+
+            # Fix each image by re-running merge_all_sources
+            from services.switch_source_db import merge_all_sources
+
+            for image in affected_images:
+                filepath = image['filepath']
+                merge_result = merge_all_sources(filepath)
+
+                if merge_result.get("status") == "success":
+                    result.issues_fixed += 1
+                else:
+                    error_msg = merge_result.get("error", "Unknown error")
+                    result.add_error(f"Failed to fix {filepath}: {error_msg}")
+
+            result.add_message(f"Re-merged {result.issues_fixed} images")
+
+    except Exception as e:
+        result.add_error(f"Error during check: {str(e)}")
+
+    return result
+
+
 def run_all_health_checks(auto_fix=True, include_thumbnails=False, include_tag_deltas=True):
     """
     Run all database health checks.
@@ -380,6 +434,7 @@ def run_all_health_checks(auto_fix=True, include_thumbnails=False, include_tag_d
         check_and_fix_null_active_source(auto_fix),
         check_active_source_priority(auto_fix),
         check_orphaned_image_sources(auto_fix),
+        check_merged_images_missing_tags(auto_fix),
     ]
 
     if include_tag_deltas:
@@ -419,6 +474,7 @@ def startup_health_check():
     checks = [
         check_and_fix_null_active_source(auto_fix=True),
         check_orphaned_image_sources(auto_fix=True),
+        check_merged_images_missing_tags(auto_fix=True),
     ]
 
     total_issues = sum(c.issues_found for c in checks)

@@ -85,13 +85,14 @@ RATE_LIMIT_DELAY = 0.5  # seconds between requests
 #
 # IMPORTANT: When you change BOORU_PRIORITY, increment BOORU_PRIORITY_VERSION
 # This ensures remote systems detect the change and re-tag automatically
-BOORU_PRIORITY_VERSION = 3  # Increment this when changing priority order
+BOORU_PRIORITY_VERSION = 4  # Increment this when changing priority order
 
 BOORU_PRIORITY = [
     "danbooru",     # Best general categorization
     "e621",         # Good specific categorization
     "gelbooru",     # Tags only
     "yandere",      # Tags only
+    "pixiv",        # Pixiv tags and artist info
     "local_tagger"  # AI fallback
 ]
 

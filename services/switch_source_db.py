@@ -54,7 +54,7 @@ def extract_tags_from_source(source_data, source_name):
         tags_dict["meta"] = source_data.get("tag_string_meta", "")
         tags_dict["general"] = source_data.get("tag_string_general", "")
         
-    elif source_name == "e621":
+    elif source_name in ["e621", "pixiv"]:
         tags = source_data.get("tags", {})
         if isinstance(tags, dict):
             tags_dict["character"] = " ".join(tags.get("character", []))
@@ -63,7 +63,7 @@ def extract_tags_from_source(source_data, source_name):
             tags_dict["species"] = " ".join(tags.get("species", []))
             tags_dict["meta"] = " ".join(tags.get("meta", []))
             tags_dict["general"] = " ".join(tags.get("general", []))
-            
+
     elif source_name == "local_tagger" or source_name == "camie_tagger":
         # Handle both old 'camie_tagger' and new 'local_tagger' format
         tags = source_data.get("tags", {})
@@ -236,8 +236,9 @@ def merge_all_sources(filepath):
 
         # Update database
         try:
-            # Delete old image_tags
+            # Delete old image_tags and image_sources
             cursor.execute("DELETE FROM image_tags WHERE image_id = ?", (image_id,))
+            cursor.execute("DELETE FROM image_sources WHERE image_id = ?", (image_id,))
 
             # Insert merged tags
             for tag_name, tag_info in merged_tags.items():
@@ -254,10 +255,29 @@ def merge_all_sources(filepath):
                 tag_id = cursor.fetchone()['id']
 
                 # Link tag to image
+                # Use 'original' as source since 'merged' is not allowed by CHECK constraint
                 cursor.execute("""
                     INSERT OR IGNORE INTO image_tags (image_id, tag_id, source)
                     VALUES (?, ?, ?)
-                """, (image_id, tag_id, 'merged'))
+                """, (image_id, tag_id, 'original'))
+
+            # Populate image_sources table with all available sources
+            for source_name in metadata["sources"].keys():
+                # Get or create source_id
+                cursor.execute("SELECT id FROM sources WHERE name = ?", (source_name,))
+                source_row = cursor.fetchone()
+                if source_row:
+                    source_id = source_row['id']
+                else:
+                    # Create source if it doesn't exist
+                    cursor.execute("INSERT INTO sources (name) VALUES (?)", (source_name,))
+                    source_id = cursor.lastrowid
+
+                # Link image to source
+                cursor.execute("""
+                    INSERT OR IGNORE INTO image_sources (image_id, source_id)
+                    VALUES (?, ?)
+                """, (image_id, source_id))
 
             # Update images table with merged data
             # Use first post_id/parent_id if available

@@ -445,7 +445,7 @@ def extract_tag_data(data, source):
         image_url = data.get('file_url')
         preview_url = data.get('large_file_url') or data.get('preview_file_url')
         width, height, file_size = data.get('image_width'), data.get('image_height'), data.get('file_size')
-    
+
     elif source == 'e621':
         tag_data = data.get("tags", {})
         tags_dict["character"] = " ".join(tag_data.get("character", []))
@@ -456,12 +456,25 @@ def extract_tag_data(data, source):
         image_url = data.get('file', {}).get('url')
         preview_url = data.get('preview', {}).get('url')
         width, height, file_size = data.get('file', {}).get('width'), data.get('file', {}).get('height'), data.get('file', {}).get('size')
-        
+
     elif source in ['gelbooru', 'yandere']:
         tags_dict["general"] = data.get("tags", "")
         image_url = data.get('file_url')
         preview_url = data.get('preview_url')  # Works for both
         width, height, file_size = data.get('width'), data.get('height'), data.get('file_size')
+
+    elif source == 'pixiv':
+        tag_data = data.get("tags", {})
+        tags_dict["character"] = " ".join(tag_data.get("character", []))
+        tags_dict["copyright"] = " ".join(tag_data.get("copyright", []))
+        tags_dict["artist"] = " ".join(tag_data.get("artist", []))
+        tags_dict["meta"] = " ".join(tag_data.get("meta", []))
+        tags_dict["general"] = " ".join(tag_data.get("general", []))
+        tags_dict["species"] = " ".join(tag_data.get("species", []))
+        image_url = data.get('image_url')
+        preview_url = None  # Pixiv doesn't provide direct preview URLs
+        width, height = data.get('width'), data.get('height')
+        file_size = None  # Not provided by Pixiv API
 
     return {
         "tags": tags_dict,
@@ -704,6 +717,173 @@ def fetch_by_post_id(source, post_id):
         print(f"Error fetching {source} post {post_id}: {e}")
     return None
 
+def extract_pixiv_id_from_filename(filename):
+    """
+    Extract Pixiv illustration ID from filename.
+
+    Supports various Pixiv naming patterns:
+    - 131010854_p0.png (standard pattern)
+    - 131010854.png (without page number)
+    - pixiv_131010854.jpg (with prefix)
+    - any filename containing _p[n]. pattern where n is a digit
+
+    Args:
+        filename: The filename to extract from
+
+    Returns:
+        Pixiv ID as string, or None if no valid ID found
+    """
+    import re
+
+    # Pattern 1: [id]_p[page].[ext] (e.g., 131010854_p0.png)
+    match = re.search(r'(\d{6,})_p\d+\.', filename)
+    if match:
+        return match.group(1)
+
+    # Pattern 2: pixiv_[id].[ext] or similar prefix patterns
+    match = re.search(r'pixiv[_-](\d{6,})\.', filename, re.IGNORECASE)
+    if match:
+        return match.group(1)
+
+    # Pattern 3: Just the ID with extension (e.g., 131010854.png)
+    # Only if it's a reasonable Pixiv ID length (6-9 digits)
+    basename = os.path.splitext(filename)[0]
+    if basename.isdigit() and 6 <= len(basename) <= 9:
+        return basename
+
+    return None
+
+def fetch_pixiv_metadata(pixiv_id):
+    """
+    Fetch metadata for a Pixiv illustration using unofficial API.
+
+    Args:
+        pixiv_id: Pixiv illustration ID
+
+    Returns:
+        Dict with source='pixiv' and data containing tags and metadata, or None if failed
+    """
+    try:
+        # Use the unofficial Pixiv API endpoint (doesn't require authentication)
+        # This endpoint is used by the Pixiv website itself
+        url = f"https://www.pixiv.net/ajax/illust/{pixiv_id}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://www.pixiv.net/"
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get('error'):
+            print(f"[Pixiv] API error for ID {pixiv_id}: {data.get('message', 'Unknown error')}")
+            return None
+
+        if not data.get('body'):
+            print(f"[Pixiv] No data found for ID {pixiv_id}")
+            return None
+
+        body = data['body']
+
+        # Extract tags - Pixiv provides tags as a list with translations
+        tags_general = []
+        if 'tags' in body and 'tags' in body['tags']:
+            for tag_obj in body['tags']['tags']:
+                # Prefer English translation if available, otherwise use original tag
+                tag_name = tag_obj.get('translation', {}).get('en', tag_obj.get('tag', ''))
+                if tag_name:
+                    # Replace spaces with underscores to match booru format
+                    tag_name = tag_name.replace(' ', '_').lower()
+                    tags_general.append(tag_name)
+
+        # Extract artist name
+        artist_name = body.get('userName', '').replace(' ', '_').lower()
+        artist_id = body.get('userId', '')
+
+        # Get image URL (original)
+        image_url = body.get('urls', {}).get('original')
+
+        print(f"[Pixiv] Found illustration {pixiv_id}: {len(tags_general)} tags, artist: {artist_name}")
+
+        return {
+            "source": "pixiv",
+            "data": {
+                "tags": {
+                    "general": tags_general,
+                    "artist": [artist_name] if artist_name else [],
+                    "character": [],
+                    "copyright": [],
+                    "meta": [],
+                    "species": []
+                },
+                "pixiv_id": pixiv_id,
+                "title": body.get('title', ''),
+                "artist_name": artist_name,
+                "artist_id": artist_id,
+                "image_url": image_url,
+                "width": body.get('width'),
+                "height": body.get('height')
+            }
+        }
+
+    except requests.exceptions.RequestException as e:
+        print(f"[Pixiv] Network error fetching ID {pixiv_id}: {e}")
+        return None
+    except Exception as e:
+        print(f"[Pixiv] Error fetching Pixiv ID {pixiv_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def download_pixiv_image(pixiv_id, image_url, output_dir="./pixiv_originals"):
+    """
+    Download the original image from Pixiv.
+
+    Args:
+        pixiv_id: Pixiv illustration ID
+        image_url: URL to the original image
+        output_dir: Directory to save the image
+
+    Returns:
+        Path to downloaded file, or None if failed
+    """
+    try:
+        if not image_url:
+            print(f"[Pixiv] No image URL provided for ID {pixiv_id}")
+            return None
+
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Extract filename from URL
+        filename = os.path.basename(image_url.split('?')[0])
+        output_path = os.path.join(output_dir, f"{pixiv_id}_{filename}")
+
+        # Check if already downloaded
+        if os.path.exists(output_path):
+            print(f"[Pixiv] Image already exists: {output_path}")
+            return output_path
+
+        # Download with proper headers (Pixiv requires referer)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": f"https://www.pixiv.net/artworks/{pixiv_id}"
+        }
+
+        response = requests.get(image_url, headers=headers, timeout=30)
+        response.raise_for_status()
+
+        with open(output_path, 'wb') as f:
+            f.write(response.content)
+
+        print(f"[Pixiv] Downloaded original image: {output_path}")
+        return output_path
+
+    except Exception as e:
+        print(f"[Pixiv] Error downloading image for ID {pixiv_id}: {e}")
+        return None
+
 def process_image_file(filepath, move_from_ingest=False):
     """
     Process an image file, fetch metadata, and add to database.
@@ -800,6 +980,21 @@ def process_image_file(filepath, move_from_ingest=False):
                     if all_results:
                         break
 
+        # If SauceNAO failed, try extracting Pixiv ID from filename
+        if not all_results:
+            pixiv_id = extract_pixiv_id_from_filename(filename)
+            if pixiv_id:
+                print(f"Detected Pixiv ID {pixiv_id} from filename, fetching metadata...")
+                pixiv_result = fetch_pixiv_metadata(pixiv_id)
+                if pixiv_result:
+                    all_results[pixiv_result['source']] = pixiv_result['data']
+                    print(f"Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
+
+                    # Optionally download the original image for comparison
+                    image_url = pixiv_result['data'].get('image_url')
+                    if image_url:
+                        download_pixiv_image(pixiv_id, image_url)
+
         if not all_results:
             print(f"All online searches failed for {db_path}, trying local AI tagger...")
             local_tagger_result = tag_with_local_tagger(filepath)
@@ -829,7 +1024,7 @@ def process_image_file(filepath, move_from_ingest=False):
         tags_artist = primary_source_data.get("tag_string_artist", "")
         tags_meta = primary_source_data.get("tag_string_meta", "")
         tags_general = primary_source_data.get("tag_string_general", "")
-    elif source_name in ['e621', 'local_tagger']:
+    elif source_name in ['e621', 'local_tagger', 'pixiv']:
         tags = primary_source_data.get("tags", {})
         tags_character = " ".join(tags.get("character", []))
         tags_copyright = " ".join(tags.get("copyright", []))

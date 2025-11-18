@@ -428,6 +428,7 @@ def autocomplete():
             ("source:e621", "E621 images", "e621"),
             ("source:gelbooru", "Gelbooru images", "gelbooru"),
             ("source:yandere", "Yandere images", "yandere"),
+            ("source:pixiv", "Pixiv images", "pixiv"),
             ("source:local_tagger", "Locally tagged images", "local"),
             ("has:parent", "Images with parent", "parent"),
             ("has:child", "Images with children", "child"),
@@ -663,6 +664,17 @@ async def retry_tagging_service():
                         if all_results:
                             break
 
+        # If SauceNAO failed, try extracting Pixiv ID from filename
+        if not all_results:
+            filename = os.path.basename(filepath)
+            pixiv_id = processing.extract_pixiv_id_from_filename(filename)
+            if pixiv_id:
+                print(f"[Retry Tagging] Detected Pixiv ID {pixiv_id} from filename, fetching metadata...")
+                pixiv_result = processing.fetch_pixiv_metadata(pixiv_id)
+                if pixiv_result:
+                    all_results[pixiv_result['source']] = pixiv_result['data']
+                    print(f"[Retry Tagging] Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
+
         # If still no results and fallback is allowed, use local tagger
         if not all_results and not skip_local_fallback:
             print(f"[Retry Tagging] All online searches failed, falling back to local AI tagger...")
@@ -704,7 +716,7 @@ async def retry_tagging_service():
             tags_artist = primary_source_data.get("tag_string_artist", "")
             tags_meta = primary_source_data.get("tag_string_meta", "")
             tags_general = primary_source_data.get("tag_string_general", "")
-        elif source_name in ['e621', 'local_tagger']:
+        elif source_name in ['e621', 'local_tagger', 'pixiv']:
             tags = primary_source_data.get("tags", {})
             tags_character = " ".join(tags.get("character", []))
             tags_copyright = " ".join(tags.get("copyright", []))
@@ -943,6 +955,17 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                             if all_results:
                                 break
 
+            # If SauceNAO failed, try extracting Pixiv ID from filename
+            if not all_results:
+                filename = os.path.basename(filepath)
+                pixiv_id = processing.extract_pixiv_id_from_filename(filename)
+                if pixiv_id:
+                    print(f"[Bulk Retry Tagging] Detected Pixiv ID {pixiv_id} from filename, fetching metadata...")
+                    pixiv_result = processing.fetch_pixiv_metadata(pixiv_id)
+                    if pixiv_result:
+                        all_results[pixiv_result['source']] = pixiv_result['data']
+                        print(f"[Bulk Retry Tagging] Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
+
             # If still no results and fallback allowed, try local tagger
             if not all_results and not skip_local_fallback:
                 local_tagger_result = processing.tag_with_local_tagger(full_path)
@@ -977,7 +1000,7 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                 tags_artist = primary_source_data.get("tag_string_artist", "")
                 tags_meta = primary_source_data.get("tag_string_meta", "")
                 tags_general = primary_source_data.get("tag_string_general", "")
-            elif source_name in ['e621', 'local_tagger']:
+            elif source_name in ['e621', 'local_tagger', 'pixiv']:
                 tags = primary_source_data.get("tags", {})
                 tags_character = " ".join(tags.get("character", []))
                 tags_copyright = " ".join(tags.get("copyright", []))
