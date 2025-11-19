@@ -1,0 +1,31 @@
+# ============================================================================
+# Booru - AI/ML Dependencies (Optional)
+# ============================================================================
+# Install with: pip install -r requirements.txt -r requirements-ai.txt
+#
+# These packages are OPTIONAL and only needed if you want to use:
+# - Local AI image tagging with ONNX models
+# - Image preprocessing with torchvision transforms
+#
+# Note: These packages are large (torch ~2GB, onnxruntime ~100MB)
+# ============================================================================
+
+# ONNX Runtime for AI inference
+onnxruntime>=1.23.2,<2.0.0
+
+# PyTorch Vision for image transforms
+torchvision>=0.24.0,<0.25.0
+
+# PyTorch (dependency of torchvision)
+torch>=2.9.0,<3.0.0
+
+# Additional dependencies automatically installed:
+# - nvidia-* packages (for CUDA support, if available)
+# - typing_extensions
+# - filelock
+# - fsspec
+# - flatbuffers
+# - protobuf
+# - grpcio
+# - sympy
+# - networkx
