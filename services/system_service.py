@@ -74,6 +74,13 @@ def scan_and_process_service():
             models.load_data_from_db()
             print("Data reload complete")
 
+        # Optimize query planner if new images were added
+        if processed_count > 0:
+            print("New images added. Analyzing database statistics...")
+            with get_db_connection() as conn:
+                conn.execute("ANALYZE")
+            print("Database analysis complete")
+
         # Build response message
         messages = []
         if processed_count > 0:
@@ -93,6 +100,7 @@ def scan_and_process_service():
             "status": "success",
             "message": message,
             "processed": processed_count,
+            "cleaned": cleaned_count,
             "cleaned": cleaned_count,
             "orphaned_tags_cleaned": orphaned_tags_count
         })
@@ -406,4 +414,52 @@ async def clean_orphans_service():
     except Exception as e:
         import traceback
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def reindex_database_service():
+    """Service to optimize the database (VACUUM and REINDEX)."""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from database import get_db_connection
+        import time
+        
+        start_time = time.time()
+        monitor_service.add_log("Starting database optimization...", "info")
+        
+        with get_db_connection() as conn:
+            # Enable auto-vacuum to keep DB size in check
+            conn.execute("PRAGMA auto_vacuum = FULL")
+            
+            # Rebuild FTS index
+            monitor_service.add_log("Rebuilding FTS index...", "info")
+            conn.execute("INSERT INTO images_fts(images_fts) VALUES('rebuild')")
+            
+            # Rebuild standard indexes
+            monitor_service.add_log("Reindexing standard indexes...", "info")
+            conn.execute("REINDEX")
+            
+            # Optimize database file
+            monitor_service.add_log("Vacuuming database...", "info")
+            conn.execute("VACUUM")
+            
+            # Analyze for query planner optimization
+            monitor_service.add_log("Analyzing database statistics...", "info")
+            conn.execute("ANALYZE")
+            
+        duration = time.time() - start_time
+        message = f"Database optimization complete in {duration:.2f} seconds."
+        monitor_service.add_log(message, "success")
+        
+        return jsonify({
+            "status": "success",
+            "message": message,
+            "duration": duration
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        monitor_service.add_log(f"Database optimization failed: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500

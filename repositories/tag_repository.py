@@ -51,6 +51,61 @@ def get_all_tags_sorted():
         return [dict(row) for row in conn.execute(query).fetchall()]
 
 
+def search_tags(query=None, category=None, limit=100, offset=0):
+    """
+    Search for tags with pagination and filtering using SQL.
+    
+    Args:
+        query: Search string (partial match)
+        category: Category filter ('all' or specific category)
+        limit: Max results
+        offset: Pagination offset
+        
+    Returns:
+        Tuple (tags, total_count)
+    """
+    with get_db_connection() as conn:
+        sql_parts = ["""
+            SELECT t.name, t.category, COUNT(it.image_id) as count
+            FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
+        """]
+        
+        where_clauses = []
+        params = []
+        
+        if query:
+            where_clauses.append("LOWER(t.name) LIKE ?")
+            params.append(f"%{query.lower()}%")
+            
+        if category and category != 'all':
+            where_clauses.append("t.category = ?")
+            params.append(category)
+            
+        if where_clauses:
+            sql_parts.append("WHERE " + " AND ".join(where_clauses))
+            
+        sql_parts.append("GROUP BY t.id")
+        sql_parts.append("ORDER BY t.name ASC")
+        sql_parts.append("LIMIT ? OFFSET ?")
+        params.extend([limit, offset])
+        
+        full_query = " ".join(sql_parts)
+        
+        # Get total count for pagination
+        count_sql_parts = ["SELECT COUNT(*) FROM tags t"]
+        if where_clauses:
+            count_sql_parts.append("WHERE " + " AND ".join(where_clauses))
+            
+        count_query = " ".join(count_sql_parts)
+        # Use params excluding limit and offset for count query
+        total = conn.execute(count_query, params[:-2]).fetchone()[0]
+        
+        tags = [dict(row) for row in conn.execute(full_query, params).fetchall()]
+        
+        return tags, total
+
+
 # ============================================================================
 # TAG NORMALIZATION
 # ============================================================================

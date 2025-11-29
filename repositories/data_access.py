@@ -94,12 +94,6 @@ def get_image_details(filepath):
         SELECT
             i.*,
             (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id) as all_tags,
-            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'character') as tags_character,
-            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'copyright') as tags_copyright,
-            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'artist') as tags_artist,
-            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'species') as tags_species,
-            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'meta') as tags_meta,
-            (SELECT COALESCE(GROUP_CONCAT(t.name, ' '), '') FROM tags t JOIN image_tags it ON t.id = it.tag_id WHERE it.image_id = i.id AND t.category = 'general') as tags_general,
             rm.data as raw_metadata
         FROM images i
         LEFT JOIN raw_metadata rm ON i.id = rm.image_id
@@ -112,6 +106,11 @@ def get_image_details(filepath):
         details_dict = dict(details)
         if details_dict.get('raw_metadata'):
             details_dict['raw_metadata'] = json.loads(details_dict['raw_metadata'])
+
+        # Ensure tag fields are strings (not None) for backward compatibility
+        for key in ['tags_character', 'tags_copyright', 'tags_artist', 'tags_species', 'tags_meta', 'tags_general']:
+            if details_dict.get(key) is None:
+                details_dict[key] = ''
 
         # If no active_source set but we have metadata, determine it
         if not details_dict.get('active_source') and details_dict.get('raw_metadata'):

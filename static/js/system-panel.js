@@ -209,47 +209,47 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
     let isBackgroundTask = false;
 
     fetch(url, options)
-    .then(async res => {
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await res.text();
-            console.error('Non-JSON response:', text);
-            throw new Error(`Server returned non-JSON response. Status: ${res.status}`);
-        }
-        return res.json();
-    })
-    .then(data => {
-        if (data.status === 'success') {
-            const msg = data.message || `${actionName} completed`;
-            showNotification(msg, 'success');
-            loadLogs();
-            loadSystemStatus();
-        } else if (data.status === 'started' && data.task_id) {
-            // Background task started - poll for progress
-            isBackgroundTask = true;
-            showNotification(`${actionName} started in background`, 'info');
-            pollTaskProgress(data.task_id, actionName, buttonElement, originalText);
-        } else if (data.error === 'Unauthorized') {
-            localStorage.removeItem('system_secret');
-            SYSTEM_SECRET = null;
-            showNotification('Invalid system secret', 'error');
-            updateSecretUI();
-        } else {
-            throw new Error(data.error || 'Unknown error');
-        }
-    })
-    .catch(err => {
-        const errMsg = `${actionName} failed: ${err.message}`;
-        showNotification(errMsg, 'error');
-        console.error('Full error:', err);
-    })
-    .finally(() => {
-        // Don't reset button if it's a background task (polling will handle it)
-        if (buttonElement && !isBackgroundTask) {
-            buttonElement.innerHTML = originalText;
-            buttonElement.disabled = false;
-        }
-    });
+        .then(async res => {
+            const contentType = res.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await res.text();
+                console.error('Non-JSON response:', text);
+                throw new Error(`Server returned non-JSON response. Status: ${res.status}`);
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                const msg = data.message || `${actionName} completed`;
+                showNotification(msg, 'success');
+                loadLogs();
+                loadSystemStatus();
+            } else if (data.status === 'started' && data.task_id) {
+                // Background task started - poll for progress
+                isBackgroundTask = true;
+                showNotification(`${actionName} started in background`, 'info');
+                pollTaskProgress(data.task_id, actionName, buttonElement, originalText);
+            } else if (data.error === 'Unauthorized') {
+                localStorage.removeItem('system_secret');
+                SYSTEM_SECRET = null;
+                showNotification('Invalid system secret', 'error');
+                updateSecretUI();
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        })
+        .catch(err => {
+            const errMsg = `${actionName} failed: ${err.message}`;
+            showNotification(errMsg, 'error');
+            console.error('Full error:', err);
+        })
+        .finally(() => {
+            // Don't reset button if it's a background task (polling will handle it)
+            if (buttonElement && !isBackgroundTask) {
+                buttonElement.innerHTML = originalText;
+                buttonElement.disabled = false;
+            }
+        });
 }
 
 function pollTaskProgress(taskId, actionName, buttonElement, originalText) {
@@ -373,6 +373,13 @@ function systemRecountTags(event) {
     });
 }
 
+function systemReindexDatabase(event) {
+    if (event) event.preventDefault();
+    showConfirm('This will optimize the database (VACUUM and REINDEX). This may take a few seconds. Continue?', () => {
+        systemAction('/api/system/reindex', event.target, 'Optimize Database');
+    });
+}
+
 function systemBulkRetryTagging(event) {
     if (event) event.preventDefault();
 
@@ -386,15 +393,15 @@ function systemBulkRetryTagging(event) {
 
     // Add hover and click handlers
     optionBtns.forEach(btn => {
-        btn.addEventListener('mouseenter', function() {
+        btn.addEventListener('mouseenter', function () {
             this.style.transform = 'translateY(-2px)';
             this.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
         });
-        btn.addEventListener('mouseleave', function() {
+        btn.addEventListener('mouseleave', function () {
             this.style.transform = 'translateY(0)';
             this.style.boxShadow = 'none';
         });
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             const option = this.dataset.option;
             document.body.removeChild(overlay);
             const skipLocalFallback = option === 'online-only';

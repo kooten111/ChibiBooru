@@ -499,7 +499,15 @@ def perform_search(search_query):
         should_shuffle = False  # FTS results are ranked by relevance
     else:
         # Use traditional tag-based search
-        results = models.get_all_images_with_tags()
+        
+        # Optimization: If all terms are exact tags, use the database index
+        # This avoids fetching the entire database for simple tag searches
+        are_all_tags = general_terms and not _should_use_fts(general_terms)
+        
+        if are_all_tags:
+            results = models.search_images_by_tags(general_terms)
+        else:
+            results = models.get_all_images_with_tags()
 
         # Apply specific filters first
         if pool_filter:
