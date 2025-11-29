@@ -463,24 +463,35 @@ async def retry_tagging_service():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_local_fallback: bool):
+async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_local_fallback: bool, pixiv_only: bool = False):
     """Background task to process bulk retry tagging."""
     
-    # Get all images that were tagged with local_tagger
+    # Get images based on mode
     with get_db_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, filepath, md5, active_source
-            FROM images
-            WHERE active_source IN ('local_tagger', 'camie_tagger')
-            ORDER BY id
-        """)
+        if pixiv_only:
+            # Pixiv-only mode: only process images with Pixiv as active source
+            cursor.execute("""
+                SELECT id, filepath, md5, active_source
+                FROM images
+                WHERE active_source = 'pixiv'
+                ORDER BY id
+            """)
+        else:
+            # Normal mode: process images with local tagger
+            cursor.execute("""
+                SELECT id, filepath, md5, active_source
+                FROM images
+                WHERE active_source IN ('local_tagger', 'camie_tagger')
+                ORDER BY id
+            """)
         local_tagged_images = cursor.fetchall()
 
     if not local_tagged_images:
+        mode_name = "Pixiv" if pixiv_only else "locally tagged"
         return {
             "status": "success",
-            "message": "No locally tagged images found",
+            "message": f"No {mode_name} images found",
             "total": 0,
             "success": 0,
             "failed": 0,
@@ -493,7 +504,14 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
     still_local_count = 0
     results = []
 
-    mode = "online-only" if skip_local_fallback else "with fallback"
+    # Determine processing mode for logging
+    if pixiv_only:
+        mode = "pixiv-complement"
+    elif skip_local_fallback:
+        mode = "online-only"
+    else:
+        mode = "with fallback"
+    
     print(f"[Bulk Retry Tagging] Starting bulk retry for {total} images (mode: {mode})...")
 
     await task_manager.update_progress(task_id, 0, total, f"Starting bulk retry for {total} images ({mode})")
@@ -524,59 +542,90 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                 results.append({"filepath": filepath, "status": "file_not_found"})
                 continue
 
-            # Try to fetch metadata from online sources
-            all_results = processing.search_all_sources(md5)
+            all_results = {}
             used_saucenao = False
             saucenao_response = None
+            used_local_tagger = False
 
-            # If MD5 lookup failed, try SauceNao
-            if not all_results:
-                saucenao_response = processing.search_saucenao(full_path)
-                used_saucenao = True
-                if saucenao_response and 'results' in saucenao_response:
-                    for result in saucenao_response.get('results', []):
-                        if float(result['header']['similarity']) > 80:
-                            for url in result['data'].get('ext_urls', []):
-                                post_id, source = None, None
-                                if 'danbooru.donmai.us' in url:
-                                    post_id = url.split('/posts/')[-1].split('?')[0]
-                                    source = 'danbooru'
-                                elif 'e621.net' in url:
-                                    post_id = url.split('/posts/')[-1].split('?')[0]
-                                    source = 'e621'
-
-                                if post_id and source:
-                                    fetched_data = processing.fetch_by_post_id(source, post_id)
-                                    if fetched_data:
-                                        all_results[fetched_data['source']] = fetched_data['data']
-                                        break
-                            if all_results:
-                                break
-
-            # If SauceNAO failed, try extracting Pixiv ID from filename
-            if not all_results:
-                filename = os.path.basename(filepath)
-                pixiv_id = processing.extract_pixiv_id_from_filename(filename)
-                if pixiv_id:
-                    print(f"[Bulk Retry Tagging] Detected Pixiv ID {pixiv_id} from filename, fetching metadata...")
-                    pixiv_result = processing.fetch_pixiv_metadata(pixiv_id)
-                    if pixiv_result:
-                        all_results[pixiv_result['source']] = pixiv_result['data']
-                        print(f"[Bulk Retry Tagging] Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
-
-                        # Complement Pixiv with local tagger
-                        print(f"[Bulk Retry Tagging] Pixiv source found, complementing with local AI tagger...")
-                        local_tagger_result = processing.tag_with_local_tagger(full_path)
-                        if local_tagger_result:
-                            all_results[local_tagger_result['source']] = local_tagger_result['data']
-                            print(f"[Bulk Retry Tagging] Tagged with Local Tagger (complementing Pixiv): {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
-
-            # If still no results and fallback allowed, try local tagger
-            if not all_results and not skip_local_fallback:
+            if pixiv_only:
+                # Pixiv-only mode: Get existing Pixiv data and complement with local tagger
+                print(f"[Bulk Retry Tagging] Pixiv-only mode: Fetching existing Pixiv metadata...")
+                
+                # Get existing Pixiv data from raw_metadata
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT data FROM raw_metadata WHERE image_id = ?", (image_id,))
+                    raw_meta = cursor.fetchone()
+                    if raw_meta:
+                        try:
+                            raw_data = json.loads(raw_meta['data'])
+                            if 'sources' in raw_data and 'pixiv' in raw_data['sources']:
+                                all_results['pixiv'] = raw_data['sources']['pixiv']
+                                print(f"[Bulk Retry Tagging] Found existing Pixiv data")
+                        except:
+                            pass
+                
+                # Run local tagger to complement
+                print(f"[Bulk Retry Tagging] Complementing with local AI tagger...")
                 local_tagger_result = processing.tag_with_local_tagger(full_path)
+                used_local_tagger = True
                 if local_tagger_result:
                     all_results[local_tagger_result['source']] = local_tagger_result['data']
-                    print(f"[Bulk Retry Tagging] Re-tagged with Local Tagger: {filepath}")
+                    print(f"[Bulk Retry Tagging] Tagged with Local Tagger (complementing Pixiv): {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+            else:
+                # Normal mode: Try to fetch metadata from online sources
+                all_results = processing.search_all_sources(md5)
+
+                # If MD5 lookup failed, try SauceNao
+                if not all_results:
+                    saucenao_response = processing.search_saucenao(full_path)
+                    used_saucenao = True
+                    if saucenao_response and 'results' in saucenao_response:
+                        for result in saucenao_response.get('results', []):
+                            if float(result['header']['similarity']) > 80:
+                                for url in result['data'].get('ext_urls', []):
+                                    post_id, source = None, None
+                                    if 'danbooru.donmai.us' in url:
+                                        post_id = url.split('/posts/')[-1].split('?')[0]
+                                        source = 'danbooru'
+                                    elif 'e621.net' in url:
+                                        post_id = url.split('/posts/')[-1].split('?')[0]
+                                        source = 'e621'
+
+                                    if post_id and source:
+                                        fetched_data = processing.fetch_by_post_id(source, post_id)
+                                        if fetched_data:
+                                            all_results[fetched_data['source']] = fetched_data['data']
+                                            break
+                                if all_results:
+                                    break
+
+                # If SauceNAO failed, try extracting Pixiv ID from filename
+                if not all_results:
+                    filename = os.path.basename(filepath)
+                    pixiv_id = processing.extract_pixiv_id_from_filename(filename)
+                    if pixiv_id:
+                        print(f"[Bulk Retry Tagging] Detected Pixiv ID {pixiv_id} from filename, fetching metadata...")
+                        pixiv_result = processing.fetch_pixiv_metadata(pixiv_id)
+                        if pixiv_result:
+                            all_results[pixiv_result['source']] = pixiv_result['data']
+                            print(f"[Bulk Retry Tagging] Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
+
+                            # Complement Pixiv with local tagger
+                            print(f"[Bulk Retry Tagging] Pixiv source found, complementing with local AI tagger...")
+                            local_tagger_result = processing.tag_with_local_tagger(full_path)
+                            used_local_tagger = True
+                            if local_tagger_result:
+                                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                                print(f"[Bulk Retry Tagging] Tagged with Local Tagger (complementing Pixiv): {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+
+                # If still no results and fallback allowed, try local tagger
+                if not all_results and not skip_local_fallback:
+                    local_tagger_result = processing.tag_with_local_tagger(full_path)
+                    used_local_tagger = True
+                    if local_tagger_result:
+                        all_results[local_tagger_result['source']] = local_tagger_result['data']
+                        print(f"[Bulk Retry Tagging] Re-tagged with Local Tagger: {filepath}")
 
             # If still no results, skip (keep as local)
             if not all_results:
@@ -684,7 +733,7 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                     "relative_path": filepath,
                     "saucenao_lookup": used_saucenao,
                     "saucenao_response": saucenao_response,
-                    "local_tagger_lookup": False,
+                    "local_tagger_lookup": used_local_tagger,
                     "sources": all_results
                 }
 
@@ -759,6 +808,7 @@ async def bulk_retry_tagging_service():
 
     data = await request.json or {}
     skip_local_fallback = data.get('skip_local_fallback', False)
+    pixiv_only = data.get('pixiv_only', False)
 
     # Generate a unique task ID
     task_id = f"bulk_retry_{uuid.uuid4().hex[:8]}"
@@ -768,7 +818,8 @@ async def bulk_retry_tagging_service():
         await task_manager.start_task(
             task_id,
             _process_bulk_retry_tagging_task,
-            skip_local_fallback=skip_local_fallback
+            skip_local_fallback=skip_local_fallback,
+            pixiv_only=pixiv_only
         )
 
         return jsonify({

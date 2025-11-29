@@ -409,8 +409,15 @@ function systemBulkRetryTagging(event) {
         btn.addEventListener('click', function () {
             const option = this.dataset.option;
             document.body.removeChild(overlay);
-            const skipLocalFallback = option === 'online-only';
-            systemAction('/api/bulk_retry_tagging', event.target, 'Bulk Retry Tagging', { skip_local_fallback: skipLocalFallback });
+
+            const params = {};
+            if (option === 'online-only') {
+                params.skip_local_fallback = true;
+            } else if (option === 'pixiv-only') {
+                params.pixiv_only = true;
+            }
+
+            systemAction('/api/bulk_retry_tagging', event.target, 'Bulk Retry Tagging', params);
         });
     });
 

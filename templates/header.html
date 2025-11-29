@@ -228,17 +228,22 @@
         <div class="custom-confirm-overlay">
             <div class="custom-confirm-modal" style="max-width: 550px;">
                 <h3>🔄 Bulk Retry Tagging Options</h3>
-                <p>This will retry tagging for all locally-tagged images. Choose your preferred method:</p>
+                <p>Choose which images to reprocess:</p>
                 <div class="retry-options">
+                    <button class="retry-option-btn pixiv-only" data-option="pixiv-only">
+                        <div class="retry-option-title">🎨 Complement Pixiv Images</div>
+                        <div class="retry-option-desc">Add local AI tags to existing Pixiv images only. Fast and safe.
+                        </div>
+                    </button>
                     <button class="retry-option-btn online-only" data-option="online-only">
                         <div class="retry-option-title">🌐 Online Sources Only</div>
-                        <div class="retry-option-desc">Try Danbooru, e621, and SauceNao. Keep current tags if nothing
-                            found.</div>
+                        <div class="retry-option-desc">Retry locally-tagged images with Danbooru, e621, and SauceNao.
+                            Keep current tags if nothing found.</div>
                     </button>
                     <button class="retry-option-btn with-fallback" data-option="with-fallback">
                         <div class="retry-option-title">🤖 With Local AI Fallback</div>
-                        <div class="retry-option-desc">Try online sources first, then re-run local AI tagger if nothing
-                            found.</div>
+                        <div class="retry-option-desc">Try online sources for locally-tagged images, then re-run local
+                            AI tagger if nothing found.</div>
                     </button>
                 </div>
                 <div class="button-group">
