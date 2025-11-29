@@ -169,6 +169,69 @@ async def delete_images_bulk_service():
         "results": results
     })
 
+async def download_images_bulk_service():
+    """Service to download multiple images as a zip file."""
+    from quart import send_file
+    import zipfile
+    import io
+    
+    data = await request.json
+    filepaths = data.get('filepaths', [])
+
+    if not filepaths or not isinstance(filepaths, list):
+        return jsonify({"error": "filepaths array is required"}), 400
+
+    # Create a zip file in memory
+    zip_buffer = io.BytesIO()
+    
+    files_added = 0
+    errors = []
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for filepath in filepaths:
+            # The filepath from the frontend is 'images/folder/image.jpg'
+            # We need the path relative to the 'static/images' directory
+            clean_filepath = filepath.replace('images/', '', 1)
+            full_image_path = os.path.join("static/images", clean_filepath)
+
+            try:
+                if os.path.exists(full_image_path):
+                    # Add file to zip with just the basename to avoid nested folders
+                    arcname = os.path.basename(clean_filepath)
+                    
+                    # Handle duplicate filenames by appending a counter
+                    counter = 1
+                    original_arcname = arcname
+                    while arcname in zip_file.namelist():
+                        name, ext = os.path.splitext(original_arcname)
+                        arcname = f"{name}_{counter}{ext}"
+                        counter += 1
+                    
+                    zip_file.write(full_image_path, arcname)
+                    files_added += 1
+                else:
+                    errors.append(f"{clean_filepath}: File not found")
+            except Exception as e:
+                errors.append(f"{clean_filepath}: {str(e)}")
+
+    # Check if any files were added
+    if files_added == 0:
+        return jsonify({
+            "error": "No valid images found",
+            "errors": errors
+        }), 404
+
+    # Seek to the beginning of the buffer
+    zip_buffer.seek(0)
+
+    # Return the zip file
+    return await send_file(
+        zip_buffer,
+        mimetype='application/zip',
+        as_attachment=True,
+        attachment_filename='images.zip'
+    )
+
 async def retry_tagging_service():
     """Service to retry tagging for an image that was previously tagged with local_tagger."""
     data = await request.json

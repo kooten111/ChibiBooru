@@ -12,6 +12,7 @@
     const toggleIcon = document.querySelector('.toggle-icon');
     const toggleText = document.querySelector('.toggle-text');
     const selectAllBtn = document.getElementById('select-all-btn');
+    const downloadSelectedBtn = document.getElementById('download-selected-btn');
     const deleteSelectedBtn = document.getElementById('delete-selected-btn');
     const selectedCountSpan = document.getElementById('selected-count');
 
@@ -36,6 +37,8 @@
             });
             selectAllBtn.style.display = 'flex';
             selectAllBtn.classList.add('visible');
+            downloadSelectedBtn.style.display = 'flex';
+            downloadSelectedBtn.classList.add('visible');
             deleteSelectedBtn.style.display = 'flex';
             deleteSelectedBtn.classList.add('visible');
             selectionToggle.classList.add('active');
@@ -49,6 +52,8 @@
             });
             selectAllBtn.style.display = 'none';
             selectAllBtn.classList.remove('visible');
+            downloadSelectedBtn.style.display = 'none';
+            downloadSelectedBtn.classList.remove('visible');
             deleteSelectedBtn.style.display = 'none';
             deleteSelectedBtn.classList.remove('visible');
             selectionToggle.classList.remove('active');
@@ -123,6 +128,59 @@
             });
 
             updateSelectedCount();
+        });
+    }
+
+    // Handle Download Selected button
+    if (downloadSelectedBtn) {
+        downloadSelectedBtn.addEventListener('click', async function () {
+            if (selectedImages.size === 0) {
+                alert('No images selected');
+                return;
+            }
+
+            // Update button to show loading state
+            const originalText = downloadSelectedBtn.innerHTML;
+            downloadSelectedBtn.disabled = true;
+            downloadSelectedBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Preparing...</span>';
+
+            try {
+                const response = await fetch('/api/download_images_bulk', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filepaths: Array.from(selectedImages)
+                    })
+                });
+
+                if (response.ok) {
+                    // Get the blob from the response
+                    const blob = await response.blob();
+
+                    // Create a download link
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `images_${Date.now()}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+
+                    // Cleanup
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    const result = await response.json();
+                    alert('Error downloading images: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error during bulk download:', error);
+                alert('Network error occurred while downloading images');
+            } finally {
+                downloadSelectedBtn.disabled = false;
+                downloadSelectedBtn.innerHTML = originalText;
+            }
         });
     }
 

@@ -21,6 +21,10 @@ async def delete_image():
 async def delete_images_bulk():
     return await image_service.delete_images_bulk_service()
 
+@api_blueprint.route('/download_images_bulk', methods=['POST'])
+async def download_images_bulk():
+    return await image_service.download_images_bulk_service()
+
 @api_blueprint.route('/retry_tagging', methods=['POST'])
 async def retry_tagging():
     return await image_service.retry_tagging_service()
