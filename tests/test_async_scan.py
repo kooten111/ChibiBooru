@@ -30,7 +30,7 @@ def slow_scan():
 mock_system_service.scan_and_process_service = slow_scan
 sys.modules['services.system_service'] = mock_system_service
 
-from routers.api import trigger_scan
+from routers.api.system import trigger_scan
 
 class TestAsyncScan(unittest.TestCase):
     def test_scan_is_async(self):
