@@ -1,6 +1,6 @@
 from quart import request, jsonify
 from . import api_blueprint
-from services import system_service, monitor_service, api_service
+from services import system_service, monitor_service
 import asyncio
 
 @api_blueprint.route('/reload', methods=['POST'])
@@ -69,8 +69,8 @@ async def stop_monitor():
 
 @api_blueprint.route('/task_status', methods=['GET'])
 async def task_status():
-    return await api_service.get_task_status_service()
+    return await system_service.get_task_status_service()
 
 @api_blueprint.route('/database_health_check', methods=['POST'])
 async def database_health_check():
-    return await api_service.database_health_check_service()
+    return await system_service.database_health_check_service()

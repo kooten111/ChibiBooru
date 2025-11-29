@@ -1,6 +1,6 @@
 from quart import request, jsonify
 from . import api_blueprint
-from services import api_service
+from services import tag_service
 from database import models
 
 @api_blueprint.route('/tags/fetch')
@@ -24,4 +24,4 @@ async def fetch_tags():
 
 @api_blueprint.route('/autocomplete')
 async def autocomplete():
-    return api_service.autocomplete()
+    return tag_service.autocomplete()

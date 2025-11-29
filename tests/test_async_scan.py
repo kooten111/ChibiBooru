@@ -17,24 +17,32 @@ sys.modules['utils.file_utils'] = MagicMock()
 sys.modules['watchdog.observers'] = MagicMock()
 sys.modules['watchdog.events'] = MagicMock()
 sys.modules['services.switch_source_db'] = MagicMock()
-sys.modules['services.api_service'] = MagicMock()
+
 sys.modules['services.monitor_service'] = MagicMock()
 sys.modules['services.implication_service'] = MagicMock()
 sys.modules['services.rating_service'] = MagicMock()
 
-# Mock system_service to simulate a slow scan
-mock_system_service = MagicMock()
-def slow_scan():
-    time.sleep(1) # Block for 1 second
-    return {"status": "success"}
-mock_system_service.scan_and_process_service = slow_scan
-sys.modules['services.system_service'] = mock_system_service
+
+# Remove global mock setup for system_service
+# mock_system_service = MagicMock()
+# def slow_scan():
+#     time.sleep(1) # Block for 1 second
+#     return {"status": "success"}
+# mock_system_service.scan_and_process_service = slow_scan
+# sys.modules['services.system_service'] = mock_system_service
 
 from routers.api.system import trigger_scan
 
 class TestAsyncScan(unittest.TestCase):
-    def test_scan_is_async(self):
+    @patch('routers.api.system.system_service')
+    def test_scan_is_async(self, mock_system_service):
         print("\nTesting async scan endpoint...")
+        
+        # Setup mock
+        def slow_scan():
+            time.sleep(1) # Block for 1 second
+            return {"status": "success"}
+        mock_system_service.scan_and_process_service = slow_scan
         
         async def run_test():
             start_time = time.time()

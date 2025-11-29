@@ -469,4 +469,45 @@ def reindex_database_service():
         import traceback
         traceback.print_exc()
         monitor_service.add_log(f"Database optimization failed: {str(e)}", "error")
+
+async def get_task_status_service():
+    """Service to get the status of a background task."""
+    from services.background_tasks import task_manager
+
+    task_id = request.args.get('task_id')
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+
+    status = await task_manager.get_task_status(task_id)
+    if not status:
+        return jsonify({"error": "Task not found"}), 404
+
+    return jsonify(status)
+
+
+async def database_health_check_service():
+    """Service to run database health checks and optionally fix issues."""
+    data = await request.json or {}
+    auto_fix = data.get('auto_fix', True)
+    include_thumbnails = data.get('include_thumbnails', False)
+    include_tag_deltas = data.get('include_tag_deltas', True)
+
+    try:
+        from services import health_service as database_health
+
+        results = database_health.run_all_health_checks(
+            auto_fix=auto_fix,
+            include_thumbnails=include_thumbnails,
+            include_tag_deltas=include_tag_deltas
+        )
+
+        return jsonify({
+            "status": "success",
+            "message": f"Health check complete: {results['total_issues_found']} issues found, {results['total_issues_fixed']} fixed",
+            "results": results
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
