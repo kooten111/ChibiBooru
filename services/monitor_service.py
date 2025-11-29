@@ -17,7 +17,9 @@ monitor_status = {
     "total_processed": 0,
     "interval_seconds": 300, # 5 minutes (fallback, not used with watchdog)
     "logs": [],
-    "mode": "watchdog"  # "watchdog" for real-time or "polling" for legacy
+    "mode": "watchdog",  # "watchdog" for real-time or "polling" for legacy
+    "pending_reload": False,
+    "last_activity": 0
 }
 
 def get_status():
@@ -97,10 +99,11 @@ class ImageFileHandler(FileSystemEventHandler):
                     if processing.process_image_file(filepath, move_from_ingest=True):
                         monitor_status["last_scan_found"] = 1
                         monitor_status["total_processed"] += 1
-                        # Reload with bucketed path
-                        bucketed_rel_path = get_bucketed_path(filename, "images").replace("images/", "", 1)
-                        models.reload_single_image(bucketed_rel_path)
-                        models.reload_tag_counts()
+                        
+                        # Mark for reload, but don't reload immediately to prevent UI hang
+                        monitor_status["pending_reload"] = True
+                        monitor_status["last_activity"] = time.time()
+                        
                         add_log(f"Successfully processed from ingest: {filename}", 'success')
                     else:
                         add_log(f"Skipped (duplicate): {filename}", 'warning')
@@ -118,9 +121,11 @@ class ImageFileHandler(FileSystemEventHandler):
                     if processing.process_image_file(filepath, move_from_ingest=False):
                         monitor_status["last_scan_found"] = 1
                         monitor_status["total_processed"] += 1
-                        # Selective reload
-                        models.reload_single_image(rel_path)
-                        models.reload_tag_counts()
+                        
+                        # Mark for reload
+                        monitor_status["pending_reload"] = True
+                        monitor_status["last_activity"] = time.time()
+                        
                         add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
                     else:
                         add_log(f"Skipped (duplicate): {os.path.basename(filepath)}", 'warning')
@@ -276,8 +281,20 @@ def initial_scan_then_idle():
         add_log(f"Error during initial scan: {e}", 'error')
 
     # Now just idle - watchdog will handle new files
+    # Check for pending reloads periodically
     while monitor_status["running"]:
-        time.sleep(10)
+        if monitor_status["pending_reload"]:
+            # Check if enough time has passed since last activity (debounce)
+            if time.time() - monitor_status["last_activity"] > 2.0:
+                try:
+                    add_log("Reloading data after batch ingest...")
+                    models.load_data_from_db()
+                    monitor_status["pending_reload"] = False
+                    add_log("Data reload complete.", 'success')
+                except Exception as e:
+                    add_log(f"Error reloading data: {e}", 'error')
+        
+        time.sleep(1)
 
 def stop_monitor():
     """Stops the background monitoring thread."""
