@@ -4439,17 +4439,185 @@ body.ui-hidden::after {
     -webkit-backface-visibility: hidden;
 }
 
-/* BULK DELETE ACTIONS */
-.bulk-actions {
+/* ==================== FLOATING BULK ACTIONS PANEL (RIGHT-SIDE) ==================== */
+
+/* Panel Container - Fixed position on right side */
+.bulk-fab-container {
+    position: fixed;
+    top: 180px;
+    right: 16px;
+    z-index: 999;
     display: flex;
-    gap: var(--spacing-md);
-    justify-content: center;
-    margin-top: var(--spacing-md);
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.bulk-actions .btn {
-    font-size: var(--font-size-sm);
+/* Hide the main FAB button */
+.bulk-fab-button {
+    display: none;
+}
+
+/* Panel Menu - Minimal, flat design */
+.bulk-fab-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(40, 45, 60, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    width: 180px;
+}
+
+/* Remove the pill container - make toggle switch standalone */
+.bulk-fab-menu .selection-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+.bulk-fab-menu .selection-toggle-container:hover {
+    opacity: 0.8;
+}
+
+/* Toggle Switch - Simplified */
+.toggle-switch {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: rgba(60, 60, 80, 0.9);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    flex-shrink: 0;
+}
+
+.toggle-switch.active {
+    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    border-color: rgba(74, 158, 255, 0.5);
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch.active .toggle-slider {
+    transform: translateX(20px);
+}
+
+/* Toggle Label - Simplified */
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.toggle-switch.active~.toggle-label {
+    color: var(--primary-blue);
+}
+
+.toggle-icon {
+    display: none;
+}
+
+.toggle-text {
+    white-space: nowrap;
+    min-width: 85px;
+    display: inline-block;
+}
+
+/* Action Buttons - Minimal flat design */
+.bulk-action-btn {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.bulk-action-btn.visible {
+    display: flex;
+}
+
+.bulk-action-btn .btn-icon {
+    font-size: 14px;
+}
+
+/* Select All Button */
+#select-all-btn {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+#select-all-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--primary-blue);
+}
+
+/* Delete Selected Button */
+#delete-selected-btn {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    border: none;
+}
+
+#delete-selected-btn:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+#delete-selected-btn:disabled {
+    background: var(--bg-disabled);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Selection Badge */
+.selection-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1f2937;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* Responsive positioning */
+@media (max-width: 768px) {
+    .bulk-fab-container {
+        top: auto;
+        bottom: 16px;
+        right: 16px;
+    }
 }
 
 /* Checkbox styling on thumbnails */
