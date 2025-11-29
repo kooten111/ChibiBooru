@@ -6,7 +6,7 @@ import os
 from werkzeug.utils import secure_filename
 
 import config
-import database_models as models
+from database import models
 from services import processing_service as processing
 from services import query_service, system_service, api_service, monitor_service
 from utils import get_thumbnail_path

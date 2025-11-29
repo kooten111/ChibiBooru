@@ -6,7 +6,7 @@ from datetime import timedelta
 load_dotenv(override=True)
 
 from routers import main_blueprint, api_blueprint
-import database_models as models
+from database import models
 from database import initialize_database, repair_orphaned_image_tags
 from services.priority_service import check_and_apply_priority_changes
 from services.health_service import startup_health_check

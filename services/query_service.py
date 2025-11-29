@@ -1,4 +1,4 @@
-import database_models as models
+from database import models
 import config
 from utils import get_thumbnail_path
 from math import log

@@ -7,7 +7,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image, UnidentifiedImageError
 import numpy as np
-import database_models as models
+from database import models
 from database import get_db_connection
 from utils.deduplication import remove_duplicate
 import time

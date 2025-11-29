@@ -1,6 +1,6 @@
 from quart import Blueprint, request, jsonify
 from services.switch_source_db import switch_metadata_source_db, merge_all_sources
-import database_models as models
+from database import models
 from services import api_service, system_service, monitor_service
 import asyncio
 

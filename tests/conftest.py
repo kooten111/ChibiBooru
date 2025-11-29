@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from app import create_app
 import database
-import database_models as models
+from database import models
 import config
 
 
@@ -76,7 +76,9 @@ def db_connection(test_db_path, monkeypatch):
     Uses monkeypatch to override the DB_FILE path.
     """
     # Override the DB_FILE in database module
-    monkeypatch.setattr(database, 'DB_FILE', test_db_path)
+    # Override the DB_FILE in database.core module
+    import database.core
+    monkeypatch.setattr(database.core, 'DB_FILE', test_db_path)
 
     # Initialize the test database
     database.initialize_database()
@@ -113,7 +115,9 @@ def app(test_db_path, test_image_dir, test_thumb_dir, monkeypatch):
     monkeypatch.setattr(config, 'THUMB_DIR', test_thumb_dir)
     monkeypatch.setattr(config, 'ENABLE_LOCAL_TAGGER', False)
     monkeypatch.setattr(config, 'ENABLE_SAUCENAO', False)
-    monkeypatch.setattr(database, 'DB_FILE', test_db_path)
+    # Override the DB_FILE in database.core module
+    import database.core
+    monkeypatch.setattr(database.core, 'DB_FILE', test_db_path)
 
     # Create app
     app = create_app()

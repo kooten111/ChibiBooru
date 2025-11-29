@@ -9,7 +9,7 @@ from tests.conftest import (
     create_test_pool,
     create_test_implication,
 )
-import database_models as models
+from database import models
 
 
 @pytest.mark.unit

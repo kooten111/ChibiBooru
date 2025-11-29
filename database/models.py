@@ -3,7 +3,7 @@ import os
 import json
 import sqlite3
 from tqdm import tqdm
-from database import get_db_connection
+from .core import get_db_connection
 from functools import lru_cache
 
 from core.cache_manager import (

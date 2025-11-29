@@ -3,7 +3,7 @@ Tests for services/query_service.py - Search and similarity calculations
 """
 import pytest
 from services import query_service
-import database_models as models
+from database import models
 import config
 
 
