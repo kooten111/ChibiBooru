@@ -191,6 +191,11 @@ function systemAction(endpoint, buttonElement, actionName, body = null) {
         return;
     }
 
+    // Ensure we have the button element, not an icon inside it
+    if (buttonElement && buttonElement.tagName !== 'BUTTON') {
+        buttonElement = buttonElement.closest('button');
+    }
+
     const originalText = buttonElement ? buttonElement.innerHTML : '';
     if (buttonElement) {
         buttonElement.innerHTML = '<span class="processing-spinner">⚙️</span> Processing...';
