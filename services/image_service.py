@@ -248,6 +248,14 @@ async def retry_tagging_service():
                     all_results[pixiv_result['source']] = pixiv_result['data']
                     print(f"[Retry Tagging] Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
 
+                    # Complement Pixiv with local tagger
+                    print(f"[Retry Tagging] Pixiv source found, complementing with local AI tagger...")
+                    local_tagger_result = processing.tag_with_local_tagger(full_path)
+                    used_local_tagger = True
+                    if local_tagger_result:
+                        all_results[local_tagger_result['source']] = local_tagger_result['data']
+                        print(f"[Retry Tagging] Tagged with Local Tagger (complementing Pixiv): {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+
         # If still no results and fallback is allowed, use local tagger
         if not all_results and not skip_local_fallback:
             print(f"[Retry Tagging] All online searches failed, falling back to local AI tagger...")
@@ -291,12 +299,31 @@ async def retry_tagging_service():
             tags_general = primary_source_data.get("tag_string_general", "")
         elif source_name in ['e621', 'local_tagger', 'pixiv']:
             tags = primary_source_data.get("tags", {})
-            tags_character = " ".join(tags.get("character", []))
-            tags_copyright = " ".join(tags.get("copyright", []))
-            tags_artist = " ".join(tags.get("artist", []))
-            tags_species = " ".join(tags.get("species", []))
-            tags_meta = " ".join(tags.get("meta", []))
-            tags_general = " ".join(tags.get("general", []))
+            
+            # Helper to get list from tags dict
+            t_char = tags.get("character", [])
+            t_copy = tags.get("copyright", [])
+            t_art = tags.get("artist", [])
+            t_spec = tags.get("species", [])
+            t_meta = tags.get("meta", [])
+            t_gen = tags.get("general", [])
+
+            # If Pixiv is the source, complement with local tagger tags
+            if source_name == 'pixiv' and 'local_tagger' in all_results:
+                print("[Retry Tagging] Merging local tagger tags into Pixiv tags...")
+                local_tags = all_results['local_tagger'].get('tags', {})
+                t_char = list(t_char) + list(local_tags.get("character", []))
+                t_copy = list(t_copy) + list(local_tags.get("copyright", []))
+                t_spec = list(t_spec) + list(local_tags.get("species", []))
+                t_meta = list(t_meta) + list(local_tags.get("meta", []))
+                t_gen = list(t_gen) + list(local_tags.get("general", []))
+
+            tags_character = " ".join(t_char)
+            tags_copyright = " ".join(t_copy)
+            tags_artist = " ".join(t_art)
+            tags_species = " ".join(t_spec)
+            tags_meta = " ".join(t_meta)
+            tags_general = " ".join(t_gen)
 
         # Deduplicate tags across categories
         character_set = set(tags_character.split())
@@ -537,6 +564,13 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                         all_results[pixiv_result['source']] = pixiv_result['data']
                         print(f"[Bulk Retry Tagging] Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
 
+                        # Complement Pixiv with local tagger
+                        print(f"[Bulk Retry Tagging] Pixiv source found, complementing with local AI tagger...")
+                        local_tagger_result = processing.tag_with_local_tagger(full_path)
+                        if local_tagger_result:
+                            all_results[local_tagger_result['source']] = local_tagger_result['data']
+                            print(f"[Bulk Retry Tagging] Tagged with Local Tagger (complementing Pixiv): {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+
             # If still no results and fallback allowed, try local tagger
             if not all_results and not skip_local_fallback:
                 local_tagger_result = processing.tag_with_local_tagger(full_path)
@@ -573,12 +607,31 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                 tags_general = primary_source_data.get("tag_string_general", "")
             elif source_name in ['e621', 'local_tagger', 'pixiv']:
                 tags = primary_source_data.get("tags", {})
-                tags_character = " ".join(tags.get("character", []))
-                tags_copyright = " ".join(tags.get("copyright", []))
-                tags_artist = " ".join(tags.get("artist", []))
-                tags_species = " ".join(tags.get("species", []))
-                tags_meta = " ".join(tags.get("meta", []))
-                tags_general = " ".join(tags.get("general", []))
+                
+                # Helper to get list from tags dict
+                t_char = tags.get("character", [])
+                t_copy = tags.get("copyright", [])
+                t_art = tags.get("artist", [])
+                t_spec = tags.get("species", [])
+                t_meta = tags.get("meta", [])
+                t_gen = tags.get("general", [])
+
+                # If Pixiv is the source, complement with local tagger tags
+                if source_name == 'pixiv' and 'local_tagger' in all_results:
+                    print("[Bulk Retry Tagging] Merging local tagger tags into Pixiv tags...")
+                    local_tags = all_results['local_tagger'].get('tags', {})
+                    t_char = list(t_char) + list(local_tags.get("character", []))
+                    t_copy = list(t_copy) + list(local_tags.get("copyright", []))
+                    t_spec = list(t_spec) + list(local_tags.get("species", []))
+                    t_meta = list(t_meta) + list(local_tags.get("meta", []))
+                    t_gen = list(t_gen) + list(local_tags.get("general", []))
+
+                tags_character = " ".join(t_char)
+                tags_copyright = " ".join(t_copy)
+                tags_artist = " ".join(t_art)
+                tags_species = " ".join(t_spec)
+                tags_meta = " ".join(t_meta)
+                tags_general = " ".join(t_gen)
 
             # Deduplicate tags
             character_set = set(tags_character.split())

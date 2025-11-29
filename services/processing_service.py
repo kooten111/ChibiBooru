@@ -995,6 +995,14 @@ def process_image_file(filepath, move_from_ingest=False):
                     if image_url:
                         download_pixiv_image(pixiv_id, image_url)
 
+                    # Complement Pixiv with local tagger
+                    print(f"Pixiv source found, complementing with local AI tagger...")
+                    local_tagger_result = tag_with_local_tagger(filepath)
+                    used_local_tagger = True
+                    if local_tagger_result:
+                        all_results[local_tagger_result['source']] = local_tagger_result['data']
+                        print(f"Tagged with Local Tagger (complementing Pixiv): {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+
         if not all_results:
             print(f"All online searches failed for {db_path}, trying local AI tagger...")
             local_tagger_result = tag_with_local_tagger(filepath)
@@ -1026,12 +1034,33 @@ def process_image_file(filepath, move_from_ingest=False):
         tags_general = primary_source_data.get("tag_string_general", "")
     elif source_name in ['e621', 'local_tagger', 'pixiv']:
         tags = primary_source_data.get("tags", {})
-        tags_character = " ".join(tags.get("character", []))
-        tags_copyright = " ".join(tags.get("copyright", []))
-        tags_artist = " ".join(tags.get("artist", []))
-        tags_species = " ".join(tags.get("species", []))
-        tags_meta = " ".join(tags.get("meta", []))
-        tags_general = " ".join(tags.get("general", []))
+        
+        # Helper to get list from tags dict
+        t_char = tags.get("character", [])
+        t_copy = tags.get("copyright", [])
+        t_art = tags.get("artist", [])
+        t_spec = tags.get("species", [])
+        t_meta = tags.get("meta", [])
+        t_gen = tags.get("general", [])
+
+        # If Pixiv is the source, complement with local tagger tags
+        if source_name == 'pixiv' and 'local_tagger' in all_results:
+            print("Merging local tagger tags into Pixiv tags...")
+            local_tags = all_results['local_tagger'].get('tags', {})
+            t_char = list(t_char) + list(local_tags.get("character", []))
+            t_copy = list(t_copy) + list(local_tags.get("copyright", []))
+            # Keep Pixiv artist as primary, but maybe append? Usually Pixiv artist is accurate.
+            # t_art = list(t_art) + list(local_tags.get("artist", [])) 
+            t_spec = list(t_spec) + list(local_tags.get("species", []))
+            t_meta = list(t_meta) + list(local_tags.get("meta", []))
+            t_gen = list(t_gen) + list(local_tags.get("general", []))
+
+        tags_character = " ".join(t_char)
+        tags_copyright = " ".join(t_copy)
+        tags_artist = " ".join(t_art)
+        tags_species = " ".join(t_spec)
+        tags_meta = " ".join(t_meta)
+        tags_general = " ".join(t_gen)
 
     character_set = set(tags_character.split())
     copyright_set = set(tags_copyright.split())
