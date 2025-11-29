@@ -450,7 +450,7 @@ def reindex_database_service():
             conn.execute("ANALYZE")
             
         duration = time.time() - start_time
-        message = f"Database optimization complete in {duration:.2f} seconds."
+        message = f"Optimization complete: Rebuilt FTS & standard indexes, vacuumed database, and updated statistics ({duration:.2f}s)."
         monitor_service.add_log(message, "success")
         
         return jsonify({
