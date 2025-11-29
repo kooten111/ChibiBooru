@@ -429,7 +429,12 @@ def reindex_database_service():
         start_time = time.time()
         monitor_service.add_log("Starting database optimization...", "info")
         
-        with get_db_connection() as conn:
+        # VACUUM cannot be run inside a transaction
+        # We need to use a connection with isolation_level=None (autocommit)
+        conn = get_db_connection()
+        conn.isolation_level = None
+        
+        try:
             # Enable auto-vacuum to keep DB size in check
             conn.execute("PRAGMA auto_vacuum = FULL")
             
@@ -448,6 +453,8 @@ def reindex_database_service():
             # Analyze for query planner optimization
             monitor_service.add_log("Analyzing database statistics...", "info")
             conn.execute("ANALYZE")
+        finally:
+            conn.close()
             
         duration = time.time() - start_time
         message = f"Optimization complete: Rebuilt FTS & standard indexes, vacuumed database, and updated statistics ({duration:.2f}s)."
