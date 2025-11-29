@@ -1,6 +1,6 @@
 # services/api_service.py
 from quart import request, jsonify, url_for
-import models
+import database_models as models
 import random
 import sys
 import os
@@ -8,7 +8,7 @@ import json
 import requests
 from urllib.parse import urlparse
 from utils import get_thumbnail_path
-import processing
+from services import processing_service as processing
 from database import get_db_connection
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -1186,7 +1186,7 @@ async def database_health_check_service():
     include_tag_deltas = data.get('include_tag_deltas', True)
 
     try:
-        import database_health
+        from services import health_service as database_health
 
         results = database_health.run_all_health_checks(
             auto_fix=auto_fix,

@@ -5,11 +5,11 @@ from datetime import timedelta
 
 load_dotenv(override=True)
 
-from routes import main_blueprint, api_blueprint
-import models
+from routers import main_blueprint, api_blueprint
+import database_models as models
 from database import initialize_database, repair_orphaned_image_tags
-from priority_monitor import check_and_apply_priority_changes
-from database_health import startup_health_check
+from services.priority_service import check_and_apply_priority_changes
+from services.health_service import startup_health_check
 
 def create_app():
     """Create and configure the Quart application."""

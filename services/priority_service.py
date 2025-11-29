@@ -112,7 +112,7 @@ def check_and_apply_priority_changes():
         print("   (Manual tag changes will be preserved)\n")
 
         # Import here to avoid circular dependency
-        from models import repopulate_from_database
+        from database_models import repopulate_from_database
 
         # Apply the new priority
         repopulate_from_database()

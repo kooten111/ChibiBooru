@@ -441,7 +441,7 @@ def batch_apply_implications_to_all_images() -> int:
             image_id = img_row['id']
 
             # Import from models to reuse existing function
-            from models import apply_implications_for_image
+            from database_models import apply_implications_for_image
             if apply_implications_for_image(image_id):
                 count += 1
 

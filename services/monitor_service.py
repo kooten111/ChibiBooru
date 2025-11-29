@@ -2,8 +2,8 @@
 import threading
 import time
 import os
-import models
-import processing
+import database_models as models
+from services import processing_service as processing
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 

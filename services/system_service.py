@@ -1,8 +1,8 @@
 # services/system_service.py
 import os
 from quart import request, jsonify
-import models
-import processing
+import database_models as models
+from services import processing_service as processing
 from utils.deduplication import scan_and_remove_duplicates
 from . import monitor_service
 import subprocess

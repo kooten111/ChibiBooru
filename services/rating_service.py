@@ -30,7 +30,7 @@ USE_SEPARATE_MODEL_DB = True
 def get_model_connection():
     """Get connection to model database (separate or main DB)."""
     if USE_SEPARATE_MODEL_DB:
-        from rating_model_db import get_model_db_connection
+        from repositories.rating_repository import get_model_db_connection
         return get_model_db_connection()
     else:
         return get_db_connection()

@@ -241,7 +241,7 @@ def apply_tag_deltas():
             conn.commit()
             print(f"Successfully applied {applied} tag deltas.")
 
-            from models import rebuild_categorized_tags_from_relations
+            from database_models import rebuild_categorized_tags_from_relations
             rebuild_categorized_tags_from_relations()
 
             return True

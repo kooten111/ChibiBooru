@@ -179,7 +179,7 @@ def check_missing_thumbnails(auto_fix=False):
         result.add_message(f"Found {result.issues_found} images without thumbnails")
 
         if auto_fix:
-            from processing import ensure_thumbnail
+            from services.processing_service import ensure_thumbnail
             for filepath in missing:
                 full_path = os.path.join("static/images", filepath)
                 if os.path.exists(full_path):

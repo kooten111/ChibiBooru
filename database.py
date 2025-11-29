@@ -6,6 +6,7 @@ DB_FILE = "booru.db"
 def get_db_connection():
     """Create a database connection."""
     conn = sqlite3.connect(DB_FILE)
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
 
