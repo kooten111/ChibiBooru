@@ -9,6 +9,7 @@ static/thumbnails/
 static/logo/
 venv/
 .vscode/
+./ingest/
 
 # Testing and documentation
 
@@ -24,3 +25,5 @@ tags.json
 todo.txt
 todo.md
 .env
+booru.db-shm
+booru.db-wal
