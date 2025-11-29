@@ -129,9 +129,22 @@ python app.py
    ```bash
    pip install -r requirements-ai.txt
    ```
-   Then place your ONNX model files in `models/Tagger/` (e.g., `model.onnx`, `metadata.json`)
 
-5. **Optional: Install development dependencies:**
+5. **Optional: Download tagger model:**
+
+   If you need an ONNX tagger model, [Camie Tagger v2](https://huggingface.co/Camais03/camie-tagger-v2) is a good option.
+
+   **Quick setup:**
+   ```bash
+   python scripts/download_tagger.py
+   ```
+
+   **Manual download:**
+   Place these files in `models/Tagger/`:
+   - [camie-tagger-v2.onnx](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2.onnx) → rename to `model.onnx`
+   - [camie-tagger-v2-metadata.json](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2-metadata.json) → rename to `metadata.json`
+
+6. **Optional: Install development dependencies:**
    ```bash
    pip install -r requirements-dev.txt
    ```
@@ -574,7 +587,12 @@ Use any ONNX-based tagging model:
 2. Update `LOCAL_TAGGER_NAME` in `.env`
 3. Adjust `LOCAL_TAGGER_THRESHOLD` in `config.py` if needed
 
-Compatible models include WD14, Z3D-E621, and similar ONNX taggers.
+Compatible models include:
+
+- [Camie Tagger v2](https://huggingface.co/Camais03/camie-tagger-v2) (use `python scripts/download_tagger.py`)
+- WD14 (WaifuDiffusion) tagger variants
+- Z3D-E621 tagger
+- Other ONNX-based image taggers
 
 ### Database Optimization
 
