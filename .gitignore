@@ -9,7 +9,7 @@ static/thumbnails/
 static/logo/
 venv/
 .vscode/
-./ingest/
+ingest/
 
 # Testing and documentation
 
