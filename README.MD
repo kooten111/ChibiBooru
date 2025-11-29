@@ -17,10 +17,10 @@ A self-hosted web application for organizing and browsing your local image colle
 
 ## Screenshots
 
-![Main gallery interface showing the image grid layout with search and filtering options](file:///home/kooten/.gemini/antigravity/brain/506c5117-283e-4d0c-b7c4-b6bfac03e50d/gallery_rating_general_1764451926828.png)
+![Main gallery interface showing the image grid layout with search and filtering options](screenshots/gallery_view.png)
 *Gallery view with rating:general filter showing safe content*
 
-![Image detail page displaying the full image, metadata, tags, and related information](file:///home/kooten/.gemini/antigravity/brain/506c5117-283e-4d0c-b7c4-b6bfac03e50d/image_detail_view_1764451986439.png)
+![Image detail page displaying the full image, metadata, tags, and related information](screenshots/image_detail_view.png)
 *Image detail page with tag editor and metadata viewer*
 
 ---
