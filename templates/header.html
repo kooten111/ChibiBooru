@@ -9,7 +9,8 @@
                         <div class="autocomplete-container">
                             <div class="chip-input-wrapper" id="chipInputWrapper">
                                 <div class="chip-input-chips" id="chipInputChips"></div>
-                                <input type="text" id="chipTextInput" placeholder="Search tags, filters, or freetext..." autocomplete="off">
+                                <input type="text" id="chipTextInput" placeholder="Search tags, filters, or freetext..."
+                                    autocomplete="off">
                             </div>
                             <input type="hidden" name="query" id="searchInput" value="{{ query or '' }}">
                             <div class="autocomplete-suggestions" id="autocompleteSuggestions"></div>
@@ -55,7 +56,7 @@
             <span>System</span>
         </button>
     </div>
-    
+
     <div class="stats-panels-container" id="statsPanelsContainer">
         <div class="stat-panel panel" id="system-panel">
             <h3><span>⚙️</span> System Control</h3>
@@ -89,42 +90,105 @@
                         🛠️ Debug Options
                         <span class="toggle-arrow">▼</span>
                     </button>
-                    
+
                     <div class="debug-options" id="debugOptions">
-                        <div class="system-buttons mt-15">
-                            <button class="btn btn-warning" onclick="systemBulkRetryTagging(event)">
-                                🔄 Retry All Local-Tagged Images
-                            </button>
-                            <button class="btn btn-info" onclick="systemDatabaseHealthCheck(event)">
-                                🔍 Database Health Check
-                            </button>
-                            <button class="btn btn-danger" onclick="systemRebuildTags(event)">
-                                ⚠️ Rebuild Database from Metadata
-                            </button>
-                            <button class="btn btn-primary" onclick="systemRebuildCategorized(event)">
-                                🔖 Rebuild Categorized Tags
-                            </button>
-                            <button class="btn btn-primary" onclick="systemRecategorizeTags(event)">
-                                🏷️ Recategorize Tags
-                            </button>
-                            <button class="btn btn-primary" onclick="systemRecountTags(event)">
-                                🔢 Recount Tags
-                            </button>
-                            <button class="btn btn-primary" onclick="systemGenerateThumbnails(event)">
-                                🖼️ Generate Thumbnails
-                            </button>
-                            <button class="btn btn-success" onclick="systemApplyMergedSources(event)">
-                                🔀 Apply Merged Sources
-                            </button>
-                            <button class="btn btn-danger" onclick="systemDeduplicate(event)">
-                                🗑️ Deduplicate Images
-                            </button>
-                            <button class="btn btn-danger" onclick="systemCleanOrphans(event)">
-                                🧹 Clean Orphan Metadata
-                            </button>
-                            <button class="btn btn-info" onclick="systemReindexDatabase(event)">
-                                ⚡ Optimize Database (Vacuum/Reindex)
-                            </button>
+                        <div class="settings-group">
+                            <h5>Database Maintenance</h5>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Optimize Database</span>
+                                    <span class="settings-desc">Run VACUUM and REINDEX to reclaim space and improve
+                                        performance.</span>
+                                </div>
+                                <button class="btn btn-info" onclick="systemReindexDatabase(event)">Run</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Database Health Check</span>
+                                    <span class="settings-desc">Scan for and fix common database inconsistencies.</span>
+                                </div>
+                                <button class="btn btn-info" onclick="systemDatabaseHealthCheck(event)">Check</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Generate Thumbnails</span>
+                                    <span class="settings-desc">Create missing thumbnails for all images.</span>
+                                </div>
+                                <button class="btn btn-primary"
+                                    onclick="systemGenerateThumbnails(event)">Generate</button>
+                            </div>
+                        </div>
+
+                        <div class="settings-group">
+                            <h5>Tag & Metadata Management</h5>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Recount Tags</span>
+                                    <span class="settings-desc">Update tag counts based on current usage.</span>
+                                </div>
+                                <button class="btn btn-primary" onclick="systemRecountTags(event)">Recount</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Recategorize Tags</span>
+                                    <span class="settings-desc">Move general tags to correct categories (artist,
+                                        character, etc.) based on known data.</span>
+                                </div>
+                                <button class="btn btn-primary"
+                                    onclick="systemRecategorizeTags(event)">Recategorize</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Rebuild Categorized Tags</span>
+                                    <span class="settings-desc">Refresh the cache of categorized tags for faster
+                                        display.</span>
+                                </div>
+                                <button class="btn btn-primary"
+                                    onclick="systemRebuildCategorized(event)">Rebuild</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Apply Merged Sources</span>
+                                    <span class="settings-desc">Merge tags from multiple sources (e.g., Pixiv + Local)
+                                        for images.</span>
+                                </div>
+                                <button class="btn btn-success" onclick="systemApplyMergedSources(event)">Apply</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Retry Local Tagging</span>
+                                    <span class="settings-desc">Re-run tagging for images that only have local
+                                        tags.</span>
+                                </div>
+                                <button class="btn btn-warning" onclick="systemBulkRetryTagging(event)">Retry</button>
+                            </div>
+                        </div>
+
+                        <div class="settings-group danger-zone">
+                            <h5>Advanced / Danger Zone</h5>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Clean Orphan Metadata</span>
+                                    <span class="settings-desc">Remove database entries for files that no longer
+                                        exist.</span>
+                                </div>
+                                <button class="btn btn-danger" onclick="systemCleanOrphans(event)">Clean</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Deduplicate Images</span>
+                                    <span class="settings-desc">Find and remove duplicate images based on hash.</span>
+                                </div>
+                                <button class="btn btn-danger" onclick="systemDeduplicate(event)">Deduplicate</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Rebuild Database</span>
+                                    <span class="settings-desc">Wipe the database and rebuild it from file metadata.
+                                        IRREVERSIBLE.</span>
+                                </div>
+                                <button class="btn btn-danger" onclick="systemRebuildTags(event)">Rebuild</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -168,11 +232,13 @@
                 <div class="retry-options">
                     <button class="retry-option-btn online-only" data-option="online-only">
                         <div class="retry-option-title">🌐 Online Sources Only</div>
-                        <div class="retry-option-desc">Try Danbooru, e621, and SauceNao. Keep current tags if nothing found.</div>
+                        <div class="retry-option-desc">Try Danbooru, e621, and SauceNao. Keep current tags if nothing
+                            found.</div>
                     </button>
                     <button class="retry-option-btn with-fallback" data-option="with-fallback">
                         <div class="retry-option-title">🤖 With Local AI Fallback</div>
-                        <div class="retry-option-desc">Try online sources first, then re-run local AI tagger if nothing found.</div>
+                        <div class="retry-option-desc">Try online sources first, then re-run local AI tagger if nothing
+                            found.</div>
                     </button>
                 </div>
                 <div class="button-group">

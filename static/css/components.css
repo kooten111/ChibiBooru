@@ -31,9 +31,9 @@
     box-shadow: var(--shadow-sm);
     position: relative;
     transition: max-height var(--transition-smooth) ease-in-out,
-                padding var(--transition-smooth) ease-in-out,
-                opacity var(--transition-smooth) ease-in-out,
-                border-width var(--transition-smooth) ease-in-out;
+        padding var(--transition-smooth) ease-in-out,
+        opacity var(--transition-smooth) ease-in-out,
+        border-width var(--transition-smooth) ease-in-out;
     max-height: 100px;
 }
 
@@ -162,6 +162,10 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     width: 100%;
     box-shadow: var(--shadow-xl);
     animation: slideIn var(--transition-normal) ease-out;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-blue) transparent;
 }
 
 .stat-panel.active {
@@ -668,7 +672,7 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-normal);
     transition: background-color var(--transition-normal),
-                border-color var(--transition-normal);
+        border-color var(--transition-normal);
 }
 
 /* Chip types */
@@ -1248,8 +1252,13 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
 
 /* Processing Spinner Animation */
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .processing-spinner {
@@ -1268,14 +1277,15 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
     overflow: hidden;
     opacity: 0;
     transition: max-height var(--transition-slow) ease,
-                opacity var(--transition-smooth) ease,
-                margin var(--transition-smooth) ease;
+        opacity var(--transition-smooth) ease,
+        margin var(--transition-smooth) ease;
 }
 
 .debug-options.open {
-    max-height: 800px;
+    max-height: 2000px;
     opacity: 1;
     margin-top: 15px;
+    overflow: visible;
 }
 
 /* Responsive */
@@ -1388,7 +1398,8 @@ body.image-page {
 /* When pool-management panel is collapsed, remove flex space */
 .image-page .pool-management:has(.panel-header.collapsed) {
     flex: 0 0 auto;
-    max-height: auto; /* Only show header height */
+    max-height: auto;
+    /* Only show header height */
 }
 
 .image-page .metadata-info {
@@ -1832,8 +1843,16 @@ body.ui-hidden::after {
 }
 
 @keyframes fadeInOut {
-    0%, 100% { opacity: 0; }
-    10%, 90% { opacity: 1; }
+
+    0%,
+    100% {
+        opacity: 0;
+    }
+
+    10%,
+    90% {
+        opacity: 1;
+    }
 }
 
 /* Responsive */
@@ -2010,7 +2029,8 @@ body.ui-hidden::after {
 /* Panel Header for integrated collapse functionality */
 .panel-header {
     width: 100%;
-    display: flex; /* Show on both desktop and mobile */
+    display: flex;
+    /* Show on both desktop and mobile */
     align-items: center;
     gap: var(--spacing-md);
     padding: 15px var(--spacing-lg);
@@ -2054,7 +2074,8 @@ body.ui-hidden::after {
 
 .panel:has(.panel-header) .panel-collapsible-content {
     padding: var(--spacing-lg);
-    max-height: 5000px; /* Large enough for content */
+    max-height: 5000px;
+    /* Large enough for content */
     overflow-y: auto;
     transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out, opacity 0.2s ease-in-out;
     opacity: 1;
@@ -2071,7 +2092,8 @@ body.ui-hidden::after {
 
 /* Section content - transparent wrapper on desktop, functional on mobile */
 .section-content {
-    display: contents; /* Makes the wrapper transparent on desktop */
+    display: contents;
+    /* Makes the wrapper transparent on desktop */
 }
 
 /* When section-content contains a collapsed panel, change to flex column and collapse */
@@ -2085,7 +2107,7 @@ body.ui-hidden::after {
 }
 
 /* Ensure the child panel inside section-content also gets flex behavior */
-.section-content:has(.panel-header.collapsed) > .panel {
+.section-content:has(.panel-header.collapsed)>.panel {
     flex: 0 0 auto;
     width: 100%;
 }
@@ -2112,11 +2134,16 @@ body.ui-hidden::after {
 
     /* Collapsible section styles - only on mobile */
     .section-content {
-        display: block; /* Override display: contents on mobile */
-        max-height: none; /* Remove max-height constraint */
-        min-height: 0; /* Remove minimum height */
-        overflow: visible; /* Allow content to be visible */
-        transition: none; /* No transition on wrapper */
+        display: block;
+        /* Override display: contents on mobile */
+        max-height: none;
+        /* Remove max-height constraint */
+        min-height: 0;
+        /* Remove minimum height */
+        overflow: visible;
+        /* Allow content to be visible */
+        transition: none;
+        /* No transition on wrapper */
     }
 
     .section-content.collapsed {
@@ -2124,7 +2151,8 @@ body.ui-hidden::after {
         min-height: 0 !important;
         padding: 0 !important;
         overflow: visible;
-        opacity: 1; /* Keep wrapper visible */
+        opacity: 1;
+        /* Keep wrapper visible */
     }
 
     /* Ensure sidebars are visible on mobile */
@@ -3192,7 +3220,7 @@ body.ui-hidden::after {
 
 /* Mobile Responsive */
 @media (max-width: 600px) {
-    #sourceModal > div {
+    #sourceModal>div {
         width: 95%;
         padding: var(--spacing-lg);
     }
@@ -4280,6 +4308,7 @@ body.ui-hidden::after {
     from {
         opacity: 0;
     }
+
     to {
         opacity: 1;
     }
@@ -4290,6 +4319,7 @@ body.ui-hidden::after {
         opacity: 0;
         transform: translateX(100px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -4301,6 +4331,7 @@ body.ui-hidden::after {
         opacity: 1;
         transform: translateX(0);
     }
+
     to {
         opacity: 0;
         transform: translateX(100px);
@@ -4308,21 +4339,21 @@ body.ui-hidden::after {
 }
 
 /* Custom scrollbar for modal */
-#saucenaoModal > div::-webkit-scrollbar {
+#saucenaoModal>div::-webkit-scrollbar {
     width: 8px;
 }
 
-#saucenaoModal > div::-webkit-scrollbar-track {
+#saucenaoModal>div::-webkit-scrollbar-track {
     background: rgba(20, 20, 30, 0.3);
     border-radius: 4px;
 }
 
-#saucenaoModal > div::-webkit-scrollbar-thumb {
+#saucenaoModal>div::-webkit-scrollbar-thumb {
     background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
     border-radius: 4px;
 }
 
-#saucenaoModal > div::-webkit-scrollbar-thumb:hover {
+#saucenaoModal>div::-webkit-scrollbar-thumb:hover {
     background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
 }
 
@@ -4364,6 +4395,7 @@ body.ui-hidden::after {
         opacity: 0.8;
         filter: blur(2px);
     }
+
     100% {
         opacity: 1;
         filter: blur(0);
@@ -4438,6 +4470,7 @@ body.ui-hidden::after {
     outline: 3px solid var(--primary-blue);
     outline-offset: -3px;
 }
+
 /* ============================================================================
    Rating Tag Styling
    ============================================================================ */
@@ -4624,4 +4657,62 @@ body.ui-hidden::after {
     border: var(--border-width) solid var(--border-color);
     opacity: 0;
     transition: opacity 0.3s ease-in-out;
+}
+
+/* SETTINGS MENU OVERHAUL */
+.settings-group {
+    background: rgba(30, 30, 45, 0.4);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.settings-group h5 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+    border-bottom: var(--border-width) solid var(--border-color);
+    padding-bottom: var(--spacing-xs);
+}
+
+.settings-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-item:last-child {
+    border-bottom: none;
+}
+
+.settings-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    margin-right: var(--spacing-md);
+}
+
+.settings-label {
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+}
+
+.settings-desc {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+.settings-group.danger-zone {
+    border-color: rgba(255, 100, 100, 0.3);
+    background: rgba(40, 20, 20, 0.3);
+}
+
+.settings-group.danger-zone h5 {
+    color: var(--danger);
+    border-bottom-color: rgba(255, 100, 100, 0.3);
 }
