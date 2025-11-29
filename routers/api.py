@@ -2,6 +2,7 @@ from quart import Blueprint, request, jsonify
 from services.switch_source_db import switch_metadata_source_db, merge_all_sources
 import database_models as models
 from services import api_service, system_service, monitor_service
+import asyncio
 
 api_blueprint = Blueprint('api', __name__)
 
@@ -11,7 +12,7 @@ async def get_images():
 
 @api_blueprint.route('/reload', methods=['POST'])
 async def reload_data():
-    return system_service.reload_data()
+    return await asyncio.to_thread(system_service.reload_data)
 
 @api_blueprint.route('/system/status')
 async def system_status():
@@ -23,23 +24,23 @@ async def system_logs():
 
 @api_blueprint.route('/system/scan', methods=['POST'])
 async def trigger_scan():
-    return system_service.scan_and_process_service()
+    return await asyncio.to_thread(system_service.scan_and_process_service)
 
 @api_blueprint.route('/system/rebuild', methods=['POST'])
 async def trigger_rebuild():
-    return system_service.rebuild_service()
+    return await asyncio.to_thread(system_service.rebuild_service)
 
 @api_blueprint.route('/system/rebuild_categorized', methods=['POST'])
 async def trigger_rebuild_categorized():
-    return system_service.rebuild_categorized_service()
+    return await asyncio.to_thread(system_service.rebuild_categorized_service)
 
 @api_blueprint.route('/system/recategorize', methods=['POST'])
 async def trigger_recategorize():
-    return system_service.recategorize_service()
+    return await asyncio.to_thread(system_service.recategorize_service)
 
 @api_blueprint.route('/system/thumbnails', methods=['POST'])
 async def trigger_thumbnails():
-    return system_service.trigger_thumbnails()
+    return await asyncio.to_thread(system_service.trigger_thumbnails)
 
 @api_blueprint.route('/system/deduplicate', methods=['POST'])
 async def deduplicate():
@@ -51,11 +52,11 @@ async def clean_orphans():
 
 @api_blueprint.route('/system/apply_merged_sources', methods=['POST'])
 async def apply_merged_sources():
-    return system_service.apply_merged_sources_service()
+    return await asyncio.to_thread(system_service.apply_merged_sources_service)
 
 @api_blueprint.route('/system/recount_tags', methods=['POST'])
 async def recount_tags():
-    return system_service.recount_tags_service()
+    return await asyncio.to_thread(system_service.recount_tags_service)
 
 @api_blueprint.route('/system/monitor/start', methods=['POST'])
 async def start_monitor():
@@ -728,7 +729,7 @@ async def api_get_images_for_rating():
                         SELECT 1 FROM image_tags it
                         JOIN tags t ON it.tag_id = t.id
                         WHERE it.image_id = i.id
-                          AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                        AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
                     )
                     ORDER BY i.id
                     LIMIT ?
