@@ -1,12 +1,16 @@
 // bulk-delete.js - Mass delete functionality for image gallery
 
-(function() {
+(function () {
     'use strict';
 
     let selectionMode = false;
     let selectedImages = new Set();
 
-    const enableSelectionBtn = document.getElementById('enable-selection-btn');
+    const selectionToggle = document.getElementById('selection-toggle');
+    const toggleContainer = document.querySelector('.selection-toggle-container');
+    const toggleLabel = document.querySelector('.toggle-label');
+    const toggleIcon = document.querySelector('.toggle-icon');
+    const toggleText = document.querySelector('.toggle-text');
     const selectAllBtn = document.getElementById('select-all-btn');
     const deleteSelectedBtn = document.getElementById('delete-selected-btn');
     const selectedCountSpan = document.getElementById('selected-count');
@@ -16,7 +20,7 @@
     const hasQuery = urlParams.has('query');
 
     // Only enable bulk delete on search results pages
-    if (!hasQuery || !enableSelectionBtn) {
+    if (!hasQuery || !selectionToggle) {
         return;
     }
 
@@ -30,11 +34,13 @@
             checkboxes.forEach(cb => {
                 cb.style.display = 'block';
             });
-            selectAllBtn.style.display = 'inline-block';
-            deleteSelectedBtn.style.display = 'inline-block';
-            enableSelectionBtn.textContent = 'Disable Selection';
-            enableSelectionBtn.classList.remove('btn-secondary');
-            enableSelectionBtn.classList.add('btn-primary');
+            selectAllBtn.style.display = 'flex';
+            selectAllBtn.classList.add('visible');
+            deleteSelectedBtn.style.display = 'flex';
+            deleteSelectedBtn.classList.add('visible');
+            selectionToggle.classList.add('active');
+            toggleIcon.textContent = '☑';
+            toggleText.textContent = 'Selecting...';
         } else {
             // Disable selection mode - hide checkboxes and reset
             checkboxes.forEach(cb => {
@@ -42,18 +48,31 @@
                 cb.checked = false;
             });
             selectAllBtn.style.display = 'none';
+            selectAllBtn.classList.remove('visible');
             deleteSelectedBtn.style.display = 'none';
-            enableSelectionBtn.textContent = 'Enable Selection';
-            enableSelectionBtn.classList.remove('btn-primary');
-            enableSelectionBtn.classList.add('btn-secondary');
+            deleteSelectedBtn.classList.remove('visible');
+            selectionToggle.classList.remove('active');
+            toggleIcon.textContent = '☐';
+            toggleText.textContent = 'Select Mode';
             selectedImages.clear();
             updateSelectedCount();
         }
     }
 
-    // Handle Enable/Disable Selection button
-    if (enableSelectionBtn) {
-        enableSelectionBtn.addEventListener('click', toggleSelectionMode);
+    // Handle toggle switch clicks
+    if (selectionToggle) {
+        selectionToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSelectionMode();
+        });
+    }
+
+    // Also handle clicks on the container for better UX
+    if (toggleContainer) {
+        toggleContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleSelectionMode();
+        });
     }
 
     // Update the selected count display
@@ -66,13 +85,13 @@
         if (selectAllBtn) {
             const allCheckboxes = document.querySelectorAll('.image-select-checkbox');
             const allSelected = allCheckboxes.length > 0 &&
-                               Array.from(allCheckboxes).every(cb => cb.checked);
+                Array.from(allCheckboxes).every(cb => cb.checked);
             selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
         }
     }
 
     // Handle checkbox changes
-    document.addEventListener('change', function(e) {
+    document.addEventListener('change', function (e) {
         if (e.target.classList.contains('image-select-checkbox')) {
             const imagePath = e.target.dataset.imagePath;
 
@@ -88,7 +107,7 @@
 
     // Handle Select All button
     if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', function() {
+        selectAllBtn.addEventListener('click', function () {
             const checkboxes = document.querySelectorAll('.image-select-checkbox');
             const allSelected = Array.from(checkboxes).every(cb => cb.checked);
 
@@ -109,7 +128,7 @@
 
     // Handle Delete Selected button
     if (deleteSelectedBtn) {
-        deleteSelectedBtn.addEventListener('click', async function() {
+        deleteSelectedBtn.addEventListener('click', async function () {
             if (selectedImages.size === 0) {
                 alert('No images selected');
                 return;
@@ -175,7 +194,7 @@
     }
 
     // Prevent checkbox clicks from triggering the image link
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
         if (e.target.classList.contains('image-select-checkbox')) {
             e.stopPropagation();
         }
