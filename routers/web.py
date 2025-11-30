@@ -278,7 +278,7 @@ async def upload_image():
         if 'file' not in await request.files:
             return jsonify({"error": "No file part"}), 400
 
-        files = await request.files.getlist('file')
+        files = (await request.files).getlist('file')
         if not files or files[0].filename == '':
             return jsonify({"error": "No selected file"}), 400
 
