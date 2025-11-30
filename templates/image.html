@@ -361,7 +361,7 @@
         
         <div class="main-content">
             <div class="image-and-actions-container">
-                <div class="image-view" id="imageViewContainer">
+                <div class="image-view" id="imageViewContainer" data-filepath="{{ filepath }}">
                     {% if filepath.endswith('.mp4') %}
                     <video controls loop preload="metadata">
                         <source src="{{ url_for('static', filename=filepath) }}" type="video/mp4">

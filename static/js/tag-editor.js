@@ -593,22 +593,18 @@ class TagEditor {
     async clearDeltas() {
         console.log('Clearing deltas for current image');
 
-        // Get the current filepath from the page
-        const imageContainer = document.querySelector('.image-container img');
-        if (!imageContainer || !imageContainer.src) {
+        // Get the current filepath from the data attribute
+        const imageViewContainer = document.getElementById('imageViewContainer');
+        if (!imageViewContainer) {
+            showNotification('Could not find image container', 'error');
+            return;
+        }
+
+        const filepath = imageViewContainer.dataset.filepath;
+        if (!filepath) {
             showNotification('Could not find image path', 'error');
             return;
         }
-
-        // Extract filepath from image src
-        const imageSrc = imageContainer.src;
-        const match = imageSrc.match(/\/view\/(images\/.+)$/);
-        if (!match) {
-            showNotification('Could not parse image path', 'error');
-            return;
-        }
-
-        const filepath = match[1];
 
         // Confirm with user
         if (!confirm('Clear all manual modification markers for this image?\n\nThis will remove the strikethrough/crossed-out tags and reset the delta tracking.\n\nNote: This does NOT change the actual tags, only the modification markers.')) {
