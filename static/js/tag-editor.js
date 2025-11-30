@@ -50,6 +50,17 @@ class TagEditor {
             cancelBtn.id = 'cancelEditBtn';
             editBtn.after(cancelBtn);
         }
+
+        // Add clear deltas button if it doesn't exist
+        let clearDeltasBtn = document.getElementById('clearDeltasBtn');
+        if (!clearDeltasBtn) {
+            clearDeltasBtn = document.createElement('button');
+            clearDeltasBtn.className = 'btn btn-warning';
+            clearDeltasBtn.textContent = '🗑️ Clear Deltas';
+            clearDeltasBtn.id = 'clearDeltasBtn';
+            clearDeltasBtn.title = 'Clear manual modification markers for this image';
+            cancelBtn.after(clearDeltasBtn);
+        }
     }
 
     loadCurrentTags() {
@@ -497,6 +508,11 @@ class TagEditor {
             cancelBtn.remove();
         }
 
+        const clearDeltasBtn = document.getElementById('clearDeltasBtn');
+        if (clearDeltasBtn) {
+            clearDeltasBtn.remove();
+        }
+
         this.isEditing = false;
 
         // Clean up suggestions
@@ -574,6 +590,57 @@ class TagEditor {
         showNotification('Changes cancelled', 'info');
     }
 
+    async clearDeltas() {
+        console.log('Clearing deltas for current image');
+
+        // Get the current filepath from the page
+        const imageContainer = document.querySelector('.image-container img');
+        if (!imageContainer || !imageContainer.src) {
+            showNotification('Could not find image path', 'error');
+            return;
+        }
+
+        // Extract filepath from image src
+        const imageSrc = imageContainer.src;
+        const match = imageSrc.match(/\/view\/(images\/.+)$/);
+        if (!match) {
+            showNotification('Could not parse image path', 'error');
+            return;
+        }
+
+        const filepath = match[1];
+
+        // Confirm with user
+        if (!confirm('Clear all manual modification markers for this image?\n\nThis will remove the strikethrough/crossed-out tags and reset the delta tracking.\n\nNote: This does NOT change the actual tags, only the modification markers.')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/clear_deltas', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filepath })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                showNotification(result.message, 'success');
+                // Reload the page to show updated deltas
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                showNotification(result.error || 'Failed to clear deltas', 'error');
+            }
+        } catch (err) {
+            console.error('Clear deltas error:', err);
+            showNotification('Failed to clear deltas: ' + err.message, 'error');
+        }
+    }
+
 
 }
 
@@ -622,10 +689,12 @@ function toggleTagEditor() {
     }
 }
 
-// Attach cancel handler
+// Attach cancel and clear deltas handlers
 document.addEventListener('click', (e) => {
     if (e.target.id === 'cancelEditBtn') {
         window.tagEditor.cancelEdit();
+    } else if (e.target.id === 'clearDeltasBtn') {
+        window.tagEditor.clearDeltas();
     }
 });
 

@@ -61,3 +61,30 @@ async def switch_source():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+@api_blueprint.route('/clear_deltas', methods=['POST'])
+async def clear_deltas():
+    """Clear tag deltas for a specific image."""
+    try:
+        data = await request.json
+        filepath = data.get('filepath')
+
+        if not filepath:
+            return jsonify({"error": "Missing filepath"}), 400
+
+        # Normalize filepath
+        filepath = filepath.replace('images/', '', 1)
+
+        # Clear deltas for this image
+        count = models.clear_deltas_for_image(filepath)
+
+        return jsonify({
+            "status": "success",
+            "message": f"Cleared {count} delta(s) for this image",
+            "count": count
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
