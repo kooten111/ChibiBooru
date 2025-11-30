@@ -406,10 +406,16 @@ def apply_implications_for_image(image_id):
 # TAG UPDATE FUNCTIONS
 # ============================================================================
 
-def update_image_tags(filepath, new_tags_str):
-    """Update the tags for a specific image (legacy uncategorized format)."""
-    from repositories.delta_tracker import compute_tag_deltas, record_tag_delta
+def update_image_tags(filepath, new_tags_str, record_deltas=False):
+    """
+    Update the tags for a specific image (legacy uncategorized format).
 
+    Args:
+        filepath (str): Image filepath
+        new_tags_str (str): Space-separated tag names
+        record_deltas (bool): If True, record tag changes for preservation across rebuilds.
+                             Should ONLY be True for manual user edits, NOT automated systems.
+    """
     new_tags = set(tag.strip() for tag in new_tags_str.lower().split())
 
     try:
@@ -423,13 +429,16 @@ def update_image_tags(filepath, new_tags_str):
             image_id = result['id']
             image_md5 = result['md5']
 
-            # Compute deltas before making changes (treats all as general tags)
-            categorized_tags = {'tags_general': new_tags_str}
-            deltas = compute_tag_deltas(filepath, categorized_tags)
+            # Only record deltas if explicitly requested (manual user edits)
+            if record_deltas:
+                from repositories.delta_tracker import compute_tag_deltas, record_tag_delta
+                # Compute deltas before making changes (treats all as general tags)
+                categorized_tags = {'tags_general': new_tags_str}
+                deltas = compute_tag_deltas(filepath, categorized_tags)
 
-            # Record each delta
-            for tag_name, tag_category, operation in deltas:
-                record_tag_delta(image_md5, tag_name, tag_category, operation)
+                # Record each delta
+                for tag_name, tag_category, operation in deltas:
+                    record_tag_delta(image_md5, tag_name, tag_category, operation)
 
             cursor.execute("DELETE FROM image_tags WHERE image_id = ?", (image_id,))
 
@@ -461,11 +470,16 @@ def update_image_tags(filepath, new_tags_str):
         return False
 
 
-def update_image_tags_categorized(filepath, categorized_tags):
-    """Update image tags by category in the database."""
-    # Import delta tracking from the repository
-    from repositories.delta_tracker import compute_tag_deltas, record_tag_delta
+def update_image_tags_categorized(filepath, categorized_tags, record_deltas=False):
+    """
+    Update image tags by category in the database.
 
+    Args:
+        filepath (str): Image filepath
+        categorized_tags (dict): Dict of categorized tags
+        record_deltas (bool): If True, record tag changes for preservation across rebuilds.
+                             Should ONLY be True for manual user edits, NOT automated systems.
+    """
     # Normalize filepath
     if filepath.startswith('images/'):
         filepath = filepath[7:]
@@ -486,13 +500,15 @@ def update_image_tags_categorized(filepath, categorized_tags):
             image_id = result['id']
             image_md5 = result['md5']
 
-            # Compute deltas before making changes
-            deltas = compute_tag_deltas(filepath, categorized_tags)
-            print(f"Computed {len(deltas)} tag deltas for {filepath}")
+            # Only record deltas if explicitly requested (manual user edits)
+            if record_deltas:
+                from repositories.delta_tracker import compute_tag_deltas, record_tag_delta
+                deltas = compute_tag_deltas(filepath, categorized_tags)
+                print(f"Recording {len(deltas)} tag deltas for manual edit of {filepath}")
 
-            # Record each delta in the tag_deltas table
-            for tag_name, tag_category, operation in deltas:
-                record_tag_delta(image_md5, tag_name, tag_category, operation)
+                # Record each delta in the tag_deltas table
+                for tag_name, tag_category, operation in deltas:
+                    record_tag_delta(image_md5, tag_name, tag_category, operation)
 
             # Update the categorized tag columns in images table
             cursor.execute("""

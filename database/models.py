@@ -247,4 +247,6 @@ from repositories.delta_tracker import (
     compute_tag_deltas,
     apply_tag_deltas,
     get_image_deltas,
+    clear_all_deltas,
+    clear_deltas_for_image,
 )

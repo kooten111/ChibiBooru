@@ -24,6 +24,8 @@ from .delta_tracker import (
     compute_tag_deltas,
     apply_tag_deltas,
     get_image_deltas,
+    clear_all_deltas,
+    clear_deltas_for_image,
 )
 
 from .tag_repository import (
@@ -57,6 +59,8 @@ __all__ = [
     'compute_tag_deltas',
     'apply_tag_deltas',
     'get_image_deltas',
+    'clear_all_deltas',
+    'clear_deltas_for_image',
     # Tag repository
     'get_tag_counts',
     'reload_tag_counts',

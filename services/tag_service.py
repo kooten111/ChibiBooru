@@ -3,112 +3,37 @@ from database import models
 from database import get_db_connection
 import traceback
 
-def update_image_tags_categorized(filepath, categorized_tags):
-    """Update image tags by category in the database."""
-    # Normalize filepath
-    if filepath.startswith('images/'):
-        filepath = filepath[7:]
-    elif filepath.startswith('static/images/'):
-        filepath = filepath[14:]
-    
-    try:
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Get image_id
-            cursor.execute("SELECT id FROM images WHERE filepath = ?", (filepath,))
-            result = cursor.fetchone()
-            if not result:
-                print(f"Image not found: {filepath}")
-                return False
-            
-            image_id = result['id']
-            
-            # Update the categorized tag columns in images table
-            cursor.execute("""
-                UPDATE images 
-                SET tags_character = ?,
-                    tags_copyright = ?,
-                    tags_artist = ?,
-                    tags_species = ?,
-                    tags_meta = ?,
-                    tags_general = ?
-                WHERE id = ?
-            """, (
-                categorized_tags.get('tags_character', ''),
-                categorized_tags.get('tags_copyright', ''),
-                categorized_tags.get('tags_artist', ''),
-                categorized_tags.get('tags_species', ''),
-                categorized_tags.get('tags_meta', ''),
-                categorized_tags.get('tags_general', ''),
-                image_id
-            ))
-            
-            # Delete old image_tags entries
-            cursor.execute("DELETE FROM image_tags WHERE image_id = ?", (image_id,))
-            
-            # Insert new tags for each category
-            for category_key, tags_str in categorized_tags.items():
-                if not tags_str or not tags_str.strip():
-                    continue
-                    
-                # Remove 'tags_' prefix from category name
-                category_name = category_key.replace('tags_', '')
-                
-                tags = [t.strip() for t in tags_str.split() if t.strip()]
-                for tag_name in tags:
-                    # Get or create tag with proper category
-                    cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
-                    tag_result = cursor.fetchone()
-                    
-                    if tag_result:
-                        tag_id = tag_result['id']
-                        # Update category if tag exists
-                        cursor.execute("UPDATE tags SET category = ? WHERE id = ?", (category_name, tag_id))
-                    else:
-                        # Insert new tag with category
-                        cursor.execute(
-                            "INSERT INTO tags (name, category) VALUES (?, ?)",
-                            (tag_name, category_name)
-                        )
-                        tag_id = cursor.lastrowid
-                    
-                    # Link tag to image
-                    cursor.execute(
-                        "INSERT INTO image_tags (image_id, tag_id) VALUES (?, ?)",
-                        (image_id, tag_id)
-                    )
-            
-            conn.commit()
-            print(f"Successfully updated tags for {filepath}")
-            return True
-            
-    except Exception as e:
-        print(f"Error updating categorized tags for {filepath}: {e}")
-        traceback.print_exc()
-        if 'conn' in locals():
-            conn.rollback()
-        return False
-
 async def edit_tags_service():
-    """Service to update tags for an image with category support."""
+    """Service to update tags for an image with category support.
+
+    This is for MANUAL USER EDITS only and records deltas for preservation
+    across database rebuilds.
+    """
     data = await request.json
     filepath = data.get('filepath', '').replace('images/', '', 1)
-    
+
     # Check if we have categorized tags (new format) or plain tags (old format)
     categorized_tags = data.get('categorized_tags')
-    
+
     if not filepath:
         return jsonify({"error": "Filepath is required"}), 400
 
     try:
         if categorized_tags:
-            # New categorized format
-            success = update_image_tags_categorized(filepath, categorized_tags)
+            # New categorized format - THIS IS A MANUAL USER EDIT, record deltas
+            success = models.update_image_tags_categorized(
+                filepath,
+                categorized_tags,
+                record_deltas=True  # Record manual user modifications
+            )
         else:
-            # Old format for backwards compatibility
+            # Old format for backwards compatibility - THIS IS A MANUAL USER EDIT, record deltas
             new_tags_str = data.get('tags', '').strip()
-            success = models.update_image_tags(filepath, new_tags_str)
+            success = models.update_image_tags(
+                filepath,
+                new_tags_str,
+                record_deltas=True  # Record manual user modifications
+            )
 
         if success:
             # Selective reload: only update this image and tag counts

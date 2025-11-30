@@ -325,3 +325,80 @@ def get_image_deltas(filepath):
     except Exception as e:
         print(f"Error getting image deltas: {e}")
         return {'added': [], 'removed': []}
+
+
+def clear_all_deltas():
+    """
+    Clear all tag deltas from the database.
+
+    WARNING: This will permanently delete all recorded manual modifications.
+    Use this to clean up incorrectly recorded automated changes.
+
+    Returns:
+        int: Number of deltas deleted
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Count deltas before deletion
+            cursor.execute("SELECT COUNT(*) as count FROM tag_deltas")
+            count = cursor.fetchone()['count']
+
+            # Delete all deltas
+            cursor.execute("DELETE FROM tag_deltas")
+            conn.commit()
+
+            print(f"Cleared {count} tag deltas from the database.")
+            return count
+
+    except Exception as e:
+        print(f"Error clearing tag deltas: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
+
+
+def clear_deltas_for_image(filepath):
+    """
+    Clear all tag deltas for a specific image.
+
+    Args:
+        filepath (str): Image filepath
+
+    Returns:
+        int: Number of deltas deleted
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+
+            # Get MD5 for the image
+            cursor.execute("SELECT md5 FROM images WHERE filepath = ?", (filepath,))
+            result = cursor.fetchone()
+
+            if not result:
+                print(f"Image not found: {filepath}")
+                return 0
+
+            md5 = result['md5']
+
+            # Count deltas before deletion
+            cursor.execute(
+                "SELECT COUNT(*) as count FROM tag_deltas WHERE image_md5 = ?",
+                (md5,)
+            )
+            count = cursor.fetchone()['count']
+
+            # Delete deltas for this image
+            cursor.execute("DELETE FROM tag_deltas WHERE image_md5 = ?", (md5,))
+            conn.commit()
+
+            print(f"Cleared {count} tag deltas for {filepath}.")
+            return count
+
+    except Exception as e:
+        print(f"Error clearing deltas for {filepath}: {e}")
+        import traceback
+        traceback.print_exc()
+        return 0
