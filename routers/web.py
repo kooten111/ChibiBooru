@@ -291,7 +291,7 @@ async def upload_image():
                 # Save to bucketed directory
                 bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
                 filepath = os.path.join(bucket_dir, filename)
-                file.save(filepath)
+                await file.save(filepath)
 
                 # Process the file (already in bucketed location, so don't move)
                 if processing.process_image_file(filepath, move_from_ingest=False):
