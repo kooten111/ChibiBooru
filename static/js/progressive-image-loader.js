@@ -84,6 +84,13 @@ class ProgressiveImageLoader {
      * Swap image to thumbnail first, then load full resolution
      */
     swapToThumbnailThenFull(imgElement, fullPath, thumbPath) {
+        // Remove skeleton state if present
+        const thumbnail = imgElement.closest('.thumbnail');
+        if (thumbnail) {
+            thumbnail.classList.remove('skeleton');
+            thumbnail.classList.add('has-image');
+        }
+
         // Add loading class
         imgElement.classList.add('progressive-loading');
 

@@ -150,23 +150,24 @@ class InfiniteScroll {
     
     appendImages(images) {
         const fragment = document.createDocumentFragment();
-        
+
         images.forEach((img, index) => {
             const thumbnail = document.createElement('div');
-            thumbnail.className = 'thumbnail';
+            thumbnail.className = 'thumbnail skeleton';
             thumbnail.style.animationDelay = `${index * 0.02}s`;
-            
+
             thumbnail.innerHTML = `
                 <a href="/view/${img.path}">
-                    <img src="/static/${img.thumb}" alt="Image" loading="lazy">
+                    <img src="/static/${img.thumb}" alt="Image" loading="lazy" onload="this.closest('.thumbnail').classList.add('has-image')">
                 </a>
             `;
-            
+
             fragment.appendChild(thumbnail);
-            
+
             // Setup masonry for new image
             const imgElement = thumbnail.querySelector('img');
             if (imgElement.complete) {
+                thumbnail.classList.add('has-image');
                 this.setupMasonryForImage(imgElement, thumbnail);
             } else {
                 imgElement.addEventListener('load', () => {
@@ -174,7 +175,7 @@ class InfiniteScroll {
                 });
             }
         });
-        
+
         this.gallery.appendChild(fragment);
     }
     

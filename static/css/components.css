@@ -4370,6 +4370,55 @@ body.ui-hidden::after {
     color: #5aaeff;
 }
 
+/* ==================== SKELETON SCREENS ==================== */
+/* Loading placeholders for images before content loads */
+
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(
+        90deg,
+        rgba(30, 30, 45, 0.8) 0%,
+        rgba(40, 45, 60, 0.9) 50%,
+        rgba(30, 30, 45, 0.8) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Skeleton for thumbnail images in gallery */
+.thumbnail.skeleton::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    border: 2px solid rgba(135, 206, 235, 0.2);
+    border-radius: 8px;
+    opacity: 0.4;
+}
+
+/* Hide skeleton state when image is loading */
+.thumbnail.skeleton.has-image {
+    animation: none;
+    background: rgba(30, 30, 45, 0.5);
+}
+
+.thumbnail.skeleton.has-image::before {
+    display: none;
+}
+
 /* ==================== PROGRESSIVE IMAGE LOADING ==================== */
 /* Smooth transitions for LOD-style image loading (thumbnail -> full resolution) */
 
