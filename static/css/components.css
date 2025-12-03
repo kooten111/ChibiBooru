@@ -4451,12 +4451,13 @@ body.ui-hidden::after {
 }
 
 /* Smooth fade-in for main image */
-.image-view img {
+.image-view.skeleton img {
     opacity: 0;
     transition: opacity 0.3s ease-in-out;
 }
 
-.image-view.has-image img {
+.image-view.has-image img,
+.image-view img {
     opacity: 1;
 }
 
