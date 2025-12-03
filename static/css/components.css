@@ -3454,7 +3454,7 @@ body.ui-hidden::after {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px;
+    padding: 10px 16px;
     gap: var(--spacing-md);
     background: var(--primary-blue-light);
     border-radius: var(--radius-md);
