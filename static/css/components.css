@@ -3455,6 +3455,7 @@ body.ui-hidden::after {
     justify-content: space-between;
     align-items: center;
     padding: 10px;
+    gap: var(--spacing-md);
     background: var(--primary-blue-light);
     border-radius: var(--radius-md);
     margin-bottom: var(--spacing-sm);
