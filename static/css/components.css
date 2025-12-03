@@ -4419,6 +4419,47 @@ body.ui-hidden::after {
     display: none;
 }
 
+/* Skeleton for main image view */
+.image-view.skeleton {
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-view.skeleton::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border: 3px solid rgba(135, 206, 235, 0.3);
+    border-radius: 12px;
+    opacity: 0.5;
+}
+
+/* Hide skeleton when main image loads */
+.image-view.skeleton.has-image {
+    animation: none;
+    background: transparent;
+}
+
+.image-view.skeleton.has-image::before {
+    display: none;
+}
+
+/* Smooth fade-in for main image */
+.image-view img {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.image-view.has-image img {
+    opacity: 1;
+}
+
 /* ==================== FLOATING BULK ACTIONS PANEL (RIGHT-SIDE) ==================== */
 
 /* Panel Container - Fixed position on right side */
