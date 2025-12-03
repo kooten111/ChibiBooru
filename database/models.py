@@ -28,6 +28,7 @@ from repositories.tag_repository import (
     add_implication,
     get_implications_for_tag,
     apply_implications_for_image,
+    search_tags,
 )
 
 from repositories.data_access import (
