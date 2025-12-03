@@ -3479,6 +3479,7 @@ body.ui-hidden::after {
 
 .pool-list-item button {
     padding: 5px 10px;
+    margin-left: 10px;
     font-size: var(--font-size-sm);
     background: rgba(255, 107, 107, 0.3);
     color: var(--danger);
@@ -4377,12 +4378,10 @@ body.ui-hidden::after {
 .skeleton {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(
-        90deg,
-        rgba(30, 30, 45, 0.8) 0%,
-        rgba(40, 45, 60, 0.9) 50%,
-        rgba(30, 30, 45, 0.8) 100%
-    );
+    background: linear-gradient(90deg,
+            rgba(30, 30, 45, 0.8) 0%,
+            rgba(40, 45, 60, 0.9) 50%,
+            rgba(30, 30, 45, 0.8) 100%);
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
@@ -4391,6 +4390,7 @@ body.ui-hidden::after {
     0% {
         background-position: 200% 0;
     }
+
     100% {
         background-position: -200% 0;
     }
@@ -4735,7 +4735,7 @@ body.ui-hidden::after {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--spacing-sm) 0;
+    padding: 10px;
     border-bottom: var(--border-width) solid var(--border-color);
 }
 
