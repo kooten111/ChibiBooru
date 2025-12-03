@@ -1,6 +1,6 @@
 # ChibiBooru
 
-A self-hosted web application for organizing and browsing your local image collection with automated metadata fetching and intelligent tagging. ChibiBooru combines a user-friendly interface with powerful backend tools to create a rich, searchable media library similar to popular image boorus.
+A self-hosted booru type app for organizing and browsing your local image collection with automated metadata fetching and tagging. ChibiBooru combines a user-friendly interface with powerful backend tools to create a rich, searchable media library similar to popular image boorus.
 
 ## Table of Contents
 
@@ -195,6 +195,21 @@ FLASK_DEBUG="false"
 SIMILARITY_METHOD="weighted"  # Options: 'jaccard' or 'weighted'
 ```
 
+### AI Tagger Models
+
+Use any ONNX-based tagging model:
+
+1. Place `model.onnx` and `metadata.json` in `models/Tagger/`
+2. Update `LOCAL_TAGGER_NAME` in `.env`
+3. Adjust `LOCAL_TAGGER_THRESHOLD` in `config.py` if needed
+
+Compatible models include:
+
+- [Camie Tagger v2](https://huggingface.co/Camais03/camie-tagger-v2) (use `python scripts/download_tagger.py`)
+- WD14 (WaifuDiffusion) tagger variants
+- Z3D-E621 tagger
+- Other ONNX-based image taggers
+
 ### Security Best Practices
 
 > [!CAUTION]
@@ -275,6 +290,14 @@ pool:series_name             # In specific pool
 character:holo source:danbooru .png -sketch
 ```
 
+### Uploading Images
+
+1. Click **Upload** in the header
+2. Drag and drop or select files
+3. Images are automatically processed and added
+
+**Alternatively:** Drop files in the `ingest/` folder and they'll be processed automatically
+
 ### Managing Tags
 
 1. Click on an image to view its detail page
@@ -304,31 +327,6 @@ character:holo source:danbooru .png -sketch
 3. Name your pool and add a description
 4. Add images from detail pages or pool management
 5. Search for pools using `pool:<name>`
-
-### Uploading Images
-
-1. Click **Upload** in the header
-2. Drag and drop or select files
-3. Images are automatically processed and added
-
-### Debug & Maintenance
-
-Access the **Debug** section in the System panel for:
-
-- **Database Maintenance:**
-  - Full reindex and optimization
-  - FTS rebuild
-  - Orphan cleanup
-  
-- **Tag & Metadata:**
-  - Rebuild tags from sources
-  - Apply tag implications
-  - Retry failed tagging
-  
-- **Advanced:**
-  - Find duplicates
-  - Generate missing thumbnails
-  - Database health checks
 
 ---
 
@@ -433,110 +431,6 @@ Booru/
 
 ---
 
-## Development
-
-### Running Tests
-
-The project includes a comprehensive test suite using pytest:
-
-```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
-
-# Run all tests
-pytest
-
-# Run specific test file
-pytest tests/test_query_service.py
-
-# Run with coverage
-pytest --cov=services --cov=repositories
-
-# Run with verbose output
-pytest -v
-```
-
-### Architecture Overview
-
-ChibiBooru follows a **layered architecture**:
-
-1. **Presentation Layer** (`routers/`)
-   - Web UI routes and API endpoints
-   - Request validation and response formatting
-
-2. **Business Logic Layer** (`services/`)
-   - Core application logic
-   - Orchestrates data operations
-   - Implements business rules
-
-3. **Data Access Layer** (`repositories/`)
-   - Database operations
-   - Query building
-   - Data transformation
-
-4. **Infrastructure** (`core/`, `events/`)
-   - Cross-cutting concerns (caching, events)
-   - Shared utilities
-
-**Key Design Principles:**
-- **Separation of Concerns:** Clear boundaries between layers
-- **Async-First:** Built on Quart (async Flask) for better concurrency
-- **Event-Driven:** Cache invalidation and updates via event system
-- **Modular Services:** Each service handles a specific domain
-- **Repository Pattern:** Centralized data access
-
-### Technology Stack
-
-- **Web Framework:** Quart (async Flask-compatible)
-- **ASGI Server:** Uvicorn
-- **Database:** SQLite with FTS5 (full-text search)
-- **AI/ML:** ONNX Runtime for local tagging
-- **Testing:** pytest with async support
-- **Templating:** Jinja2
-
-### Code Organization
-
-**Service Layer Pattern:**
-Each service module (`services/*.py`) handles a specific domain:
-- Encapsulates business logic
-- Uses repositories for data access
-- Raises domain exceptions
-- Returns domain objects
-
-**Repository Pattern:**
-Each repository (`repositories/*.py`) handles data persistence:
-- Executes SQL queries
-- Maps results to dicts/objects
-- No business logic
-
-**Event System:**
-Cache invalidation via events (`events/cache_events.py`):
-- Services emit events on data changes
-- Cache manager subscribes and invalidates
-
-### Contributing Guidelines
-
-1. **Code Style:**
-   - Follow PEP 8
-   - Use type hints where applicable
-   - Write docstrings for public functions
-
-2. **Testing:**
-   - Write tests for new features
-   - Maintain test coverage
-   - Test async operations properly
-
-3. **Commits:**
-   - Use clear, descriptive commit messages
-   - Reference issues where applicable
-
-4. **Pull Requests:**
-   - Ensure tests pass
-   - Update documentation as needed
-   - Keep PRs focused and scoped
-
----
-
 ## Advanced Topics
 
 ### Similarity Calculation Methods
@@ -579,91 +473,3 @@ BOORU_PRIORITY = [
 
 **Important:** When changing `BOORU_PRIORITY`, increment `BOORU_PRIORITY_VERSION` to trigger automatic re-tagging.
 
-### Custom AI Tagger Models
-
-Use any ONNX-based tagging model:
-
-1. Place `model.onnx` and `metadata.json` in `models/Tagger/`
-2. Update `LOCAL_TAGGER_NAME` in `.env`
-3. Adjust `LOCAL_TAGGER_THRESHOLD` in `config.py` if needed
-
-Compatible models include:
-
-- [Camie Tagger v2](https://huggingface.co/Camais03/camie-tagger-v2) (use `python scripts/download_tagger.py`)
-- WD14 (WaifuDiffusion) tagger variants
-- Z3D-E621 tagger
-- Other ONNX-based image taggers
-
-### Database Optimization
-
-**Automatic optimizations:**
-- FTS5 index maintained automatically
-- WAL mode for better concurrency
-- Auto-vacuum enabled
-- Startup health checks
-
-**Manual optimization:**
-Use the Debug panel to:
-- **Full Reindex:** Rebuilds all indexes and optimizes database
-- **FTS Rebuild:** Reconstructs full-text search index
-- **Clean Orphans:** Removes orphaned database entries
-
-**Performance tips:**
-- Enable WAL mode: `python scripts/enable_wal.py`
-- Run periodic reindexing for large collections
-- Monitor disk space (thumbnails can grow large)
-- Use SSD storage for better performance
-
-### Backup and Recovery
-
-**What to backup:**
-- `booru.db` - Main database (contains all metadata and tags)
-- `rating_model.db` - Rating inference data
-- `static/images/` - Your image collection
-- `.env` - Your configuration (keep secure!)
-
-**Backup command:**
-```bash
-# Stop the application first
-sqlite3 booru.db ".backup booru_backup.db"
-sqlite3 rating_model.db ".backup rating_backup.db"
-```
-
-**Recovery:**
-Simply restore the database files and restart the application.
-
-### Troubleshooting
-
-**Database locked errors:**
-- Stop all instances of the application
-- Check for abandoned connections
-- Enable WAL mode: `python scripts/enable_wal.py`
-
-**Missing thumbnails:**
-- Use Debug panel → "Generate Missing Thumbnails"
-
-**Metadata not loading:**
-- Check API key configuration
-- Verify internet connectivity
-- Check rate limits (SauceNao: 6 searches per 30 seconds)
-
-**Import errors:**
-- Ensure virtual environment is activated
-- Reinstall dependencies: `pip install -r requirements.txt --upgrade`
-
----
-
-## License
-
-[Add your license information here]
-
-## Acknowledgments
-
-- Built with [Quart](https://quart.palletsprojects.com/) - async Python web framework
-- Metadata from Danbooru, e621, Gelbooru, Yandere, and Pixiv
-- Reverse image search powered by [SauceNao](https://saucenao.com/)
-- AI tagging powered by ONNX Runtime
-
----
-
-**Made with ❤️ for organizing your image collections**
