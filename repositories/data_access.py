@@ -516,3 +516,42 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
     except Exception as e:
         print(f"Database error adding image {image_info['filepath']}: {e}")
         return False
+
+
+def get_tags_with_extended_categories(tag_names):
+    """
+    Get tags with their usage counts and extended categories.
+
+    Args:
+        tag_names: List of tag names to look up
+
+    Returns:
+        List of tuples: (tag_name, usage_count, extended_category)
+    """
+    if not tag_names:
+        return []
+
+    from core.cache_manager import get_tag_counts
+    tag_counts = get_tag_counts()
+
+    with get_db_connection() as conn:
+        # Create placeholders for SQL query
+        placeholders = ','.join('?' * len(tag_names))
+        query = f"""
+            SELECT name, extended_category
+            FROM tags
+            WHERE name IN ({placeholders})
+        """
+        rows = conn.execute(query, tag_names).fetchall()
+
+        # Create a mapping of tag names to extended categories
+        tag_to_extended_cat = {row['name']: row['extended_category'] for row in rows}
+
+        # Build result list with counts and extended categories
+        result = []
+        for tag_name in tag_names:
+            extended_cat = tag_to_extended_cat.get(tag_name, None)
+            count = tag_counts.get(tag_name, 0)
+            result.append((tag_name, count, extended_cat))
+
+        return result

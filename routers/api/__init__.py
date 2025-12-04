@@ -10,5 +10,6 @@ from . import (
     implications,
     system,
     saucenao,
-    rating
+    rating,
+    tag_categorization
 )

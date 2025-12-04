@@ -1455,6 +1455,125 @@ body.image-page {
     border-bottom-color: var(--tag-species-border);
 }
 
+/* Extended Category Colors - Group 1: Identity (Blue tones) */
+.image-page .tag-category.00-subject-count .tag-category-title {
+    color: #87ceeb; /* Sky blue */
+    border-bottom-color: rgba(135, 206, 235, 0.3);
+}
+
+.image-page .tag-category.01-body-physique .tag-category-title {
+    color: #5ca3d6; /* Medium blue */
+    border-bottom-color: rgba(92, 163, 214, 0.3);
+}
+
+.image-page .tag-category.02-body-hair .tag-category-title {
+    color: #4a90c4; /* Steel blue */
+    border-bottom-color: rgba(74, 144, 196, 0.3);
+}
+
+.image-page .tag-category.03-body-face .tag-category-title {
+    color: #3b7eb3; /* Deep blue */
+    border-bottom-color: rgba(59, 126, 179, 0.3);
+}
+
+.image-page .tag-category.04-body-genitalia .tag-category-title {
+    color: #ff69b4; /* Hot pink */
+    border-bottom-color: rgba(255, 105, 180, 0.3);
+}
+
+/* Extended Category Colors - Group 2: Context (Green/Yellow/Orange tones) */
+.image-page .tag-category.05-attire-main .tag-category-title {
+    color: #90ee90; /* Light green */
+    border-bottom-color: rgba(144, 238, 144, 0.3);
+}
+
+.image-page .tag-category.06-attire-inner .tag-category-title {
+    color: #7cdb7c; /* Medium green */
+    border-bottom-color: rgba(124, 219, 124, 0.3);
+}
+
+.image-page .tag-category.07-attire-legwear .tag-category-title {
+    color: #69c969; /* Forest green */
+    border-bottom-color: rgba(105, 201, 105, 0.3);
+}
+
+.image-page .tag-category.08-attire-acc .tag-category-title {
+    color: #56b656; /* Dark green */
+    border-bottom-color: rgba(86, 182, 86, 0.3);
+}
+
+.image-page .tag-category.09-action .tag-category-title {
+    color: #ffd700; /* Gold */
+    border-bottom-color: rgba(255, 215, 0, 0.3);
+}
+
+.image-page .tag-category.10-pose .tag-category-title {
+    color: #ffc700; /* Amber */
+    border-bottom-color: rgba(255, 199, 0, 0.3);
+}
+
+.image-page .tag-category.11-expression .tag-category-title {
+    color: #ffb700; /* Orange gold */
+    border-bottom-color: rgba(255, 183, 0, 0.3);
+}
+
+.image-page .tag-category.12-sexual-act .tag-category-title {
+    color: #ff1493; /* Deep pink */
+    border-bottom-color: rgba(255, 20, 147, 0.3);
+}
+
+.image-page .tag-category.13-object .tag-category-title {
+    color: #dda0dd; /* Plum */
+    border-bottom-color: rgba(221, 160, 221, 0.3);
+}
+
+.image-page .tag-category.14-setting .tag-category-title {
+    color: #98fb98; /* Pale green */
+    border-bottom-color: rgba(152, 251, 152, 0.3);
+}
+
+.image-page .tag-category.21-status .tag-category-title {
+    color: #ffa07a; /* Light salmon */
+    border-bottom-color: rgba(255, 160, 122, 0.3);
+}
+
+/* Extended Category Colors - Group 3: Technical/Meta (Purple/Cyan tones) */
+.image-page .tag-category.15-framing .tag-category-title {
+    color: #ba55d3; /* Medium orchid */
+    border-bottom-color: rgba(186, 85, 211, 0.3);
+}
+
+.image-page .tag-category.16-focus .tag-category-title {
+    color: #9370db; /* Medium purple */
+    border-bottom-color: rgba(147, 112, 219, 0.3);
+}
+
+.image-page .tag-category.17-style-art .tag-category-title {
+    color: #8b7ec8; /* Light purple */
+    border-bottom-color: rgba(139, 126, 200, 0.3);
+}
+
+.image-page .tag-category.18-style-tech .tag-category-title {
+    color: #7a6fb5; /* Slate blue */
+    border-bottom-color: rgba(122, 111, 181, 0.3);
+}
+
+.image-page .tag-category.19-meta-attributes .tag-category-title {
+    color: #40e0d0; /* Turquoise */
+    border-bottom-color: rgba(64, 224, 208, 0.3);
+}
+
+.image-page .tag-category.20-meta-text .tag-category-title {
+    color: #48d1cc; /* Medium turquoise */
+    border-bottom-color: rgba(72, 209, 204, 0.3);
+}
+
+/* Uncategorized tags */
+.image-page .tag-category.uncategorized .tag-category-title {
+    color: #a0a0a0; /* Gray */
+    border-bottom-color: rgba(160, 160, 160, 0.3);
+}
+
 /* Tag Category Subtitle (for Manual modifications) */
 .image-page .tag-category-subtitle {
     font-weight: var(--font-weight-medium);

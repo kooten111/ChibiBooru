@@ -47,6 +47,7 @@ from repositories.data_access import (
     search_images_by_multiple_sources,
     search_images_by_relationship,
     add_image_with_metadata,
+    get_tags_with_extended_categories,
 )
 
 def repopulate_from_database():

@@ -103,7 +103,51 @@
                         </div>
                         {% endif %}
 
-                        {% if tags %}
+                        {% if extended_grouped_tags %}
+                            {# Define extended category order and display names #}
+                            {% set extended_category_order = [
+                                ('00_Subject_Count', 'Subject Count'),
+                                ('01_Body_Physique', 'Body Physique'),
+                                ('02_Body_Hair', 'Body Hair'),
+                                ('03_Body_Face', 'Body Face'),
+                                ('04_Body_Genitalia', 'Body Genitalia'),
+                                ('05_Attire_Main', 'Attire Main'),
+                                ('06_Attire_Inner', 'Attire Inner'),
+                                ('07_Attire_Legwear', 'Attire Legwear'),
+                                ('08_Attire_Acc', 'Attire Accessories'),
+                                ('09_Action', 'Action'),
+                                ('10_Pose', 'Pose'),
+                                ('11_Expression', 'Expression'),
+                                ('12_Sexual_Act', 'Sexual Act'),
+                                ('13_Object', 'Object'),
+                                ('14_Setting', 'Setting'),
+                                ('15_Framing', 'Framing'),
+                                ('16_Focus', 'Focus'),
+                                ('17_Style_Art', 'Style Art'),
+                                ('18_Style_Tech', 'Style Tech'),
+                                ('19_Meta_Attributes', 'Meta Attributes'),
+                                ('20_Meta_Text', 'Meta Text'),
+                                ('21_Status', 'Status'),
+                                (None, 'Uncategorized')
+                            ] %}
+
+                            {# Display tags grouped by extended category in order #}
+                            {% for cat_key, cat_display_name in extended_category_order %}
+                                {% if cat_key in extended_grouped_tags or (cat_key is none and None in extended_grouped_tags) %}
+                                    <div class="tag-category extended-category {{ cat_key|replace('_', '-')|lower if cat_key else 'uncategorized' }}">
+                                        <div class="tag-category-title">{{ cat_display_name }}</div>
+                                        {% for tag, count in extended_grouped_tags[cat_key] %}
+                                        <div class="tag-item">
+                                            <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
+                                            <span class="tag-count">
+                                                {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >= 1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        {% elif tags %}
                         <div class="tag-category general">
                             <div class="tag-category-title">General</div>
                             {% for tag, count in tags %}

@@ -19,6 +19,7 @@ requirements-dev.txt
 
 # Specific files to ignore
 booru.db
+booru*.db
 database.db
 rating_model.db
 tags.json
@@ -33,3 +34,4 @@ TODO
 .xdp-booru.db-shm-r5zthB
 .xdp-booru.db-wal-mE4fRk
 .xdp-booru.db-wal-XgNdzf
+*.csv

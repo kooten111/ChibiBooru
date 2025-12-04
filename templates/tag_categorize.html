@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Categorize Tags - {{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tag-categorization.css') + '?v=2' }}">
+</head>
+<body>
+    <div class="categorize-container">
+        <a href="{{ url_for('main.home') }}" class="back-link">← Back to Home</a>
+
+        <div class="categorize-header">
+            <div class="categorize-title">Categorize Tags</div>
+            <div class="categorize-progress" id="categorizeProgress">Loading...</div>
+        </div>
+
+        <div class="stats-summary" id="statsSummary" style="display: none;">
+            <div class="stat-box">
+                <div class="stat-label">Total Tags</div>
+                <div class="stat-value" id="statTotal">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Categorized</div>
+                <div class="stat-value" id="statCategorized">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Uncategorized</div>
+                <div class="stat-value" id="statUncategorized">0</div>
+            </div>
+        </div>
+
+        <div class="categorize-layout">
+            <div class="left-sidebar">
+                <div class="categorization-guide">
+                    <div class="guide-header">Category Guide</div>
+                    <div class="guide-content">
+                        <div class="guide-section">
+                            <h3>Group 1: Identity</h3>
+                            <ul>
+                                <li><strong>00_Subject_Count:</strong> Count & gender</li>
+                                <li><strong>01_Body_Physique:</strong> Permanent body traits</li>
+                                <li><strong>02_Body_Hair:</strong> Head hair only</li>
+                                <li><strong>03_Body_Face:</strong> Eyes & face marks</li>
+                                <li><strong>04_Body_Genitalia:</strong> NSFW anatomy</li>
+                            </ul>
+                        </div>
+
+                        <div class="guide-section">
+                            <h3>Group 2: Context</h3>
+                            <ul>
+                                <li><strong>05_Attire_Main:</strong> Main clothing</li>
+                                <li><strong>06_Attire_Inner:</strong> Underwear/swimwear</li>
+                                <li><strong>07_Attire_Legwear:</strong> Socks & hosiery</li>
+                                <li><strong>08_Attire_Acc:</strong> Accessories</li>
+                                <li><strong>21_Status:</strong> State of being</li>
+                                <li><strong>09_Action:</strong> Active verbs</li>
+                                <li><strong>10_Pose:</strong> Body position</li>
+                                <li><strong>11_Expression:</strong> Emotion</li>
+                                <li><strong>12_Sexual_Act:</strong> NSFW interaction</li>
+                                <li><strong>13_Object:</strong> Props</li>
+                                <li><strong>14_Setting:</strong> Location</li>
+                            </ul>
+                        </div>
+
+                        <div class="guide-section">
+                            <h3>Group 3: Technical/Meta</h3>
+                            <ul>
+                                <li><strong>15_Framing:</strong> Camera angle</li>
+                                <li><strong>16_Focus:</strong> Part focus</li>
+                                <li><strong>17_Style_Art:</strong> Art style</li>
+                                <li><strong>18_Style_Tech:</strong> Visual effects</li>
+                                <li><strong>19_Meta_Attributes:</strong> Metadata</li>
+                                <li><strong>20_Meta_Text:</strong> Text & UI</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tag-display" id="tagDisplay">
+                <div class="loading-state" id="loadingState">
+                    Loading tags...
+                </div>
+            </div>
+
+            <div class="right-sidebar">
+                <div class="edit-tag-section">
+                    <div class="edit-tag-header">Edit Tag</div>
+                    <div class="edit-tag-controls">
+                        <input type="text" id="editTagInput" placeholder="Tag name..." class="edit-tag-input">
+                        <button onclick="loadTagForEdit()" class="edit-tag-btn">Load</button>
+                    </div>
+                    <div id="editTagDisplay" class="edit-tag-display"></div>
+                </div>
+
+                <div class="tag-queue-sidebar">
+                    <div class="queue-header">Next Tags</div>
+                    <div class="queue-list" id="queueList">
+                        <div class="queue-loading">Loading...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTags = [];
+        let currentIndex = 0;
+        let availableCategories = [];
+        let extendedCategories = []; // Full category data with shortcuts
+
+        async function loadTags() {
+            document.getElementById('loadingState').style.display = 'block';
+            document.getElementById('tagDisplay').innerHTML = '<div class="loading-state">Loading tags...</div>';
+
+            try {
+                const response = await fetch('/api/tag_categorize/tags?limit=100');
+                const data = await response.json();
+
+                currentTags = data.tags || [];
+                availableCategories = data.categories || [];
+                extendedCategories = data.extended_categories || [];
+                currentIndex = 0;
+
+                // Load stats
+                await loadStats();
+
+                if (currentTags.length === 0) {
+                    document.getElementById('tagDisplay').innerHTML =
+                        '<div class="no-tags-state">All tags are categorized! 🎉</div>';
+                } else {
+                    displayCurrentTag();
+                }
+            } catch (error) {
+                console.error('Error loading tags:', error);
+                document.getElementById('tagDisplay').innerHTML =
+                    '<div class="no-tags-state">Error loading tags: ' + error.message + '</div>';
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/tag_categorize/stats');
+                const data = await response.json();
+
+                document.getElementById('statTotal').textContent = data.total_tags || 0;
+                document.getElementById('statCategorized').textContent = data.categorized || 0;
+                document.getElementById('statUncategorized').textContent = data.uncategorized || 0;
+                document.getElementById('statsSummary').style.display = 'grid';
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        function updateQueueList() {
+            const queueList = document.getElementById('queueList');
+            if (currentTags.length === 0) {
+                queueList.innerHTML = '<div class="queue-empty">No more tags</div>';
+                return;
+            }
+
+            // Show 25 tags: keep 3 previous tags visible + current + 21 upcoming
+            const startIndex = Math.max(0, currentIndex - 3);
+            const endIndex = Math.min(currentTags.length, startIndex + 25);
+            const visibleTags = currentTags.slice(startIndex, endIndex);
+
+            queueList.innerHTML = visibleTags.map((tag, idx) => {
+                const actualIndex = startIndex + idx;
+                const isActive = actualIndex === currentIndex;
+                return `<div class="queue-item ${isActive ? 'queue-item-active' : ''}"
+                             onclick="jumpToTag(${actualIndex})"
+                             title="${tag.name} (${tag.usage_count} uses)">
+                    <div class="queue-item-number">${actualIndex + 1}</div>
+                    <div class="queue-item-name">${tag.name}</div>
+                    <div class="queue-item-count">${tag.usage_count}</div>
+                </div>`;
+            }).join('');
+
+            // Auto-scroll to active item
+            setTimeout(() => {
+                const activeItem = queueList.querySelector('.queue-item-active');
+                if (activeItem) {
+                    activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 50);
+        }
+
+        function jumpToTag(index) {
+            if (index >= 0 && index < currentTags.length) {
+                currentIndex = index;
+                displayCurrentTag();
+            }
+        }
+
+        function displayCurrentTag() {
+            if (currentTags.length === 0) {
+                document.getElementById('tagDisplay').innerHTML =
+                    '<div class="no-tags-state">All tags are categorized! 🎉</div>';
+                document.getElementById('queueList').innerHTML = '<div class="queue-empty">No more tags</div>';
+                return;
+            }
+
+            const tag = currentTags[currentIndex];
+            const progress = `Tag ${currentIndex + 1} / ${currentTags.length}`;
+            document.getElementById('categorizeProgress').textContent = progress;
+
+            // Update queue list
+            updateQueueList();
+
+            const sampleImages = tag.sample_images || [];
+            const imageGallery = sampleImages.length > 0
+                ? `<div class="sample-images">
+                    ${sampleImages.map(filepath => {
+                        const isVideo = filepath.endsWith('.mp4') || filepath.endsWith('.webm');
+                        const videoType = filepath.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+                        return isVideo
+                            ? `<video controls loop preload="metadata"><source src="/static/images/${filepath}" type="${videoType}"></video>`
+                            : `<img src="/static/images/${filepath}" alt="Sample image">`;
+                    }).join('')}
+                  </div>`
+                : '<div class="no-samples">No sample images available</div>';
+
+            document.getElementById('tagDisplay').innerHTML = `
+                <div class="tag-info">
+                    <div class="tag-name">${tag.name}</div>
+                    <div class="tag-usage">Used in ${tag.usage_count} image${tag.usage_count !== 1 ? 's' : ''}</div>
+                    ${imageGallery}
+
+                    <div class="category-buttons">
+                        ${extendedCategories.map(catData => {
+                            const [catKey, catName, shortcut, description] = catData;
+                            const cssClass = catKey.replace(/_/g, '-').toLowerCase();
+                            return `<button class="category-btn category-btn-${cssClass}"
+                                    onclick="setCategory('${catKey}')"
+                                    title="${description}">
+                                ${catName}<br><small>(${shortcut})</small>
+                            </button>`;
+                        }).join('')}
+                    </div>
+
+                    <div class="navigation-buttons">
+                        <button class="nav-btn" onclick="previousTag()" ${currentIndex === 0 ? 'disabled' : ''}>
+                            ← Previous (P)
+                        </button>
+                        <button class="nav-btn" onclick="showSuggestion()">
+                            Suggest (?)
+                        </button>
+                        <button class="nav-btn" onclick="skipTag()">
+                            Skip (K)
+                        </button>
+                        <button class="nav-btn nav-btn-primary" onclick="nextTag()" ${currentIndex >= currentTags.length - 1 ? 'disabled' : ''}>
+                            Next (N / →)
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function showSuggestion() {
+            const tag = currentTags[currentIndex];
+
+            try {
+                const response = await fetch(`/api/tag_categorize/tag_details?tag_name=${encodeURIComponent(tag.name)}`);
+                const data = await response.json();
+
+                if (data.suggested_category) {
+                    showNotification(`Suggested: ${data.suggested_category}`, 'info');
+
+                    // Auto-select the suggested category
+                    if (confirm(`Categorize "${tag.name}" as "${data.suggested_category}"?`)) {
+                        await setCategory(data.suggested_category);
+                    }
+                } else {
+                    showNotification('No suggestion available', 'info');
+                }
+            } catch (error) {
+                console.error('Error getting suggestion:', error);
+                showNotification('Error getting suggestion: ' + error.message, 'error');
+            }
+        }
+
+        async function setCategory(category) {
+            const tag = currentTags[currentIndex];
+
+            try {
+                const response = await fetch('/api/tag_categorize/set', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        tag_name: tag.name,
+                        category: category
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(`"${tag.name}" → ${category}`, 'success');
+                    // Remove the tag from the list
+                    currentTags.splice(currentIndex, 1);
+
+                    // Update stats
+                    await loadStats();
+
+                    // Display next tag (or stay at same index since we removed one)
+                    if (currentTags.length === 0) {
+                        document.getElementById('tagDisplay').innerHTML =
+                            '<div class="no-tags-state">All tags are categorized! 🎉</div>';
+                    } else {
+                        if (currentIndex >= currentTags.length) {
+                            currentIndex = currentTags.length - 1;
+                        }
+                        displayCurrentTag();
+                    }
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error setting category:', error);
+                showNotification('Error: ' + error.message, 'error');
+            }
+        }
+
+        function nextTag() {
+            if (currentIndex < currentTags.length - 1) {
+                currentIndex++;
+                displayCurrentTag();
+            } else {
+                showNotification('No more tags', 'info');
+            }
+        }
+
+        function previousTag() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                displayCurrentTag();
+            }
+        }
+
+        function skipTag() {
+            nextTag();
+        }
+
+        async function loadTagForEdit() {
+            const tagName = document.getElementById('editTagInput').value.trim();
+            if (!tagName) {
+                showNotification('Please enter a tag name', 'error');
+                return;
+            }
+
+            const editDisplay = document.getElementById('editTagDisplay');
+            editDisplay.innerHTML = '<div class="loading-state">Loading tag...</div>';
+
+            try {
+                const response = await fetch(`/api/tag_categorize/tag_details?tag_name=${encodeURIComponent(tagName)}`);
+                const data = await response.json();
+
+                if (!data || data.error) {
+                    editDisplay.innerHTML = `<div class="no-tags-state">Tag "${tagName}" not found</div>`;
+                    return;
+                }
+
+                const tag = data;
+                editDisplay.innerHTML = `
+                    <div class="edit-tag-info">
+                        <div class="edit-tag-name">${tag.name}</div>
+                        <div class="edit-tag-meta">
+                            <span>Current Category: <strong>${tag.category || 'Uncategorized'}</strong></span>
+                            <span>Usage Count: ${tag.usage_count || 0}</span>
+                        </div>
+                        <div class="category-buttons">
+                            ${extendedCategories.map(catData => {
+                                const [catKey, catName, shortcut, description] = catData;
+                                const cssClass = catKey.replace(/_/g, '-').toLowerCase();
+                                return `<button class="category-btn category-btn-${cssClass}"
+                                        onclick="updateTagCategory('${tag.name}', '${catKey}')"
+                                        title="${description}">
+                                    ${catName}
+                                </button>`;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading tag:', error);
+                editDisplay.innerHTML = `<div class="no-tags-state">Error loading tag: ${error.message}</div>`;
+            }
+        }
+
+        async function updateTagCategory(tagName, category) {
+            try {
+                const response = await fetch('/api/tag_categorize/set', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        tag_name: tagName,
+                        category: category
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(`"${tagName}" updated to ${category}`, 'success');
+                    document.getElementById('editTagInput').value = '';
+                    document.getElementById('editTagDisplay').innerHTML = '';
+                    await loadStats();
+                } else {
+                    showNotification('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error updating category:', error);
+                showNotification('Error: ' + error.message, 'error');
+            }
+        }
+
+        // Allow Enter key to load tag
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('editTagInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    loadTagForEdit();
+                }
+            });
+        });
+
+        // Load tags on page load
+        loadTags();
+    </script>
+    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script type="module">
+        import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
+        window.showNotification = showNotification;
+    </script>
+</body>
+</html>

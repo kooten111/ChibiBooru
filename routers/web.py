@@ -59,6 +59,17 @@ async def rate_manage():
     return await render_template('rate_manage.html', app_name=config.APP_NAME)
 
 
+# ============================================================================
+# Tag Categorization UI Routes
+# ============================================================================
+
+@main_blueprint.route('/tag_categorize')
+@login_required
+async def tag_categorize():
+    """Interactive tag categorization interface."""
+    return await render_template('tag_categorize.html', app_name=config.APP_NAME)
+
+
 @main_blueprint.route('/')
 @login_required
 async def home():
@@ -193,7 +204,18 @@ async def show_image(filepath):
     tag_counts = models.get_tag_counts()
     stats = query_service.get_enhanced_stats()
 
+    # Get general tags grouped by their extended categories
     general_tags = sorted((data.get("tags_general") or "").split())
+    tags_with_extended_categories = models.get_tags_with_extended_categories(general_tags)
+
+    # Group tags by extended category for display
+    extended_grouped_tags = {}
+    for tag, count, extended_cat in tags_with_extended_categories:
+        if extended_cat not in extended_grouped_tags:
+            extended_grouped_tags[extended_cat] = []
+        extended_grouped_tags[extended_cat].append((tag, count))
+
+    # Keep the old format for backward compatibility (all general tags together)
     tags_with_counts = [(tag, tag_counts.get(tag, 0)) for tag in general_tags if tag]
 
     categorized_tags = {
@@ -232,6 +254,7 @@ async def show_image(filepath):
         thumbnail_path=thumbnail_path,
         tags=tags_with_counts,
         categorized_tags=categorized_tags,
+        extended_grouped_tags=extended_grouped_tags,
         metadata=data.get('raw_metadata'),
         related_images=combined_related,
         stats=stats,
