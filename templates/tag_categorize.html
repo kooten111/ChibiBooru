@@ -88,6 +88,19 @@
             </div>
 
             <div class="right-sidebar">
+                <div class="import-export-section">
+                    <div class="import-export-header">Import/Export</div>
+                    <div class="import-export-buttons">
+                        <button class="import-export-btn export-btn" onclick="exportCategorizations()">
+                            <span class="btn-icon">⬇</span> Export
+                        </button>
+                        <button class="import-export-btn import-btn" onclick="document.getElementById('importFileInput').click()">
+                            <span class="btn-icon">⬆</span> Import
+                        </button>
+                        <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+                    </div>
+                </div>
+
                 <div class="edit-tag-section">
                     <div class="edit-tag-header">Edit Tag</div>
                     <div class="edit-tag-controls">
@@ -103,6 +116,81 @@
                         <div class="queue-loading">Loading...</div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="custom-modal" style="display: none;">
+        <div class="custom-modal-overlay" onclick="closeExportModal()"></div>
+        <div class="custom-modal-content">
+            <div class="custom-modal-header">
+                <h2>Export Tag Categorizations</h2>
+                <button class="custom-modal-close" onclick="closeExportModal()">×</button>
+            </div>
+            <div class="custom-modal-body">
+                <p>Choose which tags to export:</p>
+                <div class="export-options">
+                    <label class="export-option">
+                        <input type="radio" name="exportType" value="categorized" checked>
+                        <div class="option-content">
+                            <strong>Categorized Tags Only</strong>
+                            <span>Export only tags that have been categorized</span>
+                        </div>
+                    </label>
+                    <label class="export-option">
+                        <input type="radio" name="exportType" value="all">
+                        <div class="option-content">
+                            <strong>All Tags</strong>
+                            <span>Export all tags (including uncategorized)</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="custom-modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeExportModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="confirmExport()">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="custom-modal" style="display: none;">
+        <div class="custom-modal-overlay" onclick="closeImportModal()"></div>
+        <div class="custom-modal-content">
+            <div class="custom-modal-header">
+                <h2>Import Tag Categorizations</h2>
+                <button class="custom-modal-close" onclick="closeImportModal()">×</button>
+            </div>
+            <div class="custom-modal-body">
+                <p>Choose how to import the categorizations:</p>
+                <div class="import-options">
+                    <label class="import-option">
+                        <input type="radio" name="importMode" value="merge" checked>
+                        <div class="option-content">
+                            <strong>Merge (Recommended)</strong>
+                            <span>Keep existing categorizations, only categorize uncategorized tags</span>
+                        </div>
+                    </label>
+                    <label class="import-option">
+                        <input type="radio" name="importMode" value="update">
+                        <div class="option-content">
+                            <strong>Update</strong>
+                            <span>Only update already categorized tags, leave uncategorized tags as-is</span>
+                        </div>
+                    </label>
+                    <label class="import-option import-option-danger">
+                        <input type="radio" name="importMode" value="overwrite">
+                        <div class="option-content">
+                            <strong>Overwrite (Dangerous)</strong>
+                            <span>Replace ALL categorizations - this will overwrite existing work!</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="custom-modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeImportModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="confirmImport()">Import</button>
             </div>
         </div>
     </div>
@@ -441,6 +529,117 @@
                 }
             });
         });
+
+        // Export modal functions
+        function exportCategorizations() {
+            document.getElementById('exportModal').style.display = 'flex';
+        }
+
+        function closeExportModal() {
+            document.getElementById('exportModal').style.display = 'none';
+        }
+
+        async function confirmExport() {
+            const exportType = document.querySelector('input[name="exportType"]:checked').value;
+            const categorizedOnly = exportType === 'categorized';
+
+            closeExportModal();
+
+            try {
+                const url = `/api/tag_categorize/export?categorized_only=${categorizedOnly}`;
+
+                showNotification('Exporting tag categorizations...', 'info');
+
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Export failed: ${response.statusText}`);
+                }
+
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `tag_categorizations_${new Date().toISOString()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(downloadUrl);
+
+                showNotification('Export completed successfully!', 'success');
+            } catch (error) {
+                console.error('Error exporting:', error);
+                showNotification('Error exporting: ' + error.message, 'error');
+            }
+        }
+
+        // Import modal functions
+        let importFileData = null;
+
+        function closeImportModal() {
+            document.getElementById('importModal').style.display = 'none';
+            importFileData = null;
+        }
+
+        async function confirmImport() {
+            const mode = document.querySelector('input[name="importMode"]:checked').value;
+
+            closeImportModal();
+
+            if (!importFileData) {
+                showNotification('No import data available', 'error');
+                return;
+            }
+
+            try {
+                showNotification('Importing tag categorizations...', 'info');
+
+                const response = await fetch(`/api/tag_categorize/import?mode=${mode}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(importFileData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showNotification(`Import completed! Updated: ${result.updated}, Skipped: ${result.skipped}`, 'success');
+
+                    // Reload tags and stats
+                    await loadStats();
+                    await loadTags();
+                } else {
+                    showNotification('Error importing: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error importing:', error);
+                showNotification('Error importing: ' + error.message, 'error');
+            } finally {
+                importFileData = null;
+            }
+        }
+
+        // Handle import file selection
+        async function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const data = JSON.parse(text);
+
+                // Store the data and show the modal
+                importFileData = data;
+                document.getElementById('importModal').style.display = 'flex';
+            } catch (error) {
+                console.error('Error reading file:', error);
+                showNotification('Error reading file: ' + error.message, 'error');
+            } finally {
+                // Reset file input
+                event.target.value = '';
+            }
+        }
 
         // Load tags on page load
         loadTags();

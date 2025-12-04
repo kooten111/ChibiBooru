@@ -177,3 +177,70 @@ async def api_suggest_category():
         return jsonify({
             "error": str(e)
         }), 500
+
+
+@api_blueprint.route('/tag_categorize/export', methods=['GET'])
+async def api_export_categorizations():
+    """Export tag categorizations as JSON."""
+    try:
+        categorized_only = request.args.get('categorized_only', 'false').lower() == 'true'
+        export_data = tag_cat.export_tag_categorizations(categorized_only=categorized_only)
+
+        from quart import Response
+        import json
+
+        response = Response(
+            json.dumps(export_data, indent=2),
+            mimetype='application/json',
+            headers={
+                'Content-Disposition': f'attachment; filename="tag_categorizations_{export_data["export_date"]}.json"'
+            }
+        )
+        return response
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+@api_blueprint.route('/tag_categorize/import', methods=['POST'])
+async def api_import_categorizations():
+    """Import tag categorizations from JSON."""
+    try:
+        data = await request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No data provided"
+            }), 400
+
+        mode = request.args.get('mode', 'merge')
+        if mode not in ['merge', 'overwrite', 'update']:
+            return jsonify({
+                "success": False,
+                "error": "Invalid mode. Must be one of: merge, overwrite, update"
+            }), 400
+
+        stats = tag_cat.import_tag_categorizations(data, mode=mode)
+
+        # Reload data to update in-memory cache
+        models.load_data_from_db()
+
+        return jsonify({
+            "success": True,
+            **stats
+        })
+    except ValueError as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

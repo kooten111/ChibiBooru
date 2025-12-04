@@ -369,3 +369,115 @@ def get_tag_details(tag_name: str) -> Dict:
             'suggested_category': suggest_category_for_tag(tag_name),
             'cooccurring_tags': cooccurring_tags
         }
+
+
+def export_tag_categorizations(categorized_only: bool = False) -> Dict:
+    """
+    Export tag categorizations to a dictionary suitable for JSON serialization.
+
+    Args:
+        categorized_only: If True, only export tags that have extended categories
+
+    Returns:
+        Dict with export metadata and tag categorizations
+    """
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        if categorized_only:
+            cur.execute("""
+                SELECT name, extended_category
+                FROM tags
+                WHERE extended_category IS NOT NULL
+                ORDER BY name
+            """)
+        else:
+            cur.execute("""
+                SELECT name, extended_category
+                FROM tags
+                ORDER BY name
+            """)
+
+        tags = {}
+        for row in cur.fetchall():
+            tags[row['name']] = row['extended_category']
+
+        from datetime import datetime
+        return {
+            'export_version': '1.0',
+            'export_date': datetime.utcnow().isoformat(),
+            'tag_count': len(tags),
+            'categorized_only': categorized_only,
+            'categories': TAG_CATEGORIES,
+            'tags': tags
+        }
+
+
+def import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict:
+    """
+    Import tag categorizations from exported data.
+
+    Args:
+        data: Exported categorization data
+        mode: Import mode - 'merge' (keep existing), 'overwrite' (replace all), or 'update' (only update existing)
+
+    Returns:
+        Dict with import statistics
+    """
+    if not data or 'tags' not in data:
+        raise ValueError("Invalid import data: missing 'tags' field")
+
+    tags_data = data['tags']
+    stats = {
+        'total': len(tags_data),
+        'updated': 0,
+        'skipped': 0,
+        'errors': []
+    }
+
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        for tag_name, category in tags_data.items():
+            # Validate category
+            if category is not None and category not in TAG_CATEGORIES:
+                stats['errors'].append(f"{tag_name}: Invalid category '{category}'")
+                stats['skipped'] += 1
+                continue
+
+            try:
+                # Check if tag exists
+                cur.execute("SELECT extended_category FROM tags WHERE name = ?", (tag_name,))
+                row = cur.fetchone()
+
+                if not row:
+                    stats['errors'].append(f"{tag_name}: Tag not found in database")
+                    stats['skipped'] += 1
+                    continue
+
+                existing_category = row['extended_category']
+
+                # Apply import mode logic
+                if mode == 'merge' and existing_category is not None:
+                    # Keep existing categorization
+                    stats['skipped'] += 1
+                    continue
+                elif mode == 'update' and existing_category is None:
+                    # Only update already categorized tags
+                    stats['skipped'] += 1
+                    continue
+
+                # Update the tag
+                cur.execute(
+                    "UPDATE tags SET extended_category = ? WHERE name = ?",
+                    (category, tag_name)
+                )
+                stats['updated'] += 1
+
+            except Exception as e:
+                stats['errors'].append(f"{tag_name}: {str(e)}")
+                stats['skipped'] += 1
+
+        conn.commit()
+
+    return stats
