@@ -126,10 +126,13 @@
                 extendedCategories = data.extended_categories || [];
                 currentIndex = 0;
 
-                // Load stats
+                // Load stats first to check actual uncategorized count
                 await loadStats();
 
-                if (currentTags.length === 0) {
+                // Check if there are truly no uncategorized tags (not just empty batch)
+                const uncategorizedCount = parseInt(document.getElementById('statUncategorized').textContent) || 0;
+
+                if (uncategorizedCount === 0) {
                     document.getElementById('tagDisplay').innerHTML =
                         '<div class="no-tags-state">All tags are categorized! 🎉</div>';
                 } else {
@@ -147,9 +150,12 @@
                 const response = await fetch('/api/tag_categorize/stats');
                 const data = await response.json();
 
-                document.getElementById('statTotal').textContent = data.total_tags || 0;
-                document.getElementById('statCategorized').textContent = data.categorized || 0;
-                document.getElementById('statUncategorized').textContent = data.uncategorized || 0;
+                // Use meaningful counts (tags actually used in images) instead of total counts
+                const meaningfulTotal = (data.meaningful_categorized || 0) + (data.meaningful_uncategorized || 0);
+
+                document.getElementById('statTotal').textContent = meaningfulTotal;
+                document.getElementById('statCategorized').textContent = data.meaningful_categorized || 0;
+                document.getElementById('statUncategorized').textContent = data.meaningful_uncategorized || 0;
                 document.getElementById('statsSummary').style.display = 'grid';
             } catch (error) {
                 console.error('Error loading stats:', error);
@@ -197,9 +203,19 @@
         }
 
         function displayCurrentTag() {
-            if (currentTags.length === 0) {
+            // Check actual uncategorized count from stats
+            const uncategorizedCount = parseInt(document.getElementById('statUncategorized').textContent) || 0;
+
+            if (currentTags.length === 0 && uncategorizedCount === 0) {
                 document.getElementById('tagDisplay').innerHTML =
                     '<div class="no-tags-state">All tags are categorized! 🎉</div>';
+                document.getElementById('queueList').innerHTML = '<div class="queue-empty">No more tags</div>';
+                return;
+            }
+
+            if (currentTags.length === 0) {
+                document.getElementById('tagDisplay').innerHTML =
+                    '<div class="no-tags-state">No tags in current batch. Try refreshing the page.</div>';
                 document.getElementById('queueList').innerHTML = '<div class="queue-empty">No more tags</div>';
                 return;
             }
@@ -309,15 +325,10 @@
                     await loadStats();
 
                     // Display next tag (or stay at same index since we removed one)
-                    if (currentTags.length === 0) {
-                        document.getElementById('tagDisplay').innerHTML =
-                            '<div class="no-tags-state">All tags are categorized! 🎉</div>';
-                    } else {
-                        if (currentIndex >= currentTags.length) {
-                            currentIndex = currentTags.length - 1;
-                        }
-                        displayCurrentTag();
+                    if (currentIndex >= currentTags.length) {
+                        currentIndex = currentTags.length - 1;
                     }
+                    displayCurrentTag();
                 } else {
                     showNotification('Error: ' + result.error, 'error');
                 }

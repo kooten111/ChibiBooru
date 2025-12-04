@@ -62,6 +62,11 @@ SYSTEM_PROMPT = f"""You are a tag categorization expert for an image booru datab
 
 {CATEGORY_GUIDE}
 
+IMPORTANT: Respond with ONLY the exact category key from the list above. Common mistakes to avoid:
+- There is NO "19_Meta_Text" category - use "20_Meta_Text" for text/UI elements
+- Category 19 is "19_Meta_Attributes" (for metadata like highres, absurdres)
+- Category 20 is "20_Meta_Text" (for text/speech bubbles/watermarks)
+
 When given a tag, respond with ONLY the category key (e.g., "09_Action" or "02_Body_Hair").
 Do not include any explanation, just the category key.
 
@@ -74,7 +79,55 @@ Examples:
 - "blue_eyes" -> 03_Body_Face
 - "school_uniform" -> 05_Attire_Main
 - "outdoors" -> 14_Setting
+- "holding_weapon" -> 09_Action
+- "sitting" -> 10_Pose
+- "spread_legs" -> 10_Pose
+- "cup" -> 13_Object
+- "phone" -> 13_Object
+- "speech_bubble" -> 20_Meta_Text
+- "watermark" -> 20_Meta_Text
+- "symbol" -> 20_Meta_Text
+- "highres" -> 19_Meta_Attributes
+- "nude" -> 21_Status
+- "wet" -> 21_Status
+- "thighhighs" -> 07_Attire_Legwear
+- "gloves" -> 08_Attire_Acc
 """
+
+
+def auto_correct_category(category: str) -> Optional[str]:
+    """
+    Auto-correct common LLM mistakes in category names.
+
+    Args:
+        category: The category string returned by the LLM
+
+    Returns:
+        Corrected category or None if cannot be corrected
+    """
+    # Common mistakes mapping
+    corrections = {
+        '19_Meta_Text': '20_Meta_Text',  # Most common mistake
+        '06_Attire_Legwear': '07_Attire_Legwear',  # Sometimes confuses numbering
+        '02_Body_Physique': '01_Body_Physique',  # Sometimes confuses numbering
+    }
+
+    # Try direct correction
+    if category in corrections:
+        return corrections[category]
+
+    # Try fuzzy matching - if they got the name right but number wrong
+    category_lower = category.lower()
+    for valid_cat in TAG_CATEGORIES:
+        valid_lower = valid_cat.lower()
+        # Check if the text part matches (after the number prefix)
+        if '_' in category and '_' in valid_cat:
+            user_text = '_'.join(category.split('_')[1:]).lower()
+            valid_text = '_'.join(valid_cat.split('_')[1:]).lower()
+            if user_text == valid_text:
+                return valid_cat
+
+    return None
 
 
 def categorize_tag_with_llm(tag_name: str, usage_count: int, max_retries: int = 3) -> Optional[str]:
@@ -113,10 +166,17 @@ def categorize_tag_with_llm(tag_name: str, usage_count: int, max_retries: int = 
             # Validate the category
             if category in TAG_CATEGORIES:
                 return category
-            else:
-                print(f"  Warning: Invalid category '{category}' for tag '{tag_name}' (attempt {attempt + 1}/{max_retries})")
-                if attempt < max_retries - 1:
-                    sleep(1)  # Brief pause before retry
+
+            # Try auto-correction
+            corrected = auto_correct_category(category)
+            if corrected:
+                print(f"  Info: Auto-corrected '{category}' -> '{corrected}'")
+                return corrected
+
+            # If still invalid, log and retry
+            print(f"  Warning: Invalid category '{category}' for tag '{tag_name}' (attempt {attempt + 1}/{max_retries})")
+            if attempt < max_retries - 1:
+                sleep(1)  # Brief pause before retry
 
         except requests.exceptions.RequestException as e:
             print(f"  Error communicating with LLM (attempt {attempt + 1}/{max_retries}): {e}")
