@@ -182,6 +182,25 @@ def initialize_database():
         """)
 
         # ===================================================================
+        # Local Tagger Predictions Table
+        # ===================================================================
+        # Stores ALL predictions from local tagger with confidence scores.
+        # This is immutable source data - display merging happens at runtime.
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS local_tagger_predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id INTEGER NOT NULL,
+            tag_name TEXT NOT NULL,
+            category TEXT,
+            confidence REAL NOT NULL,
+            tagger_version TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
+            UNIQUE(image_id, tag_name)
+        )
+        """)
+
+        # ===================================================================
         # Rating Inference Tables
         # ===================================================================
 
@@ -267,6 +286,11 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_image_id ON image_sources(image_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_sources_source_id ON image_sources(source_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_raw_metadata_image_id ON raw_metadata(image_id)")
+
+        # Local tagger predictions indexes
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_ltp_image_id ON local_tagger_predictions(image_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_ltp_confidence ON local_tagger_predictions(confidence)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_ltp_tag_name ON local_tagger_predictions(tag_name)")
 
         # Rating inference indexes
         cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_weights_rating ON rating_tag_weights(rating)")

@@ -126,6 +126,40 @@ def get_image_details(filepath):
         return details_dict
 
 
+def get_image_details_with_merged_tags(filepath, merge_local_predictions=True):
+    """
+    Get image details with optionally merged local tagger predictions.
+    
+    Args:
+        filepath: Image filepath (relative path without 'images/' prefix)
+        merge_local_predictions: If True, merge high-confidence local tagger general tags
+        
+    Returns:
+        Image details dict with additional 'merged_general_tags' field if applicable
+    """
+    details = get_image_details(filepath)
+    if not details:
+        return None
+    
+    # Only merge if enabled and source is NOT local_tagger (local_tagger already has all its tags)
+    if merge_local_predictions and details.get('active_source') != 'local_tagger':
+        image_id = details.get('id')
+        if image_id:
+            from repositories import tagger_predictions_repository
+            existing_general = set(details.get('tags_general', '').split())
+            
+            # Get merged tags from local tagger predictions
+            merged_tags = tagger_predictions_repository.get_merged_general_tags(
+                image_id, 
+                existing_general
+            )
+            
+            if merged_tags:
+                details['merged_general_tags'] = list(merged_tags)
+    
+    return details
+
+
 def delete_image(filepath):
     """Delete an image and all its related data from the database."""
     try:

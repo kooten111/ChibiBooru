@@ -511,3 +511,101 @@ async def database_health_check_service():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+def bulk_retag_local_service():
+    """
+    Service to wipe all local tagger predictions and re-run local tagger for all images.
+    This populates the local_tagger_predictions table with fresh data.
+    """
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        from database import get_db_connection
+        from repositories import tagger_predictions_repository
+        import config
+
+        monitor_service.add_log("Starting bulk local tagger re-run...", "info")
+
+        # Step 1: Clear all existing local tagger predictions
+        deleted = tagger_predictions_repository.clear_all_predictions()
+        monitor_service.add_log(f"Cleared {deleted} existing predictions", "info")
+
+        # Step 2: Get all images that need tagging
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, filepath FROM images")
+            all_images = cursor.fetchall()
+
+        total = len(all_images)
+        if total == 0:
+            return jsonify({
+                "status": "success",
+                "message": "No images to process.",
+                "processed": 0,
+                "predictions_stored": 0
+            })
+
+        monitor_service.add_log(f"Processing {total} images...", "info")
+
+        # Step 3: Re-run local tagger for each image
+        processed = 0
+        total_predictions = 0
+        errors = 0
+
+        for idx, row in enumerate(all_images, 1):
+            image_id = row['id']
+            filepath = row['filepath']
+
+            # Log progress every 10%
+            if idx % max(1, total // 10) == 0:
+                progress_pct = int((idx / total) * 100)
+                monitor_service.add_log(f"Progress: {idx}/{total} ({progress_pct}%)", "info")
+
+            try:
+                # Construct full path
+                full_path = f"static/images/{filepath}"
+                
+                # Skip if file doesn't exist
+                if not os.path.exists(full_path):
+                    continue
+
+                # Skip videos for now (handled differently)
+                if full_path.endswith(('.mp4', '.webm')):
+                    continue
+
+                # Run local tagger
+                result = processing.tag_with_local_tagger(full_path)
+                if result and result.get('data', {}).get('all_predictions'):
+                    predictions = result['data']['all_predictions']
+                    tagger_name = result['data'].get('tagger_name')
+                    
+                    stored = tagger_predictions_repository.store_predictions(
+                        image_id, predictions, tagger_name
+                    )
+                    total_predictions += stored
+                    processed += 1
+            except Exception as e:
+                errors += 1
+                if errors <= 5:  # Only log first 5 errors
+                    monitor_service.add_log(f"Error processing {filepath}: {str(e)}", "error")
+
+        message = f"✓ Processed {processed}/{total} images, stored {total_predictions} predictions"
+        if errors > 0:
+            message += f", {errors} errors"
+        monitor_service.add_log(message, "success")
+
+        return jsonify({
+            "status": "success",
+            "message": message,
+            "processed": processed,
+            "predictions_stored": total_predictions,
+            "errors": errors
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        monitor_service.add_log(f"Bulk retag failed: {str(e)}", "error")
+        return jsonify({"error": str(e)}), 500

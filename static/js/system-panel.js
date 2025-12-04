@@ -385,6 +385,13 @@ function systemReindexDatabase(event) {
     });
 }
 
+function systemBulkRetagLocal(event) {
+    if (event) event.preventDefault();
+    showConfirm('This will run the local AI tagger on EVERY image and save all predictions with confidence scores. This takes a while. Continue?', () => {
+        systemAction('/api/system/bulk_retag_local', event.target, 'Rescan All Images');
+    });
+}
+
 function systemBulkRetryTagging(event) {
     if (event) event.preventDefault();
 

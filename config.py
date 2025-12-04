@@ -61,6 +61,15 @@ LOCAL_TAGGER_TARGET_SIZE = 512  # Input image size for model
 # Change this when you swap models (e.g., "CamieTagger", "WD14", "Z3D-E621")
 LOCAL_TAGGER_NAME = os.environ.get('LOCAL_TAGGER_NAME', 'CamieTagger')
 
+# Confidence thresholds for immutable data architecture
+# STORAGE_THRESHOLD: Store all predictions >= this value (for cross-referencing later)
+# DISPLAY_THRESHOLD: When merging into other sources, only show predictions >= this value
+LOCAL_TAGGER_STORAGE_THRESHOLD = float(os.environ.get('LOCAL_TAGGER_STORAGE_THRESHOLD', 0.10))
+LOCAL_TAGGER_DISPLAY_THRESHOLD = float(os.environ.get('LOCAL_TAGGER_DISPLAY_THRESHOLD', 0.50))
+
+# Categories to merge into other sources (character/copyright/artist usually correct from boorus)
+LOCAL_TAGGER_MERGE_CATEGORIES = ['general']
+
 # ==================== MONITORING ====================
 
 # Automatic background scanning for new images
@@ -185,7 +194,10 @@ def get_local_tagger_config():
         "threshold": LOCAL_TAGGER_THRESHOLD,
         "target_size": LOCAL_TAGGER_TARGET_SIZE,
         "name": LOCAL_TAGGER_NAME,
-        "enabled": ENABLE_LOCAL_TAGGER
+        "enabled": ENABLE_LOCAL_TAGGER,
+        "storage_threshold": LOCAL_TAGGER_STORAGE_THRESHOLD,
+        "display_threshold": LOCAL_TAGGER_DISPLAY_THRESHOLD,
+        "merge_categories": LOCAL_TAGGER_MERGE_CATEGORIES,
     }
 
 def get_booru_apis():

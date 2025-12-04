@@ -197,7 +197,10 @@ async def view_pool(pool_id):
 @login_required
 async def show_image(filepath):
     lookup_path = filepath.replace("images/", "", 1)
-    data = models.get_image_details(lookup_path)
+    
+    # Use the merged tags function to include high-confidence local tagger predictions
+    from repositories.data_access import get_image_details_with_merged_tags
+    data = get_image_details_with_merged_tags(lookup_path)
     if not data:
         return "Image not found", 404
 
@@ -206,6 +209,12 @@ async def show_image(filepath):
 
     # Get general tags grouped by their extended categories
     general_tags = sorted((data.get("tags_general") or "").split())
+    
+    # Include merged local tagger predictions if available
+    merged_general = data.get('merged_general_tags', [])
+    if merged_general:
+        general_tags = sorted(set(general_tags) | set(merged_general))
+    
     tags_with_extended_categories = models.get_tags_with_extended_categories(general_tags)
 
     # Group tags by extended category for display
@@ -261,7 +270,8 @@ async def show_image(filepath):
         random_tags=[],
         data=data,
         app_name=config.APP_NAME,
-        tag_deltas=tag_deltas
+        tag_deltas=tag_deltas,
+        merged_general_tags=merged_general  # Pass to template for potential styling
     )
 
 @main_blueprint.route('/similar/<path:filepath>')

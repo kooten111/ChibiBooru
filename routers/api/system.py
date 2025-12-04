@@ -74,3 +74,8 @@ async def task_status():
 @api_blueprint.route('/database_health_check', methods=['POST'])
 async def database_health_check():
     return await system_service.database_health_check_service()
+
+@api_blueprint.route('/system/bulk_retag_local', methods=['POST'])
+async def bulk_retag_local():
+    """Wipe all local tagger predictions and re-run local tagger for all images."""
+    return await asyncio.to_thread(system_service.bulk_retag_local_service)

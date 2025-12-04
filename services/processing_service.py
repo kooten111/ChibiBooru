@@ -269,7 +269,15 @@ def preprocess_image_for_local_tagger(image_path):
 
 
 def tag_with_local_tagger(filepath):
-    """Tag an image using the local tagger."""
+    """
+    Tag an image using the local tagger.
+    
+    Returns dict with:
+      - source: 'local_tagger'
+      - data: {tags, tagger_name, all_predictions}
+        - tags: categorized tags above display threshold (for active_source use)
+        - all_predictions: list of {tag_name, category, confidence} above storage threshold
+    """
     load_local_tagger()
     if not local_tagger_session:
         print("[Local Tagger] Tagger not available, cannot process file.")
@@ -288,18 +296,41 @@ def tag_with_local_tagger(filepath):
         logits = raw_outputs[1] if len(raw_outputs) > 1 else raw_outputs[0]
         probs = 1.0 / (1.0 + np.exp(-logits))
 
-        tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": []}
+        # Get thresholds from config
+        storage_threshold = tagger_config.get('storage_threshold', 0.10)
+        display_threshold = tagger_config.get('threshold', 0.50)
 
-        indices = np.where(probs[0] >= tagger_config['threshold'])[0]
+        # Collect ALL predictions above storage threshold (for database storage)
+        all_predictions = []
+        
+        # Also collect tags above display threshold (for immediate use as active_source)
+        tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": [], "species": []}
+
+        # Get all indices above storage threshold
+        indices = np.where(probs[0] >= storage_threshold)[0]
+        
         for idx in indices:
             idx_str = str(idx)
             tag_name = idx_to_tag_map.get(idx_str)
-            if tag_name:
-                # Skip rating tags - these should only come from the rating inference system
-                if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
-                    continue
+            if not tag_name:
+                continue
+                
+            # Skip rating tags - these should only come from the rating inference system
+            if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
+                continue
 
-                category = tag_to_category_map.get(tag_name, "general")
+            category = tag_to_category_map.get(tag_name, "general")
+            confidence = float(probs[0][idx])
+            
+            # Store all predictions above storage threshold
+            all_predictions.append({
+                'tag_name': tag_name,
+                'category': category,
+                'confidence': confidence
+            })
+            
+            # Only add to display tags if above display threshold
+            if confidence >= display_threshold:
                 if category in tags_by_category:
                     tags_by_category[category].append(tag_name)
                 else:
@@ -309,7 +340,8 @@ def tag_with_local_tagger(filepath):
             "source": "local_tagger",
             "data": {
                 "tags": tags_by_category,
-                "tagger_name": tagger_config.get('name', 'Unknown')
+                "tagger_name": tagger_config.get('name', 'Unknown'),
+                "all_predictions": all_predictions
             }
         }
     except Exception as e:
@@ -995,21 +1027,19 @@ def process_image_file(filepath, move_from_ingest=False):
                     if image_url:
                         download_pixiv_image(pixiv_id, image_url)
 
-                    # Complement Pixiv with local tagger
-                    print(f"Pixiv source found, complementing with local AI tagger...")
-                    local_tagger_result = tag_with_local_tagger(filepath)
-                    used_local_tagger = True
-                    if local_tagger_result:
-                        all_results[local_tagger_result['source']] = local_tagger_result['data']
-                        print(f"Tagged with Local Tagger (complementing Pixiv): {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
-
-        if not all_results:
-            print(f"All online searches failed for {db_path}, trying local AI tagger...")
-            local_tagger_result = tag_with_local_tagger(filepath)
-            used_local_tagger = True
-            if local_tagger_result:
-                all_results[local_tagger_result['source']] = local_tagger_result['data']
-                print(f"Tagged with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+        # ALWAYS run local tagger for ALL images (not just as fallback)
+        # This stores predictions for cross-referencing and data augmentation
+        print(f"Running local AI tagger for prediction storage...")
+        local_tagger_result = tag_with_local_tagger(filepath)
+        used_local_tagger = True
+        if local_tagger_result:
+            all_results[local_tagger_result['source']] = local_tagger_result['data']
+            tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
+            pred_count = len(local_tagger_result['data'].get('all_predictions', []))
+            if all_results and len(all_results) > 1:
+                print(f"Tagged with Local Tagger (complementing {list(all_results.keys())[0]}): {tag_count} display tags, {pred_count} stored predictions.")
+            else:
+                print(f"Tagged with Local Tagger (primary source): {tag_count} display tags, {pred_count} stored predictions.")
 
     if not all_results:
         print(f"No metadata found for {db_path}")
@@ -1111,6 +1141,27 @@ def process_image_file(filepath, move_from_ingest=False):
 
     if success:
         ensure_thumbnail(filepath)
+        
+        # Store local tagger predictions if available
+        if 'local_tagger' in all_results:
+            local_data = all_results['local_tagger']
+            all_predictions = local_data.get('all_predictions', [])
+            if all_predictions:
+                from repositories import tagger_predictions_repository
+                # Get the image_id for the newly inserted image
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
+                    row = cursor.fetchone()
+                    if row:
+                        image_id = row['id']
+                        stored_count = tagger_predictions_repository.store_predictions(
+                            image_id, 
+                            all_predictions,
+                            local_data.get('tagger_name')
+                        )
+                        print(f"[Local Tagger] Stored {stored_count} predictions for {db_path}")
+        
         return True
     else:
         print(f"Failed to add image {db_path} to DB. It might be a duplicate from a concurrent process. Removing file.")
