@@ -1,0 +1,480 @@
+# Configuration Documentation
+
+## Table of Contents
+- [Overview](#overview)
+- [Environment Variables](#environment-variables)
+- [Configuration File](#configuration-file)
+- [Configuration Validation](#configuration-validation)
+- [Helper Functions](#helper-functions)
+
+---
+
+## Overview
+
+ChibiBooru uses a centralized configuration system with environment variables and Python constants.
+
+**Configuration Sources**:
+1. `.env` file (environment variables)
+2. `config.py` (Python constants with defaults)
+
+---
+
+## Environment Variables
+
+**File**: `.env` (create from `.env.example`)
+
+### Application Settings
+
+#### `APP_NAME`
+**Type**: String  
+**Default**: `"ChibiBooru"`  
+**Description**: Application name shown in header and page titles
+
+---
+
+### Security Settings
+
+#### `APP_PASSWORD` ⚠️ REQUIRED
+**Type**: String  
+**Default**: `"default-password"`  
+**Description**: Password for web UI login  
+**Security**: Change this before deployment!
+
+---
+
+#### `SECRET_KEY` ⚠️ REQUIRED
+**Type**: String  
+**Default**: `"dev-secret-key-change-for-production"`  
+**Description**: Flask session encryption key  
+**Security**: Use long random string in production  
+**Generate**: `python -c "import secrets; print(secrets.token_hex(32))"`
+
+---
+
+#### `RELOAD_SECRET` ⚠️ REQUIRED
+**Type**: String  
+**Default**: `"change-this-secret"`  
+**Description**: Secret for system control API operations  
+**Security**: Change this before deployment!
+
+---
+
+### API Keys (Optional)
+
+#### `SAUCENAO_API_KEY`
+**Type**: String  
+**Default**: `""`  
+**Description**: SauceNao API key for reverse image search  
+**Get Key**: https://saucenao.com/user.php  
+**Feature**: Enables SauceNao integration when set
+
+---
+
+#### `GELBOORU_API_KEY`
+**Type**: String  
+**Default**: `""`  
+**Description**: Gelbooru API key (optional)  
+**Get Key**: https://gelbooru.com/index.php?page=account&s=options
+
+---
+
+#### `GELBOORU_USER_ID`
+**Type**: String  
+**Default**: `""`  
+**Description**: Gelbooru user ID (optional)
+
+---
+
+### AI Tagging
+
+#### `LOCAL_TAGGER_NAME`
+**Type**: String  
+**Default**: `"CamieTagger"`  
+**Description**: Display name for local AI tagger  
+**Examples**: `"CamieTagger"`, `"WD14"`, `"Z3D-E621"`
+
+---
+
+### Web Server
+
+#### `FLASK_HOST`
+**Type**: String  
+**Default**: `"0.0.0.0"`  
+**Description**: Web server host  
+**Options**:
+- `"0.0.0.0"`: Allow external connections
+- `"127.0.0.1"`: Localhost only
+
+---
+
+#### `FLASK_PORT`
+**Type**: Integer  
+**Default**: `5000`  
+**Description**: Web server port number
+
+---
+
+#### `FLASK_DEBUG`
+**Type**: Boolean  
+**Default**: `false`  
+**Description**: Enable Flask debug mode  
+**Values**: `"true"` or `"false"`  
+**Warning**: Never enable in production!
+
+---
+
+### Similarity Calculation
+
+#### `SIMILARITY_METHOD`
+**Type**: String  
+**Default**: `"weighted"`  
+**Description**: Similarity calculation method  
+**Options**:
+- `"jaccard"`: Basic set intersection/union
+- `"weighted"`: IDF + category weights (recommended)
+
+---
+
+## Configuration File
+
+**File**: `config.py`
+
+### Path Configuration
+
+#### Image Storage
+```python
+IMAGE_DIRECTORY = "./static/images"      # Main image storage
+THUMB_DIR = "./static/thumbnails"        # Thumbnail storage
+THUMB_SIZE = 1000                        # Max thumbnail dimension (px)
+```
+
+---
+
+#### Ingest Folder
+```python
+INGEST_DIRECTORY = "./ingest"            # Auto-processing folder
+```
+
+**Purpose**: Drop images here for automatic processing
+
+---
+
+#### Data Storage
+```python
+TAGS_FILE = "./tags.json"                # Legacy tags file
+METADATA_DIR = "./metadata"              # Metadata storage
+DATABASE_PATH = "./booru.db"             # Main database
+```
+
+---
+
+### Local AI Tagger Configuration
+
+```python
+LOCAL_TAGGER_MODEL_PATH = "./models/Tagger/model.onnx"
+LOCAL_TAGGER_METADATA_PATH = "./models/Tagger/metadata.json"
+LOCAL_TAGGER_THRESHOLD = 0.6             # Confidence threshold (0.0-1.0)
+LOCAL_TAGGER_TARGET_SIZE = 512           # Input image size
+LOCAL_TAGGER_NAME = os.environ.get('LOCAL_TAGGER_NAME', 'CamieTagger')
+```
+
+**Threshold**: Higher = fewer but more confident tags  
+**Target Size**: Model input dimension (don't change unless using different model)
+
+---
+
+### Monitoring Configuration
+
+```python
+MONITOR_ENABLED = True                   # Enable background monitoring
+MONITOR_INTERVAL = 300                   # Check interval (seconds)
+```
+
+**Monitor**: Watches for new files in `IMAGE_DIRECTORY` and `INGEST_DIRECTORY`
+
+---
+
+### Processing Configuration
+
+```python
+MAX_WORKERS = 4                          # Parallel threads for metadata fetching
+REQUEST_TIMEOUT = 10                     # API request timeout (seconds)
+RATE_LIMIT_DELAY = 0.5                   # Delay between requests (seconds)
+```
+
+**MAX_WORKERS**: Higher = faster processing but more API load  
+**Recommendation**: 4-8 workers for good balance
+
+---
+
+### Source Priority Configuration
+
+```python
+BOORU_PRIORITY_VERSION = 4               # Increment when changing priority
+BOORU_PRIORITY = [
+    "danbooru",     # Best general categorization
+    "e621",         # Good specific categorization  
+    "gelbooru",     # Tags only
+    "yandere",      # Tags only
+    "pixiv",        # Pixiv tags and artist info
+    "local_tagger"  # AI fallback
+]
+```
+
+**Priority Order**: First match wins for primary source  
+**Version**: Increment `BOORU_PRIORITY_VERSION` when changing order to trigger re-tagging
+
+---
+
+#### Merged Sources
+```python
+USE_MERGED_SOURCES_BY_DEFAULT = True     # Default to merged view for multi-source images
+```
+
+**True**: Images with multiple sources default to merged view  
+**False**: Use first source from `BOORU_PRIORITY`
+
+---
+
+### Pagination
+
+```python
+IMAGES_PER_PAGE = 100                    # Images per page in gallery
+```
+
+---
+
+### Feature Flags
+
+```python
+ENABLE_SAUCENAO = bool(SAUCENAO_API_KEY)       # Auto-enable if key present
+ENABLE_LOCAL_TAGGER = True                     # Enable/disable AI tagging
+ENABLE_DEDUPLICATION = True                    # MD5-based duplicate detection
+```
+
+---
+
+### Similarity Category Weights
+
+```python
+SIMILARITY_CATEGORY_WEIGHTS = {
+    'character': 6.0,    # Character matches very significant
+    'copyright': 3.0,    # Same series/franchise important
+    'artist': 2.0,       # Same artist style matters
+    'species': 2.5,      # Species tags
+    'general': 1.0,      # Standard descriptive tags
+    'meta': 0.5          # Less relevant for similarity
+}
+```
+
+**Higher Weight**: Category contributes more to similarity score  
+**Use Case**: Fine-tune similarity matching behavior
+
+---
+
+## Configuration Validation
+
+### `validate_config() -> bool`
+
+Validates configuration and warns about issues.
+
+**Checks**:
+1. Image directory exists
+2. Ingest directory exists (creates if missing)
+3. Local tagger model files exist (if enabled)
+4. Security settings changed from defaults
+
+**Output**:
+```
+⚠️  Configuration Warnings:
+  - RELOAD_SECRET is set to default value - change this for production!
+  - APP_PASSWORD is set to default value - change this for security!
+  - SECRET_KEY is set to default value - change this for production!
+```
+
+**Called**: Automatically on module import (except when `__main__`)
+
+**Returns**: `True` if no warnings, `False` if warnings present
+
+---
+
+## Helper Functions
+
+### `get_local_tagger_config() -> Dict`
+
+Get local tagger configuration as a dictionary.
+
+**Returns**:
+```python
+{
+    "model_path": "./models/Tagger/model.onnx",
+    "metadata_path": "./models/Tagger/metadata.json",
+    "threshold": 0.6,
+    "target_size": 512,
+    "name": "CamieTagger",
+    "enabled": True
+}
+```
+
+**Use Case**: Pass to tagger initialization functions
+
+---
+
+### `get_booru_apis() -> Dict`
+
+Get configured booru API settings.
+
+**Returns**:
+```python
+{
+    "gelbooru": {
+        "api_key": "...",
+        "user_id": "..."
+    }
+}
+```
+
+**Use Case**: Authentication for API requests
+
+---
+
+## Configuration Best Practices
+
+### Security
+
+1. **Change All Secrets**:
+   ```env
+   APP_PASSWORD=your-strong-password-here
+   SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+   RELOAD_SECRET=another-strong-secret
+   ```
+
+2. **Never Commit `.env`**:
+   - Already in `.gitignore`
+   - Contains sensitive credentials
+
+3. **Use Different Secrets**:
+   - Don't reuse passwords
+   - Each secret should be unique
+
+---
+
+### Performance Tuning
+
+#### For Fast Metadata Fetching
+```python
+MAX_WORKERS = 8              # More parallel requests
+REQUEST_TIMEOUT = 15         # Longer timeout for slow APIs
+RATE_LIMIT_DELAY = 0.2       # Faster requests (may hit rate limits)
+```
+
+#### For Large Collections
+```python
+IMAGES_PER_PAGE = 50         # Fewer images per page (faster loading)
+THUMB_SIZE = 800             # Smaller thumbnails (faster generation)
+```
+
+#### For Better Similarity
+```python
+SIMILARITY_METHOD = "weighted"   # More accurate than jaccard
+SIMILARITY_CATEGORY_WEIGHTS = {
+    'character': 8.0,            # Increase character importance
+    'copyright': 4.0,
+    'general': 0.8               # Decrease general tag importance
+}
+```
+
+---
+
+### Model Configuration
+
+#### Switching AI Models
+1. Download new ONNX model
+2. Place in `models/Tagger/`
+3. Rename to `model.onnx` and `metadata.json`
+4. Update `.env`:
+   ```env
+   LOCAL_TAGGER_NAME=WD14
+   ```
+5. Adjust threshold if needed in `config.py`:
+   ```python
+   LOCAL_TAGGER_THRESHOLD = 0.7  # Different models need different thresholds
+   ```
+
+---
+
+### Source Priority Tuning
+
+#### Change Priority Order
+```python
+# In config.py
+BOORU_PRIORITY_VERSION = 5  # INCREMENT THIS!
+BOORU_PRIORITY = [
+    "e621",         # Now prefer e621 first
+    "danbooru",
+    # ...
+]
+```
+
+**Important**: Always increment `BOORU_PRIORITY_VERSION` to trigger automatic re-tagging
+
+---
+
+## Environment-Specific Configurations
+
+### Development
+```env
+FLASK_DEBUG=true
+FLASK_HOST=127.0.0.1
+FLASK_PORT=5000
+```
+
+### Production
+```env
+FLASK_DEBUG=false
+FLASK_HOST=0.0.0.0
+FLASK_PORT=80
+# Strong secrets required!
+```
+
+### High-Volume Processing
+```python
+MAX_WORKERS = 16
+MONITOR_INTERVAL = 60  # Check more frequently
+```
+
+---
+
+## Troubleshooting
+
+### "Local tagger model not found"
+**Solution**: Download model or disable local tagging:
+```python
+ENABLE_LOCAL_TAGGER = False
+```
+
+### "RELOAD_SECRET is set to default value"
+**Solution**: Change in `.env`:
+```env
+RELOAD_SECRET=your-unique-secret-here
+```
+
+### Slow image loading
+**Solution**: Reduce images per page:
+```python
+IMAGES_PER_PAGE = 50
+```
+
+### API rate limiting
+**Solution**: Increase delay:
+```python
+RATE_LIMIT_DELAY = 1.0  # 1 second between requests
+```
+
+---
+
+## Related Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+- [DATABASE.md](DATABASE.md) - Database configuration
+- [SERVICES.md](SERVICES.md) - Services using configuration
