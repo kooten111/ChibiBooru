@@ -94,7 +94,7 @@ class TestDatabaseInitialization:
         cursor.execute("PRAGMA table_info(tags)")
         columns = {row['name'] for row in cursor.fetchall()}
 
-        expected_columns = {'id', 'name', 'category'}
+        expected_columns = {'id', 'name', 'category', 'extended_category'}
         assert expected_columns.issubset(columns)
 
     def test_tag_implications_has_metadata_columns(self, db_connection):
@@ -130,12 +130,37 @@ class TestDatabaseInitialization:
             'idx_images_filepath',
             'idx_images_md5',
             'idx_tags_name',
+            'idx_tags_extended_category',
             'idx_image_tags_image_id',
             'idx_image_tags_tag_id',
         ]
 
         for index in expected_indexes:
             assert index in indexes, f"Index {index} was not created"
+
+    def test_extended_category_column_can_be_used(self, db_connection):
+        """Test that extended_category column can be queried and updated."""
+        cursor = db_connection.cursor()
+        
+        # Insert a tag
+        cursor.execute("INSERT INTO tags (name, category) VALUES (?, ?)", ('test_tag', 'general'))
+        db_connection.commit()
+        
+        # Update extended_category
+        cursor.execute("UPDATE tags SET extended_category = ? WHERE name = ?", ('09_Action', 'test_tag'))
+        db_connection.commit()
+        
+        # Query extended_category
+        cursor.execute("SELECT extended_category FROM tags WHERE name = ?", ('test_tag',))
+        result = cursor.fetchone()
+        assert result is not None
+        assert result['extended_category'] == '09_Action'
+        
+        # Query by extended_category
+        cursor.execute("SELECT name FROM tags WHERE extended_category = ?", ('09_Action',))
+        result = cursor.fetchone()
+        assert result is not None
+        assert result['name'] == 'test_tag'
 
     def test_fts_triggers_are_created(self, db_connection):
         """Test that FTS5 triggers are created."""
