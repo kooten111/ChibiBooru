@@ -60,6 +60,12 @@ A self-hosted booru type app for organizing and browsing your local image collec
   - Manual creation and approval workflow
   - Chain preview to see full impact before applying
 
+- **Extended Categories:**
+  - 22-category "Platinum Schema" for granular tag organization
+  - Manual categorization interface with keyboard shortcuts
+  - LLM-powered auto-categorization for bulk processing
+  - Visual grouping by category on image pages
+
 ### 📚 Organization Tools
 
 - **Pools:** Create named collections with custom image ordering
@@ -341,6 +347,7 @@ For detailed technical documentation, see the [`docs/`](docs/) directory:
 - **[Core](docs/CORE.md)** - Cache management, events, and utilities
 - **[Configuration](docs/CONFIGURATION.md)** - All configuration options and environment variables
 - **[Data Flow](docs/DATA_FLOW.md)** - End-to-end data flow diagrams
+- **[Extended Categories](docs/EXTENDED_CATEGORIES.md)** - 22-category Platinum Schema for advanced tag organization
 
 ---
 
