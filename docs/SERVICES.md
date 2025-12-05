@@ -1576,7 +1576,7 @@ List of all 22 extended categories with metadata:
 EXTENDED_CATEGORIES = [
     ('00_Subject_Count', 'Subject Count', '0', 'Count & Gender (1girl, solo, 1boy)'),
     ('01_Body_Physique', 'Body Physique', '1', 'Permanent body traits (breasts, tail, animal_ears)'),
-    # ... (see EXTENDED_CATEGORIES.md for complete list)
+    # [... 20 more categories - see EXTENDED_CATEGORIES.md for complete list]
 ]
 ```
 

@@ -166,22 +166,26 @@ The `scripts/llm_auto_categorize_tags.py` script uses a local LLM (via LM Studio
 ### Prerequisites
 
 1. **LM Studio** running locally
-   - Default URL: `http://192.168.1.122:1234`
+   - Default URL: `http://192.168.1.122:1234` (update IP address in script to match your installation)
    - Model: `mistralai/ministral-3-14b-reasoning` (or compatible)
    - Server must be running before script execution
 
-2. **Python dependencies** (included in `requirements.txt`)
-   - `requests`: HTTP client for LLM API
+2. **Python dependencies** (confirmed in `requirements.txt`)
+   - `requests>=2.32.5`: HTTP client for LLM API
 
 ### Configuration
 
-Edit the script to customize:
+Edit the script to customize for your environment:
 
 ```python
 # LM Studio API configuration
-LM_STUDIO_URL = "http://192.168.1.122:1234/v1/chat/completions"
-MODEL_NAME = "mistralai/ministral-3-14b-reasoning"
+LM_STUDIO_URL = "http://192.168.1.122:1234/v1/chat/completions"  # Change IP to match your LM Studio server
+MODEL_NAME = "mistralai/ministral-3-14b-reasoning"  # Change to match your loaded model
 ```
+
+**Important**: Update the IP address (`192.168.1.122`) to match where your LM Studio instance is running:
+- Local installation: `http://localhost:1234` or `http://127.0.0.1:1234`
+- Remote server: `http://YOUR_SERVER_IP:1234`
 
 ### Command-Line Options
 
@@ -274,17 +278,19 @@ Success rate: 95.1%
 
 **Connection failed:**
 - Verify LM Studio is running
-- Check URL in script matches LM Studio server
-- Ensure firewall allows connection
+- Check IP address in script matches your LM Studio server location
+  - For local: Use `http://localhost:1234` or `http://127.0.0.1:1234`
+  - For remote: Use `http://YOUR_SERVER_IP:1234`
+- Ensure firewall allows connection on port 1234
 
 **Low accuracy:**
-- Try a different model
-- Adjust temperature parameter in script
+- Try a different model (some models work better for categorization)
+- Adjust temperature parameter in script (lower = more consistent)
 - Review and manually fix incorrect categorizations
 
 **Rate limit errors:**
-- Reduce batch size
-- Increase delay between requests in script
+- Reduce batch size (`--batch-size`)
+- Increase delay between requests in script (modify `sleep(0.1)` value)
 
 ---
 
