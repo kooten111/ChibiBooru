@@ -1554,49 +1554,204 @@ Enhanced autocomplete with grouped suggestions.
 **File**: `services/tag_categorization_service.py`
 
 ### Purpose
-Advanced tag categorization using Platinum Schema and machine learning.
+Advanced tag categorization using the Extended Categories system (22-category "Platinum Schema") for granular tag organization.
+
+> **📘 For complete documentation**, see [**Extended Categories Documentation**](EXTENDED_CATEGORIES.md)
+
+### Extended Categories Overview
+
+The service provides a **22-category system** organized into three main groups:
+
+1. **Identity (Permanent Traits)**: Subject count, body features, hair, face, genitalia
+2. **Context (Temporary/Situational)**: Attire, actions, poses, expressions, objects, settings
+3. **Technical/Meta**: Framing, focus, art style, visual effects, metadata
+
+### Key Constants
+
+#### `EXTENDED_CATEGORIES`
+
+List of all 22 extended categories with metadata:
+
+```python
+EXTENDED_CATEGORIES = [
+    ('00_Subject_Count', 'Subject Count', '0', 'Count & Gender (1girl, solo, 1boy)'),
+    ('01_Body_Physique', 'Body Physique', '1', 'Permanent body traits (breasts, tail, animal_ears)'),
+    # ... (see EXTENDED_CATEGORIES.md for complete list)
+]
+```
+
+Each tuple contains: `(category_key, display_name, keyboard_shortcut, description)`
+
+#### `TAG_CATEGORIES`
+
+Simplified list of category keys for validation:
+```python
+TAG_CATEGORIES = ['00_Subject_Count', '01_Body_Physique', ..., '21_Status']
+```
 
 ### Functions
 
-#### `categorize_tag_platinum_schema(tag_name: str) -> Optional[str]`
+#### `get_uncategorized_tags_by_frequency(limit: int = 100, include_simple_categories: bool = True) -> List[Dict]`
 
-Categorize a tag using Platinum Schema rules.
+Get uncategorized tags sorted by usage frequency.
 
-**Platinum Schema Categories**:
-- `form` - Body shape, posture
-- `attire` - Clothing, accessories
-- `object` - Props, items
-- `animal` - Animals (non-anthro)
-- `body` - Body parts, features
-- `action` - Actions, poses
-- `location` - Settings, backgrounds
-- `expression` - Facial expressions
-- `style` - Art styles, aesthetics
-- `color` - Color tags
-- `meta` - Image metadata
-- `rating` - Content ratings
-
-**Returns**: Category name or `None` if no match
+**Returns**:
+```python
+[
+    {
+        'name': 'sitting',
+        'usage_count': 1250,
+        'sample_images': ['images/1.jpg', 'images/2.jpg', 'images/3.jpg'],
+        'current_category': 'general'
+    }
+]
+```
 
 ---
 
-#### `batch_categorize_tags(limit: int = 1000) -> Dict`
+#### `get_categorization_stats() -> Dict`
 
-Categorize multiple uncategorized tags in batch.
+Get comprehensive statistics about tag categorization status.
 
 **Returns**:
 ```python
 {
-    "categorized": 150,
-    "total_processed": 1000,
-    "categories": {
-        "form": 20,
-        "attire": 50,
-        "object": 30,
-        ...
+    'total_tags': 5000,
+    'categorized': 3200,
+    'uncategorized': 1800,
+    'meaningful_uncategorized': 450,
+    'meaningful_categorized': 2850,
+    'by_category': {
+        '02_Body_Hair': 320,
+        '03_Body_Face': 180,
+        '09_Action': 420
+    },
+    'categories': TAG_CATEGORIES,
+    'extended_categories': EXTENDED_CATEGORIES
+}
+```
+
+---
+
+#### `set_tag_category(tag_name: str, category: Optional[str]) -> Dict`
+
+Set or update the extended category for a tag.
+
+**Returns**:
+```python
+{
+    'old_category': None,
+    'new_category': '10_Pose'
+}
+```
+
+**Raises**: `ValueError` if category is invalid or tag not found
+
+---
+
+#### `bulk_categorize_tags(categorizations: List[Tuple[str, str]]) -> Dict`
+
+Categorize multiple tags at once.
+
+**Parameters**:
+- `categorizations`: List of `(tag_name, category)` tuples
+
+**Returns**:
+```python
+{
+    'success_count': 150,
+    'error_count': 5,
+    'errors': ['tag1: Invalid category', ...]
+}
+```
+
+---
+
+#### `suggest_category_for_tag(tag_name: str) -> Optional[str]`
+
+Suggest a category based on naming patterns and co-occurrence statistics.
+
+**Algorithm**:
+1. Check pattern-based rules (e.g., `artist:`, `by_`, parentheses)
+2. Analyze co-occurrence with already categorized tags
+3. Return most likely category or default to 'general'
+
+---
+
+#### `get_tag_details(tag_name: str) -> Dict`
+
+Get detailed information about a tag including suggestions.
+
+**Returns**:
+```python
+{
+    'name': 'sitting',
+    'category': 'general',
+    'usage_count': 1250,
+    'suggested_category': '10_Pose',
+    'cooccurring_tags': [
+        {'name': 'chair', 'category': 'general', 'cooccurrence': 450}
+    ]
+}
+```
+
+---
+
+#### `export_tag_categorizations(categorized_only: bool = False) -> Dict`
+
+Export tag categorizations to JSON-serializable format.
+
+**Returns**:
+```python
+{
+    'export_version': '1.0',
+    'export_date': '2024-01-15T12:00:00.000000',
+    'tag_count': 3200,
+    'categorized_only': True,
+    'categories': TAG_CATEGORIES,
+    'tags': {
+        'sitting': '10_Pose',
+        'running': '09_Action',
+        # ...
     }
 }
 ```
+
+---
+
+#### `import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict`
+
+Import tag categorizations from exported data.
+
+**Modes**:
+- `merge`: Keep existing, only add new
+- `overwrite`: Replace all categorizations
+- `update`: Only update already-categorized tags
+
+**Returns**:
+```python
+{
+    'total': 500,
+    'updated': 450,
+    'skipped': 50,
+    'errors': []
+}
+```
+
+---
+
+### Related Tools
+
+- **Web UI**: `/tag_categorize` - Interactive categorization interface with keyboard shortcuts
+- **LLM Script**: `scripts/llm_auto_categorize_tags.py` - Automated categorization using local LLM
+- **API Endpoints**: See [Extended Categories Documentation](EXTENDED_CATEGORIES.md#api-endpoints)
+
+---
+
+### See Also
+
+- **[Extended Categories Documentation](EXTENDED_CATEGORIES.md)** - Complete guide to the 22-category system
+- **[Database Schema](DATABASE.md#tags)** - Tags table with `extended_category` column
 
 ---
 
@@ -1607,3 +1762,4 @@ Categorize multiple uncategorized tags in batch.
 - [REPOSITORIES.md](REPOSITORIES.md) - Data access layer
 - [ROUTERS.md](ROUTERS.md) - Web and API routes
 - [DATA_FLOW.md](DATA_FLOW.md) - End-to-end data flows
+- [EXTENDED_CATEGORIES.md](EXTENDED_CATEGORIES.md) - Extended tag categorization system
