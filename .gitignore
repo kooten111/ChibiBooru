@@ -13,7 +13,7 @@ ingest/
 
 # Testing and documentation
 
-docs/
+# docs/ - Now tracked for project documentation
 pytest.ini
 requirements-dev.txt
 
