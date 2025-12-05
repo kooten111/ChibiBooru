@@ -9,9 +9,8 @@ A self-hosted booru type app for organizing and browsing your local image collec
 - [Installation](#installation)
 - [Configuration](#configuration)
 - [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Development](#development)
-- [Advanced Topics](#advanced-topics)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
 
 ---
 
@@ -60,6 +59,12 @@ A self-hosted booru type app for organizing and browsing your local image collec
   - Automatic detection via naming patterns and statistical analysis
   - Manual creation and approval workflow
   - Chain preview to see full impact before applying
+
+- **Extended Categories:**
+  - 22-category "Platinum Schema" for granular tag organization
+  - Manual categorization interface with keyboard shortcuts
+  - LLM-powered auto-categorization for bulk processing
+  - Visual grouping by category on image pages
 
 ### 📚 Organization Tools
 
@@ -330,146 +335,52 @@ character:holo source:danbooru .png -sketch
 
 ---
 
-## Project Structure
+## Documentation
 
-```
-Booru/
-├── app.py                  # Application entry point with Quart + Uvicorn
-├── config.py               # Centralized configuration
-├── start_uvicorn.sh        # Server startup script
-│
-├── services/               # Business logic layer (14 services)
-│   ├── background_tasks.py      # Async background task management
-│   ├── health_service.py        # Database health checks and auto-repair
-│   ├── image_service.py         # Image CRUD and bulk operations
-│   ├── implication_service.py   # Tag implication detection and management
-│   ├── monitor_service.py       # Background file monitoring
-│   ├── priority_service.py      # Source priority change detection
-│   ├── processing_service.py    # Metadata fetching and image processing
-│   ├── query_service.py         # Search and similarity calculations
-│   ├── rating_service.py        # AI rating inference
-│   ├── saucenao_service.py      # SauceNao reverse image search
-│   ├── switch_source_db.py      # Metadata source switching
-│   ├── system_service.py        # System operations (scan, thumbnails, etc)
-│   └── tag_service.py           # Tag operations and autocomplete
-│
-├── routers/                # Web and API routing
-│   ├── web.py                   # Main web UI routes
-│   └── api/                     # RESTful API endpoints
-│       ├── images.py            # Image API
-│       ├── implications.py      # Implication management API
-│       ├── pools.py             # Pool management API
-│       ├── rating.py            # Rating inference API
-│       ├── saucenao.py          # SauceNao search API
-│       ├── system.py            # System management API
-│       └── tags.py              # Tag management API
-│
-├── repositories/           # Data access layer
-│   ├── data_access.py           # Core database operations
-│   ├── delta_tracker.py         # Tag modification tracking
-│   ├── pool_repository.py       # Pool data operations
-│   ├── rating_repository.py     # Rating model database
-│   └── tag_repository.py        # Tag data operations
-│
-├── database/               # Database layer
-│   ├── core.py                  # SQLite connection and utilities
-│   └── models.py                # ORM models and schema
-│
-├── core/                   # Core infrastructure
-│   └── cache_manager.py         # Intelligent cache management
-│
-├── events/                 # Event handling
-│   └── cache_events.py          # Cache invalidation events
-│
-├── utils/                  # Utility functions
-│   ├── deduplication.py         # Duplicate detection (MD5-based)
-│   └── file_utils.py            # File handling utilities
-│
-├── static/                 # Static web assets
-│   ├── css/                     # Stylesheets
-│   ├── js/                      # JavaScript files
-│   ├── images/                  # YOUR IMAGE COLLECTION GOES HERE
-│   ├── thumbnails/              # Auto-generated thumbnails
-│   └── favicon.svg
-│
-├── templates/              # Jinja2 HTML templates
-│   ├── index.html               # Main gallery view
-│   ├── image.html               # Image detail page
-│   ├── implications.html        # Implication management
-│   ├── pools.html               # Pool management
-│   ├── tags.html                # Tag browser
-│   ├── upload.html              # Upload interface
-│   └── ...
-│
-├── models/                 # AI model files
-│   └── Tagger/                  # Place ONNX models here
-│       ├── model.onnx
-│       └── metadata.json
-│
-├── scripts/                # Utility scripts
-│   ├── backfill_rating_sources.py
-│   └── enable_wal.py
-│
-├── tests/                  # Test suite
-│   ├── test_async_scan.py
-│   ├── test_concurrency.py
-│   ├── test_database.py
-│   ├── test_models.py
-│   ├── test_monitor_batching.py
-│   └── test_query_service.py
-│
-├── ingest/                 # Drop images here for auto-processing
-├── booru.db                # Main SQLite database (auto-created)
-├── rating_model.db         # Rating model database (auto-created)
-│
-├── requirements.txt        # Core dependencies
-├── requirements-ai.txt     # AI tagging dependencies
-├── requirements-dev.txt    # Development dependencies
-├── .env.example            # Example configuration
-└── .env                    # Your configuration (create from .env.example)
-```
+For detailed technical documentation, see the [`docs/`](docs/) directory:
+
+- **[Architecture](docs/ARCHITECTURE.md)** - System architecture, design patterns, and technology stack
+- **[Database](docs/DATABASE.md)** - Complete database schema, tables, indexes, and relationships
+- **[Services](docs/SERVICES.md)** - Business logic layer with all 14 services documented
+- **[Repositories](docs/REPOSITORIES.md)** - Data access layer and repository patterns
+- **[Routers](docs/ROUTERS.md)** - Web UI and API endpoint documentation
+- **[Core](docs/CORE.md)** - Cache management, events, and utilities
+- **[Configuration](docs/CONFIGURATION.md)** - All configuration options and environment variables
+- **[Data Flow](docs/DATA_FLOW.md)** - End-to-end data flow diagrams
+- **[Extended Categories](docs/EXTENDED_CATEGORIES.md)** - 22-category Platinum Schema for advanced tag organization
 
 ---
 
-## Advanced Topics
+## Contributing
 
-### Similarity Calculation Methods
+Contributions are welcome! Please read the documentation in [`docs/`](docs/) to understand the codebase architecture before making changes.
 
-Configure via `SIMILARITY_METHOD` in `.env`:
+### Development Setup
 
-- **`jaccard`:** Simple set intersection/union. Fast and straightforward.
-- **`weighted`** (default): Advanced IDF + category weighting:
-  - Prioritizes rare tags over common ones
-  - Weights character/copyright tags higher
-  - Provides more nuanced similarity matching
+1. Install development dependencies:
+   ```bash
+   pip install -r requirements-dev.txt
+   ```
 
-**Adjust category weights** in `config.py`:
+2. Run tests:
+   ```bash
+   pytest
+   ```
 
-```python
-SIMILARITY_CATEGORY_WEIGHTS = {
-    'character': 6.0,   # Very significant
-    'copyright': 3.0,   # Important
-    'artist': 2.0,      # Matters
-    'species': 2.5,     # Species tags
-    'general': 1.0,     # Standard tags
-    'meta': 0.5         # Less relevant
-}
-```
+3. Review the architecture documentation:
+   - [Architecture Overview](docs/ARCHITECTURE.md) for system design
+   - [Services Documentation](docs/SERVICES.md) for business logic
+   - [Database Schema](docs/DATABASE.md) for data models
 
-### Source Priority Configuration
+### Project Structure
 
-Control which metadata source is used first in `config.py`:
+See [Architecture Documentation](docs/ARCHITECTURE.md#layer-architecture) for a detailed explanation of the layered architecture:
 
-```python
-BOORU_PRIORITY = [
-    "danbooru",     # Best categorization
-    "e621",         # Good specific tags
-    "gelbooru",     # Tags only
-    "yandere",      # Tags only
-    "pixiv",        # Pixiv metadata
-    "local_tagger"  # AI fallback
-]
-```
+- **Services Layer** (`services/`) - Business logic (14 services)
+- **Routers Layer** (`routers/`) - Web and API endpoints
+- **Repositories Layer** (`repositories/`) - Data access
+- **Database Layer** (`database/`) - Schema and models
+- **Core Infrastructure** (`core/`, `events/`, `utils/`) - Supporting systems
 
-**Important:** When changing `BOORU_PRIORITY`, increment `BOORU_PRIORITY_VERSION` to trigger automatic re-tagging.
+For detailed information about each component, refer to the respective documentation files in [`docs/`](docs/).
 

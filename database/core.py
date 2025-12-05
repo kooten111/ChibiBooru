@@ -67,6 +67,14 @@ def initialize_database():
         )
         """)
 
+        # Add extended_category column to tags if it doesn't exist (for Platinum Schema categorization)
+        cur.execute("PRAGMA table_info(tags);")
+        tag_columns = [row['name'] for row in cur.fetchall()]
+
+        if 'extended_category' not in tag_columns:
+            print("Adding 'extended_category' column to 'tags' table...")
+            cur.execute("ALTER TABLE tags ADD COLUMN extended_category TEXT")
+
         # Image-to-Tag mapping table
         cur.execute("""
         CREATE TABLE IF NOT EXISTS image_tags (
@@ -280,6 +288,7 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_ingested_at ON images(ingested_at DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_extended_category ON tags(extended_category)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag_id ON image_tags(tag_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_source ON image_tags(source)")
