@@ -868,14 +868,14 @@ def fetch_pixiv_metadata(pixiv_id):
         traceback.print_exc()
         return None
 
-def download_pixiv_image(pixiv_id, image_url, output_dir="./pixiv_originals"):
+def download_pixiv_image(pixiv_id, image_url, output_dir="./ingest"):
     """
     Download the original image from Pixiv.
 
     Args:
         pixiv_id: Pixiv illustration ID
         image_url: URL to the original image
-        output_dir: Directory to save the image
+        output_dir: Directory to save the image (defaults to ingest folder for auto-processing)
 
     Returns:
         Path to downloaded file, or None if failed
@@ -935,6 +935,30 @@ def process_image_file(filepath, move_from_ingest=False):
     # Get filename
     filename = os.path.basename(filepath)
     is_video = filepath.lower().endswith(('.mp4', '.webm'))
+
+    # Check if this is a Pixiv image and if we should fetch the original instead
+    if not is_video and move_from_ingest:
+        pixiv_id = extract_pixiv_id_from_filename(filename)
+        if pixiv_id:
+            print(f"[Pixiv] Detected Pixiv ID {pixiv_id} from filename, checking for original...")
+            pixiv_result = fetch_pixiv_metadata(pixiv_id)
+            if pixiv_result:
+                image_url = pixiv_result['data'].get('image_url')
+                if image_url:
+                    print(f"[Pixiv] Downloading original quality image instead...")
+                    import config
+                    original_path = download_pixiv_image(pixiv_id, image_url, output_dir=config.INGEST_DIRECTORY)
+                    if original_path and original_path != filepath and os.path.exists(original_path):
+                        # Successfully downloaded original, remove the compressed version
+                        print(f"[Pixiv] Replacing compressed version with original: {original_path}")
+                        try:
+                            os.remove(filepath)
+                            print(f"[Pixiv] Removed compressed version: {filepath}")
+                        except Exception as e:
+                            print(f"[Pixiv] Warning: Could not remove compressed version: {e}")
+                        # Process the original instead
+                        filepath = original_path
+                        filename = os.path.basename(filepath)
 
     # Calculate MD5 before any moves
     md5 = get_md5(filepath)
@@ -1037,11 +1061,7 @@ def process_image_file(filepath, move_from_ingest=False):
                 if pixiv_result:
                     all_results[pixiv_result['source']] = pixiv_result['data']
                     print(f"Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
-
-                    # Optionally download the original image for comparison
-                    image_url = pixiv_result['data'].get('image_url')
-                    if image_url:
-                        download_pixiv_image(pixiv_id, image_url)
+                    # Note: Original image download happens earlier in process_image_file() if needed
 
         # Run local tagger based on configuration
         if config.LOCAL_TAGGER_ALWAYS_RUN:
