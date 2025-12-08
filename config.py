@@ -64,8 +64,8 @@ LOCAL_TAGGER_NAME = os.environ.get('LOCAL_TAGGER_NAME', 'CamieTagger')
 # Confidence thresholds for immutable data architecture
 # STORAGE_THRESHOLD: Store all predictions >= this value (for cross-referencing later)
 # DISPLAY_THRESHOLD: When merging into other sources, only show predictions >= this value
-LOCAL_TAGGER_STORAGE_THRESHOLD = float(os.environ.get('LOCAL_TAGGER_STORAGE_THRESHOLD', 0.10))
-LOCAL_TAGGER_DISPLAY_THRESHOLD = float(os.environ.get('LOCAL_TAGGER_DISPLAY_THRESHOLD', 0.50))
+LOCAL_TAGGER_STORAGE_THRESHOLD = float(os.environ.get('LOCAL_TAGGER_STORAGE_THRESHOLD', 0.50))
+LOCAL_TAGGER_DISPLAY_THRESHOLD = float(os.environ.get('LOCAL_TAGGER_DISPLAY_THRESHOLD', 0.70))
 
 # Categories to merge into other sources (character/copyright/artist usually correct from boorus)
 LOCAL_TAGGER_MERGE_CATEGORIES = ['general']
@@ -127,6 +127,11 @@ ENABLE_SAUCENAO = bool(SAUCENAO_API_KEY)  # Auto-enable if key present
 ENABLE_LOCAL_TAGGER = True  # Set to False to disable AI tagging entirely
 ENABLE_DEDUPLICATION = True  # MD5-based duplicate detection
 
+# Local tagger behavior
+# If True, runs local tagger on ALL images (even when online sources are found)
+# If False, only runs local tagger as fallback when no online sources are found
+LOCAL_TAGGER_ALWAYS_RUN = os.environ.get('LOCAL_TAGGER_ALWAYS_RUN', 'false').lower() in ('true', '1', 'yes')
+
 # ==================== SIMILARITY CALCULATION ====================
 
 # Similarity calculation method
@@ -140,7 +145,7 @@ SIMILARITY_CATEGORY_WEIGHTS = {
     'copyright': 3.0,   # Same series/franchise is important
     'artist': 2.0,      # Same artist style matters
     'species': 2.5,     # Species tags
-    'general': 1.0,     # Standard descriptive tags
+    'general': 3.0,     # Standard descriptive tags
     'meta': 0.5         # Resolution, format, year - less relevant for similarity
 }
 

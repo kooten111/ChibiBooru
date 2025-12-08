@@ -939,16 +939,37 @@ def process_image_file(filepath, move_from_ingest=False):
     # Calculate MD5 before any moves
     md5 = get_md5(filepath)
 
+    # Check for duplicates BEFORE moving the file
+    if models.md5_exists(md5):
+        print(f"Duplicate detected (MD5: {md5}). Removing file: {filepath}")
+        try:
+            os.remove(filepath)
+            print(f"Removed duplicate file: {filepath}")
+        except Exception as e:
+            print(f"Error removing duplicate {filepath}: {e}")
+        return False
+
     # Determine final destination path
     if move_from_ingest:
         # Move from ingest to bucketed structure
         bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
         dest_filepath = os.path.join(bucket_dir, filename)
 
-        # Move the file
-        shutil.move(filepath, dest_filepath)
-        filepath = dest_filepath
-        print(f"Moved to bucketed location: {dest_filepath}")
+        # Check if destination already exists (race condition: another process moved same file)
+        if os.path.exists(dest_filepath):
+            # Another process already moved this file, remove our copy and use theirs
+            print(f"Destination already exists (race condition): {dest_filepath}")
+            print(f"Removing duplicate from ingest: {filepath}")
+            try:
+                os.remove(filepath)
+            except Exception as e:
+                print(f"Error removing duplicate from ingest: {e}")
+            filepath = dest_filepath
+        else:
+            # Move the file
+            shutil.move(filepath, dest_filepath)
+            filepath = dest_filepath
+            print(f"Moved to bucketed location: {dest_filepath}")
 
     # Get relative path for database (relative to static/)
     if filepath.startswith("./static/"):
@@ -966,11 +987,6 @@ def process_image_file(filepath, move_from_ingest=False):
         db_path = rel_path[7:]  # Store without "images/" prefix
     else:
         db_path = rel_path
-
-    if models.md5_exists(md5):
-        print(f"Duplicate detected (MD5: {md5}). Removing redundant file: {filepath}")
-        remove_duplicate(db_path)
-        return False
 
     all_results = search_all_sources(md5)
     saucenao_response = None
@@ -1027,19 +1043,30 @@ def process_image_file(filepath, move_from_ingest=False):
                     if image_url:
                         download_pixiv_image(pixiv_id, image_url)
 
-        # ALWAYS run local tagger for ALL images (not just as fallback)
-        # This stores predictions for cross-referencing and data augmentation
-        print(f"Running local AI tagger for prediction storage...")
-        local_tagger_result = tag_with_local_tagger(filepath)
-        used_local_tagger = True
-        if local_tagger_result:
-            all_results[local_tagger_result['source']] = local_tagger_result['data']
-            tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
-            pred_count = len(local_tagger_result['data'].get('all_predictions', []))
-            if all_results and len(all_results) > 1:
-                print(f"Tagged with Local Tagger (complementing {list(all_results.keys())[0]}): {tag_count} display tags, {pred_count} stored predictions.")
-            else:
-                print(f"Tagged with Local Tagger (primary source): {tag_count} display tags, {pred_count} stored predictions.")
+        # Run local tagger based on configuration
+        if config.LOCAL_TAGGER_ALWAYS_RUN:
+            # Always run mode: Run local tagger on ALL images for prediction storage
+            print(f"Running local AI tagger for prediction storage...")
+            local_tagger_result = tag_with_local_tagger(filepath)
+            used_local_tagger = True
+            if local_tagger_result:
+                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
+                pred_count = len(local_tagger_result['data'].get('all_predictions', []))
+                if all_results and len(all_results) > 1:
+                    print(f"Tagged with Local Tagger (complementing {list(all_results.keys())[0]}): {tag_count} display tags, {pred_count} stored predictions.")
+                else:
+                    print(f"Tagged with Local Tagger (primary source): {tag_count} display tags, {pred_count} stored predictions.")
+        elif not all_results:
+            # Fallback mode: Only run local tagger if no online sources found
+            print(f"No online sources found, using local AI tagger as fallback...")
+            local_tagger_result = tag_with_local_tagger(filepath)
+            used_local_tagger = True
+            if local_tagger_result:
+                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
+                pred_count = len(local_tagger_result['data'].get('all_predictions', []))
+                print(f"Tagged with Local Tagger (fallback): {tag_count} display tags, {pred_count} stored predictions.")
 
     if not all_results:
         print(f"No metadata found for {db_path}")
@@ -1164,6 +1191,11 @@ def process_image_file(filepath, move_from_ingest=False):
         
         return True
     else:
-        print(f"Failed to add image {db_path} to DB. It might be a duplicate from a concurrent process. Removing file.")
-        remove_duplicate(filepath)
+        # Database insertion failed - likely due to race condition where another process
+        # added the same file. Do NOT delete the file here because:
+        # 1. If it's a race condition, another process owns this file in the DB
+        # 2. The file at 'filepath' might be the same file another process successfully added
+        # Just return False to indicate this process didn't add it
+        print(f"Failed to add image {db_path} to DB. It might be a duplicate from a concurrent process.")
+        print(f"File remains at: {filepath}")
         return False
