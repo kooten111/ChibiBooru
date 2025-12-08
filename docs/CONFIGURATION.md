@@ -186,11 +186,15 @@ LOCAL_TAGGER_NAME = os.environ.get('LOCAL_TAGGER_NAME', 'CamieTagger')
 ### Monitoring Configuration
 
 ```python
-MONITOR_ENABLED = True                   # Enable background monitoring
-MONITOR_INTERVAL = 300                   # Check interval (seconds)
+MONITOR_ENABLED = True                   # Auto-start monitor service on app startup
+MONITOR_INTERVAL = 300                   # Check interval (seconds) - only used in polling mode
 ```
 
-**Monitor**: Watches for new files in `IMAGE_DIRECTORY` and `INGEST_DIRECTORY`
+**Monitor**: Automatically watches for new files in `IMAGE_DIRECTORY` and `INGEST_DIRECTORY` when `MONITOR_ENABLED = True`. Uses **watchdog mode** for real-time filesystem monitoring by default. `MONITOR_INTERVAL` is only used in legacy polling mode.
+
+**Manual Control**: You can also start/stop the monitor via API:
+- `POST /api/system/monitor/start` - Start monitoring
+- `POST /api/system/monitor/stop` - Stop monitoring
 
 ---
 

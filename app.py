@@ -36,6 +36,14 @@ def create_app():
     # Load data from DB on startup (no app context needed in Quart)
     models.load_data_from_db()
 
+    # Start monitor service if enabled
+    if config.MONITOR_ENABLED:
+        from services import monitor_service
+        if monitor_service.start_monitor():
+            print("✓ Monitor service started automatically")
+        else:
+            print("⚠ Monitor service was already running")
+
     app.register_blueprint(main_blueprint)
     app.register_blueprint(api_blueprint, url_prefix='/api')
 
