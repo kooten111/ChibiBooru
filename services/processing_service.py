@@ -930,6 +930,11 @@ def process_image_file(filepath, move_from_ingest=False):
     from utils.file_utils import ensure_bucket_dir, get_bucketed_path
     import shutil
 
+    # Check if file exists (race condition check for concurrent processing)
+    if not os.path.exists(filepath):
+        print(f"File not found (likely processed by another thread): {filepath}")
+        return False
+
     print(f"Processing: {filepath}")
 
     # Get filename
@@ -946,7 +951,6 @@ def process_image_file(filepath, move_from_ingest=False):
                 image_url = pixiv_result['data'].get('image_url')
                 if image_url:
                     print(f"[Pixiv] Downloading original quality image instead...")
-                    import config
                     original_path = download_pixiv_image(pixiv_id, image_url, output_dir=config.INGEST_DIRECTORY)
                     if original_path and original_path != filepath and os.path.exists(original_path):
                         # Successfully downloaded original, remove the compressed version
@@ -961,7 +965,14 @@ def process_image_file(filepath, move_from_ingest=False):
                         filename = os.path.basename(filepath)
 
     # Calculate MD5 before any moves
-    md5 = get_md5(filepath)
+    try:
+        md5 = get_md5(filepath)
+    except FileNotFoundError:
+        print(f"File disappeared during MD5 calculation (race condition): {filepath}")
+        return False
+    except Exception as e:
+        print(f"Error calculating MD5 for {filepath}: {e}")
+        return False
 
     # Check for duplicates BEFORE moving the file
     if models.md5_exists(md5):

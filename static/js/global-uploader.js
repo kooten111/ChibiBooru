@@ -6,17 +6,30 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!dropZone) return;
 
     let dragCounter = 0;
+    let dragTimeout = null;
+    const DRAG_DELAY = 300; // milliseconds to wait before showing drop zone
 
     window.addEventListener('dragenter', (e) => {
         e.preventDefault();
         dragCounter++;
-        dropZone.classList.add('active');
+
+        // Only set timeout on first dragenter
+        if (dragCounter === 1) {
+            dragTimeout = setTimeout(() => {
+                dropZone.classList.add('active');
+            }, DRAG_DELAY);
+        }
     });
 
     window.addEventListener('dragleave', (e) => {
         e.preventDefault();
         dragCounter--;
         if (dragCounter === 0) {
+            // Clear timeout if drag ends before delay completes
+            if (dragTimeout) {
+                clearTimeout(dragTimeout);
+                dragTimeout = null;
+            }
             dropZone.classList.remove('active');
         }
     });
@@ -28,6 +41,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('drop', (e) => {
         e.preventDefault();
         dragCounter = 0;
+
+        // Clear timeout if drop happens before delay completes
+        if (dragTimeout) {
+            clearTimeout(dragTimeout);
+            dragTimeout = null;
+        }
+
         dropZone.classList.remove('active');
 
         const files = e.dataTransfer.files;

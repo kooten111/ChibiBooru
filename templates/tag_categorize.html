@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Categorize Tags - {{ app_name }}</title>
@@ -9,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tag-categorization.css') + '?v=2' }}">
 </head>
+
 <body>
     <div class="categorize-container">
         <a href="{{ url_for('main.home') }}" class="back-link">← Back to Home</a>
@@ -41,40 +43,40 @@
                         <div class="guide-section">
                             <h3>Group 1: Identity</h3>
                             <ul>
-                                <li><strong>00_Subject_Count:</strong> Count & gender</li>
-                                <li><strong>01_Body_Physique:</strong> Permanent body traits</li>
-                                <li><strong>02_Body_Hair:</strong> Head hair only</li>
-                                <li><strong>03_Body_Face:</strong> Eyes & face marks</li>
-                                <li><strong>04_Body_Genitalia:</strong> NSFW anatomy</li>
+                                <li><strong>Subject_Count:</strong> Count & gender</li>
+                                <li><strong>Body_Physique:</strong> Permanent body traits</li>
+                                <li><strong>Body_Hair:</strong> Head hair only</li>
+                                <li><strong>Body_Face:</strong> Eyes & face marks</li>
+                                <li><strong>Body_Genitalia:</strong> NSFW anatomy</li>
                             </ul>
                         </div>
 
                         <div class="guide-section">
                             <h3>Group 2: Context</h3>
                             <ul>
-                                <li><strong>05_Attire_Main:</strong> Main clothing</li>
-                                <li><strong>06_Attire_Inner:</strong> Underwear/swimwear</li>
-                                <li><strong>07_Attire_Legwear:</strong> Socks & hosiery</li>
-                                <li><strong>08_Attire_Acc:</strong> Accessories</li>
-                                <li><strong>21_Status:</strong> State of being</li>
-                                <li><strong>09_Action:</strong> Active verbs</li>
-                                <li><strong>10_Pose:</strong> Body position</li>
-                                <li><strong>11_Expression:</strong> Emotion</li>
-                                <li><strong>12_Sexual_Act:</strong> NSFW interaction</li>
-                                <li><strong>13_Object:</strong> Props</li>
-                                <li><strong>14_Setting:</strong> Location</li>
+                                <li><strong>Attire_Main:</strong> Main clothing</li>
+                                <li><strong>Attire_Inner:</strong> Underwear/swimwear</li>
+                                <li><strong>Attire_Legwear:</strong> Socks & hosiery</li>
+                                <li><strong>Attire_Acc:</strong> Accessories</li>
+                                <li><strong>Status:</strong> State of being</li>
+                                <li><strong>Action:</strong> Active verbs</li>
+                                <li><strong>Pose:</strong> Body position</li>
+                                <li><strong>Expression:</strong> Emotion</li>
+                                <li><strong>Sexual_Act:</strong> NSFW interaction</li>
+                                <li><strong>Object:</strong> Props</li>
+                                <li><strong>Setting:</strong> Location</li>
                             </ul>
                         </div>
 
                         <div class="guide-section">
                             <h3>Group 3: Technical/Meta</h3>
                             <ul>
-                                <li><strong>15_Framing:</strong> Camera angle</li>
-                                <li><strong>16_Focus:</strong> Part focus</li>
-                                <li><strong>17_Style_Art:</strong> Art style</li>
-                                <li><strong>18_Style_Tech:</strong> Visual effects</li>
-                                <li><strong>19_Meta_Attributes:</strong> Metadata</li>
-                                <li><strong>20_Meta_Text:</strong> Text & UI</li>
+                                <li><strong>Framing:</strong> Camera angle</li>
+                                <li><strong>Focus:</strong> Part focus</li>
+                                <li><strong>Style_Art:</strong> Art style</li>
+                                <li><strong>Style_Tech:</strong> Visual effects</li>
+                                <li><strong>Meta_Attributes:</strong> Metadata</li>
+                                <li><strong>Meta_Text:</strong> Text & UI</li>
                             </ul>
                         </div>
                     </div>
@@ -94,14 +96,17 @@
                         <button class="import-export-btn export-btn" onclick="exportCategorizations()">
                             <span class="btn-icon">⬇</span> Export
                         </button>
-                        <button class="import-export-btn import-btn" onclick="document.getElementById('importFileInput').click()">
+                        <button class="import-export-btn import-btn"
+                            onclick="document.getElementById('importFileInput').click()">
                             <span class="btn-icon">⬆</span> Import
                         </button>
-                        <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+                        <input type="file" id="importFileInput" accept=".json" style="display: none;"
+                            onchange="handleImportFile(event)">
                     </div>
                     <div class="import-export-header" style="margin-top: 20px;">Maintenance</div>
                     <div class="import-export-buttons">
-                        <button class="import-export-btn" onclick="syncBaseCategories()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <button class="import-export-btn" onclick="syncBaseCategories()"
+                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
                             <span class="btn-icon">🔄</span> Sync Base Categories
                         </button>
                     </div>
@@ -338,12 +343,12 @@
             const imageGallery = sampleImages.length > 0
                 ? `<div class="sample-images">
                     ${sampleImages.map(filepath => {
-                        const isVideo = filepath.endsWith('.mp4') || filepath.endsWith('.webm');
-                        const videoType = filepath.endsWith('.webm') ? 'video/webm' : 'video/mp4';
-                        return isVideo
-                            ? `<video controls loop preload="metadata"><source src="/static/images/${filepath}" type="${videoType}"></video>`
-                            : `<img src="/static/images/${filepath}" alt="Sample image">`;
-                    }).join('')}
+                    const isVideo = filepath.endsWith('.mp4') || filepath.endsWith('.webm');
+                    const videoType = filepath.endsWith('.webm') ? 'video/webm' : 'video/mp4';
+                    return isVideo
+                        ? `<video controls loop preload="metadata"><source src="/static/images/${filepath}" type="${videoType}"></video>`
+                        : `<img src="/static/images/${filepath}" alt="Sample image">`;
+                }).join('')}
                   </div>`
                 : '<div class="no-samples">No sample images available</div>';
 
@@ -355,14 +360,14 @@
 
                     <div class="category-buttons">
                         ${extendedCategories.map(catData => {
-                            const [catKey, catName, shortcut, description] = catData;
-                            const cssClass = catKey.replace(/_/g, '-').toLowerCase();
-                            return `<button class="category-btn category-btn-${cssClass}"
+                const [catKey, catName, shortcut, description] = catData;
+                const cssClass = catKey.replace(/_/g, '-').toLowerCase();
+                return `<button class="category-btn category-btn-${cssClass}"
                                     onclick="setCategory('${catKey}')"
                                     title="${description}">
                                 ${catName}<br><small>(${shortcut})</small>
                             </button>`;
-                        }).join('')}
+            }).join('')}
                     </div>
 
                     <div class="navigation-buttons">
@@ -494,14 +499,14 @@
                         </div>
                         <div class="category-buttons">
                             ${extendedCategories.map(catData => {
-                                const [catKey, catName, shortcut, description] = catData;
-                                const cssClass = catKey.replace(/_/g, '-').toLowerCase();
-                                return `<button class="category-btn category-btn-${cssClass}"
+                    const [catKey, catName, shortcut, description] = catData;
+                    const cssClass = catKey.replace(/_/g, '-').toLowerCase();
+                    return `<button class="category-btn category-btn-${cssClass}"
                                         onclick="updateTagCategory('${tag.name}', '${catKey}')"
                                         title="${description}">
                                     ${catName}
                                 </button>`;
-                            }).join('')}
+                }).join('')}
                         </div>
                     </div>
                 `;
@@ -699,4 +704,5 @@
         window.showNotification = showNotification;
     </script>
 </body>
+
 </html>

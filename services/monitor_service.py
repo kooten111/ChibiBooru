@@ -94,19 +94,28 @@ class ImageFileHandler(FileSystemEventHandler):
             if is_from_ingest:
                 # File from ingest - will be moved to bucketed structure
                 filename = os.path.basename(filepath)
+
+                # Check if file still exists (race condition check)
+                if not os.path.exists(filepath):
+                    # File was already processed by another thread/process
+                    return
+
                 try:
                     add_log(f"New file detected in ingest: {filename}", 'info')
                     if processing.process_image_file(filepath, move_from_ingest=True):
                         monitor_status["last_scan_found"] = 1
                         monitor_status["total_processed"] += 1
-                        
+
                         # Mark for reload, but don't reload immediately to prevent UI hang
                         monitor_status["pending_reload"] = True
                         monitor_status["last_activity"] = time.time()
-                        
+
                         add_log(f"Successfully processed from ingest: {filename}", 'success')
                     else:
                         add_log(f"Skipped (duplicate): {filename}", 'warning')
+                except FileNotFoundError:
+                    # File was moved/deleted by another process - this is normal in concurrent processing
+                    pass
                 except Exception as e:
                     add_log(f"Error processing {filename}: {e}", 'error')
             else:
