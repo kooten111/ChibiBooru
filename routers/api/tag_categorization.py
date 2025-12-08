@@ -244,3 +244,26 @@ async def api_import_categorizations():
             "success": False,
             "error": str(e)
         }), 500
+
+
+@api_blueprint.route('/tag_categorize/sync_base_categories', methods=['POST'])
+async def api_sync_base_categories():
+    """Sync base categories from extended categories."""
+    try:
+        stats = tag_cat.sync_base_categories_from_extended()
+
+        # Reload data to update in-memory cache
+        models.load_data_from_db()
+
+        return jsonify({
+            "success": True,
+            **stats
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+

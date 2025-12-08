@@ -19,6 +19,7 @@ def create_app():
     app.config['RELOAD_SECRET'] = config.RELOAD_SECRET
     app.config['SECRET_KEY'] = config.SECRET_KEY
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=4)
+    app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max request size
 
     # Ensure the database file and tables exist.
     initialize_database()

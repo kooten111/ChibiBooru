@@ -49,6 +49,29 @@ SIMPLE_CATEGORIES = [
 # Use extended categories by default
 TAG_CATEGORIES = [cat[0] for cat in EXTENDED_CATEGORIES]  # Extract just the category keys
 
+# Mapping from extended categories to base categories
+# This determines which base category a tag should have based on its extended category
+EXTENDED_TO_BASE_CATEGORY_MAP = {
+    # Meta categories - these contain metadata tags
+    '19_Meta_Attributes': 'meta',
+    '20_Meta_Text': 'meta',
+
+    # All other extended categories default to 'general'
+    # Character, artist, copyright, and species tags should be manually set or detected separately
+}
+
+def get_base_category_from_extended(extended_category: str) -> str:
+    """
+    Get the base category for a tag based on its extended category.
+
+    Args:
+        extended_category: The extended category key (e.g., '19_Meta_Attributes')
+
+    Returns:
+        The base category ('character', 'copyright', 'artist', 'species', 'general', or 'meta')
+    """
+    return EXTENDED_TO_BASE_CATEGORY_MAP.get(extended_category, 'general')
+
 
 def get_uncategorized_tags_by_frequency(limit: int = 100, include_simple_categories: bool = True) -> List[Dict]:
     """
@@ -66,6 +89,8 @@ def get_uncategorized_tags_by_frequency(limit: int = 100, include_simple_categor
         cur = conn.cursor()
 
         # Get tags that need extended categorization (tags without extended_category)
+        # Only include 'general' and 'meta' tags - character, artist, copyright, and species
+        # tags don't need extended categories
         cur.execute("""
             SELECT
                 t.name,
@@ -75,6 +100,7 @@ def get_uncategorized_tags_by_frequency(limit: int = 100, include_simple_categor
             FROM tags t
             LEFT JOIN image_tags it ON t.id = it.tag_id
             WHERE t.extended_category IS NULL
+            AND t.category IN ('general', 'meta')
             GROUP BY t.name, t.category, t.extended_category
             HAVING usage_count > 0
             ORDER BY usage_count DESC
@@ -125,11 +151,23 @@ def get_categorization_stats() -> Dict:
         total_tags = cur.fetchone()['total']
 
         # Extended categorization stats
-        cur.execute("SELECT COUNT(*) as extended_uncategorized FROM tags WHERE extended_category IS NULL")
+        # Only count 'general' and 'meta' tags as needing extended categorization
+        cur.execute("""
+            SELECT COUNT(*) as extended_uncategorized
+            FROM tags
+            WHERE extended_category IS NULL
+            AND category IN ('general', 'meta')
+        """)
         extended_uncategorized = cur.fetchone()['extended_uncategorized']
 
-        # Extended categorized tags
-        extended_categorized = total_tags - extended_uncategorized
+        # Extended categorized tags (only general and meta)
+        cur.execute("""
+            SELECT COUNT(*) as extended_categorized
+            FROM tags
+            WHERE extended_category IS NOT NULL
+            OR category NOT IN ('general', 'meta')
+        """)
+        extended_categorized = cur.fetchone()['extended_categorized']
 
         # Tags by extended category
         cur.execute("""
@@ -142,21 +180,23 @@ def get_categorization_stats() -> Dict:
 
         by_extended_category = {row['extended_category']: row['count'] for row in cur.fetchall()}
 
-        # Tags with extended category that are actually used
+        # Tags with extended category that are actually used, OR non-general/meta tags
         cur.execute("""
             SELECT COUNT(DISTINCT t.id) as meaningful_extended_categorized
             FROM tags t
             JOIN image_tags it ON t.id = it.tag_id
             WHERE t.extended_category IS NOT NULL
+            OR t.category NOT IN ('general', 'meta')
         """)
         meaningful_extended_categorized = cur.fetchone()['meaningful_extended_categorized']
 
-        # Tags without extended category that are used
+        # Tags without extended category that are used (only general and meta)
         cur.execute("""
             SELECT COUNT(DISTINCT t.id) as meaningful_extended_uncategorized
             FROM tags t
             JOIN image_tags it ON t.id = it.tag_id
             WHERE t.extended_category IS NULL
+            AND t.category IN ('general', 'meta')
         """)
         meaningful_extended_uncategorized = cur.fetchone()['meaningful_extended_uncategorized']
 
@@ -189,19 +229,32 @@ def set_tag_category(tag_name: str, category: Optional[str]) -> Dict:
     with get_db_connection() as conn:
         cur = conn.cursor()
 
-        # Get old extended category
-        cur.execute("SELECT extended_category FROM tags WHERE name = ?", (tag_name,))
+        # Get old extended category and current base category
+        cur.execute("SELECT extended_category, category FROM tags WHERE name = ?", (tag_name,))
         row = cur.fetchone()
         old_category = row['extended_category'] if row else None
 
         if not row:
             raise ValueError(f"Tag '{tag_name}' not found")
 
-        # Update extended category
-        cur.execute(
-            "UPDATE tags SET extended_category = ? WHERE name = ?",
-            (category, tag_name)
-        )
+        # Determine the base category from extended category
+        base_category = get_base_category_from_extended(category) if category else row['category']
+
+        # Only update base category if it's currently 'general' or 'meta'
+        # Don't override character, artist, copyright, or species tags
+        current_base = row['category']
+        if current_base in ['general', 'meta']:
+            # Update both extended and base category
+            cur.execute(
+                "UPDATE tags SET extended_category = ?, category = ? WHERE name = ?",
+                (category, base_category, tag_name)
+            )
+        else:
+            # Keep existing base category, only update extended category
+            cur.execute(
+                "UPDATE tags SET extended_category = ? WHERE name = ?",
+                (category, tag_name)
+            )
 
         conn.commit()
 
@@ -385,22 +438,28 @@ def export_tag_categorizations(categorized_only: bool = False) -> Dict:
         cur = conn.cursor()
 
         if categorized_only:
+            # Only export extended categories for general and meta tags
+            # Artist/character/copyright/species tags don't need extended categories
             cur.execute("""
-                SELECT name, extended_category
+                SELECT name, category, extended_category
                 FROM tags
                 WHERE extended_category IS NOT NULL
+                AND category IN ('general', 'meta')
                 ORDER BY name
             """)
         else:
             cur.execute("""
-                SELECT name, extended_category
+                SELECT name, category, extended_category
                 FROM tags
+                WHERE category IN ('general', 'meta')
                 ORDER BY name
             """)
 
         tags = {}
         for row in cur.fetchall():
-            tags[row['name']] = row['extended_category']
+            # Only export extended category if tag is general or meta
+            if row['category'] in ('general', 'meta'):
+                tags[row['name']] = row['extended_category']
 
         from datetime import datetime
         return {
@@ -447,15 +506,24 @@ def import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict:
 
             try:
                 # Check if tag exists
-                cur.execute("SELECT extended_category FROM tags WHERE name = ?", (tag_name,))
+                cur.execute("SELECT extended_category, category FROM tags WHERE name = ?", (tag_name,))
                 row = cur.fetchone()
 
                 if not row:
-                    stats['errors'].append(f"{tag_name}: Tag not found in database")
+                    # Tag doesn't exist - skip it
+                    # New tags should only be created when images are imported from sources
+                    # that provide the correct base category (character, artist, etc.)
                     stats['skipped'] += 1
                     continue
 
                 existing_category = row['extended_category']
+                existing_base_category = row['category']
+
+                # Don't apply extended categories to character/artist/copyright/species tags
+                # These are already fully categorized by their base category
+                if existing_base_category in ('character', 'artist', 'copyright', 'species'):
+                    stats['skipped'] += 1
+                    continue
 
                 # Apply import mode logic
                 if mode == 'merge' and existing_category is not None:
@@ -467,11 +535,26 @@ def import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict:
                     stats['skipped'] += 1
                     continue
 
-                # Update the tag
-                cur.execute(
-                    "UPDATE tags SET extended_category = ? WHERE name = ?",
-                    (category, tag_name)
-                )
+                # Update the tag with proper base category mapping
+                # Get current base category
+                cur.execute("SELECT category FROM tags WHERE name = ?", (tag_name,))
+                current_base = cur.fetchone()['category']
+
+                # Determine new base category from extended category
+                base_category = get_base_category_from_extended(category) if category else current_base
+
+                # Only update base category if it's currently 'general' or 'meta'
+                # Don't override character, artist, copyright, or species tags
+                if current_base in ['general', 'meta']:
+                    cur.execute(
+                        "UPDATE tags SET extended_category = ?, category = ? WHERE name = ?",
+                        (category, base_category, tag_name)
+                    )
+                else:
+                    cur.execute(
+                        "UPDATE tags SET extended_category = ? WHERE name = ?",
+                        (category, tag_name)
+                    )
                 stats['updated'] += 1
 
             except Exception as e:
@@ -481,3 +564,64 @@ def import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict:
         conn.commit()
 
     return stats
+
+
+def sync_base_categories_from_extended() -> Dict:
+    """
+    Update all tags' base categories based on their extended categories.
+    This only affects tags with base category 'general' or 'meta'.
+    Character, artist, copyright, and species tags are not modified.
+
+    Also cleans up extended_category from artist/character/copyright/species tags
+    since they don't need extended categorization.
+
+    Returns:
+        Dict with statistics about the update
+    """
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # First, clean up extended_category from artist/character/copyright/species tags
+        cur.execute("""
+            UPDATE tags
+            SET extended_category = NULL
+            WHERE category IN ('artist', 'character', 'copyright', 'species')
+            AND extended_category IS NOT NULL
+        """)
+        cleaned = cur.rowcount
+
+        # Get all tags with extended categories (only general and meta now)
+        cur.execute("""
+            SELECT id, name, category, extended_category
+            FROM tags
+            WHERE extended_category IS NOT NULL
+            AND category IN ('general', 'meta')
+        """)
+
+        tags = cur.fetchall()
+        updated = 0
+
+        for tag in tags:
+            tag_id = tag['id']
+            current_base = tag['category']
+            extended_cat = tag['extended_category']
+
+            # Get the correct base category from extended category
+            new_base = get_base_category_from_extended(extended_cat)
+
+            # Only update if it changed
+            if new_base != current_base:
+                cur.execute(
+                    "UPDATE tags SET category = ? WHERE id = ?",
+                    (new_base, tag_id)
+                )
+                updated += 1
+
+        conn.commit()
+
+        return {
+            'total_checked': len(tags),
+            'updated': updated,
+            'unchanged': len(tags) - updated,
+            'cleaned': cleaned
+        }

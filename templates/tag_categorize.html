@@ -99,6 +99,12 @@
                         </button>
                         <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
                     </div>
+                    <div class="import-export-header" style="margin-top: 20px;">Maintenance</div>
+                    <div class="import-export-buttons">
+                        <button class="import-export-btn" onclick="syncBaseCategories()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                            <span class="btn-icon">🔄</span> Sync Base Categories
+                        </button>
+                    </div>
                 </div>
 
                 <div class="edit-tag-section">
@@ -202,8 +208,11 @@
         let extendedCategories = []; // Full category data with shortcuts
 
         async function loadTags() {
-            document.getElementById('loadingState').style.display = 'block';
-            document.getElementById('tagDisplay').innerHTML = '<div class="loading-state">Loading tags...</div>';
+            const loadingState = document.getElementById('loadingState');
+            if (loadingState) loadingState.style.display = 'block';
+
+            const tagDisplay = document.getElementById('tagDisplay');
+            if (tagDisplay) tagDisplay.innerHTML = '<div class="loading-state">Loading tags...</div>';
 
             try {
                 const response = await fetch('/api/tag_categorize/tags?limit=100');
@@ -218,18 +227,23 @@
                 await loadStats();
 
                 // Check if there are truly no uncategorized tags (not just empty batch)
-                const uncategorizedCount = parseInt(document.getElementById('statUncategorized').textContent) || 0;
+                const statElement = document.getElementById('statUncategorized');
+                const uncategorizedCount = statElement ? parseInt(statElement.textContent) || 0 : 0;
 
                 if (uncategorizedCount === 0) {
-                    document.getElementById('tagDisplay').innerHTML =
-                        '<div class="no-tags-state">All tags are categorized! 🎉</div>';
+                    const tagDisplay = document.getElementById('tagDisplay');
+                    if (tagDisplay) {
+                        tagDisplay.innerHTML = '<div class="no-tags-state">All tags are categorized! 🎉</div>';
+                    }
                 } else {
                     displayCurrentTag();
                 }
             } catch (error) {
                 console.error('Error loading tags:', error);
-                document.getElementById('tagDisplay').innerHTML =
-                    '<div class="no-tags-state">Error loading tags: ' + error.message + '</div>';
+                const tagDisplay = document.getElementById('tagDisplay');
+                if (tagDisplay) {
+                    tagDisplay.innerHTML = '<div class="no-tags-state">Error loading tags: ' + error.message + '</div>';
+                }
             }
         }
 
@@ -241,10 +255,15 @@
                 // Use meaningful counts (tags actually used in images) instead of total counts
                 const meaningfulTotal = (data.meaningful_categorized || 0) + (data.meaningful_uncategorized || 0);
 
-                document.getElementById('statTotal').textContent = meaningfulTotal;
-                document.getElementById('statCategorized').textContent = data.meaningful_categorized || 0;
-                document.getElementById('statUncategorized').textContent = data.meaningful_uncategorized || 0;
-                document.getElementById('statsSummary').style.display = 'grid';
+                const statTotal = document.getElementById('statTotal');
+                const statCategorized = document.getElementById('statCategorized');
+                const statUncategorized = document.getElementById('statUncategorized');
+                const statsSummary = document.getElementById('statsSummary');
+
+                if (statTotal) statTotal.textContent = meaningfulTotal;
+                if (statCategorized) statCategorized.textContent = data.meaningful_categorized || 0;
+                if (statUncategorized) statUncategorized.textContent = data.meaningful_uncategorized || 0;
+                if (statsSummary) statsSummary.style.display = 'grid';
             } catch (error) {
                 console.error('Error loading stats:', error);
             }
@@ -583,12 +602,14 @@
         async function confirmImport() {
             const mode = document.querySelector('input[name="importMode"]:checked').value;
 
-            closeImportModal();
-
             if (!importFileData) {
                 showNotification('No import data available', 'error');
                 return;
             }
+
+            // Store data in local variable before closing modal
+            const dataToImport = importFileData;
+            closeImportModal();
 
             try {
                 showNotification('Importing tag categorizations...', 'info');
@@ -598,7 +619,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(importFileData)
+                    body: JSON.stringify(dataToImport)
                 });
 
                 const result = await response.json();
@@ -638,6 +659,34 @@
             } finally {
                 // Reset file input
                 event.target.value = '';
+            }
+        }
+
+        // Sync base categories from extended categories
+        async function syncBaseCategories() {
+            if (!confirm('This will update the base category (character/artist/copyright/species/general/meta) for all tags based on their extended categories. Continue?')) {
+                return;
+            }
+
+            try {
+                showNotification('Syncing base categories...', 'info');
+
+                const response = await fetch('/api/tag_categorize/sync_base_categories', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const cleanedMsg = result.cleaned > 0 ? `, Cleaned: ${result.cleaned}` : '';
+                    showNotification(`Sync completed! Checked: ${result.total_checked}, Updated: ${result.updated}, Unchanged: ${result.unchanged}${cleanedMsg}`, 'success');
+                    await loadStats();
+                } else {
+                    showNotification('Error syncing: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error syncing:', error);
+                showNotification('Error syncing: ' + error.message, 'error');
             }
         }
 
