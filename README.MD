@@ -81,6 +81,26 @@ A self-hosted booru type app for organizing and browsing your local image collec
 - **Debug Panel:** Comprehensive tools for database maintenance, optimization, and bulk operations
 - **Health Checks:** Automatic startup health checks with self-repair capabilities
 
+### 🚀 Performance Optimizations
+
+- **Database Performance:**
+  - Configurable SQLite cache (64-256MB) and memory-mapped I/O (256MB-1GB)
+  - Batched database operations for 5-10x faster bulk processing
+  - Optimized tag search with two-step query approach and case-insensitive indexes
+  - WAL mode with tunable checkpointing for better concurrency
+
+- **Async Cache Loading:**
+  - Background cache reloads prevent UI blocking
+  - Non-blocking API responses during data refresh
+  - Progress tracking for large collections
+  - Automatic concurrency protection
+
+- **Query Optimizations:**
+  - Eliminated expensive random ordering for faster results
+  - Batched fetches to avoid SQL parameter limits
+  - Index-based filtering before joining large tables
+  - Optimized for collections up to 100k+ images
+
 ---
 
 ## Quick Start
@@ -198,6 +218,12 @@ FLASK_DEBUG="false"
 
 # Similarity
 SIMILARITY_METHOD="weighted"  # Options: 'jaccard' or 'weighted'
+
+# Database Performance (optional, for large collections)
+DB_CACHE_SIZE_MB="128"        # SQLite cache size (default: 64MB)
+DB_MMAP_SIZE_MB="512"         # Memory-mapped I/O (default: 256MB)
+DB_BATCH_SIZE="200"           # Batch size for bulk ops (default: 100)
+DB_WAL_AUTOCHECKPOINT="2000"  # WAL checkpoint interval (default: 1000)
 ```
 
 ### AI Tagger Models

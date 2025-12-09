@@ -27,12 +27,25 @@ ChibiBooru uses **SQLite 3** as its embedded database with several performance o
 ### Connection Settings
 ```python
 # database/core.py
-conn = sqlite3.connect(DB_FILE)
+conn = sqlite3.connect(DB_FILE, check_same_thread=False)
 conn.execute("PRAGMA foreign_keys = ON")      # Enable referential integrity
 conn.execute("PRAGMA journal_mode = WAL")     # Write-Ahead Logging
 conn.execute("PRAGMA synchronous = NORMAL")   # Balance safety/performance
+conn.execute(f"PRAGMA cache_size = {-DB_CACHE_SIZE_MB * 1024}")  # Configurable cache
+conn.execute("PRAGMA page_size = 8192")       # Larger page size for better performance
+conn.execute(f"PRAGMA mmap_size = {DB_MMAP_SIZE_MB * 1024 * 1024}")  # Memory-mapped I/O
+conn.execute("PRAGMA temp_store = MEMORY")    # Temp tables in memory
+conn.execute(f"PRAGMA wal_autocheckpoint = {DB_WAL_AUTOCHECKPOINT}")  # Checkpoint control
 conn.row_factory = sqlite3.Row                # Dict-like row access
 ```
+
+**Performance Optimizations**:
+- **check_same_thread=False**: Allow multi-threaded access (safe with proper locking)
+- **cache_size**: Configurable page cache (default 64MB, can increase for large databases)
+- **page_size**: 8KB pages for better performance with large blobs
+- **mmap_size**: Memory-mapped I/O for faster reads (default 256MB)
+- **temp_store = MEMORY**: Keep temporary tables in RAM for faster sorts/indexes
+- **wal_autocheckpoint**: Control when WAL file is checkpointed (default 1000 frames)
 
 ## Database Schema
 
@@ -163,6 +176,7 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 
 **Indexes**:
 - `idx_tags_name ON tags(name)`
+- `idx_tags_name_lower ON tags(LOWER(name))`  *(New: case-insensitive search optimization)*
 - `idx_tags_category ON tags(category)`
 - `idx_tags_extended_category ON tags(extended_category)`
 
@@ -560,10 +574,47 @@ CREATE INDEX idx_rating_pair_weights_tags ON rating_tag_pair_weights(tag1, tag2)
 ### Query Performance Tips
 
 1. **Use EXPLAIN QUERY PLAN** to verify index usage
-2. **Batch inserts** in transactions for better performance
+2. **Batch inserts** in transactions for better performance (see `DB_BATCH_SIZE` config)
 3. **ANALYZE** database periodically for query optimization
 4. **VACUUM** to reclaim space and defragment
 5. **WAL mode** for concurrent reads during writes
+
+### Performance Optimizations (New in Latest Version)
+
+**Tag Search Optimization**:
+- Two-step query approach: First find matching image IDs, then batch fetch details
+- Case-insensitive index on tag names for faster searches
+- Batched queries (500 images per batch) to avoid SQL parameter limits
+- Eliminates expensive `ORDER BY RANDOM()` in favor of `ORDER BY id`
+
+**Bulk Operations**:
+- Configurable batch size (`DB_BATCH_SIZE`, default 100) for commits
+- Reduces transaction overhead by 5-10x
+- Minimizes database lock time during large updates
+- Used in: repopulation, tag rebuilding, tag categorization
+
+**Cache Manager Optimization**:
+- Batched JSON parsing with progress tracking
+- Temp storage to minimize lock time during reload
+- Prevents UI blocking with async loading option
+
+**Query Optimization Examples**:
+```sql
+-- OLD: Expensive random ordering
+SELECT * FROM images ORDER BY RANDOM() LIMIT 100;
+
+-- NEW: Fast sequential ordering
+SELECT * FROM images ORDER BY id LIMIT 100;
+
+-- OLD: Slow tag search with GROUP_CONCAT on all images
+SELECT filepath, GROUP_CONCAT(name) FROM images JOIN image_tags ...
+
+-- NEW: Fast two-step with index-based filtering
+-- Step 1: Find matching IDs (uses indexes)
+SELECT image_id FROM image_tags WHERE tag_id IN (...) GROUP BY image_id;
+-- Step 2: Batch fetch details for matched IDs only
+SELECT filepath, tags FROM images WHERE id IN (...);
+```
 
 ---
 
