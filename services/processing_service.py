@@ -1168,6 +1168,37 @@ def process_image_file(filepath, move_from_ingest=False):
         'general': list(general_set)
     }
 
+    # Extract rating if present (danbooru, e621, etc.)
+    rating = None
+    rating_source = None
+    if 'rating' in primary_source_data:
+        rating_char = primary_source_data.get('rating', '').lower()
+        # Map single-letter ratings to full tag names
+        rating_map = {
+            'g': 'rating:general',
+            's': 'rating:sensitive',
+            'q': 'rating:questionable',
+            'e': 'rating:explicit'
+        }
+        rating = rating_map.get(rating_char)
+
+        # Determine source trust level
+        # danbooru and e621 are authoritative (original)
+        # local_tagger is 50/50 (treat as ai_inference)
+        # others default to original
+        if source_name in ['danbooru', 'e621']:
+            rating_source = 'original'  # Trusted source
+        elif source_name in ['local_tagger', 'camie_tagger']:
+            rating_source = 'ai_inference'  # Less trusted
+        else:
+            rating_source = 'original'  # Default to original for other sources
+
+    # Add rating to categorized tags if present
+    if rating and rating_source:
+        # For now, add to meta category or create a rating-specific list
+        # We'll pass this separately to the add_image_with_metadata function
+        pass
+
     parent_id = primary_source_data.get('parent_id')
     if source_name == 'e621':
         parent_id = primary_source_data.get('relationships', {}).get('parent_id')
@@ -1179,6 +1210,8 @@ def process_image_file(filepath, move_from_ingest=False):
         'parent_id': parent_id,
         'has_children': primary_source_data.get('has_children', False),
         'saucenao_lookup': used_saucenao,
+        'rating': rating,
+        'rating_source': rating_source,
     }
 
     raw_metadata_to_save = {

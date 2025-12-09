@@ -536,6 +536,23 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
                     tag_id = cursor.fetchone()['id']
                     cursor.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
 
+            # 3.5. Apply rating tag if present
+            rating = image_info.get('rating')
+            rating_source = image_info.get('rating_source')
+            if rating and rating_source:
+                # Insert or update the rating tag with 'rating' category
+                cursor.execute("""
+                    INSERT INTO tags (name, category) VALUES (?, 'rating')
+                    ON CONFLICT(name) DO UPDATE SET category = 'rating'
+                """, (rating,))
+                cursor.execute("SELECT id FROM tags WHERE name = ?", (rating,))
+                tag_id = cursor.fetchone()['id']
+                # Insert the image_tag with the appropriate source
+                cursor.execute("""
+                    INSERT OR IGNORE INTO image_tags (image_id, tag_id, source)
+                    VALUES (?, ?, ?)
+                """, (image_id, tag_id, rating_source))
+
             # 4. Insert raw metadata
             cursor.execute(
                 "INSERT INTO raw_metadata (image_id, data) VALUES (?, ?)",

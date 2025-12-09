@@ -191,6 +191,31 @@ def get_unrated_images() -> List[Tuple[int, List[str]]]:
         return result
 
 
+def get_unrated_images_count() -> int:
+    """
+    Get count of images without any rating tag (optimized for performance).
+
+    Returns:
+        Number of unrated images
+    """
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # Count images without rating tags
+        cur.execute(f"""
+            SELECT COUNT(*) as count
+            FROM images i
+            WHERE NOT EXISTS (
+                SELECT 1 FROM image_tags it
+                JOIN tags t ON it.tag_id = t.id
+                WHERE it.image_id = i.id
+                  AND t.name IN ({','.join('?' * len(RATINGS))})
+            )
+        """, RATINGS)
+
+        return cur.fetchone()['count']
+
+
 # ============================================================================
 # Training Algorithm
 # ============================================================================
@@ -925,7 +950,7 @@ def get_model_stats() -> Dict:
         stale = is_model_stale()
 
         # Count unrated images
-        unrated = len(get_unrated_images())
+        unrated = get_unrated_images_count()
 
         return {
             'model_trained': model_trained,

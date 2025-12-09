@@ -228,12 +228,30 @@ async def show_image(filepath):
     # Keep the old format for backward compatibility (all general tags together)
     tags_with_counts = [(tag, tag_counts.get(tag, 0)) for tag in general_tags if tag]
 
+    # Get rating tags from image_tags table and merge them into meta category
+    rating_tags = []
+    if data.get('id'):
+        from database import get_db_connection
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT t.name
+                FROM image_tags it
+                JOIN tags t ON it.tag_id = t.id
+                WHERE it.image_id = ? AND t.category = 'rating'
+            """, (data['id'],))
+            rating_tags = [row['name'] for row in cur.fetchall()]
+
+    # Merge rating tags with meta tags
+    meta_tags = (data.get("tags_meta") or "").split()
+    meta_with_rating = sorted(set(meta_tags) | set(rating_tags))
+
     categorized_tags = {
         "character": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_character") or "").split()) if t],
         "copyright": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_copyright") or "").split()) if t],
         "artist": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_artist") or "").split()) if t],
         "species": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_species") or "").split()) if t],
-        "meta": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_meta") or "").split()) if t],
+        "meta": [(t, tag_counts.get(t, 0)) for t in meta_with_rating if t],
     }
 
     similar_images = query_service.find_related_by_tags(filepath)
