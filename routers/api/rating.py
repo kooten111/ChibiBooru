@@ -300,6 +300,7 @@ async def api_get_images_for_rating():
                     })
 
             # Build images list with pre-fetched tags
+            from utils.file_utils import get_thumbnail_path
             images = []
             for row in image_rows:
                 image_id = row['id']
@@ -320,6 +321,7 @@ async def api_get_images_for_rating():
                 images.append({
                     'id': image_id,
                     'filepath': filepath,
+                    'thumb': get_thumbnail_path(filepath),
                     'rating': rating,
                     'rating_source': rating_source,
                     'tag_count': len(tags),

@@ -155,6 +155,12 @@
             document.getElementById('actionLogContent').textContent = '';
         }
 
+        // URL encode a filepath, preserving forward slashes
+        function urlEncodePath(filepath) {
+            if (!filepath) return filepath;
+            return filepath.split('/').map(part => encodeURIComponent(part)).join('/');
+        }
+
         async function loadStats() {
             try {
                 const response = await fetch('/api/rate/stats');
@@ -448,13 +454,18 @@
                                        img.rating_source === 'user' ? '👤 User' :
                                        img.rating_source === 'original' ? '📦 Original' : '';
 
+                    // URL encode paths for special characters
+                    const encodedFilepath = urlEncodePath(img.filepath);
+                    const encodedThumb = urlEncodePath(img.thumb);
+                    const thumbPrefix = img.thumb.startsWith('thumbnails/') || img.thumb.startsWith('images/') ? '' : 'images/';
+
                     return `
                         <div class="image-card" style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; background: var(--bg-panel);">
-                            <a href="/view/${img.filepath}" target="_blank" style="display: block;">
-                                <img src="/static/thumbnails/${img.filepath}"
+                            <a href="/view/${encodedFilepath}" target="_blank" style="display: block;">
+                                <img src="/static/${thumbPrefix}${encodedThumb}"
                                      alt="Image ${img.id}"
                                      style="width: 100%; height: 200px; object-fit: cover; display: block;"
-                                     onerror="this.src='/static/images/${img.filepath}'">
+                                     onerror="this.src='/static/images/${encodedFilepath}'">
                             </a>
                             <div style="padding: 10px;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
