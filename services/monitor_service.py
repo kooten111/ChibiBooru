@@ -210,7 +210,8 @@ def run_scan():
 
     # For bulk operations, full reload is acceptable
     if processed_count > 0:
-        models.load_data_from_db()
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
 
     return processed_count
 
@@ -297,7 +298,8 @@ def initial_scan_then_idle():
             if time.time() - monitor_status["last_activity"] > 2.0:
                 try:
                     add_log("Reloading data after batch ingest...")
-                    models.load_data_from_db()
+                    from core.cache_manager import load_data_from_db_async
+                    load_data_from_db_async()
                     monitor_status["pending_reload"] = False
                     add_log("Data reload complete.", 'success')
                 except Exception as e:

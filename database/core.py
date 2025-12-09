@@ -1,14 +1,42 @@
 # database.py
 import sqlite3
+import config
 
 DB_FILE = "booru.db"
 
 def get_db_connection():
-    """Create a database connection."""
-    conn = sqlite3.connect(DB_FILE)
+    """Create a database connection with optimized performance settings."""
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+
+    # Enable foreign keys
     conn.execute("PRAGMA foreign_keys = ON")
+
+    # WAL mode for better concurrency
     conn.execute("PRAGMA journal_mode = WAL")
+
+    # Faster synchronization (safe with WAL mode)
     conn.execute("PRAGMA synchronous = NORMAL")
+
+    # Increase cache size (configurable, default 64MB)
+    # Negative value means KB
+    cache_size_kb = -1 * config.DB_CACHE_SIZE_MB * 1024
+    conn.execute(f"PRAGMA cache_size = {cache_size_kb}")
+
+    # Increase page size for better performance with large blobs
+    # Note: This only affects NEW databases, existing ones keep their page size
+    conn.execute("PRAGMA page_size = 8192")
+
+    # Memory-mapped I/O for faster reads (configurable, default 256MB)
+    mmap_size_bytes = config.DB_MMAP_SIZE_MB * 1024 * 1024
+    conn.execute(f"PRAGMA mmap_size = {mmap_size_bytes}")
+
+    # Increase temp store to memory for faster sorts/indexes
+    conn.execute("PRAGMA temp_store = MEMORY")
+
+    # Optimize for multiple readers (configurable)
+    conn.execute(f"PRAGMA wal_autocheckpoint = {config.DB_WAL_AUTOCHECKPOINT}")
+
+    # Enable row factory for dict-like access
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -287,6 +315,7 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_relationships ON images(parent_id, has_children)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_ingested_at ON images(ingested_at DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name_lower ON tags(LOWER(name))")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_extended_category ON tags(extended_category)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")

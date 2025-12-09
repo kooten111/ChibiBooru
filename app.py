@@ -48,6 +48,10 @@ def create_app():
     app.register_blueprint(main_blueprint)
     app.register_blueprint(api_blueprint, url_prefix='/api')
 
+    # Register custom Jinja2 filters
+    from utils import url_encode_path
+    app.jinja_env.filters['urlencode_path'] = url_encode_path
+
     return app
 
 if __name__ == '__main__':

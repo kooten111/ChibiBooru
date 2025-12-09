@@ -8,7 +8,10 @@ from database import models, get_db_connection
 async def api_tag_categorization_stats():
     """Get statistics about tag categorization status."""
     try:
-        stats = tag_cat.get_categorization_stats()
+        # By default, skip the expensive "meaningful" stats for faster page load
+        # Frontend can request full stats with ?full=true if needed
+        include_meaningful = request.args.get('full', 'false').lower() == 'true'
+        stats = tag_cat.get_categorization_stats(include_meaningful=include_meaningful)
         return jsonify(stats)
     except Exception as e:
         import traceback
@@ -68,8 +71,9 @@ async def api_set_tag_category():
 
         result = tag_cat.set_tag_category(tag_name, category)
 
-        # Reload data to update in-memory cache
-        models.load_data_from_db()
+        # Reload data to update in-memory cache (async to avoid blocking)
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
 
         return jsonify({
             "success": True,
@@ -138,8 +142,9 @@ async def api_bulk_categorize():
 
         result = tag_cat.bulk_categorize_tags(cat_tuples)
 
-        # Reload data to update in-memory cache
-        models.load_data_from_db()
+        # Reload data to update in-memory cache (async to avoid blocking)
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
 
         return jsonify({
             "success": True,
@@ -225,8 +230,9 @@ async def api_import_categorizations():
 
         stats = tag_cat.import_tag_categorizations(data, mode=mode)
 
-        # Reload data to update in-memory cache
-        models.load_data_from_db()
+        # Reload data to update in-memory cache (async to avoid blocking)
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
 
         return jsonify({
             "success": True,
@@ -252,8 +258,9 @@ async def api_sync_base_categories():
     try:
         stats = tag_cat.sync_base_categories_from_extended()
 
-        # Reload data to update in-memory cache
-        models.load_data_from_db()
+        # Reload data to update in-memory cache (async to avoid blocking)
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
 
         return jsonify({
             "success": True,

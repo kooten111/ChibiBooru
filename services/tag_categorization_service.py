@@ -93,6 +93,7 @@ def get_uncategorized_tags_by_frequency(limit: int = 100, include_simple_categor
         # tags don't need extended categories
         cur.execute("""
             SELECT
+                t.id,
                 t.name,
                 t.category,
                 t.extended_category,
@@ -101,44 +102,68 @@ def get_uncategorized_tags_by_frequency(limit: int = 100, include_simple_categor
             LEFT JOIN image_tags it ON t.id = it.tag_id
             WHERE t.extended_category IS NULL
             AND t.category IN ('general', 'meta')
-            GROUP BY t.name, t.category, t.extended_category
+            GROUP BY t.id, t.name, t.category, t.extended_category
             HAVING usage_count > 0
             ORDER BY usage_count DESC
             LIMIT ?
         """, (limit,))
 
+        tag_rows = cur.fetchall()
+
+        if not tag_rows:
+            return []
+
+        # Build tag results
         tags = []
-        for row in cur.fetchall():
-            tag_name = row['name']
-            current_category = row['category']
-            usage_count = row['usage_count']
+        tag_id_to_index = {}
 
-            # Get sample images for this tag
-            cur.execute("""
-                SELECT i.filepath
-                FROM images i
-                JOIN image_tags it ON i.id = it.image_id
-                JOIN tags t ON it.tag_id = t.id
-                WHERE t.name = ?
-                ORDER BY RANDOM()
-                LIMIT 3
-            """, (tag_name,))
-
-            sample_images = [r['filepath'] for r in cur.fetchall()]
-
+        for idx, row in enumerate(tag_rows):
+            tag_id_to_index[row['id']] = idx
             tags.append({
-                'name': tag_name,
-                'usage_count': usage_count,
-                'sample_images': sample_images,
-                'current_category': current_category
+                'name': row['name'],
+                'usage_count': row['usage_count'],
+                'sample_images': [],
+                'current_category': row['category']
             })
+
+        # Batch fetch sample images for all tags at once (much faster than individual queries)
+        # Using a subquery to get 3 random images per tag
+        tag_ids = [row['id'] for row in tag_rows]
+        placeholders = ','.join('?' for _ in tag_ids)
+
+        # Get sample images in a single query
+        # Use a window function to limit to 3 per tag
+        cur.execute(f"""
+            SELECT tag_id, filepath
+            FROM (
+                SELECT
+                    it.tag_id,
+                    i.filepath,
+                    ROW_NUMBER() OVER (PARTITION BY it.tag_id ORDER BY i.id) as rn
+                FROM image_tags it
+                JOIN images i ON it.image_id = i.id
+                WHERE it.tag_id IN ({placeholders})
+            )
+            WHERE rn <= 3
+        """, tag_ids)
+
+        # Distribute sample images to their respective tags
+        for row in cur.fetchall():
+            tag_id = row['tag_id']
+            if tag_id in tag_id_to_index:
+                idx = tag_id_to_index[tag_id]
+                tags[idx]['sample_images'].append(row['filepath'])
 
         return tags
 
 
-def get_categorization_stats() -> Dict:
+def get_categorization_stats(include_meaningful: bool = True) -> Dict:
     """
     Get statistics about tag categorization status.
+
+    Args:
+        include_meaningful: If True, include stats for tags actually used in images (slower).
+                          If False, only include basic tag counts (faster).
 
     Returns:
         Dict with categorization stats
@@ -146,30 +171,45 @@ def get_categorization_stats() -> Dict:
     with get_db_connection() as conn:
         cur = conn.cursor()
 
-        # Total tags
-        cur.execute("SELECT COUNT(*) as total FROM tags")
-        total_tags = cur.fetchone()['total']
-
-        # Extended categorization stats
-        # Only count 'general' and 'meta' tags as needing extended categorization
+        # Fast basic stats - only count tags table (no expensive joins)
         cur.execute("""
-            SELECT COUNT(*) as extended_uncategorized
+            SELECT
+                COUNT(*) as total_tags,
+                SUM(CASE WHEN extended_category IS NULL AND category IN ('general', 'meta') THEN 1 ELSE 0 END) as extended_uncategorized,
+                SUM(CASE WHEN extended_category IS NOT NULL OR category NOT IN ('general', 'meta') THEN 1 ELSE 0 END) as extended_categorized
             FROM tags
-            WHERE extended_category IS NULL
-            AND category IN ('general', 'meta')
         """)
-        extended_uncategorized = cur.fetchone()['extended_uncategorized']
 
-        # Extended categorized tags (only general and meta)
-        cur.execute("""
-            SELECT COUNT(*) as extended_categorized
-            FROM tags
-            WHERE extended_category IS NOT NULL
-            OR category NOT IN ('general', 'meta')
-        """)
-        extended_categorized = cur.fetchone()['extended_categorized']
+        stats_row = cur.fetchone()
 
-        # Tags by extended category
+        meaningful_categorized = 0
+        meaningful_uncategorized = 0
+
+        if include_meaningful:
+            # Count "meaningful" tags (tags that are actually used in images)
+            # Use INNER JOIN with GROUP BY on the tags side - this leverages the tag_id index
+            # and avoids the expensive DISTINCT operation in a subquery
+            cur.execute("""
+                SELECT
+                    SUM(CASE
+                        WHEN t.extended_category IS NOT NULL OR t.category NOT IN ('general', 'meta')
+                        THEN 1 ELSE 0
+                    END) as meaningful_categorized,
+                    SUM(CASE
+                        WHEN t.extended_category IS NULL AND t.category IN ('general', 'meta')
+                        THEN 1 ELSE 0
+                    END) as meaningful_uncategorized
+                FROM (
+                    SELECT DISTINCT tag_id FROM image_tags
+                ) it
+                INNER JOIN tags t ON it.tag_id = t.id
+            """)
+
+            meaningful_row = cur.fetchone()
+            meaningful_categorized = meaningful_row['meaningful_categorized'] or 0
+            meaningful_uncategorized = meaningful_row['meaningful_uncategorized'] or 0
+
+        # Get tags by extended category (simple aggregation - no joins needed)
         cur.execute("""
             SELECT extended_category, COUNT(*) as count
             FROM tags
@@ -177,35 +217,14 @@ def get_categorization_stats() -> Dict:
             GROUP BY extended_category
             ORDER BY count DESC
         """)
-
         by_extended_category = {row['extended_category']: row['count'] for row in cur.fetchall()}
 
-        # Tags with extended category that are actually used, OR non-general/meta tags
-        cur.execute("""
-            SELECT COUNT(DISTINCT t.id) as meaningful_extended_categorized
-            FROM tags t
-            JOIN image_tags it ON t.id = it.tag_id
-            WHERE t.extended_category IS NOT NULL
-            OR t.category NOT IN ('general', 'meta')
-        """)
-        meaningful_extended_categorized = cur.fetchone()['meaningful_extended_categorized']
-
-        # Tags without extended category that are used (only general and meta)
-        cur.execute("""
-            SELECT COUNT(DISTINCT t.id) as meaningful_extended_uncategorized
-            FROM tags t
-            JOIN image_tags it ON t.id = it.tag_id
-            WHERE t.extended_category IS NULL
-            AND t.category IN ('general', 'meta')
-        """)
-        meaningful_extended_uncategorized = cur.fetchone()['meaningful_extended_uncategorized']
-
         return {
-            'total_tags': total_tags,
-            'categorized': extended_categorized,
-            'uncategorized': extended_uncategorized,
-            'meaningful_uncategorized': meaningful_extended_uncategorized,
-            'meaningful_categorized': meaningful_extended_categorized,
+            'total_tags': stats_row['total_tags'],
+            'categorized': stats_row['extended_categorized'],
+            'uncategorized': stats_row['extended_uncategorized'],
+            'meaningful_uncategorized': meaningful_uncategorized,
+            'meaningful_categorized': meaningful_categorized,
             'by_category': by_extended_category,
             'categories': TAG_CATEGORIES,
             'extended_categories': EXTENDED_CATEGORIES

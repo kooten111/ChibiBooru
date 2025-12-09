@@ -108,7 +108,8 @@ async def home():
 @main_blueprint.route('/tags')
 @login_required
 async def tags_browser():
-    all_tags = models.get_all_tags_sorted()
+    # Don't load all tags - they're loaded via JavaScript API
+    # Just provide stats for the page
     stats = query_service.get_enhanced_stats()
 
     # Get random tags for explore section
@@ -120,7 +121,7 @@ async def tags_browser():
 
     return await render_template(
         'tags.html',
-        all_tags=all_tags,
+        all_tags=[],  # Empty - tags loaded via API
         stats=stats,
         query='',
         random_tags=random_tags,

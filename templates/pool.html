@@ -37,7 +37,7 @@
         <div class="gallery pool-gallery" data-pool-id="{{ pool.id }}">
             {% for image in images %}
             <div class="thumbnail skeleton pool-image-item" data-sort-order="{{ image.sort_order }}" data-filepath="{{ image.path }}">
-                <a href="{{ url_for('main.show_image', filepath=image.path) }}">
+                <a href="/view/{{ image.path | urlencode_path }}">
                     <img src="{{ url_for('static', filename=image.thumb) }}" alt="Image" loading="lazy" onload="this.closest('.thumbnail').classList.add('has-image')">
                     <div class="image-order-badge">{{ image.sort_order }}</div>
                 </a>

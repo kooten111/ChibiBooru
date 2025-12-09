@@ -504,7 +504,7 @@
                     <div class="panel-collapsible-content" id="related-images-content">
                         <div class="related-grid-vertical">
                             {% for related in related_images %}
-                            <a href="{{ url_for('main.show_image', filepath=related.path) }}" class="related-thumb">
+                            <a href="/view/{{ related.path | urlencode_path }}" class="related-thumb">
                                 <img src="{{ url_for('static', filename=related.thumb) }}" alt="Related">
                                 <span class="label {{ related.match_type }}">
                                     {% if related.match_type == 'parent' %}Parent

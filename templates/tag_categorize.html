@@ -220,29 +220,37 @@
             if (tagDisplay) tagDisplay.innerHTML = '<div class="loading-state">Loading tags...</div>';
 
             try {
-                const response = await fetch('/api/tag_categorize/tags?limit=100');
-                const data = await response.json();
+                // Load tags first for immediate page display
+                const tagsResponse = await fetch('/api/tag_categorize/tags?limit=100');
+                const data = await tagsResponse.json();
 
                 currentTags = data.tags || [];
                 availableCategories = data.categories || [];
                 extendedCategories = data.extended_categories || [];
                 currentIndex = 0;
 
-                // Load stats first to check actual uncategorized count
-                await loadStats();
-
-                // Check if there are truly no uncategorized tags (not just empty batch)
-                const statElement = document.getElementById('statUncategorized');
-                const uncategorizedCount = statElement ? parseInt(statElement.textContent) || 0 : 0;
-
-                if (uncategorizedCount === 0) {
-                    const tagDisplay = document.getElementById('tagDisplay');
-                    if (tagDisplay) {
-                        tagDisplay.innerHTML = '<div class="no-tags-state">All tags are categorized! 🎉</div>';
-                    }
+                // Display tags immediately
+                if (currentTags.length === 0) {
+                    tagDisplay.innerHTML = '<div class="no-tags-state">No uncategorized tags in this batch.</div>';
                 } else {
                     displayCurrentTag();
                 }
+
+                // Load stats in the background (non-blocking, without "meaningful" counts for speed)
+                fetch('/api/tag_categorize/stats')
+                    .then(res => res.json())
+                    .then(data => {
+                        updateStatsDisplay(data);
+
+                        // Update the empty state message if stats show everything is categorized
+                        if (currentTags.length === 0 && data.uncategorized === 0) {
+                            tagDisplay.innerHTML = '<div class="no-tags-state">All tags are categorized! 🎉</div>';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error loading stats:', error);
+                    });
+
             } catch (error) {
                 console.error('Error loading tags:', error);
                 const tagDisplay = document.getElementById('tagDisplay');
@@ -252,23 +260,37 @@
             }
         }
 
-        async function loadStats() {
+        function updateStatsDisplay(data) {
             try {
-                const response = await fetch('/api/tag_categorize/stats');
-                const data = await response.json();
+                // Use meaningful counts if available (tags actually used in images)
+                // Otherwise fall back to basic counts for faster loading
+                const hasMeaningful = data.meaningful_categorized !== undefined &&
+                                     data.meaningful_categorized > 0 ||
+                                     data.meaningful_uncategorized > 0;
 
-                // Use meaningful counts (tags actually used in images) instead of total counts
-                const meaningfulTotal = (data.meaningful_categorized || 0) + (data.meaningful_uncategorized || 0);
+                const categorized = hasMeaningful ? data.meaningful_categorized : data.categorized;
+                const uncategorized = hasMeaningful ? data.meaningful_uncategorized : data.uncategorized;
+                const total = (categorized || 0) + (uncategorized || 0);
 
                 const statTotal = document.getElementById('statTotal');
                 const statCategorized = document.getElementById('statCategorized');
                 const statUncategorized = document.getElementById('statUncategorized');
                 const statsSummary = document.getElementById('statsSummary');
 
-                if (statTotal) statTotal.textContent = meaningfulTotal;
-                if (statCategorized) statCategorized.textContent = data.meaningful_categorized || 0;
-                if (statUncategorized) statUncategorized.textContent = data.meaningful_uncategorized || 0;
+                if (statTotal) statTotal.textContent = total;
+                if (statCategorized) statCategorized.textContent = categorized || 0;
+                if (statUncategorized) statUncategorized.textContent = uncategorized || 0;
                 if (statsSummary) statsSummary.style.display = 'grid';
+            } catch (error) {
+                console.error('Error updating stats display:', error);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/tag_categorize/stats');
+                const data = await response.json();
+                updateStatsDisplay(data);
             } catch (error) {
                 console.error('Error loading stats:', error);
             }

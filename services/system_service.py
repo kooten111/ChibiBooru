@@ -71,7 +71,8 @@ def scan_and_process_service():
         # Reload data to update tag counts after cleaning
         if cleaned_count > 0 or orphaned_tags_count > 0:
             print(f"Reloading data to update tag counts...")
-            models.load_data_from_db()
+            from core.cache_manager import load_data_from_db_async
+            load_data_from_db_async()
             print("Data reload complete")
 
         # Optimize query planner if new images were added
@@ -119,11 +120,13 @@ def rebuild_service():
         
         models.repopulate_from_database()
         
-        models.load_data_from_db()
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
         
         return jsonify({"status": "success", "message": "Tag re-processing complete."})
     except Exception as e:
-        models.load_data_from_db()
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
         return jsonify({"error": str(e)}), 500
 
 def rebuild_categorized_service():
@@ -133,7 +136,8 @@ def rebuild_categorized_service():
         return jsonify({"error": "Unauthorized"}), 401
     try:
         updated_count = models.rebuild_categorized_tags_from_relations()
-        models.load_data_from_db()  # Refresh cache
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()  # Refresh cache
         return jsonify({
             "status": "success",
             "message": f"Updated categorized tags for {updated_count} images.",

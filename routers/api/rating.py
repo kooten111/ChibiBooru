@@ -150,8 +150,9 @@ async def api_set_rating():
 
         result = rating_inference.set_image_rating(image_id, rating, source='user')
 
-        # Reload data to update in-memory cache
-        models.load_data_from_db()
+        # Reload data to update in-memory cache (async to avoid blocking)
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
 
         return jsonify({
             "success": True,
@@ -273,20 +274,38 @@ async def api_get_images_for_rating():
                 # Get all images
                 cur.execute("SELECT id, filepath FROM images ORDER BY id LIMIT ?", (limit,))
 
+            # Fetch all images first
+            image_rows = cur.fetchall()
+            image_ids = [row['id'] for row in image_rows]
+
+            # Batch fetch all tags for all images in a single query
+            tags_by_image = {}
+            if image_ids:
+                placeholders = ','.join('?' for _ in image_ids)
+                cur.execute(f"""
+                    SELECT it.image_id, t.name, it.source
+                    FROM image_tags it
+                    JOIN tags t ON it.tag_id = t.id
+                    WHERE it.image_id IN ({placeholders})
+                """, image_ids)
+
+                # Group tags by image_id
+                for tag_row in cur.fetchall():
+                    img_id = tag_row['image_id']
+                    if img_id not in tags_by_image:
+                        tags_by_image[img_id] = []
+                    tags_by_image[img_id].append({
+                        'name': tag_row['name'],
+                        'source': tag_row['source']
+                    })
+
+            # Build images list with pre-fetched tags
             images = []
-            for row in cur.fetchall():
+            for row in image_rows:
                 image_id = row['id']
                 filepath = row['filepath']
 
-                # Get tags for this image
-                cur.execute("""
-                    SELECT t.name, it.source
-                    FROM image_tags it
-                    JOIN tags t ON it.tag_id = t.id
-                    WHERE it.image_id = ?
-                """, (image_id,))
-
-                all_tags = cur.fetchall()
+                all_tags = tags_by_image.get(image_id, [])
                 tags = [t['name'] for t in all_tags if not t['name'].startswith('rating:')]
                 rating_tags = [t for t in all_tags if t['name'].startswith('rating:')]
 

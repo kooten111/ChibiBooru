@@ -14,7 +14,7 @@
     <div class="container">
         <div class="raw-data-header">
             <h2>Raw Metadata for {{ filepath.split('/')[-1] }}</h2>
-            <a href="{{ url_for('main.show_image', filepath=filepath) }}" class="btn btn-secondary">
+            <a href="/view/{{ filepath | urlencode_path }}" class="btn btn-secondary">
                 ← Back to Image
             </a>
         </div>

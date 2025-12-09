@@ -156,8 +156,11 @@ class InfiniteScroll {
             thumbnail.className = 'thumbnail skeleton';
             thumbnail.style.animationDelay = `${index * 0.02}s`;
 
+            // URL-encode the path to handle non-ASCII characters (Japanese, etc.)
+            const encodedPath = img.path.split('/').map(part => encodeURIComponent(part)).join('/');
+
             thumbnail.innerHTML = `
-                <a href="/view/${img.path}">
+                <a href="/view/${encodedPath}">
                     <img src="/static/${img.thumb}" alt="Image" loading="lazy" onload="this.closest('.thumbnail').classList.add('has-image')">
                 </a>
             `;

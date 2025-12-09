@@ -12,10 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!href) return;
         
         // Extract filepath from URL (assumes format: /view/images/path/to/image.jpg)
-        const match = href.match(/\/view\/(images\/.+)$/);
+        // URL may contain encoded characters, so we need to decode them
+        const match = href.match(/\/view\/(.+)$/);
         if (!match) return;
-        
-        const imagePath = match[1];
+
+        // Decode the URL-encoded path
+        const imagePath = decodeURIComponent(match[1]);
         
         // Preload the full-size image
         const preloadLink = document.createElement('link');

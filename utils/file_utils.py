@@ -1,5 +1,6 @@
 import os
 import hashlib
+from urllib.parse import quote
 
 
 def get_hash_bucket(filename, bucket_chars=3):
@@ -104,3 +105,23 @@ def get_file_md5(filepath):
         return hash_md5.hexdigest()
     except:
         return None
+
+
+def url_encode_path(filepath):
+    """
+    URL-encode a filepath, preserving forward slashes.
+    Handles non-ASCII characters (Japanese, etc.) properly.
+
+    Args:
+        filepath: The filepath to encode (e.g., "images/abc/ファイル名.jpg")
+
+    Returns:
+        URL-encoded path (e.g., "images/abc/%E3%83%95%E3%82%A1%E3%82%A4%E3%83%AB%E5%90%8D.jpg")
+    """
+    if not filepath:
+        return filepath
+
+    # Split path into components and encode each part separately
+    parts = filepath.split('/')
+    encoded_parts = [quote(part, safe='') for part in parts]
+    return '/'.join(encoded_parts)

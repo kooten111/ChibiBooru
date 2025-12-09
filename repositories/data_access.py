@@ -68,7 +68,10 @@ def md5_exists(md5):
 
 
 def get_all_images_with_tags():
-    """Get all images with their concatenated tags."""
+    """Get all images with their concatenated tags.
+    
+    Optimized to avoid ORDER BY RANDOM() which is very expensive.
+    """
     with get_db_connection() as conn:
         query = """
         SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
@@ -76,7 +79,7 @@ def get_all_images_with_tags():
         LEFT JOIN image_tags it ON i.id = it.image_id
         LEFT JOIN tags t ON it.tag_id = t.id
         GROUP BY i.id
-        ORDER BY RANDOM()
+        ORDER BY i.id
         """
         return [dict(row) for row in conn.execute(query).fetchall()]
 
@@ -375,27 +378,62 @@ def search_images_by_relationship(relationship_type):
 # ============================================================================
 
 def search_images_by_tags(tags_list):
-    """Search for images that have ALL specified tags (AND logic)."""
+    """Search for images that have ALL specified tags (AND logic).
+
+    Optimized to use index-based lookups and minimize GROUP_CONCAT overhead.
+    Uses a two-step approach: first find matching image IDs, then batch fetch tags.
+    """
+    if not tags_list:
+        return []
+
     with get_db_connection() as conn:
-        base_query = """
-        SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
-        FROM images i
-        JOIN image_tags it ON i.id = it.image_id
-        JOIN tags t ON it.tag_id = t.id
-        WHERE i.id IN (
-            SELECT it_inner.image_id
-            FROM image_tags it_inner
-            JOIN tags t_inner ON it_inner.tag_id = t_inner.id
-            WHERE t_inner.name IN ({placeholders})
-            GROUP BY it_inner.image_id
-            HAVING COUNT(DISTINCT t_inner.name) = ?
-        )
-        GROUP BY i.id
-        """
-        placeholders = ','.join('?' for _ in tags_list)
-        query = base_query.format(placeholders=placeholders)
-        params = tags_list + [len(tags_list)]
-        return [dict(row) for row in conn.execute(query, params).fetchall()]
+        # Step 1: Find image IDs that match the tag criteria (fast, index-based)
+        if len(tags_list) == 1:
+            # Single tag - simple query
+            id_query = """
+            SELECT DISTINCT it.image_id
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            WHERE LOWER(t.name) = LOWER(?)
+            """
+            image_ids = [row[0] for row in conn.execute(id_query, (tags_list[0],)).fetchall()]
+        else:
+            # Multiple tags - use AND logic with HAVING clause
+            placeholders = ','.join('?' for _ in tags_list)
+            id_query = f"""
+            SELECT it.image_id
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            WHERE LOWER(t.name) IN ({placeholders})
+            GROUP BY it.image_id
+            HAVING COUNT(DISTINCT t.name) = ?
+            """
+            params = [tag.lower() for tag in tags_list] + [len(tags_list)]
+            image_ids = [row[0] for row in conn.execute(id_query, params).fetchall()]
+
+        if not image_ids:
+            return []
+
+        # Step 2: Batch fetch filepaths and tags for matched images
+        # Use batching to avoid hitting SQL parameter limits
+        BATCH_SIZE = 500
+        results = []
+
+        for i in range(0, len(image_ids), BATCH_SIZE):
+            batch_ids = image_ids[i:i + BATCH_SIZE]
+            placeholders = ','.join('?' for _ in batch_ids)
+
+            batch_query = f"""
+            SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
+            FROM images i
+            LEFT JOIN image_tags it ON i.id = it.image_id
+            LEFT JOIN tags t ON it.tag_id = t.id
+            WHERE i.id IN ({placeholders})
+            GROUP BY i.id
+            """
+            results.extend([dict(row) for row in conn.execute(batch_query, batch_ids).fetchall()])
+
+        return results
 
 
 def search_images_by_source(source_name):

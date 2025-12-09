@@ -159,31 +159,26 @@
         </div>
 
         <div class="category-filter-bar">
-            {% set category_counts = {} %}
-            {% for tag in all_tags %}
-                {% if category_counts.update({tag.category: category_counts.get(tag.category, 0) + 1}) %}{% endif %}
-            {% endfor %}
-
             <button class="category-filter-btn active" data-category="all">
-                All <span class="category-count">({{ all_tags|length }})</span>
+                All <span class="category-count">({{ stats.total_tags }})</span>
             </button>
             <button class="category-filter-btn character" data-category="character">
-                Character <span class="category-count">({{ category_counts.get('character', 0) }})</span>
+                Character <span class="category-count">({{ stats.category_counts.get('character', 0) }})</span>
             </button>
             <button class="category-filter-btn copyright" data-category="copyright">
-                Copyright <span class="category-count">({{ category_counts.get('copyright', 0) }})</span>
+                Copyright <span class="category-count">({{ stats.category_counts.get('copyright', 0) }})</span>
             </button>
             <button class="category-filter-btn artist" data-category="artist">
-                Artist <span class="category-count">({{ category_counts.get('artist', 0) }})</span>
+                Artist <span class="category-count">({{ stats.category_counts.get('artist', 0) }})</span>
             </button>
             <button class="category-filter-btn species" data-category="species">
-                Species <span class="category-count">({{ category_counts.get('species', 0) }})</span>
+                Species <span class="category-count">({{ stats.category_counts.get('species', 0) }})</span>
             </button>
             <button class="category-filter-btn meta" data-category="meta">
-                Meta <span class="category-count">({{ category_counts.get('meta', 0) }})</span>
+                Meta <span class="category-count">({{ stats.category_counts.get('meta', 0) }})</span>
             </button>
             <button class="category-filter-btn general" data-category="general">
-                General <span class="category-count">({{ category_counts.get('general', 0) }})</span>
+                General <span class="category-count">({{ stats.category_counts.get('general', 0) }})</span>
             </button>
         </div>
 

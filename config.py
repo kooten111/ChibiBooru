@@ -76,6 +76,24 @@ LOCAL_TAGGER_MERGE_CATEGORIES = ['general']
 MONITOR_ENABLED = True
 MONITOR_INTERVAL = 300  # seconds between checks (5 minutes)
 
+# ==================== DATABASE PERFORMANCE ====================
+
+# SQLite cache size in MB (default 64MB, increase for better performance with large databases)
+# Higher values use more RAM but improve query performance
+DB_CACHE_SIZE_MB = int(os.environ.get('DB_CACHE_SIZE_MB', 64))
+
+# Memory-mapped I/O size in MB (default 256MB)
+# Allows SQLite to map database file to memory for faster reads
+DB_MMAP_SIZE_MB = int(os.environ.get('DB_MMAP_SIZE_MB', 256))
+
+# Batch size for database operations (default 100)
+# Higher values = fewer commits = faster but longer locks
+DB_BATCH_SIZE = int(os.environ.get('DB_BATCH_SIZE', 100))
+
+# WAL checkpoint interval (number of frames, default 1000)
+# Controls when WAL file is checkpointed back to main database
+DB_WAL_AUTOCHECKPOINT = int(os.environ.get('DB_WAL_AUTOCHECKPOINT', 1000))
+
 # ==================== PROCESSING ====================
 
 # Parallel processing

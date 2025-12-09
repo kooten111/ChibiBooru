@@ -280,8 +280,12 @@ def rebuild_categorized_tags_from_relations():
     Back-fills the categorized tag columns in the 'images' table based on
     the existing data in the 'image_tags' and 'tags' tables.
     This is a data migration step.
+
+    Optimized to use batching and reduce database round-trips.
     """
     print("Rebuilding categorized tag columns...")
+    import config
+
     with get_db_connection() as conn:
         cursor = conn.cursor()
 
@@ -289,34 +293,38 @@ def rebuild_categorized_tags_from_relations():
         cursor.execute("SELECT id FROM images")
         images = cursor.fetchall()
 
+        # Batch size for commits (use larger batch for this operation)
+        BATCH_SIZE = config.DB_BATCH_SIZE * 5
+
+        # Use a single query to get all tag data, then process in Python
+        # This is MUCH faster than individual queries per image
+        cursor.execute("""
+            SELECT it.image_id, t.category, GROUP_CONCAT(t.name, ' ') as tags
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            GROUP BY it.image_id, t.category
+        """)
+
+        # Build a lookup dictionary: {image_id: {category: tags}}
+        tags_by_image = {}
+        for row in cursor.fetchall():
+            image_id = row['image_id']
+            category = row['category']
+            tags = row['tags']
+
+            if image_id not in tags_by_image:
+                tags_by_image[image_id] = {}
+            tags_by_image[image_id][category] = tags
+
         updated_count = 0
+        updates_batch = []
+
         for image_row in tqdm(images, desc="Updating Images"):
             image_id = image_row['id']
+            categorized_tags = tags_by_image.get(image_id, {})
 
-            # Fetch all tags for this image, grouped by category
-            query = """
-            SELECT category, COALESCE(GROUP_CONCAT(name, ' '), '') as tags
-            FROM tags t
-            JOIN image_tags it ON t.id = it.tag_id
-            WHERE it.image_id = ?
-            GROUP BY t.category
-            """
-            cursor.execute(query, (image_id,))
-
-            categorized_tags = {row['category']: row['tags'] for row in cursor.fetchall()}
-
-            # Update the images table
-            update_query = """
-            UPDATE images SET
-                tags_character = ?,
-                tags_copyright = ?,
-                tags_artist = ?,
-                tags_species = ?,
-                tags_meta = ?,
-                tags_general = ?
-            WHERE id = ?
-            """
-            cursor.execute(update_query, (
+            # Prepare update data
+            updates_batch.append((
                 categorized_tags.get('character'),
                 categorized_tags.get('copyright'),
                 categorized_tags.get('artist'),
@@ -325,9 +333,37 @@ def rebuild_categorized_tags_from_relations():
                 categorized_tags.get('general'),
                 image_id
             ))
+
             updated_count += 1
 
-        conn.commit()
+            # Commit in batches to avoid holding locks too long
+            if len(updates_batch) >= BATCH_SIZE:
+                cursor.executemany("""
+                    UPDATE images SET
+                        tags_character = ?,
+                        tags_copyright = ?,
+                        tags_artist = ?,
+                        tags_species = ?,
+                        tags_meta = ?,
+                        tags_general = ?
+                    WHERE id = ?
+                """, updates_batch)
+                conn.commit()
+                updates_batch = []
+
+        # Commit remaining batch
+        if updates_batch:
+            cursor.executemany("""
+                UPDATE images SET
+                    tags_character = ?,
+                    tags_copyright = ?,
+                    tags_artist = ?,
+                    tags_species = ?,
+                    tags_meta = ?,
+                    tags_general = ?
+                WHERE id = ?
+            """, updates_batch)
+            conn.commit()
 
     print(f"Successfully updated categorized tags for {updated_count} images.")
     return updated_count

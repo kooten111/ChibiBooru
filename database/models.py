@@ -51,7 +51,10 @@ from repositories.data_access import (
 )
 
 def repopulate_from_database():
-    """Rebuilds the tag and source relationships by reading from the raw_metadata table."""
+    """Rebuilds the tag and source relationships by reading from the raw_metadata table.
+
+    Optimized version using batching to reduce database lock time and improve performance.
+    """
     # Import config here to ensure it's loaded within the application context
     import config
 
@@ -75,6 +78,10 @@ def repopulate_from_database():
         # Get all raw metadata
         cur.execute("SELECT image_id, data FROM raw_metadata")
         all_metadata = cur.fetchall()
+
+        # Batch processing to reduce commits and improve performance
+        BATCH_SIZE = config.DB_BATCH_SIZE
+        batch_count = 0
 
         for row in tqdm(all_metadata, desc="Rebuilding from DB Metadata"):
             image_id = row['image_id']
@@ -209,6 +216,13 @@ def repopulate_from_database():
                     tag_id = cur.fetchone()['id']
                     cur.execute("INSERT OR REPLACE INTO image_tags (image_id, tag_id, source) VALUES (?, ?, ?)", (image_id, tag_id, rating_source))
 
+            # Commit in batches to reduce lock time
+            batch_count += 1
+            if batch_count >= BATCH_SIZE:
+                con.commit()
+                batch_count = 0
+
+        # Final commit for remaining items
         con.commit()
 
     print("Repopulation complete.")
