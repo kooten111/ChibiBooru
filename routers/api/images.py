@@ -3,6 +3,7 @@ from . import api_blueprint
 from services import image_service, tag_service
 from services.switch_source_db import switch_metadata_source_db, merge_all_sources
 from database import models
+from utils import api_handler
 import asyncio
 
 @api_blueprint.route('/images')
@@ -34,57 +35,46 @@ async def bulk_retry_tagging():
     return await image_service.bulk_retry_tagging_service()
 
 @api_blueprint.route('/switch_source', methods=['POST'])
+@api_handler()
 async def switch_source():
-    try:
-        data = await request.json
-        filepath = data.get('filepath')
-        source = data.get('source')
+    data = await request.json
+    filepath = data.get('filepath')
+    source = data.get('source')
 
-        if not filepath or not source:
-            return jsonify({"error": "Missing filepath or source"}), 400
+    if not filepath or not source:
+        raise ValueError("Missing filepath or source")
 
-        # Handle special "merged" source
-        if source == 'merged':
-            result = merge_all_sources(filepath)
-        else:
-            result = switch_metadata_source_db(filepath, source)
+    # Handle special "merged" source
+    if source == 'merged':
+        result = merge_all_sources(filepath)
+    else:
+        result = switch_metadata_source_db(filepath, source)
 
-        if "error" in result:
-            return jsonify(result), 400
+    if "error" in result:
+        raise ValueError(result["error"])
 
-        # Selective reload: only update this image
-        models.reload_single_image(filepath.replace('images/', '', 1))
+    # Selective reload: only update this image
+    models.reload_single_image(filepath.replace('images/', '', 1))
 
-        return jsonify(result), 200
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+    return result
 
 @api_blueprint.route('/clear_deltas', methods=['POST'])
+@api_handler()
 async def clear_deltas():
     """Clear tag deltas for a specific image."""
-    try:
-        data = await request.json
-        filepath = data.get('filepath')
+    data = await request.json
+    filepath = data.get('filepath')
 
-        if not filepath:
-            return jsonify({"error": "Missing filepath"}), 400
+    if not filepath:
+        raise ValueError("Missing filepath")
 
-        # Normalize filepath
-        filepath = filepath.replace('images/', '', 1)
+    # Normalize filepath
+    filepath = filepath.replace('images/', '', 1)
 
-        # Clear deltas for this image
-        count = models.clear_deltas_for_image(filepath)
+    # Clear deltas for this image
+    count = models.clear_deltas_for_image(filepath)
 
-        return jsonify({
-            "status": "success",
-            "message": f"Cleared {count} delta(s) for this image",
-            "count": count
-        }), 200
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+    return {
+        "message": f"Cleared {count} delta(s) for this image",
+        "count": count
+    }

@@ -1,6 +1,7 @@
 from quart import request, jsonify
 from . import api_blueprint
 from services import system_service, monitor_service
+from utils import api_handler
 import asyncio
 
 @api_blueprint.route('/reload', methods=['POST'])
@@ -56,16 +57,18 @@ async def recount_tags():
     return await asyncio.to_thread(system_service.recount_tags_service)
 
 @api_blueprint.route('/system/monitor/start', methods=['POST'])
+@api_handler()
 async def start_monitor():
-    if monitor_service.start_monitor():
-        return jsonify({"status": "success", "message": "Monitor started."})
-    return jsonify({"error": "Monitor was already running."}), 400
+    if not monitor_service.start_monitor():
+        raise ValueError("Monitor was already running")
+    return {"message": "Monitor started"}
 
 @api_blueprint.route('/system/monitor/stop', methods=['POST'])
+@api_handler()
 async def stop_monitor():
-    if monitor_service.stop_monitor():
-        return jsonify({"status": "success", "message": "Monitor stopped."})
-    return jsonify({"error": "Monitor was not running."}), 400
+    if not monitor_service.stop_monitor():
+        raise ValueError("Monitor was not running")
+    return {"message": "Monitor stopped"}
 
 @api_blueprint.route('/task_status', methods=['GET'])
 async def task_status():
