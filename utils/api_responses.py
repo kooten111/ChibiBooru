@@ -3,11 +3,12 @@ Standardized API response utilities.
 All API endpoints should use these functions for consistent response format.
 """
 
-from quart import jsonify
-from typing import Any, Dict, Optional
+import traceback
+from quart import jsonify, Response
+from typing import Any, Dict, Optional, Tuple
 
 
-def success_response(data: Dict[str, Any] = None, message: str = None) -> tuple:
+def success_response(data: Dict[str, Any] = None, message: str = None) -> Response:
     """
     Create a standardized success response.
     
@@ -30,7 +31,7 @@ def success_response(data: Dict[str, Any] = None, message: str = None) -> tuple:
     return jsonify(response)
 
 
-def error_response(error: str, status_code: int = 400, data: Dict[str, Any] = None) -> tuple:
+def error_response(error: str, status_code: int = 400, data: Dict[str, Any] = None) -> Tuple[Response, int]:
     """
     Create a standardized error response.
     
@@ -52,23 +53,23 @@ def error_response(error: str, status_code: int = 400, data: Dict[str, Any] = No
     return jsonify(response), status_code
 
 
-def not_found_response(message: str = "Resource not found") -> tuple:
+def not_found_response(message: str = "Resource not found") -> Tuple[Response, int]:
     """Create a 404 response."""
     return error_response(message, 404)
 
 
-def unauthorized_response(message: str = "Unauthorized") -> tuple:
+def unauthorized_response(message: str = "Unauthorized") -> Tuple[Response, int]:
     """Create a 401 response."""
     return error_response(message, 401)
 
 
-def validation_error_response(message: str, field: str = None) -> tuple:
+def validation_error_response(message: str, field: str = None) -> Tuple[Response, int]:
     """Create a validation error response."""
     data = {"field": field} if field else None
     return error_response(message, 400, data)
 
 
-def server_error_response(error: Exception, include_traceback: bool = False) -> tuple:
+def server_error_response(error: Exception, include_traceback: bool = False) -> Tuple[Response, int]:
     """
     Create a 500 server error response.
     
@@ -76,7 +77,6 @@ def server_error_response(error: Exception, include_traceback: bool = False) -> 
         error: The exception that occurred
         include_traceback: Whether to include traceback (only in debug mode)
     """
-    import traceback
     traceback.print_exc()  # Always log to console
     
     data = None
