@@ -1,0 +1,306 @@
+# Refactoring Next Steps
+
+This document outlines the remaining and deferred tasks from the API standardization refactoring effort.
+
+## Summary of Completed Work
+
+**Phases 1-3 are complete:**
+- ✅ Created decorator and logging infrastructure (`@api_handler`, logging config)
+- ✅ Centralized tag extraction (~200 lines of duplicated code eliminated)
+- ✅ Refactored 25+ API endpoints (~240 lines of boilerplate removed)
+- ✅ All tests passing (96/104 tests, 3 pre-existing failures unrelated to refactoring)
+
+**Total Impact:**
+- ~440 lines of duplicated/boilerplate code eliminated
+- 12 files refactored
+- Consistent error handling across all API endpoints
+
+---
+
+## Deferred Tasks
+
+These tasks were identified during the refactoring but explicitly deferred to future phases:
+
+### Python Utilities (Low Priority)
+
+#### 1. Tag Database Utilities
+**Estimated Effort:** Medium
+**Impact:** High
+**Risk:** High
+
+Create centralized utilities for tag database operations to reduce duplication in:
+- `database/models.py`
+- `services/tag_service.py`
+- Various API endpoints
+
+**Suggested Implementation:**
+```python
+# utils/tag_db.py
+def insert_tag(tag_name: str, category: str = None) -> int:
+    """Insert a tag and return its ID."""
+    pass
+
+def bulk_insert_tags(tags: list[dict]) -> dict:
+    """Bulk insert tags and return mapping of names to IDs."""
+    pass
+
+def update_tag_category(tag_name: str, category: str) -> bool:
+    """Update a tag's category."""
+    pass
+```
+
+#### 2. Path Handling Utilities (Python)
+**Estimated Effort:** Medium
+**Impact:** Medium
+**Risk:** Low
+
+Create centralized path normalization and validation:
+```python
+# utils/file_utils.py
+def normalize_image_path(path: str) -> str:
+    """Normalize image path (remove 'images/' prefix, handle Unicode)."""
+    pass
+
+def validate_image_path(path: str) -> bool:
+    """Validate that path is safe and exists."""
+    pass
+
+def get_absolute_image_path(relative_path: str) -> str:
+    """Convert relative path to absolute."""
+    pass
+```
+
+### JavaScript Consolidation (Medium Priority)
+
+#### 3. Shared JavaScript Utilities
+**Estimated Effort:** Low
+**Impact:** Low
+**Risk:** Low
+
+Consolidate duplicate JavaScript functions:
+
+**File:** `static/js/utils/helpers.js`
+```javascript
+// Add shared utility functions:
+export function getCategoryIcon(category) {
+    const icons = {
+        character: '👤',
+        copyright: '©️',
+        artist: '🎨',
+        species: '🐾',
+        meta: '📋',
+        general: '🏷️'
+    };
+    return icons[category] || '🏷️';
+}
+
+export function getCategoryClass(category) {
+    return `tag-${category}`;
+}
+
+export function formatTagCount(count) {
+    return count.toLocaleString();
+}
+```
+
+**Files to Update:**
+- `static/js/image_browser.js`
+- `static/js/tag_browser.js`
+- `static/js/image_details.js`
+- `static/js/tag_categorize.js`
+
+#### 4. Notification System Standardization
+**Estimated Effort:** Low
+**Impact:** Low
+**Risk:** Low
+
+Standardize notification imports and usage across all JavaScript files:
+```javascript
+// Current: Mix of inline notifications and imported functions
+// Target: All files import from notifications.js
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
+```
+
+**Files to Update:**
+- All JavaScript files in `static/js/` directory
+
+#### 5. Cache Invalidation Helpers
+**Estimated Effort:** Low
+**Impact:** Low
+**Risk:** Low
+
+Add cache invalidation utilities:
+```javascript
+// static/js/utils/cache.js
+export function invalidateImageCache() {
+    // Clear image-related cache
+}
+
+export function invalidateTagCache() {
+    // Clear tag-related cache
+}
+
+export function invalidateAllCaches() {
+    // Clear all caches
+}
+```
+
+#### 6. Path Utilities (JavaScript)
+**Estimated Effort:** Low
+**Impact:** Medium
+**Risk:** Low
+
+Create JavaScript path handling utilities:
+
+**File:** `static/js/utils/path-utils.js`
+```javascript
+export function encodeImagePath(path) {
+    return encodeURIComponent(path).replace(/%2F/g, '/');
+}
+
+export function normalizeImagePath(path) {
+    return path.replace(/^images\//, '');
+}
+
+export function getImageUrl(filepath) {
+    return `/images/${encodeImagePath(filepath)}`;
+}
+```
+
+#### 7. Extract Template JavaScript
+**Estimated Effort:** Medium
+**Impact:** Medium
+**Risk:** Low
+
+Move inline JavaScript from templates to dedicated page modules:
+
+**Templates with inline JS to extract:**
+- `templates/rate_manage.html` → `static/js/pages/rate-manage.js`
+- `templates/rate_review.html` → `static/js/pages/rate-review.js`
+- `templates/tag_categorize.html` → `static/js/pages/tag-categorize.js`
+
+**Benefits:**
+- Better code organization
+- Easier testing
+- Improved caching
+- Better IDE support
+
+---
+
+## Future Enhancements (Phase 4+)
+
+These are larger refactoring efforts that could be tackled in future phases:
+
+### 1. Query Builder Implementation
+**Estimated Effort:** High
+**Impact:** Medium
+**Risk:** Medium
+
+Create a query builder for complex database queries:
+```python
+# utils/query_builder.py
+class QueryBuilder:
+    def filter_by_tags(self, tags: list[str]):
+        pass
+
+    def filter_by_category(self, category: str):
+        pass
+
+    def paginate(self, offset: int, limit: int):
+        pass
+```
+
+### 2. Async/Sync Pattern Cleanup
+**Estimated Effort:** Medium
+**Impact:** Low
+**Risk:** Medium
+
+Standardize async/sync patterns across the codebase to reduce confusion about when to use `await`.
+
+### 3. Circular Import Resolution
+**Estimated Effort:** High
+**Impact:** Low
+**Risk:** High
+
+Resolve circular dependencies in the import structure (if any exist).
+
+### 4. Test Coverage Expansion
+**Estimated Effort:** Medium
+**Impact:** High
+**Risk:** Low
+
+Add tests for:
+- Tag extraction utilities (all booru formats)
+- API handler decorator (error cases)
+- File path utilities
+- Integration tests for full workflows
+
+---
+
+## Prioritization Recommendation
+
+**High Priority (Do Next):**
+1. Tag database utilities - High impact on code quality
+2. Path handling utilities (Python) - Needed for consistency
+3. Test coverage expansion - Protect against regressions
+
+**Medium Priority (Can Wait):**
+4. JavaScript utilities consolidation - Nice to have, low risk
+5. Extract template JavaScript - Better organization
+6. Path utilities (JavaScript) - Improves frontend consistency
+
+**Low Priority (Optional):**
+7. Notification standardization - Cosmetic improvement
+8. Cache invalidation helpers - Already working fine
+9. Query builder - Complex, questionable ROI
+10. Async/sync cleanup - Working fine, high risk
+
+---
+
+## Maintenance Notes
+
+### Guidelines for Future Development
+
+To prevent code duplication from returning:
+
+1. **Before adding new API endpoints:**
+   - Always use `@api_handler()` decorator
+   - Raise `ValueError` for validation errors (400 response)
+   - Raise `FileNotFoundError` for missing resources (404 response)
+   - Raise `PermissionError` for auth failures (403 response)
+   - Return dict directly (decorator adds `success: true`)
+
+2. **Before extracting tags from booru sources:**
+   - Always use `utils.tag_extraction.extract_tags_from_source()`
+   - Use `extract_rating_from_source()` for ratings
+   - Use `deduplicate_categorized_tags()` to remove duplicates
+
+3. **Before adding constants:**
+   - Check if constant belongs in `config.py` (Defaults, Timeouts, Thresholds, Limits)
+   - Use existing constants instead of magic numbers
+
+4. **Before adding logging:**
+   - Use `get_logger(__name__)` from `utils.logging_config`
+   - Don't create new logger instances directly
+
+### Code Review Checklist
+
+When reviewing new code:
+- [ ] Are all API endpoints using `@api_handler()`?
+- [ ] Is tag extraction using centralized utilities?
+- [ ] Are constants defined in `config.py` instead of hardcoded?
+- [ ] Is logging using `get_logger()` from utils?
+- [ ] Are file paths normalized consistently?
+- [ ] Are errors raised with appropriate exception types?
+
+---
+
+## Questions or Suggestions?
+
+If you have questions about these next steps or want to propose changes to priorities, please open a GitHub issue with the tag `refactoring`.
+
+---
+
+**Document Version:** 1.0
+**Last Updated:** 2025-12-10
+**Related:** See `REFACTOR.md` for full refactoring analysis and completed work
