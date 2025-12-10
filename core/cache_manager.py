@@ -217,3 +217,36 @@ def reload_tag_counts():
             tag_counts_query = "SELECT name, COUNT(DISTINCT image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
             tag_counts.clear()
             tag_counts.update({row['name']: row['COUNT(DISTINCT image_id)'] for row in conn.execute(tag_counts_query).fetchall()})
+
+
+# ============================================================================
+# Cache Invalidation Helpers
+# ============================================================================
+
+def invalidate_image_cache(filepath: str = None):
+    """
+    Invalidate image-related caches.
+    
+    Args:
+        filepath: If provided, invalidate only for this image.
+                  If None, invalidate all image caches.
+    """
+    from repositories.data_access import get_image_details
+    
+    if filepath:
+        reload_single_image(filepath)
+    reload_tag_counts()
+    get_image_details.cache_clear()
+
+
+def invalidate_tag_cache():
+    """Invalidate tag-related caches."""
+    reload_tag_counts()
+
+
+def invalidate_all_caches():
+    """Invalidate all application caches."""
+    from repositories.data_access import get_image_details
+    
+    load_data_from_db()
+    get_image_details.cache_clear()

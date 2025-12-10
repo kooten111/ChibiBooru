@@ -148,10 +148,8 @@ async def saucenao_apply_service():
         if processing.process_image_file(path_to_process):
             # Selective reload: only update this image and tag counts
             rel_path = os.path.relpath(path_to_process, "static/images").replace('\\', '/')
-            models.reload_single_image(rel_path)
-            models.reload_tag_counts()
-            from repositories.data_access import get_image_details
-            get_image_details.cache_clear()
+            from core.cache_manager import invalidate_image_cache
+            invalidate_image_cache(rel_path)
             return jsonify({
                 "status": "success",
                 "redirect_url": redirect_url

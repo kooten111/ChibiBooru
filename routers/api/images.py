@@ -54,7 +54,8 @@ async def switch_source():
         raise ValueError(result["error"])
 
     # Selective reload: only update this image
-    models.reload_single_image(filepath.replace('images/', '', 1))
+    from core.cache_manager import invalidate_image_cache
+    invalidate_image_cache(filepath.replace('images/', '', 1))
 
     return result
 

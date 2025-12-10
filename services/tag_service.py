@@ -37,10 +37,8 @@ async def edit_tags_service():
 
         if success:
             # Selective reload: only update this image and tag counts
-            models.reload_single_image(filepath)
-            models.reload_tag_counts()
-            from repositories.data_access import get_image_details
-            get_image_details.cache_clear()
+            from core.cache_manager import invalidate_image_cache
+            invalidate_image_cache(filepath)
             return jsonify({"status": "success"})
         else:
             return jsonify({"error": "Failed to update tags in the database"}), 500

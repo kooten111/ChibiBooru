@@ -99,7 +99,8 @@ async def delete_image_service():
         if db_success or image_deleted or thumb_deleted:
             print("Updating cache after deletion.")
             models.remove_image_from_cache(filepath)
-            models.reload_tag_counts()
+            from core.cache_manager import invalidate_tag_cache
+            invalidate_tag_cache()
         else:
             print("No database entry or files were found to delete.")
 
@@ -167,7 +168,8 @@ async def delete_images_bulk_service():
 
     # Reload tag counts once after all deletions
     if results["deleted"] > 0:
-        models.reload_tag_counts()
+        from core.cache_manager import invalidate_tag_cache
+        invalidate_tag_cache()
 
     return jsonify({
         "status": "success" if results["failed"] == 0 else "partial",
@@ -473,10 +475,8 @@ async def retry_tagging_service():
             conn.commit()
 
         # Reload the image data in memory
-        models.reload_single_image(filepath)
-        models.reload_tag_counts()
-        from repositories.data_access import get_image_details
-        get_image_details.cache_clear()
+        from core.cache_manager import invalidate_image_cache
+        invalidate_image_cache(filepath)
 
         print(f"[Retry Tagging] Successfully updated tags for {filepath} (new source: {source_name})")
 
@@ -777,10 +777,8 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
     # Reload data after bulk operation
     await task_manager.update_progress(task_id, total, total, "Reloading data and updating tag counts...")
     print(f"[Bulk Retry Tagging] Reloading data...")
-    models.reload_single_image(None)  # Reload all
-    models.reload_tag_counts()
-    from repositories.data_access import get_image_details
-    get_image_details.cache_clear()
+    from core.cache_manager import invalidate_all_caches
+    invalidate_all_caches()
 
     print(f"[Bulk Retry Tagging] Complete: {success_count} success, {still_local_count} still local, {failed_count} failed")
 
