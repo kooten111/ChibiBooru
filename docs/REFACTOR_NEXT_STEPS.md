@@ -4,16 +4,63 @@ This document outlines the remaining and deferred tasks from the API standardiza
 
 ## Summary of Completed Work
 
-**Phases 1-3 are complete:**
+**Phases 1-4 are complete:**
 - ✅ Created decorator and logging infrastructure (`@api_handler`, logging config)
 - ✅ Centralized tag extraction (~200 lines of duplicated code eliminated)
 - ✅ Refactored 25+ API endpoints (~240 lines of boilerplate removed)
 - ✅ All tests passing (96/104 tests, 3 pre-existing failures unrelated to refactoring)
+- ✅ **Phase 4: Created utility modules for tag database, file paths, and JavaScript helpers**
 
 **Total Impact:**
-- ~440 lines of duplicated/boilerplate code eliminated
-- 12 files refactored
+- ~550 lines of duplicated/boilerplate code eliminated
+- 14 files refactored
 - Consistent error handling across all API endpoints
+- Centralized utilities for common operations
+
+---
+
+## Phase 4 Completed Work
+
+**Python Utilities:**
+- ✅ Created `utils/tag_db.py` with centralized tag database operations
+  - `insert_tag()` - Insert or update tags with category support
+  - `bulk_insert_tags()` - Batch insert tags efficiently
+  - `update_tag_category()` - Update tag categories
+  - `get_or_create_tag()` - Convenience wrapper for tag creation
+  - Proper error handling and logging
+  - Full test coverage (16 tests)
+
+- ✅ Enhanced `utils/file_utils.py` with path handling utilities
+  - `normalize_image_path()` - Remove 'images/' prefix, handle Unicode
+  - `validate_image_path()` - Security checks and file existence validation
+  - `get_absolute_image_path()` - Convert relative to absolute paths
+  - Full test coverage (20 tests)
+
+**JavaScript Utilities:**
+- ✅ Enhanced `static/js/utils/helpers.js` with shared functions
+  - `getCategoryIcon()` - Get Unicode icons for tag categories
+  - `getCategoryClass()` - Get CSS class names for categories
+  - `formatTagCount()` - Format tag counts for display
+
+- ✅ Created `static/js/utils/path-utils.js` for path handling
+  - `encodeImagePath()` - URL-encode paths while preserving slashes
+  - `normalizeImagePath()` - Remove 'images/' prefix
+  - `getImageUrl()` - Generate full image URLs
+
+- ✅ Created `static/js/utils/cache.js` for cache invalidation
+  - `invalidateImageCache()` - Clear image-related cache
+  - `invalidateTagCache()` - Clear tag-related cache
+  - `invalidateAllCaches()` - Clear all caches
+
+**Updated Files:**
+- ✅ Updated `utils/__init__.py` to export new utility functions
+- ✅ Updated `static/js/autocomplete.js` to use shared `getCategoryIcon()`
+- ✅ Updated `static/js/tag-editor.js` to use shared `getCategoryIcon()`
+
+**Testing:**
+- ✅ Created `tests/test_tag_db.py` with 16 comprehensive tests
+- ✅ Created `tests/test_file_utils.py` with 20 comprehensive tests
+- ✅ All 36 new tests passing
 
 ---
 
@@ -23,91 +70,13 @@ These tasks were identified during the refactoring but explicitly deferred to fu
 
 ### Python Utilities (Low Priority)
 
-#### 1. Tag Database Utilities
-**Estimated Effort:** Medium
-**Impact:** High
-**Risk:** High
+#### 1. ~~Tag Database Utilities~~ ✅ COMPLETED IN PHASE 4
 
-Create centralized utilities for tag database operations to reduce duplication in:
-- `database/models.py`
-- `services/tag_service.py`
-- Various API endpoints
-
-**Suggested Implementation:**
-```python
-# utils/tag_db.py
-def insert_tag(tag_name: str, category: str = None) -> int:
-    """Insert a tag and return its ID."""
-    pass
-
-def bulk_insert_tags(tags: list[dict]) -> dict:
-    """Bulk insert tags and return mapping of names to IDs."""
-    pass
-
-def update_tag_category(tag_name: str, category: str) -> bool:
-    """Update a tag's category."""
-    pass
-```
-
-#### 2. Path Handling Utilities (Python)
-**Estimated Effort:** Medium
-**Impact:** Medium
-**Risk:** Low
-
-Create centralized path normalization and validation:
-```python
-# utils/file_utils.py
-def normalize_image_path(path: str) -> str:
-    """Normalize image path (remove 'images/' prefix, handle Unicode)."""
-    pass
-
-def validate_image_path(path: str) -> bool:
-    """Validate that path is safe and exists."""
-    pass
-
-def get_absolute_image_path(relative_path: str) -> str:
-    """Convert relative path to absolute."""
-    pass
-```
+#### 2. ~~Path Handling Utilities (Python)~~ ✅ COMPLETED IN PHASE 4
 
 ### JavaScript Consolidation (Medium Priority)
 
-#### 3. Shared JavaScript Utilities
-**Estimated Effort:** Low
-**Impact:** Low
-**Risk:** Low
-
-Consolidate duplicate JavaScript functions:
-
-**File:** `static/js/utils/helpers.js`
-```javascript
-// Add shared utility functions:
-export function getCategoryIcon(category) {
-    const icons = {
-        character: '👤',
-        copyright: '©️',
-        artist: '🎨',
-        species: '🐾',
-        meta: '📋',
-        general: '🏷️'
-    };
-    return icons[category] || '🏷️';
-}
-
-export function getCategoryClass(category) {
-    return `tag-${category}`;
-}
-
-export function formatTagCount(count) {
-    return count.toLocaleString();
-}
-```
-
-**Files to Update:**
-- `static/js/image_browser.js`
-- `static/js/tag_browser.js`
-- `static/js/image_details.js`
-- `static/js/tag_categorize.js`
+#### 3. ~~Shared JavaScript Utilities~~ ✅ COMPLETED IN PHASE 4
 
 #### 4. Notification System Standardization
 **Estimated Effort:** Low
@@ -301,6 +270,6 @@ If you have questions about these next steps or want to propose changes to prior
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Last Updated:** 2025-12-10
 **Related:** See `REFACTOR.md` for full refactoring analysis and completed work
