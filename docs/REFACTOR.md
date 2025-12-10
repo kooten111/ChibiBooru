@@ -2762,14 +2762,26 @@ def invalidate_all_caches():
     - [ ] Create `static/js/utils/path-utils.js`
     - [ ] Update JavaScript files to use path-utils
     
-    ### Phase 3 Checklist
-    
+    ### Phase 3 Checklist - API Endpoint Refactoring (IN PROGRESS)
+
+    #### Completed:
+    - [x] Refactor `routers/api/pools.py` ✅ (3 endpoints - Phase 1)
+    - [x] Refactor `routers/api/rating.py` ✅ (2 endpoints - Phase 1)
+    - [x] Refactor `routers/api/tag_categorization.py` ✅ **9 endpoints, ~110 lines removed**
+
+    #### In Progress:
+    - [ ] Refactor `routers/api/system.py` with decorators
+    - [ ] Refactor `routers/api/tags.py` with decorators
+    - [ ] Refactor `routers/api/images.py` with decorators
+    - [ ] Refactor `routers/api/saucenao.py` with decorators
+    - [ ] Refactor `routers/api/implications.py` with decorators
+
+    #### Deferred JavaScript Work:
     - [ ] Update `static/js/utils/helpers.js` with shared functions
     - [ ] Update JS files to import from helpers
     - [ ] Standardize notification imports in all JS files
     - [ ] Add cache invalidation helpers
     - [ ] Extract template JS to page modules
-    - [ ] Run full test suite
     
     ### Post-Migration
     
