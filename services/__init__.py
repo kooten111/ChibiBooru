@@ -13,7 +13,7 @@ This module provides centralized business logic services for:
 - Tag implications
 
 Note: Some imports are lazy (inside functions) to avoid circular dependencies.
-See docs/REFACTOR_PHASE6.md for details on circular import patterns.
+See docs/ARCHITECTURE.md for details on the services layer architecture.
 """
 
 # Note: We intentionally keep imports minimal at the package level to avoid
