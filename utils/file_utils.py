@@ -125,3 +125,100 @@ def url_encode_path(filepath):
     parts = filepath.split('/')
     encoded_parts = [quote(part, safe='') for part in parts]
     return '/'.join(encoded_parts)
+
+
+def normalize_image_path(path: str) -> str:
+    """
+    Normalize image path by removing 'images/' prefix and handling Unicode.
+    
+    Args:
+        path: The image path to normalize (e.g., "images/abc/file.jpg" or "abc/file.jpg")
+    
+    Returns:
+        Normalized path without 'images/' prefix (e.g., "abc/file.jpg")
+    """
+    if not path:
+        return path
+    
+    # Remove 'images/' or 'Images/' prefix if present (case-insensitive, only first occurrence)
+    if path.lower().startswith("images/"):
+        normalized = path[7:]  # Remove 'images/' prefix (7 characters)
+    else:
+        normalized = path
+    
+    # Remove leading slashes
+    normalized = normalized.lstrip('/')
+    
+    return normalized
+
+
+def validate_image_path(path: str) -> bool:
+    """
+    Validate that path is safe and exists on disk.
+    
+    Args:
+        path: Relative path to validate (e.g., "abc/file.jpg")
+    
+    Returns:
+        True if path is valid and file exists, False otherwise
+    """
+    if not path:
+        return False
+    
+    # Normalize the path first
+    normalized = normalize_image_path(path)
+    
+    # Check for path traversal attempts
+    if '..' in normalized or normalized.startswith('/'):
+        return False
+    
+    # Check if file exists (try bucketed path first, then flat path)
+    filename = os.path.basename(normalized)
+    
+    # Try bucketed structure
+    bucketed_path = get_bucketed_filepath_on_disk(filename, "./static/images")
+    if os.path.exists(bucketed_path):
+        return True
+    
+    # Try flat structure
+    flat_path = os.path.join("./static/images", normalized)
+    if os.path.exists(flat_path):
+        return True
+    
+    return False
+
+
+def get_absolute_image_path(relative_path: str) -> str:
+    """
+    Convert relative path to absolute filesystem path.
+    
+    Handles both bucketed and flat directory structures.
+    
+    Args:
+        relative_path: Relative image path (e.g., "abc/file.jpg")
+    
+    Returns:
+        Absolute path on disk (e.g., "/path/to/static/images/abc/file.jpg")
+        
+    Raises:
+        FileNotFoundError: If the file doesn't exist
+    """
+    if not relative_path:
+        raise ValueError("Path cannot be empty")
+    
+    # Normalize the path
+    normalized = normalize_image_path(relative_path)
+    filename = os.path.basename(normalized)
+    
+    # Try bucketed structure first
+    bucketed_path = get_bucketed_filepath_on_disk(filename, "./static/images")
+    if os.path.exists(bucketed_path):
+        return os.path.abspath(bucketed_path)
+    
+    # Try flat structure
+    flat_path = os.path.join("./static/images", normalized)
+    if os.path.exists(flat_path):
+        return os.path.abspath(flat_path)
+    
+    # File not found
+    raise FileNotFoundError(f"Image file not found: {relative_path}")

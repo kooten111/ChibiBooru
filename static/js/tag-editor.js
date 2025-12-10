@@ -1,4 +1,4 @@
-import { escapeHtml, formatCount } from './utils/helpers.js';
+import { escapeHtml, formatCount, getCategoryIcon } from './utils/helpers.js';
 import { showNotification } from './utils/notifications.js';
 
 class TagEditor {
@@ -162,7 +162,7 @@ class TagEditor {
         return this.categories.map(category => {
             const categoryTags = this.tags[category] || [];
             const categoryTitle = this.getCategoryTitle(category);
-            const categoryIcon = this.getCategoryIcon(category);
+            const categoryIcon = getCategoryIcon(category);
 
             return `
                 <div class="edit-category-section" data-category="${category}">
@@ -220,17 +220,7 @@ class TagEditor {
         return titles[category] || category.charAt(0).toUpperCase() + category.slice(1);
     }
 
-    getCategoryIcon(category) {
-        const icons = {
-            artist: '🎨',
-            copyright: '©️',
-            character: '👤',
-            species: '🐾',
-            general: '🏷️',
-            meta: '⚙️'
-        };
-        return icons[category] || '🏷️';
-    }
+
 
     attachEditEvents() {
         const editContainer = document.getElementById('inlineTagEditor');
@@ -356,7 +346,7 @@ class TagEditor {
                 filteredItems.forEach(item => {
                     const displayText = item.display || item.tag;
                     const countText = item.count ? formatCount(item.count) : '';
-                    const icon = this.getCategoryIcon(item.category || 'general');
+                    const icon = getCategoryIcon(item.category || 'general');
 
                     html += `
                         <div class="autocomplete-item" data-tag="${escapeHtml(item.tag)}">

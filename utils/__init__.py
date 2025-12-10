@@ -1,5 +1,18 @@
-from .file_utils import get_thumbnail_path, get_file_md5, url_encode_path
+from .file_utils import (
+    get_thumbnail_path, 
+    get_file_md5, 
+    url_encode_path,
+    normalize_image_path,
+    validate_image_path,
+    get_absolute_image_path
+)
 from .deduplication import is_duplicate, remove_duplicate, build_md5_index, scan_and_remove_duplicates
+from .tag_db import (
+    insert_tag,
+    bulk_insert_tags,
+    update_tag_category,
+    get_or_create_tag
+)
 from .api_responses import (
     success_response,
     error_response,
@@ -26,6 +39,9 @@ __all__ = [
     'get_thumbnail_path',
     'get_file_md5',
     'url_encode_path',
+    'normalize_image_path',
+    'validate_image_path',
+    'get_absolute_image_path',
     'is_duplicate',
     'remove_duplicate',
     'build_md5_index',
@@ -49,5 +65,9 @@ __all__ = [
     'get_tag_category',
     'TAG_CATEGORIES',
     'TAG_COLUMN_MAP',
-    'RATING_MAP'
+    'RATING_MAP',
+    'insert_tag',
+    'bulk_insert_tags',
+    'update_tag_category',
+    'get_or_create_tag'
 ]

@@ -21,3 +21,38 @@ export function formatCount(count) {
     if (count >= 1000) return (count / 1000).toFixed(1) + 'k';
     return count.toString();
 }
+
+/**
+ * Get icon for tag category
+ * @param {string} category - Tag category name
+ * @returns {string} Unicode icon for the category
+ */
+export function getCategoryIcon(category) {
+    const icons = {
+        character: '👤',
+        copyright: '©️',
+        artist: '🎨',
+        species: '🐾',
+        meta: '📋',
+        general: '🏷️'
+    };
+    return icons[category] || '🏷️';
+}
+
+/**
+ * Get CSS class for tag category
+ * @param {string} category - Tag category name
+ * @returns {string} CSS class name
+ */
+export function getCategoryClass(category) {
+    return `tag-${category}`;
+}
+
+/**
+ * Format tag count for display
+ * @param {number} count - Tag count
+ * @returns {string} Formatted count string
+ */
+export function formatTagCount(count) {
+    return count.toLocaleString();
+}

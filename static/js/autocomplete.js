@@ -1,5 +1,5 @@
 // static/js/autocomplete.js
-import { escapeHtml, formatCount } from './utils/helpers.js';
+import { escapeHtml, formatCount, getCategoryIcon } from './utils/helpers.js';
 
 class Autocomplete {
     constructor(chipInputId = 'chipTextInput', suggestionsId = 'autocompleteSuggestions') {
@@ -79,17 +79,7 @@ class Autocomplete {
         this.updateClearButton();
     }
 
-    getCategoryIcon(category) {
-        const icons = {
-            'character': '👤',
-            'copyright': '©️',
-            'artist': '🎨',
-            'species': '🐾',
-            'general': '🏷️',
-            'meta': '⚙️'
-        };
-        return icons[category] || '🏷️';
-    }
+
 
     parseToken(token) {
         let type = 'tag';
@@ -104,7 +94,7 @@ class Autocomplete {
             const tag = categoryMatch[2];
             type = category;
             display = tag;
-            icon = this.getCategoryIcon(category);
+            icon = getCategoryIcon(category);
         } else if (token.startsWith('source:')) {
             type = 'source';
             display = token.split(':')[1];
@@ -227,7 +217,7 @@ class Autocomplete {
             group.items.forEach(item => {
                 const displayText = item.display || item.tag;
                 const countText = item.count ? formatCount(item.count) : '';
-                const icon = item.category ? this.getCategoryIcon(item.category) : '🏷️';
+                const icon = item.category ? getCategoryIcon(item.category) : '🏷️';
                 const typeClass = item.type || 'tag';
                 const categoryBadge = item.category ? `<span class="category-badge ${item.category}">${item.category}</span>` : '';
 
