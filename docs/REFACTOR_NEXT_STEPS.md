@@ -17,6 +17,10 @@ This document outlines the remaining and deferred tasks from the API standardiza
 - Consistent error handling across all API endpoints
 - Centralized utilities for common operations
 
+**What's Next:**
+- Phase 5: 2 remaining medium-priority tasks (Notification standardization, Template JS extraction)
+- Phase 6+: Future enhancements (Test coverage, Query builder, etc.)
+
 ---
 
 ## Phase 4 Completed Work
@@ -156,14 +160,76 @@ Move inline JavaScript from templates to dedicated page modules:
 
 ---
 
-## Future Enhancements (Phase 4+)
+## Remaining Deferred Tasks (Phase 5)
+
+These are the remaining medium-priority tasks from the original deferred list:
+
+### 1. Notification System Standardization
+**Estimated Effort:** Low
+**Impact:** Low
+**Risk:** Low
+**Priority:** Medium
+
+**Goal:** Standardize notification imports and usage across all JavaScript files.
+
+**Current State:** Mix of inline notifications and imported functions
+
+**Target State:** All files import from notifications.js consistently
+```javascript
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
+```
+
+**Files to Update:**
+- All JavaScript files in `static/js/` directory that use notifications
+
+**Benefits:**
+- Consistent notification handling
+- Easier to maintain and update
+- Better code organization
+
+### 2. Extract Template JavaScript
+**Estimated Effort:** Medium
+**Impact:** Medium
+**Risk:** Low
+**Priority:** Medium
+
+**Goal:** Move inline JavaScript from templates to dedicated page modules.
+
+**Templates with inline JS to extract:**
+- `templates/rate_manage.html` → `static/js/pages/rate-manage.js`
+- `templates/rate_review.html` → `static/js/pages/rate-review.js`
+- `templates/tag_categorize.html` → `static/js/pages/tag-categorize.js`
+
+**Benefits:**
+- Better code organization
+- Easier testing
+- Improved caching
+- Better IDE support
+- Separation of concerns
+
+---
+
+## Future Enhancements (Phase 6+)
 
 These are larger refactoring efforts that could be tackled in future phases:
 
-### 1. Query Builder Implementation
+### 1. Test Coverage Expansion
+**Estimated Effort:** Medium
+**Impact:** High
+**Risk:** Low
+**Priority:** High
+
+Add tests for:
+- Tag extraction utilities (all booru formats)
+- API handler decorator (error cases)
+- Integration tests for full workflows
+- Edge cases in existing utilities
+
+### 2. Query Builder Implementation
 **Estimated Effort:** High
 **Impact:** Medium
 **Risk:** Medium
+**Priority:** Medium
 
 Create a query builder for complex database queries:
 ```python
@@ -179,50 +245,47 @@ class QueryBuilder:
         pass
 ```
 
-### 2. Async/Sync Pattern Cleanup
+**Benefits:**
+- Consistent query building
+- Easier to test
+- Reduce SQL injection risks
+- Better maintainability
+
+### 3. Async/Sync Pattern Cleanup
 **Estimated Effort:** Medium
 **Impact:** Low
 **Risk:** Medium
+**Priority:** Low
 
 Standardize async/sync patterns across the codebase to reduce confusion about when to use `await`.
 
-### 3. Circular Import Resolution
+**Note:** Working fine currently, only tackle if causing actual issues.
+
+### 4. Circular Import Resolution
 **Estimated Effort:** High
 **Impact:** Low
 **Risk:** High
+**Priority:** Low
 
 Resolve circular dependencies in the import structure (if any exist).
 
-### 4. Test Coverage Expansion
-**Estimated Effort:** Medium
-**Impact:** High
-**Risk:** Low
-
-Add tests for:
-- Tag extraction utilities (all booru formats)
-- API handler decorator (error cases)
-- File path utilities
-- Integration tests for full workflows
+**Note:** High risk change, only necessary if circular imports cause actual problems.
 
 ---
 
 ## Prioritization Recommendation
 
-**High Priority (Do Next):**
-1. Tag database utilities - High impact on code quality
-2. Path handling utilities (Python) - Needed for consistency
-3. Test coverage expansion - Protect against regressions
+**Phase 5 (Do Next):**
+1. ⏭️ Notification System Standardization - Low effort, improves consistency
+2. ⏭️ Extract Template JavaScript - Medium effort, better organization
 
-**Medium Priority (Can Wait):**
-4. JavaScript utilities consolidation - Nice to have, low risk
-5. Extract template JavaScript - Better organization
-6. Path utilities (JavaScript) - Improves frontend consistency
+**Phase 6 (Future):**
+1. Test Coverage Expansion - Protect against regressions
+2. Query Builder Implementation - Nice to have, improves maintainability
 
 **Low Priority (Optional):**
-7. Notification standardization - Cosmetic improvement
-8. Cache invalidation helpers - Already working fine
-9. Query builder - Complex, questionable ROI
-10. Async/sync cleanup - Working fine, high risk
+1. Async/sync cleanup - Working fine, medium risk
+2. Circular import resolution - Working fine, high risk
 
 ---
 
@@ -270,6 +333,14 @@ If you have questions about these next steps or want to propose changes to prior
 
 ---
 
-**Document Version:** 2.0
+**Document Version:** 2.1
 **Last Updated:** 2025-12-10
 **Related:** See `REFACTOR.md` for full refactoring analysis and completed work
+
+---
+
+## Document Change Log
+
+- **v2.1 (2025-12-10)**: Reorganized remaining tasks into Phase 5 and Phase 6+ sections for clarity
+- **v2.0 (2025-12-10)**: Updated with Phase 4 completion status
+- **v1.0 (2025-12-10)**: Initial document with deferred tasks from refactoring effort
