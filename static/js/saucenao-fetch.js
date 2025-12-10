@@ -117,7 +117,7 @@ async function searchSauceNao() {
         displaySauceNaoResults(data.results);
 
     } catch (error) {
-        showError(error.message);
+        showModalError(error.message);
     }
 }
 
@@ -136,7 +136,7 @@ function showNoResults() {
     content.appendChild(noResults);
 }
 
-function showError(message) {
+function showModalError(message) {
     const content = document.getElementById('saucenaoContent');
     content.innerHTML = '';
 
@@ -255,7 +255,7 @@ async function selectSauceNaoResult(idx) {
         displayMetadataOptions(metadataResults);
 
     } catch (error) {
-        showError(error.message);
+        showModalError(error.message);
     }
 }
 

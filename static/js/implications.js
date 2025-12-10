@@ -1,4 +1,5 @@
 // Tag Implications Manager JavaScript
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
 let currentSuggestions = {};
 let currentImplications = [];
@@ -175,7 +176,7 @@ async function approveAllHighConfidence(type) {
         await approveSuggestionData(suggestion, type);
     }
 
-    alert(`Approved ${suggestions.length} high confidence suggestions!`);
+    showSuccess(`Approved ${suggestions.length} high confidence suggestions!`);
     loadSuggestions();
 }
 
@@ -194,7 +195,7 @@ async function previewSuggestion(type, idx) {
 
         const preview = await response.json();
 
-        alert(`Preview for ${suggestion.source_tag} → ${suggestion.implied_tag}\n\n` +
+        showInfo(`Preview for ${suggestion.source_tag} → ${suggestion.implied_tag}\n\n` +
               `Total images with source tag: ${preview.total_images}\n` +
               `Already have implied tag: ${preview.already_has_tag}\n` +
               `Will gain tag: ${preview.will_gain_tag}\n` +
@@ -202,7 +203,7 @@ async function previewSuggestion(type, idx) {
 
     } catch (error) {
         console.error('Error previewing:', error);
-        alert('Failed to load preview');
+        showError('Failed to load preview');
     }
 }
 
@@ -230,12 +231,12 @@ async function approveSuggestionData(suggestion, type) {
         if (result.status === 'success') {
             console.log('Approved:', suggestion);
         } else {
-            alert('Failed to approve: ' + (result.error || 'Unknown error'));
+            showError('Failed to approve: ' + (result.error || 'Unknown error'));
         }
 
     } catch (error) {
         console.error('Error approving:', error);
-        alert('Failed to approve suggestion');
+        showError('Failed to approve suggestion');
     }
 }
 
@@ -317,7 +318,7 @@ async function previewManualImplication() {
     const sourceTag = document.getElementById('sourceTag').value.trim();
 
     if (!sourceTag || impliedTags.length === 0) {
-        alert('Please enter source tag and at least one implied tag');
+        showInfo('Please enter source tag and at least one implied tag');
         return;
     }
 
@@ -360,7 +361,7 @@ async function createManualImplication() {
     const sourceTag = document.getElementById('sourceTag').value.trim();
 
     if (!sourceTag || impliedTags.length === 0) {
-        alert('Please enter source tag and at least one implied tag');
+        showInfo('Please enter source tag and at least one implied tag');
         return;
     }
 
@@ -378,12 +379,12 @@ async function createManualImplication() {
             const result = await response.json();
 
             if (result.status !== 'success') {
-                alert(`Failed to create ${sourceTag} → ${impliedTag}: ${result.error}`);
+                showError(`Failed to create ${sourceTag} → ${impliedTag}: ${result.error}`);
                 return;
             }
         }
 
-        alert(`Successfully created ${impliedTags.length} implication(s)!`);
+        showSuccess(`Successfully created ${impliedTags.length} implication(s)!`);
 
         // Reset form
         document.getElementById('sourceTag').value = '';
@@ -397,7 +398,7 @@ async function createManualImplication() {
 
     } catch (error) {
         console.error('Error creating implications:', error);
-        alert('Failed to create implications');
+        showError('Failed to create implications');
     }
 }
 
@@ -502,7 +503,7 @@ async function viewChain(tagName) {
 
     } catch (error) {
         console.error('Error loading chain:', error);
-        alert('Failed to load implication chain');
+        showError('Failed to load implication chain');
     }
 }
 
@@ -541,15 +542,15 @@ async function deleteImplication(sourceTag, impliedTag) {
         const result = await response.json();
 
         if (result.status === 'success') {
-            alert('Implication deleted');
+            showSuccess('Implication deleted');
             loadExistingImplications();
         } else {
-            alert('Failed to delete: ' + (result.error || 'Unknown error'));
+            showError('Failed to delete: ' + (result.error || 'Unknown error'));
         }
 
     } catch (error) {
         console.error('Error deleting:', error);
-        alert('Failed to delete implication');
+        showError('Failed to delete implication');
     }
 }
 

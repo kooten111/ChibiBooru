@@ -1,10 +1,11 @@
 // Source Selector JavaScript
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
 function openSourceModal() {
     // Simply show the pre-rendered modal
     const modal = document.getElementById('sourceModal');
     if (!modal) {
-        alert('Source selector not available');
+        showError('Source selector not available');
         return;
     }
     
@@ -41,7 +42,7 @@ async function switchSource(sourceName) {
     const filepath = document.getElementById('imageFilepath').value;
 
     if (!filepath) {
-        alert('Error: Image filepath not found');
+        showError('Error: Image filepath not found');
         return;
     }
 
@@ -91,7 +92,7 @@ async function switchSource(sourceName) {
             // Reload the page to show updated tags
             window.location.reload();
         } else {
-            alert('Error switching source: ' + (result.error || 'Unknown error'));
+            showError('Error switching source: ' + (result.error || 'Unknown error'));
             if (sourceOption) {
                 sourceOption.innerHTML = originalHTML;
                 sourceOption.classList.remove('switching');
@@ -99,9 +100,13 @@ async function switchSource(sourceName) {
         }
     } catch (error) {
         console.error('Error switching source:', error);
-        alert('Error switching source: ' + error.message);
+        showError('Error switching source: ' + error.message);
         if (sourceOption) {
             sourceOption.classList.remove('switching');
         }
     }
 }
+
+// Expose functions to window for onclick handlers
+window.openSourceModal = openSourceModal;
+window.switchSource = switchSource;
