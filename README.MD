@@ -374,6 +374,19 @@ For detailed technical documentation, see the [`docs/`](docs/) directory:
 - **[Configuration](docs/CONFIGURATION.md)** - All configuration options and environment variables
 - **[Data Flow](docs/DATA_FLOW.md)** - End-to-end data flow diagrams
 - **[Extended Categories](docs/EXTENDED_CATEGORIES.md)** - 22-category Platinum Schema for advanced tag organization
+- **[Future Enhancements](docs/FUTURE_ENHANCEMENTS.md)** - Planned improvements and future work
+
+### Code Quality & Architecture
+
+ChibiBooru has undergone comprehensive refactoring (Phases 1-6A) to establish consistent patterns and eliminate technical debt:
+
+- **Consistent API Error Handling:** All API endpoints use the `@api_handler()` decorator for standardized error responses and logging
+- **Centralized Utilities:** Common operations consolidated in the `utils/` package (tag database, file handling, path normalization)
+- **Modern JavaScript:** ES6 modules with shared helper functions for consistent client-side behavior
+- **Standardized Notifications:** Unified notification system across all UI interactions
+- **Comprehensive Logging:** Structured logging framework with configurable levels and output
+
+**Refactoring Impact:** ~2,000+ lines of duplicated code eliminated across 30+ files, resulting in better maintainability and consistency.
 
 ---
 
@@ -397,6 +410,7 @@ Contributions are welcome! Please read the documentation in [`docs/`](docs/) to 
    - [Architecture Overview](docs/ARCHITECTURE.md) for system design
    - [Services Documentation](docs/SERVICES.md) for business logic
    - [Database Schema](docs/DATABASE.md) for data models
+   - [Future Enhancements](docs/FUTURE_ENHANCEMENTS.md) for planned improvements
 
 ### Project Structure
 
