@@ -82,3 +82,20 @@ if (!document.getElementById('notification-styles')) {
     `;
     document.head.appendChild(style);
 }
+
+// Convenience functions for common notification types
+export function showSuccess(message, duration = 4000) {
+    showNotification(message, 'success', duration);
+}
+
+export function showError(message, duration = 4000) {
+    showNotification(message, 'error', duration);
+}
+
+export function showInfo(message, duration = 4000) {
+    showNotification(message, 'info', duration);
+}
+
+export function showWarning(message, duration = 4000) {
+    showNotification(message, 'warning', duration);
+}

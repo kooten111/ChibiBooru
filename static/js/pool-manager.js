@@ -1,4 +1,5 @@
 // static/js/pool-manager.js
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     loadPoolsForImage();
@@ -231,11 +232,11 @@ async function togglePoolMembership(poolId, _poolName, currentlyInPool) {
             // Reload the pools list in the sidebar
             await loadPoolsForImage();
         } else {
-            alert(result.error || 'Failed to update pool membership.');
+            showError(result.error || 'Failed to update pool membership.');
         }
     } catch (error) {
         console.error('Error toggling pool membership:', error);
-        alert('An error occurred.');
+        showError('An error occurred.');
     }
 }
 
@@ -258,11 +259,11 @@ async function removeImageFromPool(poolId, poolName) {
         if (response.ok) {
             await loadPoolsForImage();
         } else {
-            alert(result.error || 'Failed to remove from pool.');
+            showError(result.error || 'Failed to remove from pool.');
         }
     } catch (error) {
         console.error('Error removing from pool:', error);
-        alert('An error occurred.');
+        showError('An error occurred.');
     }
 }
 

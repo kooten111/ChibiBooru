@@ -1,4 +1,6 @@
 // static/js/system-panel.js
+import { showNotification } from './utils/notifications.js';
+
 var systemStatusInterval = null;
 var SYSTEM_SECRET = localStorage.getItem('system_secret');
 
@@ -475,35 +477,6 @@ function systemStartMonitor(event) {
 function systemStopMonitor(event) {
     if (event) event.preventDefault();
     systemAction('/api/system/monitor/stop', event.target, 'Stop Monitor');
-}
-
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.textContent = message;
-
-    let gradient;
-    if (type === 'error') {
-        gradient = 'linear-gradient(135deg, #ff6b6b 0%, #c92a2a 100%)';
-    } else if (type === 'success') {
-        gradient = 'linear-gradient(135deg, #51cf66 0%, #37b24d 100%)';
-    } else {
-        gradient = 'linear-gradient(135deg, #4a9eff 0%, #357abd 100%)';
-    }
-
-    notification.style.cssText = `
-        position: fixed; top: 100px; right: 30px; padding: 15px 25px;
-        background: ${gradient};
-        color: white; border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-        z-index: 10002; font-weight: 600; max-width: 400px;
-        animation: slideInRight 0.3s ease-out;
-    `;
-
-    document.body.appendChild(notification);
-
-    setTimeout(() => {
-        notification.style.animation = 'slideOutRight 0.3s ease-out';
-        setTimeout(() => notification.remove(), 300);
-    }, 4000);
 }
 
 // Auto-refresh status when system panel is open

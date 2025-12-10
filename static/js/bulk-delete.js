@@ -1,4 +1,5 @@
 // bulk-delete.js - Mass delete functionality for image gallery
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
 (function () {
     'use strict';
@@ -135,7 +136,7 @@
     if (downloadSelectedBtn) {
         downloadSelectedBtn.addEventListener('click', async function () {
             if (selectedImages.size === 0) {
-                alert('No images selected');
+                showInfo('No images selected');
                 return;
             }
 
@@ -172,11 +173,11 @@
                     document.body.removeChild(a);
                 } else {
                     const result = await response.json();
-                    alert('Error downloading images: ' + (result.error || 'Unknown error'));
+                    showError('Error downloading images: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error during bulk download:', error);
-                alert('Network error occurred while downloading images');
+                showError('Network error occurred while downloading images');
             } finally {
                 downloadSelectedBtn.disabled = false;
                 downloadSelectedBtn.innerHTML = originalText;
@@ -188,7 +189,7 @@
     if (deleteSelectedBtn) {
         deleteSelectedBtn.addEventListener('click', async function () {
             if (selectedImages.size === 0) {
-                alert('No images selected');
+                showInfo('No images selected');
                 return;
             }
 
@@ -229,7 +230,7 @@
                     updateSelectedCount();
 
                     // Show success message
-                    alert(result.message || `Successfully deleted ${result.results.deleted} images`);
+                    showSuccess(result.message || `Successfully deleted ${result.results.deleted} images`);
 
                     // If there are errors, show them
                     if (result.results.errors && result.results.errors.length > 0) {
@@ -239,11 +240,11 @@
                     // Reload the page to update the results count
                     window.location.reload();
                 } else {
-                    alert('Error deleting images: ' + (result.error || 'Unknown error'));
+                    showError('Error deleting images: ' + (result.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error during bulk delete:', error);
-                alert('Network error occurred while deleting images');
+                showError('Network error occurred while deleting images');
             } finally {
                 deleteSelectedBtn.disabled = false;
                 deleteSelectedBtn.innerHTML = 'Delete Selected (<span id="selected-count">0</span>)';

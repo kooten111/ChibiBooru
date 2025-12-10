@@ -1,4 +1,5 @@
 // static/js/pool-detail.js
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const modal = document.getElementById('poolModal');
@@ -53,7 +54,7 @@ async function savePool() {
     const poolDescription = document.getElementById('poolDescription').value.trim();
 
     if (!poolName) {
-        alert('Pool name is required!');
+        showInfo('Pool name is required!');
         return;
     }
 
@@ -70,14 +71,14 @@ async function savePool() {
         const result = await response.json();
 
         if (response.ok) {
-            alert(result.message || 'Pool updated successfully!');
+            showSuccess(result.message || 'Pool updated successfully!');
             window.location.reload();
         } else {
-            alert(result.error || 'Failed to update pool.');
+            showError(result.error || 'Failed to update pool.');
         }
     } catch (error) {
         console.error('Error updating pool:', error);
-        alert('An error occurred while updating the pool.');
+        showError('An error occurred while updating the pool.');
     }
 }
 
@@ -108,10 +109,15 @@ async function removeFromPool(filepath, poolId) {
                 window.location.reload();
             }
         } else {
-            alert(result.error || 'Failed to remove image from pool.');
+            showError(result.error || 'Failed to remove image from pool.');
         }
     } catch (error) {
         console.error('Error removing image from pool:', error);
-        alert('An error occurred while removing the image.');
+        showError('An error occurred while removing the image.');
     }
 }
+
+// Expose functions to window for onclick handlers
+window.editPool = editPool;
+window.closeModal = closeModal;
+window.removeFromPool = removeFromPool;

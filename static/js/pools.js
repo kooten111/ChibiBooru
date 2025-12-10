@@ -1,4 +1,5 @@
 // static/js/pools.js
+import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('poolSearchInput');
@@ -92,7 +93,7 @@ async function savePool() {
     const poolDescription = document.getElementById('poolDescription').value.trim();
 
     if (!poolName) {
-        alert('Pool name is required!');
+        showInfo('Pool name is required!');
         return;
     }
 
@@ -113,11 +114,11 @@ async function savePool() {
             closeModal();
             window.location.reload();
         } else {
-            alert(result.error || 'Failed to save pool.');
+            showError(result.error || 'Failed to save pool.');
         }
     } catch (error) {
         console.error('Error saving pool:', error);
-        alert('An error occurred while saving the pool.');
+        showError('An error occurred while saving the pool.');
     }
 }
 
@@ -137,10 +138,15 @@ async function deletePool(poolId, poolName) {
         if (response.ok) {
             window.location.reload();
         } else {
-            alert(result.error || 'Failed to delete pool.');
+            showError(result.error || 'Failed to delete pool.');
         }
     } catch (error) {
         console.error('Error deleting pool:', error);
-        alert('An error occurred while deleting the pool.');
+        showError('An error occurred while deleting the pool.');
     }
 }
+
+// Expose functions to window for onclick handlers
+window.editPool = editPool;
+window.deletePool = deletePool;
+window.closeModal = closeModal;
