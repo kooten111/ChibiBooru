@@ -128,6 +128,11 @@ BOORU_PRIORITY = [
 # When False: Images will use first available source from BOORU_PRIORITY
 USE_MERGED_SOURCES_BY_DEFAULT = True
 
+# ==================== LOGGING ====================
+
+# Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+
 # ==================== FLASK APP ====================
 
 # Web server
@@ -166,6 +171,82 @@ SIMILARITY_CATEGORY_WEIGHTS = {
     'general': 3.0,     # Standard descriptive tags
     'meta': 0.5         # Resolution, format, year - less relevant for similarity
 }
+
+# ==================== FILE TYPES ====================
+
+SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')
+SUPPORTED_VIDEO_EXTENSIONS = ('.mp4', '.webm')
+SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS + SUPPORTED_VIDEO_EXTENSIONS
+
+# For future use
+SUPPORTED_ANIMATION_EXTENSIONS = ('.gif', '.webp', '.apng')
+
+
+def is_supported_media(filepath: str) -> bool:
+    """Check if a file is a supported media type."""
+    return filepath.lower().endswith(SUPPORTED_MEDIA_EXTENSIONS)
+
+
+def is_supported_image(filepath: str) -> bool:
+    """Check if a file is a supported image type."""
+    return filepath.lower().endswith(SUPPORTED_IMAGE_EXTENSIONS)
+
+
+def is_video(filepath: str) -> bool:
+    """Check if a file is a video."""
+    return filepath.lower().endswith(SUPPORTED_VIDEO_EXTENSIONS)
+
+
+def is_animated(filepath: str) -> bool:
+    """Check if a file might be animated (gif, webp, apng)."""
+    return filepath.lower().endswith(SUPPORTED_ANIMATION_EXTENSIONS)
+
+
+# ==================== DEFAULTS ====================
+
+class Defaults:
+    """Default values for various operations."""
+    PAGINATION_LIMIT = 100
+    IMAGE_BROWSER_LIMIT = 50
+    BATCH_SIZE = 100
+    SIMILARITY_CANDIDATES = 500
+    AUTOCOMPLETE_MIN_CHARS = 2
+    AUTOCOMPLETE_MAX_RESULTS = 20
+
+
+class Timeouts:
+    """Timeout values in seconds."""
+    API_REQUEST = 10
+    SAUCENAO_SEARCH = 30
+    LONG_OPERATION = 300
+    FILE_DOWNLOAD = 60
+
+    # JavaScript timeouts (in milliseconds)
+    JS_API_TIMEOUT = 5000
+    JS_LONG_TIMEOUT = 90000
+
+
+class Intervals:
+    """Interval values in seconds."""
+    MONITOR_CHECK = 300
+    RATE_LIMIT_WINDOW = 30
+    CACHE_REFRESH = 600
+
+
+class Thresholds:
+    """Threshold values."""
+    LOCAL_TAGGER_CONFIDENCE = 0.6
+    LOCAL_TAGGER_DISPLAY = 0.7
+    SIMILARITY_MINIMUM = 0.1
+    HIGH_CONFIDENCE = 0.9
+
+
+class Limits:
+    """Size and count limits."""
+    MAX_UPLOAD_SIZE_MB = 100
+    CHUNK_SIZE = 4096
+    MAX_FILENAME_LENGTH = 255
+    MAX_TAGS_PER_IMAGE = 500
 
 # ==================== VALIDATION ====================
 

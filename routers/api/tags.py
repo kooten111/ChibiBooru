@@ -2,8 +2,10 @@ from quart import request, jsonify
 from . import api_blueprint
 from services import tag_service
 from database import models
+from utils import api_handler
 
 @api_blueprint.route('/tags/fetch')
+@api_handler()
 async def fetch_tags():
     """API endpoint for fetching tags with pagination and filtering."""
     offset = int(request.args.get('offset', 0))
@@ -14,13 +16,13 @@ async def fetch_tags():
     # Use optimized SQL search
     tags_page, total = models.search_tags(search, category, limit, offset)
 
-    return jsonify({
+    return {
         'tags': tags_page,
         'total': total,
         'offset': offset,
         'limit': limit,
         'hasMore': offset + limit < total
-    })
+    }
 
 @api_blueprint.route('/autocomplete')
 async def autocomplete():

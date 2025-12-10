@@ -10,6 +10,12 @@ import numpy as np
 from database import models
 from database import get_db_connection
 from utils.deduplication import remove_duplicate
+from utils.tag_extraction import (
+    extract_tags_from_source,
+    extract_rating_from_source,
+    merge_tag_sources,
+    deduplicate_categorized_tags
+)
 import time
 from collections import deque
 from threading import Lock
@@ -1112,86 +1118,35 @@ def process_image_file(filepath, move_from_ingest=False):
             source_name = src
             break
     
-    tags_character, tags_copyright, tags_artist, tags_species, tags_meta, tags_general = "", "", "", "", "", ""
+    # Extract tags from primary source using centralized utility
+    extracted_tags = extract_tags_from_source(primary_source_data, source_name)
 
-    if source_name == 'danbooru':
-        tags_character = primary_source_data.get("tag_string_character", "")
-        tags_copyright = primary_source_data.get("tag_string_copyright", "")
-        tags_artist = primary_source_data.get("tag_string_artist", "")
-        tags_meta = primary_source_data.get("tag_string_meta", "")
-        tags_general = primary_source_data.get("tag_string_general", "")
-    elif source_name in ['e621', 'local_tagger', 'pixiv']:
-        tags = primary_source_data.get("tags", {})
-        
-        # Helper to get list from tags dict
-        t_char = tags.get("character", [])
-        t_copy = tags.get("copyright", [])
-        t_art = tags.get("artist", [])
-        t_spec = tags.get("species", [])
-        t_meta = tags.get("meta", [])
-        t_gen = tags.get("general", [])
+    # Special case: If Pixiv is the source, merge with local tagger tags
+    if source_name == 'pixiv' and 'local_tagger' in all_results:
+        print("Merging local tagger tags into Pixiv tags...")
+        local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
+        # Merge all categories except artist (Pixiv artist is usually accurate)
+        extracted_tags = merge_tag_sources(
+            extracted_tags,
+            local_tagger_tags,
+            merge_categories=['character', 'copyright', 'species', 'meta', 'general']
+        )
 
-        # If Pixiv is the source, complement with local tagger tags
-        if source_name == 'pixiv' and 'local_tagger' in all_results:
-            print("Merging local tagger tags into Pixiv tags...")
-            local_tags = all_results['local_tagger'].get('tags', {})
-            t_char = list(t_char) + list(local_tags.get("character", []))
-            t_copy = list(t_copy) + list(local_tags.get("copyright", []))
-            # Keep Pixiv artist as primary, but maybe append? Usually Pixiv artist is accurate.
-            # t_art = list(t_art) + list(local_tags.get("artist", [])) 
-            t_spec = list(t_spec) + list(local_tags.get("species", []))
-            t_meta = list(t_meta) + list(local_tags.get("meta", []))
-            t_gen = list(t_gen) + list(local_tags.get("general", []))
+    # Deduplicate tags across categories
+    extracted_tags = deduplicate_categorized_tags(extracted_tags)
 
-        tags_character = " ".join(t_char)
-        tags_copyright = " ".join(t_copy)
-        tags_artist = " ".join(t_art)
-        tags_species = " ".join(t_spec)
-        tags_meta = " ".join(t_meta)
-        tags_general = " ".join(t_gen)
-
-    character_set = set(tags_character.split())
-    copyright_set = set(tags_copyright.split())
-    artist_set = set(tags_artist.split())
-    species_set = set(tags_species.split()) 
-    meta_set = set(tags_meta.split())
-    general_set = set(tags_general.split())
-    
-    general_set -= (character_set | copyright_set | artist_set | meta_set | species_set)
-
+    # Convert to the format expected by the rest of the function
     categorized_tags = {
-        'character': list(character_set),
-        'copyright': list(copyright_set),
-        'artist': list(artist_set),
-        'species': list(species_set),
-        'meta': list(meta_set),
-        'general': list(general_set)
+        'character': extracted_tags['tags_character'].split(),
+        'copyright': extracted_tags['tags_copyright'].split(),
+        'artist': extracted_tags['tags_artist'].split(),
+        'species': extracted_tags['tags_species'].split(),
+        'meta': extracted_tags['tags_meta'].split(),
+        'general': extracted_tags['tags_general'].split()
     }
 
-    # Extract rating if present (danbooru, e621, etc.)
-    rating = None
-    rating_source = None
-    if 'rating' in primary_source_data:
-        rating_char = primary_source_data.get('rating', '').lower()
-        # Map single-letter ratings to full tag names
-        rating_map = {
-            'g': 'rating:general',
-            's': 'rating:sensitive',
-            'q': 'rating:questionable',
-            'e': 'rating:explicit'
-        }
-        rating = rating_map.get(rating_char)
-
-        # Determine source trust level
-        # danbooru and e621 are authoritative (original)
-        # local_tagger is 50/50 (treat as ai_inference)
-        # others default to original
-        if source_name in ['danbooru', 'e621']:
-            rating_source = 'original'  # Trusted source
-        elif source_name in ['local_tagger', 'camie_tagger']:
-            rating_source = 'ai_inference'  # Less trusted
-        else:
-            rating_source = 'original'  # Default to original for other sources
+    # Extract rating using centralized utility
+    rating, rating_source = extract_rating_from_source(primary_source_data, source_name)
 
     # Add rating to categorized tags if present
     if rating and rating_source:

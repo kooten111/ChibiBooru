@@ -1,105 +1,42 @@
 import json
 from database import get_db_connection
+from utils.tag_extraction import (
+    extract_tags_from_source as extract_tags_base,
+    extract_rating_from_source
+)
 
 def extract_tags_from_source(source_data, source_name):
-    """Extract tag data from a specific source"""
+    """
+    Extract tag data from a specific source with additional metadata.
+
+    This is a wrapper around utils.tag_extraction.extract_tags_from_source
+    that adds extra fields needed by switch_source_db operations.
+    """
     if not source_data or not isinstance(source_data, dict):
         return None
 
-    tags_dict = {
-        "character": "",
-        "copyright": "",
-        "artist": "",
-        "species": "",
-        "meta": "",
-        "general": ""
-    }
+    # Use centralized tag extraction
+    tags_dict = extract_tags_base(source_data, source_name)
 
-    all_tags = set()
+    # Extract additional metadata
     parent_id = source_data.get("parent_id")
     if source_name == 'e621':
         parent_id = source_data.get('relationships', {}).get('parent_id')
     has_children = source_data.get("has_children", False)
     post_id = source_data.get("id")
 
-    # Extract rating if present (danbooru, e621, etc.)
-    rating = None
-    rating_source = None
-    if 'rating' in source_data:
-        rating_char = source_data.get('rating', '').lower()
-        # Map single-letter ratings to full tag names
-        rating_map = {
-            'g': 'rating:general',
-            's': 'rating:sensitive',
-            'q': 'rating:questionable',
-            'e': 'rating:explicit'
-        }
-        rating = rating_map.get(rating_char)
+    # Extract rating using centralized utility
+    rating, rating_source = extract_rating_from_source(source_data, source_name)
 
-        # Determine source trust level
-        # danbooru and e621 are authoritative (original)
-        # local_tagger is 50/50 (treat as ai_inference)
-        # others default to original
-        if source_name in ['danbooru', 'e621']:
-            rating_source = 'original'  # Trusted source
-        elif source_name in ['local_tagger', 'camie_tagger']:
-            rating_source = 'ai_inference'  # Less trusted
-        else:
-            rating_source = 'original'  # Default to original for other sources
-    
-    if source_name == "danbooru":
-        tags_dict["character"] = source_data.get("tag_string_character", "")
-        tags_dict["copyright"] = source_data.get("tag_string_copyright", "")
-        tags_dict["artist"] = source_data.get("tag_string_artist", "")
-        tags_dict["meta"] = source_data.get("tag_string_meta", "")
-        tags_dict["general"] = source_data.get("tag_string_general", "")
-        
-    elif source_name in ["e621", "pixiv"]:
-        tags = source_data.get("tags", {})
-        if isinstance(tags, dict):
-            tags_dict["character"] = " ".join(tags.get("character", []))
-            tags_dict["copyright"] = " ".join(tags.get("copyright", []))
-            tags_dict["artist"] = " ".join(tags.get("artist", []))
-            tags_dict["species"] = " ".join(tags.get("species", []))
-            tags_dict["meta"] = " ".join(tags.get("meta", []))
-            tags_dict["general"] = " ".join(tags.get("general", []))
-
-    elif source_name == "local_tagger" or source_name == "camie_tagger":
-        # Handle both old 'camie_tagger' and new 'local_tagger' format
-        tags = source_data.get("tags", {})
-        if isinstance(tags, dict):
-            tags_dict["character"] = " ".join(tags.get("character", []))
-            tags_dict["copyright"] = " ".join(tags.get("copyright", []))
-            tags_dict["artist"] = " ".join(tags.get("artist", []))
-            tags_dict["meta"] = " ".join(tags.get("meta", []))
-            tags_dict["general"] = " ".join(tags.get("general", []))
-        else:
-            # Fallback for old format
-            tags_dict["character"] = source_data.get("tags_character", "")
-            tags_dict["copyright"] = source_data.get("tags_copyright", "")
-            tags_dict["artist"] = source_data.get("tags_artist", "")
-            tags_dict["general"] = source_data.get("tags_general", "")
-        
-    else:
-        # Gelbooru, Yandere, etc - general tags only
-        tags_str = source_data.get("tags", "")
-        if isinstance(tags_str, list):
-            tags_str = " ".join(tags_str)
-        tags_dict["general"] = tags_str
-    
-    # Collect all tags
+    # Collect all tags for the merged "tags" field
+    all_tags = set()
     for category_tags in tags_dict.values():
         if category_tags:
             all_tags.update(category_tags.split())
 
     result = {
         "tags": " ".join(sorted(all_tags)),
-        "tags_character": tags_dict["character"],
-        "tags_copyright": tags_dict["copyright"],
-        "tags_artist": tags_dict["artist"],
-        "tags_species": tags_dict["species"],
-        "tags_meta": tags_dict["meta"],
-        "tags_general": tags_dict["general"],
+        **tags_dict,  # Include all categorized tags
         "id": post_id,
         "parent_id": parent_id,
         "has_children": has_children,
@@ -107,7 +44,7 @@ def extract_tags_from_source(source_data, source_name):
     }
 
     # Add rating information if extracted
-    if rating:
+    if rating and rating_source:
         result["rating"] = rating
         result["rating_source"] = rating_source
 

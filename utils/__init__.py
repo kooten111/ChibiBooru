@@ -8,6 +8,19 @@ from .api_responses import (
     validation_error_response,
     server_error_response
 )
+from .decorators import api_handler, sync_to_async, require_secret
+from .logging_config import setup_logging, get_logger
+from .tag_extraction import (
+    extract_tags_from_source,
+    extract_rating_from_source,
+    merge_tag_sources,
+    deduplicate_categorized_tags,
+    is_rating_tag,
+    get_tag_category,
+    TAG_CATEGORIES,
+    TAG_COLUMN_MAP,
+    RATING_MAP
+)
 
 __all__ = [
     'get_thumbnail_path',
@@ -22,5 +35,19 @@ __all__ = [
     'not_found_response',
     'unauthorized_response',
     'validation_error_response',
-    'server_error_response'
+    'server_error_response',
+    'api_handler',
+    'sync_to_async',
+    'require_secret',
+    'setup_logging',
+    'get_logger',
+    'extract_tags_from_source',
+    'extract_rating_from_source',
+    'merge_tag_sources',
+    'deduplicate_categorized_tags',
+    'is_rating_tag',
+    'get_tag_category',
+    'TAG_CATEGORIES',
+    'TAG_COLUMN_MAP',
+    'RATING_MAP'
 ]
