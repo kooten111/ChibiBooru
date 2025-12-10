@@ -171,7 +171,7 @@ services/query/
 def get_asset_version(filepath):
     """Generate content-based hash for cache busting"""
     with open(filepath, 'rb') as f:
-        file_hash = hashlib.md5(f.read()).hexdigest()[:8]
+        file_hash = hashlib.sha256(f.read()).hexdigest()[:8]
     return file_hash
 
 # Template helper
