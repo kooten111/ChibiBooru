@@ -10,9 +10,16 @@ from database import models
 from database import initialize_database, repair_orphaned_image_tags
 from services.priority_service import check_and_apply_priority_changes
 from services.health_service import startup_health_check
+from utils.logging_config import setup_logging, get_logger
 
 def create_app():
     """Create and configure the Quart application."""
+    # Initialize logging first
+    log_level = getattr(config, 'LOG_LEVEL', 'INFO')
+    setup_logging(level=log_level)
+    logger = get_logger('App')
+    logger.info("Initializing ChibiBooru application...")
+
     app = Quart(__name__)
 
     # Quart config
@@ -41,9 +48,9 @@ def create_app():
     if config.MONITOR_ENABLED:
         from services import monitor_service
         if monitor_service.start_monitor():
-            print("✓ Monitor service started automatically")
+            logger.info("✓ Monitor service started automatically")
         else:
-            print("⚠ Monitor service was already running")
+            logger.warning("⚠ Monitor service was already running")
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(api_blueprint, url_prefix='/api')

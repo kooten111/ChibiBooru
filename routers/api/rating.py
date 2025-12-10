@@ -3,67 +3,35 @@ from . import api_blueprint
 from services import rating_service as rating_inference
 from database import models
 from database import get_db_connection
+from utils import api_handler, success_response, error_response
 
 # ============================================================================
 # Rating Inference API Endpoints
 # ============================================================================
 
 @api_blueprint.route('/rate/train', methods=['POST'])
+@api_handler()
 async def api_train_model():
     """Train the rating inference model."""
-    try:
-        stats = rating_inference.train_model()
-        return jsonify({
-            "success": True,
-            "stats": stats
-        })
-    except ValueError as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 400
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    stats = rating_inference.train_model()
+    return {"stats": stats}
 
 
 @api_blueprint.route('/rate/infer', methods=['POST'])
+@api_handler()
 async def api_infer_ratings():
     """Run inference on unrated images or a specific image."""
-    try:
-        data = await request.get_json() or {}
-        image_id = data.get('image_id')
+    data = await request.get_json() or {}
+    image_id = data.get('image_id')
 
-        if image_id:
-            # Infer single image
-            result = rating_inference.infer_rating_for_image(image_id)
-            return jsonify({
-                "success": True,
-                "result": result
-            })
-        else:
-            # Infer all unrated images
-            stats = rating_inference.infer_all_unrated_images()
-            return jsonify({
-                "success": True,
-                "stats": stats
-            })
-    except ValueError as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 400
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+    if image_id:
+        # Infer single image
+        result = rating_inference.infer_rating_for_image(image_id)
+        return {"result": result}
+    else:
+        # Infer all unrated images
+        stats = rating_inference.infer_all_unrated_images()
+        return {"stats": stats}
 
 
 @api_blueprint.route('/rate/clear_ai', methods=['POST'])
