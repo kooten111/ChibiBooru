@@ -2,7 +2,7 @@
 """
 Automated tag categorization using a local LLM via LM Studio.
 
-This script fetches uncategorized tags from the database and uses a local
+This script fetches uncategorized tags from the ChibiBooru API and uses a local
 Mistral LLM running on LM Studio to automatically categorize them according
 to the extended tag categorization schema.
 """
@@ -11,19 +11,17 @@ import sys
 import os
 import json
 import requests
-import sqlite3
 from typing import Optional, List, Dict
 from time import sleep
 
-# Add parent directory to path to import from project
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from database import get_db_connection
-from services.tag_categorization_service import EXTENDED_CATEGORIES, TAG_CATEGORIES
-
-# LM Studio API configuration
+# API configuration
+CHIBIBOORU_API_URL = "http://192.168.1.5:5000/api"  # ChibiBooru API base URL
 LM_STUDIO_URL = "http://192.168.1.122:1234/v1/chat/completions"
 MODEL_NAME = "mistralai/ministral-3-14b-reasoning"  # Adjust if needed
+
+# Load category definitions from API
+TAG_CATEGORIES = None
+EXTENDED_CATEGORIES = None
 
 # Category descriptions for the LLM
 CATEGORY_GUIDE = """
@@ -190,50 +188,61 @@ def categorize_tag_with_llm(tag_name: str, usage_count: int, max_retries: int = 
     return None
 
 
-def get_uncategorized_tags(limit: int = 100) -> List[Dict]:
-    """Get uncategorized tags from the database."""
-    with get_db_connection() as conn:
-        cur = conn.cursor()
+def load_categories():
+    """Load category definitions from the API."""
+    global TAG_CATEGORIES, EXTENDED_CATEGORIES
 
-        cur.execute("""
-            SELECT
-                t.name,
-                t.category,
-                t.extended_category,
-                COUNT(DISTINCT it.image_id) as usage_count
-            FROM tags t
-            LEFT JOIN image_tags it ON t.id = it.tag_id
-            WHERE t.extended_category IS NULL
-            GROUP BY t.name, t.category, t.extended_category
-            HAVING usage_count > 0
-            ORDER BY usage_count DESC
-            LIMIT ?
-        """, (limit,))
+    try:
+        response = requests.get(f"{CHIBIBOORU_API_URL}/tag_categorize/tags?limit=1", timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        TAG_CATEGORIES = data.get('categories', [])
+        EXTENDED_CATEGORIES = data.get('extended_categories', [])
+
+        return True
+    except Exception as e:
+        print(f"Failed to load categories from API: {e}")
+        return False
+
+
+def get_uncategorized_tags(limit: int = 100) -> List[Dict]:
+    """Get uncategorized tags from the API."""
+    try:
+        response = requests.get(
+            f"{CHIBIBOORU_API_URL}/tag_categorize/tags",
+            params={'limit': limit},
+            timeout=30
+        )
+        response.raise_for_status()
+        data = response.json()
 
         tags = []
-        for row in cur.fetchall():
+        for tag in data.get('tags', []):
             tags.append({
-                'name': row['name'],
-                'current_category': row['category'],
-                'usage_count': row['usage_count']
+                'name': tag['name'],
+                'current_category': tag.get('current_category'),
+                'usage_count': tag.get('usage_count', 0)
             })
 
         return tags
+    except Exception as e:
+        print(f"Failed to fetch uncategorized tags from API: {e}")
+        return []
 
 
 def set_tag_category(tag_name: str, category: str) -> bool:
-    """Set the extended category for a tag in the database."""
+    """Set the extended category for a tag via the API."""
     try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
-            cur.execute(
-                "UPDATE tags SET extended_category = ? WHERE name = ?",
-                (category, tag_name)
-            )
-            conn.commit()
-            return True
+        response = requests.post(
+            f"{CHIBIBOORU_API_URL}/tag_categorize/set",
+            json={'tag_name': tag_name, 'category': category},
+            timeout=10
+        )
+        response.raise_for_status()
+        return True
     except Exception as e:
-        print(f"  Database error: {e}")
+        print(f"  API error: {e}")
         return False
 
 
@@ -241,7 +250,11 @@ def main():
     """Main execution function."""
     import argparse
 
+    global CHIBIBOORU_API_URL
+
     parser = argparse.ArgumentParser(description='Automatically categorize tags using a local LLM')
+    parser.add_argument('--api-url', type=str, default=CHIBIBOORU_API_URL,
+                        help=f'ChibiBooru API base URL (default: {CHIBIBOORU_API_URL})')
     parser.add_argument('--batch-size', type=int, default=100,
                         help='Number of tags to process per batch (default: 100)')
     parser.add_argument('--limit', type=int, default=None,
@@ -253,10 +266,14 @@ def main():
 
     args = parser.parse_args()
 
+    # Update API URL if provided
+    CHIBIBOORU_API_URL = args.api_url
+
     print("=" * 70)
     print("Automated Tag Categorization using Local LLM")
     print("=" * 70)
-    print(f"\nLM Studio URL: {LM_STUDIO_URL}")
+    print(f"\nChibiBooru API: {CHIBIBOORU_API_URL}")
+    print(f"LM Studio URL: {LM_STUDIO_URL}")
     print(f"Batch size: {args.batch_size}")
     if args.limit:
         print(f"Total limit: {args.limit}")
@@ -265,6 +282,14 @@ def main():
     if args.skip:
         print(f"Skipping first {args.skip} tags")
     print()
+
+    # Test API connection
+    print("Testing ChibiBooru API connection...")
+    if not load_categories():
+        print("✗ Failed to connect to ChibiBooru API")
+        print(f"Make sure the server is running at {CHIBIBOORU_API_URL}")
+        return 1
+    print(f"✓ API connection successful - loaded {len(TAG_CATEGORIES)} categories\n")
 
     # Test LLM connection
     print("Testing LLM connection...")

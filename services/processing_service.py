@@ -1081,6 +1081,7 @@ def process_image_file(filepath, move_from_ingest=False):
                     # Note: Original image download happens earlier in process_image_file() if needed
 
         # Run local tagger based on configuration
+        pixiv_found = 'pixiv' in all_results
         if config.LOCAL_TAGGER_ALWAYS_RUN:
             # Always run mode: Run local tagger on ALL images for prediction storage
             print(f"Running local AI tagger for prediction storage...")
@@ -1094,6 +1095,16 @@ def process_image_file(filepath, move_from_ingest=False):
                     print(f"Tagged with Local Tagger (complementing {list(all_results.keys())[0]}): {tag_count} display tags, {pred_count} stored predictions.")
                 else:
                     print(f"Tagged with Local Tagger (primary source): {tag_count} display tags, {pred_count} stored predictions.")
+        elif pixiv_found and config.LOCAL_TAGGER_COMPLEMENT_PIXIV:
+            # Pixiv complement mode: Always run local tagger to complement Pixiv tags
+            print(f"Pixiv source detected, running local AI tagger to complement tags...")
+            local_tagger_result = tag_with_local_tagger(filepath)
+            used_local_tagger = True
+            if local_tagger_result:
+                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
+                pred_count = len(local_tagger_result['data'].get('all_predictions', []))
+                print(f"Tagged with Local Tagger (complementing Pixiv): {tag_count} display tags, {pred_count} stored predictions.")
         elif not all_results:
             # Fallback mode: Only run local tagger if no online sources found
             print(f"No online sources found, using local AI tagger as fallback...")

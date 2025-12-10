@@ -155,6 +155,11 @@ ENABLE_DEDUPLICATION = True  # MD5-based duplicate detection
 # If False, only runs local tagger as fallback when no online sources are found
 LOCAL_TAGGER_ALWAYS_RUN = os.environ.get('LOCAL_TAGGER_ALWAYS_RUN', 'false').lower() in ('true', '1', 'yes')
 
+# Pixiv complement behavior
+# If True, always runs local tagger to complement Pixiv tags (even when LOCAL_TAGGER_ALWAYS_RUN is False)
+# Pixiv tags are often incomplete, so this helps add missing tags
+LOCAL_TAGGER_COMPLEMENT_PIXIV = os.environ.get('LOCAL_TAGGER_COMPLEMENT_PIXIV', 'true').lower() in ('true', '1', 'yes')
+
 # ==================== SIMILARITY CALCULATION ====================
 
 # Similarity calculation method
