@@ -3,6 +3,12 @@ from database import models
 from database import get_db_connection
 from services import processing_service as processing
 from utils import get_thumbnail_path
+from utils.tag_extraction import (
+    extract_tags_from_source,
+    extract_rating_from_source,
+    merge_tag_sources,
+    deduplicate_categorized_tags
+)
 import os
 import json
 import random
@@ -351,61 +357,22 @@ async def retry_tagging_service():
                 source_name = src
                 break
 
-        # Extract tags from the primary source
-        tags_character, tags_copyright, tags_artist, tags_species, tags_meta, tags_general = "", "", "", "", "", ""
+        # Extract tags from primary source using centralized utility
+        categorized_tags = extract_tags_from_source(primary_source_data, source_name)
 
-        if source_name == 'danbooru':
-            tags_character = primary_source_data.get("tag_string_character", "")
-            tags_copyright = primary_source_data.get("tag_string_copyright", "")
-            tags_artist = primary_source_data.get("tag_string_artist", "")
-            tags_meta = primary_source_data.get("tag_string_meta", "")
-            tags_general = primary_source_data.get("tag_string_general", "")
-        elif source_name in ['e621', 'local_tagger', 'pixiv']:
-            tags = primary_source_data.get("tags", {})
-            
-            # Helper to get list from tags dict
-            t_char = tags.get("character", [])
-            t_copy = tags.get("copyright", [])
-            t_art = tags.get("artist", [])
-            t_spec = tags.get("species", [])
-            t_meta = tags.get("meta", [])
-            t_gen = tags.get("general", [])
-
-            # If Pixiv is the source, complement with local tagger tags
-            if source_name == 'pixiv' and 'local_tagger' in all_results:
-                print("[Retry Tagging] Merging local tagger tags into Pixiv tags...")
-                local_tags = all_results['local_tagger'].get('tags', {})
-                t_char = list(t_char) + list(local_tags.get("character", []))
-                t_copy = list(t_copy) + list(local_tags.get("copyright", []))
-                t_spec = list(t_spec) + list(local_tags.get("species", []))
-                t_meta = list(t_meta) + list(local_tags.get("meta", []))
-                t_gen = list(t_gen) + list(local_tags.get("general", []))
-
-            tags_character = " ".join(t_char)
-            tags_copyright = " ".join(t_copy)
-            tags_artist = " ".join(t_art)
-            tags_species = " ".join(t_spec)
-            tags_meta = " ".join(t_meta)
-            tags_general = " ".join(t_gen)
+        # Special case: If Pixiv is the source, merge with local tagger tags
+        if source_name == 'pixiv' and 'local_tagger' in all_results:
+            print("[Retry Tagging] Merging local tagger tags into Pixiv tags...")
+            local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
+            # Merge all categories except artist (Pixiv artist is usually accurate)
+            categorized_tags = merge_tag_sources(
+                categorized_tags,
+                local_tagger_tags,
+                merge_categories=['character', 'copyright', 'species', 'meta', 'general']
+            )
 
         # Deduplicate tags across categories
-        character_set = set(tags_character.split())
-        copyright_set = set(tags_copyright.split())
-        artist_set = set(tags_artist.split())
-        species_set = set(tags_species.split())
-        meta_set = set(tags_meta.split())
-        general_set = set(tags_general.split())
-
-        general_set -= (character_set | copyright_set | artist_set | meta_set | species_set)
-
-        categorized_tags = {
-            'tags_character': ' '.join(sorted(character_set)),
-            'tags_copyright': ' '.join(sorted(copyright_set)),
-            'tags_artist': ' '.join(sorted(artist_set)),
-            'tags_species': ' '.join(sorted(species_set)),
-            'tags_meta': ' '.join(sorted(meta_set)),
-            'tags_general': ' '.join(sorted(general_set))
-        }
+        categorized_tags = deduplicate_categorized_tags(categorized_tags)
 
         # Update the database
         with get_db_connection() as conn:
@@ -708,60 +675,22 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                     source_name = src
                     break
 
-            # Extract and update tags (same as single retry)
-            tags_character, tags_copyright, tags_artist, tags_species, tags_meta, tags_general = "", "", "", "", "", ""
+            # Extract tags from primary source using centralized utility
+            categorized_tags = extract_tags_from_source(primary_source_data, source_name)
 
-            if source_name == 'danbooru':
-                tags_character = primary_source_data.get("tag_string_character", "")
-                tags_copyright = primary_source_data.get("tag_string_copyright", "")
-                tags_artist = primary_source_data.get("tag_string_artist", "")
-                tags_meta = primary_source_data.get("tag_string_meta", "")
-                tags_general = primary_source_data.get("tag_string_general", "")
-            elif source_name in ['e621', 'local_tagger', 'pixiv']:
-                tags = primary_source_data.get("tags", {})
-                
-                # Helper to get list from tags dict
-                t_char = tags.get("character", [])
-                t_copy = tags.get("copyright", [])
-                t_art = tags.get("artist", [])
-                t_spec = tags.get("species", [])
-                t_meta = tags.get("meta", [])
-                t_gen = tags.get("general", [])
+            # Special case: If Pixiv is the source, merge with local tagger tags
+            if source_name == 'pixiv' and 'local_tagger' in all_results:
+                print("[Bulk Retry Tagging] Merging local tagger tags into Pixiv tags...")
+                local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
+                # Merge all categories except artist (Pixiv artist is usually accurate)
+                categorized_tags = merge_tag_sources(
+                    categorized_tags,
+                    local_tagger_tags,
+                    merge_categories=['character', 'copyright', 'species', 'meta', 'general']
+                )
 
-                # If Pixiv is the source, complement with local tagger tags
-                if source_name == 'pixiv' and 'local_tagger' in all_results:
-                    print("[Bulk Retry Tagging] Merging local tagger tags into Pixiv tags...")
-                    local_tags = all_results['local_tagger'].get('tags', {})
-                    t_char = list(t_char) + list(local_tags.get("character", []))
-                    t_copy = list(t_copy) + list(local_tags.get("copyright", []))
-                    t_spec = list(t_spec) + list(local_tags.get("species", []))
-                    t_meta = list(t_meta) + list(local_tags.get("meta", []))
-                    t_gen = list(t_gen) + list(local_tags.get("general", []))
-
-                tags_character = " ".join(t_char)
-                tags_copyright = " ".join(t_copy)
-                tags_artist = " ".join(t_art)
-                tags_species = " ".join(t_spec)
-                tags_meta = " ".join(t_meta)
-                tags_general = " ".join(t_gen)
-
-            # Deduplicate tags
-            character_set = set(tags_character.split())
-            copyright_set = set(tags_copyright.split())
-            artist_set = set(tags_artist.split())
-            species_set = set(tags_species.split())
-            meta_set = set(tags_meta.split())
-            general_set = set(tags_general.split())
-            general_set -= (character_set | copyright_set | artist_set | meta_set | species_set)
-
-            categorized_tags = {
-                'tags_character': ' '.join(sorted(character_set)),
-                'tags_copyright': ' '.join(sorted(copyright_set)),
-                'tags_artist': ' '.join(sorted(artist_set)),
-                'tags_species': ' '.join(sorted(species_set)),
-                'tags_meta': ' '.join(sorted(meta_set)),
-                'tags_general': ' '.join(sorted(general_set))
-            }
+            # Deduplicate tags across categories
+            categorized_tags = deduplicate_categorized_tags(categorized_tags)
 
             # Update database
             with get_db_connection() as conn:

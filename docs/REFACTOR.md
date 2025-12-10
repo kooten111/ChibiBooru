@@ -2746,19 +2746,21 @@ def invalidate_all_caches():
     - [x] Test pilot endpoints manually ✅ **20 tests passing**
     - [x] Run full test suite ✅ **All API response tests passing**
     
-    ### Phase 2 Checklist
-    
-    - [ ] Create `utils/tag_extraction.py`
+    ### Phase 2 Checklist - Tag Extraction ✅ **COMPLETED**
+
+    - [x] Create `utils/tag_extraction.py` ✅ **COMPLETED**
+    - [x] Update `utils/__init__.py` exports ✅ **COMPLETED**
+    - [x] Refactor `services/processing_service.py` ✅ **COMPLETED** (~54 lines → ~28 lines)
+    - [x] Refactor `services/image_service.py` ✅ **COMPLETED** (2 locations refactored)
+    - [x] Refactor `database/models.py` ✅ **COMPLETED**
+    - [x] Refactor `services/switch_source_db.py` ✅ **COMPLETED** (~111 lines → ~51 lines)
+    - [x] Run full test suite ✅ **All 20 tests passing**
+
+    #### Deferred to Future Phase:
     - [ ] Add tag database utilities
     - [ ] Add path utilities to `utils/file_utils.py`
     - [ ] Create `static/js/utils/path-utils.js`
-    - [ ] Update `utils/__init__.py` exports
-    - [ ] Refactor `services/processing_service. py`
-    - [ ] Refactor `services/image_service.py`
-    - [ ] Refactor `database/models. py`
-    - [ ] Refactor `services/switch_source_db.py`
     - [ ] Update JavaScript files to use path-utils
-    - [ ] Run full test suite
     
     ### Phase 3 Checklist
     

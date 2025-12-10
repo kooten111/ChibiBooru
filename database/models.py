@@ -5,6 +5,10 @@ import sqlite3
 from tqdm import tqdm
 from .core import get_db_connection
 from functools import lru_cache
+from utils.tag_extraction import (
+    extract_tags_from_source,
+    extract_rating_from_source
+)
 
 from core.cache_manager import (
     tag_counts,
@@ -147,31 +151,18 @@ def repopulate_from_database():
                 if src in source_map:
                     cur.execute("INSERT OR IGNORE INTO image_sources (image_id, source_id) VALUES (?, ?)", (image_id, source_map[src]))
 
-            categorized_tags = {}
-            if source_name == 'danbooru':
-                categorized_tags = {
-                    'character': primary_source_data.get("tag_string_character", "").split(),
-                    'copyright': primary_source_data.get("tag_string_copyright", "").split(),
-                    'artist': primary_source_data.get("tag_string_artist", "").split(),
-                    'meta': primary_source_data.get("tag_string_meta", "").split(),
-                    'general': primary_source_data.get("tag_string_general", "").split(),
-                }
-            elif source_name == 'e621':
-                tags = primary_source_data.get("tags", {})
-                categorized_tags = {
-                    'character': tags.get("character", []), 'copyright': tags.get("copyright", []),
-                    'artist': tags.get("artist", []), 'species': tags.get("species", []),
-                    'meta': tags.get("meta", []), 'general': tags.get("general", [])
-                }
-            elif source_name == 'local_tagger' or source_name == 'camie_tagger':
-                tags = primary_source_data.get("tags", {})
-                categorized_tags = {
-                    'character': tags.get("character", []),
-                    'copyright': tags.get("copyright", []),
-                    'artist': tags.get("artist", []),
-                    'meta': tags.get("meta", []),
-                    'general': tags.get("general", [])
-                }
+            # Extract tags from primary source using centralized utility
+            extracted_tags = extract_tags_from_source(primary_source_data, source_name)
+
+            # Convert to list format expected by this function
+            categorized_tags = {
+                'character': extracted_tags['tags_character'].split(),
+                'copyright': extracted_tags['tags_copyright'].split(),
+                'artist': extracted_tags['tags_artist'].split(),
+                'species': extracted_tags['tags_species'].split(),
+                'meta': extracted_tags['tags_meta'].split(),
+                'general': extracted_tags['tags_general'].split()
+            }
 
             for category, tags_list in categorized_tags.items():
                 for tag_name in tags_list:
@@ -189,32 +180,15 @@ def repopulate_from_database():
                     tag_id = cur.fetchone()['id']
                     cur.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
 
-            # Extract and insert rating if present
-            if 'rating' in primary_source_data:
-                rating_char = primary_source_data.get('rating', '').lower()
-                # Map single-letter ratings to full tag names
-                rating_map = {
-                    'g': 'rating:general',
-                    's': 'rating:sensitive',
-                    'q': 'rating:questionable',
-                    'e': 'rating:explicit'
-                }
-                rating_tag = rating_map.get(rating_char)
+            # Extract and insert rating using centralized utility
+            rating_tag, rating_source = extract_rating_from_source(primary_source_data, source_name)
 
-                if rating_tag:
-                    # Determine source trust level
-                    if source_name in ['danbooru', 'e621']:
-                        rating_source = 'original'  # Trusted source
-                    elif source_name in ['local_tagger', 'camie_tagger']:
-                        rating_source = 'ai_inference'  # Less trusted
-                    else:
-                        rating_source = 'original'  # Default
-
-                    # Insert rating tag
-                    cur.execute("INSERT INTO tags (name, category) VALUES (?, 'meta') ON CONFLICT(name) DO UPDATE SET category='meta'", (rating_tag,))
-                    cur.execute("SELECT id FROM tags WHERE name = ?", (rating_tag,))
-                    tag_id = cur.fetchone()['id']
-                    cur.execute("INSERT OR REPLACE INTO image_tags (image_id, tag_id, source) VALUES (?, ?, ?)", (image_id, tag_id, rating_source))
+            if rating_tag and rating_source:
+                # Insert rating tag
+                cur.execute("INSERT INTO tags (name, category) VALUES (?, 'meta') ON CONFLICT(name) DO UPDATE SET category='meta'", (rating_tag,))
+                cur.execute("SELECT id FROM tags WHERE name = ?", (rating_tag,))
+                tag_id = cur.fetchone()['id']
+                cur.execute("INSERT OR REPLACE INTO image_tags (image_id, tag_id, source) VALUES (?, ?, ?)", (image_id, tag_id, rating_source))
 
             # Commit in batches to reduce lock time
             batch_count += 1
