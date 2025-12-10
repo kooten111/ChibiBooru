@@ -158,10 +158,11 @@ class InfiniteScroll {
 
             // URL-encode the path to handle non-ASCII characters (Japanese, etc.)
             const encodedPath = img.path.split('/').map(part => encodeURIComponent(part)).join('/');
+            const encodedThumb = img.thumb.split('/').map(part => encodeURIComponent(part)).join('/');
 
             thumbnail.innerHTML = `
                 <a href="/view/${encodedPath}">
-                    <img src="/static/${img.thumb}" alt="Image" loading="lazy" onload="this.closest('.thumbnail').classList.add('has-image')">
+                    <img src="/static/${encodedThumb}" alt="Image" loading="lazy" onload="this.closest('.thumbnail').classList.add('has-image')">
                 </a>
             `;
 
