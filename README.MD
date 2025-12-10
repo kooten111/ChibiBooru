@@ -16,10 +16,10 @@ A self-hosted booru type app for organizing and browsing your local image collec
 
 ## Screenshots
 
-![Main gallery interface showing the image grid layout with search and filtering options](screenshots/gallery_view.png)
+![Main gallery interface showing the image grid layout with search and filtering options](screenshots/gallery_view.webp)
 *Gallery view with rating:general filter showing safe content*
 
-![Image detail page displaying the full image, metadata, tags, and related information](screenshots/image_detail_view.png)
+![Image detail page displaying the full image, metadata, tags, and related information](screenshots/image_detail_view.webp)
 *Image detail page with tag editor and metadata viewer*
 
 ---
