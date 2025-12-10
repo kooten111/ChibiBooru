@@ -7,31 +7,45 @@ from utils import api_handler
 import asyncio
 
 @api_blueprint.route('/images')
+@api_handler()
 async def get_images():
+    """Get paginated images for infinite scroll."""
     return image_service.get_images_for_api()
 
 @api_blueprint.route('/edit_tags', methods=['POST'])
+@api_handler()
 async def edit_tags():
+    """Edit tags for an image with category support."""
     return await tag_service.edit_tags_service()
 
 @api_blueprint.route('/delete_image', methods=['POST'])
+@api_handler()
 async def delete_image():
+    """Delete an image and its associated data."""
     return await image_service.delete_image_service()
 
 @api_blueprint.route('/delete_images_bulk', methods=['POST'])
+@api_handler()
 async def delete_images_bulk():
+    """Delete multiple images in bulk."""
     return await image_service.delete_images_bulk_service()
 
 @api_blueprint.route('/download_images_bulk', methods=['POST'])
+@api_handler()
 async def download_images_bulk():
+    """Download multiple images as a zip file."""
     return await image_service.download_images_bulk_service()
 
 @api_blueprint.route('/retry_tagging', methods=['POST'])
+@api_handler()
 async def retry_tagging():
+    """Retry tagging for a single image."""
     return await image_service.retry_tagging_service()
 
 @api_blueprint.route('/bulk_retry_tagging', methods=['POST'])
+@api_handler()
 async def bulk_retry_tagging():
+    """Retry tagging for multiple images in bulk."""
     return await image_service.bulk_retry_tagging_service()
 
 @api_blueprint.route('/switch_source', methods=['POST'])

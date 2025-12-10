@@ -25,5 +25,7 @@ async def fetch_tags():
     }
 
 @api_blueprint.route('/autocomplete')
+@api_handler()
 async def autocomplete():
+    """Get autocomplete suggestions for tags."""
     return tag_service.autocomplete()
