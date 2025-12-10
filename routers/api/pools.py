@@ -1,6 +1,7 @@
 from quart import request, jsonify
 from . import api_blueprint
 from database import models
+from utils.api_responses import success_response, error_response, not_found_response, server_error_response
 
 @api_blueprint.route('/pools/create', methods=['POST'])
 async def create_pool():
@@ -10,13 +11,16 @@ async def create_pool():
         description = data.get('description', '').strip()
 
         if not name:
-            return jsonify({"error": "Pool name is required"}), 400
+            return error_response("Pool name is required", 400)
 
         pool_id = models.create_pool(name, description)
-        return jsonify({"status": "success", "pool_id": pool_id, "message": f"Pool '{name}' created successfully."})
+        return success_response(
+            data={"pool_id": pool_id},
+            message=f"Pool '{name}' created successfully."
+        )
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return server_error_response(e)
 
 @api_blueprint.route('/pools/<int:pool_id>/update', methods=['POST'])
 async def update_pool(pool_id):
@@ -26,13 +30,13 @@ async def update_pool(pool_id):
         description = data.get('description')
 
         if not name and not description:
-            return jsonify({"error": "At least one field (name or description) is required"}), 400
+            return error_response("At least one field (name or description) is required", 400)
 
         models.update_pool(pool_id, name, description)
-        return jsonify({"status": "success", "message": "Pool updated successfully."})
+        return success_response(message="Pool updated successfully.")
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return server_error_response(e)
 
 @api_blueprint.route('/pools/<int:pool_id>/delete', methods=['POST'])
 async def delete_pool(pool_id):
@@ -52,14 +56,14 @@ async def add_image_to_pool(pool_id):
         # Get image ID from filepath
         image_data = models.get_image_details(filepath)
         if not image_data:
-            return jsonify({"error": "Image not found"}), 404
+            return not_found_response("Image not found")
 
         image_id = image_data['id']
         models.add_image_to_pool(pool_id, image_id)
-        return jsonify({"status": "success", "message": "Image added to pool."})
+        return success_response(message="Image added to pool.")
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return server_error_response(e)
 
 @api_blueprint.route('/pools/<int:pool_id>/remove_image', methods=['POST'])
 async def remove_image_from_pool(pool_id):
