@@ -514,3 +514,24 @@ function toggleDebugOptions() {
     debugOptions.classList.toggle('open');
     toggleButton.classList.toggle('expanded');
 }
+
+// Export functions to global scope for onclick handlers
+window.toggleDebugOptions = toggleDebugOptions;
+window.systemScanImages = systemScanImages;
+window.systemReloadData = systemReloadData;
+window.systemRebuildTags = systemRebuildTags;
+window.systemRebuildCategorized = systemRebuildCategorized;
+window.systemRecategorizeTags = systemRecategorizeTags;
+window.systemGenerateThumbnails = systemGenerateThumbnails;
+window.systemDeduplicate = systemDeduplicate;
+window.systemCleanOrphans = systemCleanOrphans;
+window.systemApplyMergedSources = systemApplyMergedSources;
+window.systemRecountTags = systemRecountTags;
+window.systemReindexDatabase = systemReindexDatabase;
+window.systemBulkRetagLocal = systemBulkRetagLocal;
+window.systemBulkRetryTagging = systemBulkRetryTagging;
+window.systemDatabaseHealthCheck = systemDatabaseHealthCheck;
+window.systemStartMonitor = systemStartMonitor;
+window.systemStopMonitor = systemStopMonitor;
+window.saveSystemSecret = saveSystemSecret;
+window.clearSystemSecret = clearSystemSecret;

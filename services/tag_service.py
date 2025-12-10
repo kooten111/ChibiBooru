@@ -95,7 +95,13 @@ def autocomplete():
             ("order:new", "Newest first", "order"),
             ("order:newest", "Newest first", "newest"),
             ("order:old", "Oldest first", "old"),
-            ("order:oldest", "Oldest first", "oldest")
+            ("order:oldest", "Oldest first", "oldest"),
+            ("order:score", "Highest score first", "score"),
+            ("order:score_desc", "Highest score first", "score"),
+            ("order:score_asc", "Lowest score first", "score"),
+            ("order:fav", "Most favorited first", "fav"),
+            ("order:fav_desc", "Most favorited first", "fav"),
+            ("order:fav_asc", "Least favorited first", "fav")
         ]
 
         for tag, display, keyword in filters:

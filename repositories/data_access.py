@@ -558,6 +558,37 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
                 "INSERT INTO raw_metadata (image_id, data) VALUES (?, ?)",
                 (image_id, json.dumps(raw_metadata_dict))
             )
+
+            # 4.5. Extract and populate score and fav_count from metadata
+            score = None
+            fav_count = None
+            if raw_metadata_dict and 'sources' in raw_metadata_dict:
+                sources = raw_metadata_dict['sources']
+                # Check danbooru first
+                if 'danbooru' in sources:
+                    source = sources['danbooru']
+                    if 'score' in source:
+                        score_val = source['score']
+                        if isinstance(score_val, dict) and 'total' in score_val:
+                            score = score_val['total']
+                        elif isinstance(score_val, (int, float)):
+                            score = int(score_val)
+                    if 'fav_count' in source:
+                        fav_count = int(source['fav_count'])
+                # Check e621 if not found in danbooru
+                if score is None and 'e621' in sources:
+                    source = sources['e621']
+                    if 'score' in source:
+                        score_val = source['score']
+                        if isinstance(score_val, dict) and 'total' in score_val:
+                            score = score_val['total']
+                        elif isinstance(score_val, (int, float)):
+                            score = int(score_val)
+                if fav_count is None and 'e621' in sources:
+                    source = sources['e621']
+                    if 'fav_count' in source:
+                        fav_count = int(source['fav_count'])
+
             # 5. Populate categorized tag columns in images table
             tag_columns = {
                 'character': 'tags_character',
@@ -581,7 +612,9 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
                     tags_artist = ?,
                     tags_species = ?,
                     tags_meta = ?,
-                    tags_general = ?
+                    tags_general = ?,
+                    score = ?,
+                    fav_count = ?
                 WHERE id = ?
             """, (
                 update_values.get('tags_character'),
@@ -590,6 +623,8 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
                 update_values.get('tags_species'),
                 update_values.get('tags_meta'),
                 update_values.get('tags_general'),
+                score,
+                fav_count,
                 image_id
             ))
 

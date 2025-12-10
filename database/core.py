@@ -65,7 +65,9 @@ def initialize_database():
             'tags_artist': 'TEXT',
             'tags_species': 'TEXT',
             'tags_meta': 'TEXT',
-            'tags_general': 'TEXT'
+            'tags_general': 'TEXT',
+            'score': 'INTEGER',
+            'fav_count': 'INTEGER'
         }
 
         cur.execute("PRAGMA table_info(images);")
@@ -314,6 +316,8 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_active_source ON images(active_source)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_relationships ON images(parent_id, has_children)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_ingested_at ON images(ingested_at DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_score ON images(score DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_fav_count ON images(fav_count DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name_lower ON tags(LOWER(name))")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")

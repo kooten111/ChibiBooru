@@ -352,7 +352,27 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
                     })
 
             # Apply ordering if specified
-            if order_filter and order_filter in ['new', 'ingested', 'newest', 'recent']:
+            if order_filter and order_filter in ['score_desc', 'score', 'score_asc', 'fav_desc', 'fav', 'fav_asc']:
+                # Sort by score or favorites
+                filepath_to_value = {}
+                for img in results:
+                    cursor = conn.execute(
+                        "SELECT score, fav_count FROM images WHERE filepath = ?",
+                        (img['filepath'],)
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        if 'score' in order_filter:
+                            filepath_to_value[img['filepath']] = row['score'] if row['score'] is not None else -999999
+                        else:  # fav
+                            filepath_to_value[img['filepath']] = row['fav_count'] if row['fav_count'] is not None else -999999
+                    else:
+                        filepath_to_value[img['filepath']] = -999999
+
+                # Sort by value (default descending, unless _asc suffix)
+                reverse = not order_filter.endswith('_asc')
+                results = sorted(results, key=lambda x: filepath_to_value.get(x['filepath'], -999999), reverse=reverse)
+            elif order_filter and order_filter in ['new', 'ingested', 'newest', 'recent']:
                 # Sort by ingested_at (newest first)
                 filepath_to_timestamp = {}
                 for img in results:
@@ -435,23 +455,29 @@ def perform_search(search_query):
                 relationship_filter = 'any' if rel_type == 'relationship' else rel_type
         elif token.startswith('-'):
             # Negative search: exclude this term
+            # Keep the full term including any colons (e.g., -rating:explicit)
             negative_terms.append(token[1:])
         elif token.startswith('"') or (general_terms and general_terms[-1].startswith('"') and not general_terms[-1].endswith('"')):
             # Quoted phrase - switch to freetext mode
             freetext_mode = True
             general_terms.append(token)
         elif ':' in token:
-            # Check if it's a category filter (e.g., character:holo)
-            parts = token.split(':', 1)
-            category = parts[0]
-            tag = parts[1]
-            if category in valid_categories and tag:
-                if category not in category_filters:
-                    category_filters[category] = []
-                category_filters[category].append(tag)
-            else:
-                # Not a valid category, treat as general term
+            # Check if it's a rating tag (special case - not a category filter)
+            if token.startswith('rating:'):
+                # Rating tags like "rating:general" are stored as-is, not split
                 general_terms.append(token)
+            else:
+                # Check if it's a category filter (e.g., character:holo)
+                parts = token.split(':', 1)
+                category = parts[0]
+                tag = parts[1]
+                if category in valid_categories and tag:
+                    if category not in category_filters:
+                        category_filters[category] = []
+                    category_filters[category].append(tag)
+                else:
+                    # Not a valid category, treat as general term
+                    general_terms.append(token)
         else:
             general_terms.append(token)
 
@@ -655,7 +681,29 @@ def perform_search(search_query):
         should_shuffle = bool(general_terms) and not (source_filters or filename_filter or extension_filter)
 
     # Apply ordering if specified
-    if order_filter and order_filter in ['new', 'ingested', 'newest', 'recent']:
+    if order_filter and order_filter in ['score_desc', 'score', 'score_asc', 'fav_desc', 'fav', 'fav_asc']:
+        # Sort by score or favorites
+        with get_db_connection() as conn:
+            filepath_to_value = {}
+            for img in results:
+                cursor = conn.execute(
+                    "SELECT score, fav_count FROM images WHERE filepath = ?",
+                    (img['filepath'],)
+                )
+                row = cursor.fetchone()
+                if row:
+                    if 'score' in order_filter:
+                        filepath_to_value[img['filepath']] = row['score'] if row['score'] is not None else -999999
+                    else:  # fav
+                        filepath_to_value[img['filepath']] = row['fav_count'] if row['fav_count'] is not None else -999999
+                else:
+                    filepath_to_value[img['filepath']] = -999999
+
+            # Sort by value (default descending, unless _asc suffix)
+            reverse = not order_filter.endswith('_asc')
+            results = sorted(results, key=lambda x: filepath_to_value.get(x['filepath'], -999999), reverse=reverse)
+            should_shuffle = False
+    elif order_filter and order_filter in ['new', 'ingested', 'newest', 'recent']:
         # Sort by ingested_at (newest first)
         with get_db_connection() as conn:
             # Get ingested_at timestamps for all results
