@@ -11,6 +11,24 @@ from utils.logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def _validate_tag_name(tag_name: str) -> str:
+    """
+    Validate and normalize tag name.
+    
+    Args:
+        tag_name: Tag name to validate
+        
+    Returns:
+        Stripped tag name
+        
+    Raises:
+        ValueError: If tag name is empty or invalid
+    """
+    if not tag_name or not tag_name.strip():
+        raise ValueError("Tag name cannot be empty")
+    return tag_name.strip()
+
+
 def insert_tag(tag_name: str, category: str = None) -> int:
     """
     Insert a tag and return its ID.
@@ -25,10 +43,7 @@ def insert_tag(tag_name: str, category: str = None) -> int:
     Raises:
         ValueError: If tag_name is empty or invalid
     """
-    if not tag_name or not tag_name.strip():
-        raise ValueError("Tag name cannot be empty")
-    
-    tag_name = tag_name.strip()
+    tag_name = _validate_tag_name(tag_name)
     
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -133,13 +148,11 @@ def update_tag_category(tag_name: str, category: str) -> bool:
     Raises:
         ValueError: If tag_name or category is empty
     """
-    if not tag_name or not tag_name.strip():
-        raise ValueError("Tag name cannot be empty")
+    tag_name = _validate_tag_name(tag_name)
     
     if not category or not category.strip():
         raise ValueError("Category cannot be empty")
     
-    tag_name = tag_name.strip()
     category = category.strip()
     
     with get_db_connection() as conn:

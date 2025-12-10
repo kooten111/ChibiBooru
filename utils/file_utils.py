@@ -140,8 +140,11 @@ def normalize_image_path(path: str) -> str:
     if not path:
         return path
     
-    # Remove 'images/' prefix if present (case-insensitive)
-    normalized = path.replace("images/", "", 1).replace("Images/", "", 1)
+    # Remove 'images/' or 'Images/' prefix if present (case-insensitive, only first occurrence)
+    if path.lower().startswith("images/"):
+        normalized = path[7:]  # Remove 'images/' prefix (7 characters)
+    else:
+        normalized = path
     
     # Remove leading slashes
     normalized = normalized.lstrip('/')
