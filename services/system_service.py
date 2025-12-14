@@ -275,6 +275,15 @@ def recategorize_service():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def validate_secret_service():
+    """Service to validate if the provided secret matches RELOAD_SECRET."""
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+
+    if secret and secret == RELOAD_SECRET:
+        return jsonify({"success": True, "valid": True})
+    else:
+        return jsonify({"success": True, "valid": False})
+
 def get_system_status():
     """Service to get system status, including monitor status."""
     monitor_status = monitor_service.get_status()

@@ -4,6 +4,27 @@ import { showNotification } from './utils/notifications.js';
 var systemStatusInterval = null;
 var SYSTEM_SECRET = localStorage.getItem('system_secret');
 
+async function validateStoredSecret() {
+    if (!SYSTEM_SECRET) return;
+
+    try {
+        const response = await fetch(`/api/system/validate_secret?secret=${encodeURIComponent(SYSTEM_SECRET)}`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (!data.success || !data.valid) {
+            // Stored secret is invalid, clear it
+            SYSTEM_SECRET = null;
+            localStorage.removeItem('system_secret');
+            console.log('Stored secret was invalid and has been cleared');
+        }
+    } catch (err) {
+        console.error('Error validating stored secret:', err);
+    }
+}
+
 function updateSecretUI() {
     const secretSection = document.getElementById('secretSection');
     const actionsSection = document.getElementById('systemActionsSection');
@@ -35,7 +56,7 @@ function updateSecretUI() {
     }
 }
 
-function saveSystemSecret() {
+async function saveSystemSecret() {
     const input = document.getElementById('secretInput');
     if (!input) return;
 
@@ -45,12 +66,36 @@ function saveSystemSecret() {
         return;
     }
 
-    SYSTEM_SECRET = secret;
-    localStorage.setItem('system_secret', secret);
-    showNotification('Secret saved successfully', 'success');
-    updateSecretUI();
-    loadSystemStatus();
-    loadLogs();
+    // Disable input while validating
+    input.disabled = true;
+
+    try {
+        // Validate the secret with the backend
+        const response = await fetch(`/api/system/validate_secret?secret=${encodeURIComponent(secret)}`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.valid) {
+            // Secret is valid, save it
+            SYSTEM_SECRET = secret;
+            localStorage.setItem('system_secret', secret);
+            showNotification('Secret saved successfully', 'success');
+            updateSecretUI();
+            loadSystemStatus();
+            loadLogs();
+        } else {
+            // Secret is invalid
+            showNotification('Invalid system secret', 'error');
+            input.value = '';
+        }
+    } catch (err) {
+        console.error('Error validating secret:', err);
+        showNotification('Error validating secret', 'error');
+    } finally {
+        input.disabled = false;
+    }
 }
 
 function clearSystemSecret(event) {
@@ -481,9 +526,12 @@ function systemStopMonitor(event) {
 
 // Auto-refresh status when system panel is open
 document.addEventListener('DOMContentLoaded', () => {
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver(async () => {
         const systemPanel = document.getElementById('system-panel');
         if (systemPanel && systemPanel.classList.contains('active')) {
+            // Validate stored secret first
+            await validateStoredSecret();
+
             updateSecretUI();
             if (!systemStatusInterval && SYSTEM_SECRET) {
                 loadSystemStatus();

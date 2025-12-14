@@ -7,7 +7,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let dragCounter = 0;
     let dragTimeout = null;
+    let uploadTimeout = null;
     const DRAG_DELAY = 300; // milliseconds to wait before showing drop zone
+    const UPLOAD_DELAY = 1000; // milliseconds to wait before uploading (cancellable)
 
     window.addEventListener('dragenter', (e) => {
         e.preventDefault();
@@ -48,11 +50,36 @@ document.addEventListener('DOMContentLoaded', () => {
             dragTimeout = null;
         }
 
-        dropZone.classList.remove('active');
-
         const files = e.dataTransfer.files;
         if (files.length > 0) {
-            handleFileUpload(files);
+            // Show confirmation message
+            const imageCount = Array.from(files).filter(f => f.type.startsWith('image/')).length;
+            if (imageCount === 0) {
+                dropZone.classList.remove('active');
+                return;
+            }
+
+            dropZone.innerHTML = `<div>Upload ${imageCount} image(s)? <span style="font-size: 0.9em; opacity: 0.8;">(Cancelling...)</span></div>`;
+
+            // Set upload timeout
+            uploadTimeout = setTimeout(() => {
+                dropZone.classList.remove('active');
+                dropZone.innerHTML = '<div>Drop files anywhere to upload</div>';
+                handleFileUpload(files);
+            }, UPLOAD_DELAY);
+        } else {
+            dropZone.classList.remove('active');
+        }
+    });
+
+    // Cancel upload if user clicks the drop zone during countdown
+    dropZone.addEventListener('click', () => {
+        if (uploadTimeout) {
+            clearTimeout(uploadTimeout);
+            uploadTimeout = null;
+            dropZone.classList.remove('active');
+            dropZone.innerHTML = '<div>Drop files anywhere to upload</div>';
+            showNotification('Upload cancelled', 'info');
         }
     });
 

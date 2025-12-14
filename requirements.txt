@@ -54,9 +54,9 @@ numpy>=2.2.0,<3.0.0
 # AI/ML - Optional for Local Tagging
 # ----------------------------------------------------------------------------
 # Uncomment these if you want to use local AI tagging with ONNX models
-# onnxruntime>=1.23.2,<2.0.0
-# torchvision>=0.24.0,<0.25.0
-# torch>=2.9.0,<3.0.0
+onnxruntime>=1.23.2,<2.0.0
+torchvision>=0.24.0,<0.25.0
+torch>=2.9.0,<3.0.0
 
 # ----------------------------------------------------------------------------
 # File System & Monitoring

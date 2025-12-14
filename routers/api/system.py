@@ -10,6 +10,12 @@ async def reload_data():
     """Reload data from the database."""
     return await asyncio.to_thread(system_service.reload_data)
 
+@api_blueprint.route('/system/validate_secret', methods=['POST'])
+@api_handler()
+async def validate_secret():
+    """Validate if the provided secret is correct."""
+    return await asyncio.to_thread(system_service.validate_secret_service)
+
 @api_blueprint.route('/system/status')
 @api_handler()
 async def system_status():

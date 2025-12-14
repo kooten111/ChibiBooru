@@ -19,6 +19,8 @@ from utils.tag_extraction import (
 import time
 from collections import deque
 from threading import Lock
+import fcntl
+import shutil
 
 # Dependencies
 try:
@@ -196,6 +198,37 @@ class AdaptiveSauceNAORateLimiter:
 # Global adaptive SauceNAO rate limiter instance
 saucenao_rate_limiter = AdaptiveSauceNAORateLimiter()
 
+# Lock directory for preventing concurrent processing of the same file across workers
+LOCK_DIR = ".processing_locks"
+os.makedirs(LOCK_DIR, exist_ok=True)
+
+def acquire_processing_lock(md5):
+    """
+    Try to acquire a file-based lock for processing an image with the given MD5.
+    Returns (lock_fd, acquired) where lock_fd is the file descriptor (or None) and acquired is a boolean.
+    """
+    lock_file = os.path.join(LOCK_DIR, f"{md5}.lock")
+    try:
+        fd = open(lock_file, 'w')
+        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return (fd, True)
+    except (IOError, OSError):
+        # Lock is held by another process
+        if 'fd' in locals():
+            fd.close()
+        return (None, False)
+
+def release_processing_lock(lock_fd):
+    """Release a processing lock."""
+    if lock_fd:
+        try:
+            lock_file = lock_fd.name
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+            lock_fd.close()
+            os.remove(lock_file)
+        except:
+            pass
+
 
 def load_local_tagger():
     """Load the local tagger model and metadata if not already loaded."""
@@ -355,6 +388,34 @@ def tag_with_local_tagger(filepath):
         return None
 
 
+def check_ffmpeg_available():
+    """
+    Check if ffmpeg and ffprobe are available in PATH.
+
+    Returns:
+        Tuple of (ffmpeg_path, ffprobe_path) if both found, or (None, None) with error message printed
+    """
+    ffmpeg_path = shutil.which('ffmpeg')
+    ffprobe_path = shutil.which('ffprobe')
+
+    if not ffmpeg_path or not ffprobe_path:
+        missing = []
+        if not ffmpeg_path:
+            missing.append('ffmpeg')
+        if not ffprobe_path:
+            missing.append('ffprobe')
+
+        print(f"[Video Tagger] ERROR: {' and '.join(missing)} not found in PATH.")
+        print(f"[Video Tagger] FFmpeg is required for video processing.")
+        print(f"[Video Tagger] Install it using:")
+        print(f"[Video Tagger]   - Arch/CachyOS: sudo pacman -S ffmpeg")
+        print(f"[Video Tagger]   - Ubuntu/Debian: sudo apt install ffmpeg")
+        print(f"[Video Tagger]   - macOS: brew install ffmpeg")
+        return None, None
+
+    return ffmpeg_path, ffprobe_path
+
+
 def tag_video_with_frames(video_filepath, num_frames=5):
     """
     Tag a video by extracting multiple frames and merging the tags.
@@ -374,12 +435,17 @@ def tag_video_with_frames(video_filepath, num_frames=5):
     import subprocess
     import tempfile
 
+    # Check if ffmpeg/ffprobe are available
+    ffmpeg_path, ffprobe_path = check_ffmpeg_available()
+    if not ffmpeg_path or not ffprobe_path:
+        return None
+
     print(f"[Video Tagger] Extracting {num_frames} frames from: {os.path.basename(video_filepath)}")
 
     try:
         # Get video duration first
         duration_cmd = [
-            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            ffprobe_path, '-v', 'error', '-show_entries', 'format=duration',
             '-of', 'default=noprint_wrappers=1:nokey=1', video_filepath
         ]
         duration_result = subprocess.run(duration_cmd, capture_output=True, text=True, check=True)
@@ -398,7 +464,7 @@ def tag_video_with_frames(video_filepath, num_frames=5):
             try:
                 # Extract frame at timestamp
                 subprocess.run([
-                    'ffmpeg', '-ss', str(timestamp), '-i', video_filepath,
+                    ffmpeg_path, '-ss', str(timestamp), '-i', video_filepath,
                     '-vframes', '1', '-y', temp_frame_path
                 ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -462,10 +528,20 @@ def tag_video_with_frames(video_filepath, num_frames=5):
         }
 
     except subprocess.CalledProcessError as e:
-        print(f"[Video Tagger] ERROR extracting frames: {e}")
+        print(f"[Video Tagger] ERROR: Failed to extract frames from video.")
+        print(f"[Video Tagger] Video file: {os.path.basename(video_filepath)}")
+        print(f"[Video Tagger] Command failed with exit code {e.returncode}")
+        if e.stderr:
+            print(f"[Video Tagger] Error output: {e.stderr.decode('utf-8', errors='ignore').strip()}")
+        print(f"[Video Tagger] The video file may be corrupted or in an unsupported format.")
+        return None
+    except FileNotFoundError as e:
+        print(f"[Video Tagger] ERROR: Required tool not found: {e}")
+        print(f"[Video Tagger] Please ensure ffmpeg and ffprobe are installed and in your PATH.")
         return None
     except Exception as e:
         print(f"[Video Tagger] ERROR during video analysis: {e}")
+        print(f"[Video Tagger] Video file: {os.path.basename(video_filepath)}")
         return None
 
 def extract_tag_data(data, source):
@@ -551,12 +627,20 @@ def ensure_thumbnail(filepath, image_dir="./static/images"):
                 # Extract first frame from video using ffmpeg
                 import subprocess
                 import tempfile
+
+                # Check if ffmpeg is available
+                ffmpeg_path = shutil.which('ffmpeg')
+                if not ffmpeg_path:
+                    print(f"[Thumbnail] ERROR: ffmpeg not found. Cannot create thumbnail for video: {os.path.basename(filepath)}")
+                    print(f"[Thumbnail] Install ffmpeg to enable video thumbnail generation.")
+                    return  # Skip thumbnail creation for this video
+
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
                     temp_frame_path = temp_frame.name
                 try:
                     # Extract frame at 1 seconds
                     subprocess.run([
-                        'ffmpeg', '-i', filepath, '-ss', '1', '-vframes', '1',
+                        ffmpeg_path, '-i', filepath, '-ss', '1', '-vframes', '1',
                         '-y', temp_frame_path
                     ], check=True, capture_output=True)
                     # Now process the extracted frame as an image
@@ -980,6 +1064,12 @@ def process_image_file(filepath, move_from_ingest=False):
         print(f"Error calculating MD5 for {filepath}: {e}")
         return False
 
+    # Acquire lock to prevent concurrent processing of the same MD5
+    lock_fd, acquired = acquire_processing_lock(md5)
+    if not acquired:
+        print(f"File {filename} (MD5: {md5}) is being processed by another worker. Skipping.")
+        return False
+
     # Check for duplicates BEFORE moving the file
     if models.md5_exists(md5):
         print(f"Duplicate detected (MD5: {md5}). Removing file: {filepath}")
@@ -988,6 +1078,7 @@ def process_image_file(filepath, move_from_ingest=False):
             print(f"Removed duplicate file: {filepath}")
         except Exception as e:
             print(f"Error removing duplicate {filepath}: {e}")
+        release_processing_lock(lock_fd)
         return False
 
     # Determine final destination path
@@ -1118,6 +1209,7 @@ def process_image_file(filepath, move_from_ingest=False):
 
     if not all_results:
         print(f"No metadata found for {db_path}")
+        release_processing_lock(lock_fd)
         return False
 
     primary_source_data = None
@@ -1218,7 +1310,8 @@ def process_image_file(filepath, move_from_ingest=False):
                             local_data.get('tagger_name')
                         )
                         print(f"[Local Tagger] Stored {stored_count} predictions for {db_path}")
-        
+
+        release_processing_lock(lock_fd)
         return True
     else:
         # Database insertion failed - likely due to race condition where another process
@@ -1228,4 +1321,5 @@ def process_image_file(filepath, move_from_ingest=False):
         # Just return False to indicate this process didn't add it
         print(f"Failed to add image {db_path} to DB. It might be a duplicate from a concurrent process.")
         print(f"File remains at: {filepath}")
+        release_processing_lock(lock_fd)
         return False
