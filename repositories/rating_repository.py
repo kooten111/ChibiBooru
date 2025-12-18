@@ -222,7 +222,9 @@ def _migrate_weights_from_main_db(model_conn: sqlite3.Connection, main_conn: sql
     # Check if main DB has old schema (tag_name) or new schema (tag_id)
     try:
         main_cur.execute("PRAGMA table_info(rating_tag_weights)")
-        columns = {row['name']: row['type'] for row in main_cur.fetchall()}
+        # PRAGMA table_info returns tuples: (cid, name, type, notnull, dflt_value, pk)
+        # Access by index, not by key
+        columns = {row[1]: row[2] for row in main_cur.fetchall()}
         
         if 'tag_name' in columns:
             # Old schema - migrate to new normalized schema
@@ -258,7 +260,9 @@ def _migrate_weights_from_main_db(model_conn: sqlite3.Connection, main_conn: sql
     # Copy pair weights (similar logic for old vs new schema)
     try:
         main_cur.execute("PRAGMA table_info(rating_tag_pair_weights)")
-        columns = {row['name']: row['type'] for row in main_cur.fetchall()}
+        # PRAGMA table_info returns tuples: (cid, name, type, notnull, dflt_value, pk)
+        # Access by index, not by key
+        columns = {row[1]: row[2] for row in main_cur.fetchall()}
         
         if 'tag1' in columns:
             # Old schema
@@ -461,7 +465,8 @@ def get_or_create_tag_id(conn: sqlite3.Connection, tag_name: str) -> int:
     cur.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
     row = cur.fetchone()
     if row:
-        return row['id']
+        # Handle both Row objects and tuples
+        return row['id'] if hasattr(row, 'keys') else row[0]
     
     cur.execute("INSERT INTO tags (name) VALUES (?)", (tag_name,))
     return cur.lastrowid
@@ -482,7 +487,8 @@ def get_or_create_rating_id(conn: sqlite3.Connection, rating_name: str) -> int:
     cur.execute("SELECT id FROM ratings WHERE name = ?", (rating_name,))
     row = cur.fetchone()
     if row:
-        return row['id']
+        # Handle both Row objects and tuples
+        return row['id'] if hasattr(row, 'keys') else row[0]
     
     cur.execute("INSERT INTO ratings (name) VALUES (?)", (rating_name,))
     return cur.lastrowid
@@ -502,7 +508,10 @@ def get_tag_name(conn: sqlite3.Connection, tag_id: int) -> Optional[str]:
     cur = conn.cursor()
     cur.execute("SELECT name FROM tags WHERE id = ?", (tag_id,))
     row = cur.fetchone()
-    return row['name'] if row else None
+    if row:
+        # Handle both Row objects and tuples
+        return row['name'] if hasattr(row, 'keys') else row[0]
+    return None
 
 
 def get_rating_name(conn: sqlite3.Connection, rating_id: int) -> Optional[str]:
@@ -519,7 +528,10 @@ def get_rating_name(conn: sqlite3.Connection, rating_id: int) -> Optional[str]:
     cur = conn.cursor()
     cur.execute("SELECT name FROM ratings WHERE id = ?", (rating_id,))
     row = cur.fetchone()
-    return row['name'] if row else None
+    if row:
+        # Handle both Row objects and tuples
+        return row['name'] if hasattr(row, 'keys') else row[0]
+    return None
 
 
 def get_model_info(model_path: Optional[str] = None) -> Dict:

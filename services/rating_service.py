@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 
 from database import get_db_connection
+from repositories.rating_repository import get_or_create_tag_id, get_or_create_rating_id
 
 # Rating categories
 RATINGS = [
@@ -454,8 +455,6 @@ def train_model() -> Dict:
         pruning_threshold = config.get('pruning_threshold', 0.0)
 
         # Insert new tag weights with optional pruning
-        from repositories.rating_repository import get_or_create_tag_id, get_or_create_rating_id
-        
         tag_weight_count = 0
         for (tag, rating), (weight, sample_count) in tag_weights.items():
             # Apply pruning threshold (disabled by default with 0.0)

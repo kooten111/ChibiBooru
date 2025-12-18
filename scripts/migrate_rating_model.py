@@ -243,13 +243,29 @@ def _create_new_schema(conn: sqlite3.Connection) -> None:
 
 def _get_or_create_id(conn: sqlite3.Connection, table: str, name: str) -> int:
     """Get or create an ID for a tag or rating."""
+    # Whitelist valid table names to prevent SQL injection
+    valid_tables = {'tags', 'ratings'}
+    if table not in valid_tables:
+        raise ValueError(f"Invalid table name: {table}")
+    
     cur = conn.cursor()
-    cur.execute(f"SELECT id FROM {table} WHERE name = ?", (name,))
+    
+    # Use validated table name
+    if table == 'tags':
+        cur.execute("SELECT id FROM tags WHERE name = ?", (name,))
+    else:  # table == 'ratings'
+        cur.execute("SELECT id FROM ratings WHERE name = ?", (name,))
+    
     row = cur.fetchone()
     if row:
         return row[0]
     
-    cur.execute(f"INSERT INTO {table} (name) VALUES (?)", (name,))
+    # Insert new record
+    if table == 'tags':
+        cur.execute("INSERT INTO tags (name) VALUES (?)", (name,))
+    else:  # table == 'ratings'
+        cur.execute("INSERT INTO ratings (name) VALUES (?)", (name,))
+    
     return cur.lastrowid
 
 
