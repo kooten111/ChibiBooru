@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Optional, Dict, List, Tuple
 
 from database import get_db_connection
+from repositories.rating_repository import get_or_create_tag_id, get_or_create_rating_id
 
 # Rating categories
 RATINGS = [
@@ -450,25 +451,35 @@ def train_model() -> Dict:
         cur.execute("DELETE FROM rating_tag_weights")
         cur.execute("DELETE FROM rating_tag_pair_weights")
 
-        # Insert new tag weights
-        tag_weight_data = [
-            (tag, rating, weight, sample_count)
-            for (tag, rating), (weight, sample_count) in tag_weights.items()
-        ]
-        cur.executemany(
-            "INSERT INTO rating_tag_weights (tag_name, rating, weight, sample_count) VALUES (?, ?, ?, ?)",
-            tag_weight_data
-        )
+        # Get pruning threshold from config
+        pruning_threshold = config.get('pruning_threshold', 0.0)
 
-        # Insert new pair weights
-        pair_weight_data = [
-            (tag1, tag2, rating, weight, co_count)
-            for (tag1, tag2, rating), (weight, co_count) in pair_weights.items()
-        ]
-        cur.executemany(
-            "INSERT INTO rating_tag_pair_weights (tag1, tag2, rating, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
-            pair_weight_data
-        )
+        # Insert new tag weights with optional pruning
+        tag_weight_count = 0
+        for (tag, rating), (weight, sample_count) in tag_weights.items():
+            # Apply pruning threshold (disabled by default with 0.0)
+            if abs(weight) >= pruning_threshold:
+                tag_id = get_or_create_tag_id(conn, tag)
+                rating_id = get_or_create_rating_id(conn, rating)
+                cur.execute(
+                    "INSERT INTO rating_tag_weights (tag_id, rating_id, weight, sample_count) VALUES (?, ?, ?, ?)",
+                    (tag_id, rating_id, weight, sample_count)
+                )
+                tag_weight_count += 1
+
+        # Insert new pair weights with optional pruning
+        pair_weight_count = 0
+        for (tag1, tag2, rating), (weight, co_count) in pair_weights.items():
+            # Apply pruning threshold (disabled by default with 0.0)
+            if abs(weight) >= pruning_threshold:
+                tag1_id = get_or_create_tag_id(conn, tag1)
+                tag2_id = get_or_create_tag_id(conn, tag2)
+                rating_id = get_or_create_rating_id(conn, rating)
+                cur.execute(
+                    "INSERT INTO rating_tag_pair_weights (tag1_id, tag2_id, rating_id, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
+                    (tag1_id, tag2_id, rating_id, weight, co_count)
+                )
+                pair_weight_count += 1
 
         # Update metadata
         cur.execute(
@@ -500,12 +511,17 @@ def train_model() -> Dict:
         'training_samples': len(rated_images),
         'unique_tags': len({tag for tag, _ in tag_weights.keys()}),
         'unique_pairs': len(frequent_pairs),
-        'tag_weights_count': len(tag_weights),
-        'pair_weights_count': len(pair_weights),
+        'tag_weights_count': tag_weight_count,
+        'pair_weights_count': pair_weight_count,
+        'pruning_threshold': config.get('pruning_threshold', 0.0),
         'duration_seconds': round(duration, 2)
     }
 
     print(f"Training complete in {duration:.2f}s")
+    if config.get('pruning_threshold', 0.0) > 0:
+        print(f"  Applied pruning threshold: {config['pruning_threshold']}")
+        print(f"  Kept {tag_weight_count}/{len(tag_weights)} tag weights")
+        print(f"  Kept {pair_weight_count}/{len(pair_weights)} pair weights")
     return stats
 
 
@@ -525,15 +541,26 @@ def load_weights() -> Tuple[Dict, Dict]:
     with get_model_connection() as conn:
         cur = conn.cursor()
 
-        # Load tag weights
-        cur.execute("SELECT tag_name, rating, weight FROM rating_tag_weights")
+        # Load tag weights with joins to get names
+        cur.execute("""
+            SELECT t.name as tag_name, r.name as rating, tw.weight
+            FROM rating_tag_weights tw
+            JOIN tags t ON tw.tag_id = t.id
+            JOIN ratings r ON tw.rating_id = r.id
+        """)
         tag_weights = {
             (row['tag_name'], row['rating']): row['weight']
             for row in cur.fetchall()
         }
 
-        # Load pair weights
-        cur.execute("SELECT tag1, tag2, rating, weight FROM rating_tag_pair_weights")
+        # Load pair weights with joins to get names
+        cur.execute("""
+            SELECT t1.name as tag1, t2.name as tag2, r.name as rating, pw.weight
+            FROM rating_tag_pair_weights pw
+            JOIN tags t1 ON pw.tag1_id = t1.id
+            JOIN tags t2 ON pw.tag2_id = t2.id
+            JOIN ratings r ON pw.rating_id = r.id
+        """)
         pair_weights = {
             (row['tag1'], row['tag2'], row['rating']): row['weight']
             for row in cur.fetchall()
@@ -1007,12 +1034,14 @@ def get_top_weighted_tags(rating: str, limit: int = 50) -> Dict:
     with get_model_connection() as conn:
         cur = conn.cursor()
 
-        # Get top individual tags
+        # Get top individual tags with joins
         cur.execute("""
-            SELECT tag_name, weight, sample_count
-            FROM rating_tag_weights
-            WHERE rating = ?
-            ORDER BY weight DESC
+            SELECT t.name as tag_name, tw.weight, tw.sample_count
+            FROM rating_tag_weights tw
+            JOIN tags t ON tw.tag_id = t.id
+            JOIN ratings r ON tw.rating_id = r.id
+            WHERE r.name = ?
+            ORDER BY tw.weight DESC
             LIMIT ?
         """, (rating, limit))
 
@@ -1025,12 +1054,15 @@ def get_top_weighted_tags(rating: str, limit: int = 50) -> Dict:
             for row in cur.fetchall()
         ]
 
-        # Get top tag pairs
+        # Get top tag pairs with joins
         cur.execute("""
-            SELECT tag1, tag2, weight, co_occurrence_count
-            FROM rating_tag_pair_weights
-            WHERE rating = ?
-            ORDER BY weight DESC
+            SELECT t1.name as tag1, t2.name as tag2, pw.weight, pw.co_occurrence_count
+            FROM rating_tag_pair_weights pw
+            JOIN tags t1 ON pw.tag1_id = t1.id
+            JOIN tags t2 ON pw.tag2_id = t2.id
+            JOIN ratings r ON pw.rating_id = r.id
+            WHERE r.name = ?
+            ORDER BY pw.weight DESC
             LIMIT ?
         """, (rating, limit))
 
