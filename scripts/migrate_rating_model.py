@@ -171,6 +171,23 @@ def _create_new_schema(conn: sqlite3.Connection) -> None:
     """Create the new normalized schema."""
     cur = conn.cursor()
     
+    # Config table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS rating_inference_config (
+            key TEXT PRIMARY KEY,
+            value REAL NOT NULL
+        )
+    """)
+    
+    # Metadata table
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS rating_model_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     # Lookup tables
     cur.execute("""
         CREATE TABLE IF NOT EXISTS tags (
