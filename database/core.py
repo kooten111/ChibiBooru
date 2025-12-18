@@ -6,7 +6,8 @@ DB_FILE = "booru.db"
 
 def get_db_connection():
     """Create a database connection with optimized performance settings."""
-    conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+    # Set timeout to 30 seconds to wait for locks instead of failing immediately
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=30.0)
 
     # Enable foreign keys
     conn.execute("PRAGMA foreign_keys = ON")

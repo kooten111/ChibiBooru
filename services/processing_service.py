@@ -465,8 +465,8 @@ def tag_video_with_frames(video_filepath, num_frames=5):
                 # Extract frame at timestamp
                 subprocess.run([
                     ffmpeg_path, '-ss', str(timestamp), '-i', video_filepath,
-                    '-vframes', '1', '-y', temp_frame_path
-                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    '-vframes', '1', '-strict', 'unofficial', '-y', temp_frame_path
+                ], check=True, capture_output=True)
 
                 # Process frame with tagger
                 img_numpy = preprocess_image_for_local_tagger(temp_frame_path)
@@ -638,10 +638,10 @@ def ensure_thumbnail(filepath, image_dir="./static/images"):
                 with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
                     temp_frame_path = temp_frame.name
                 try:
-                    # Extract frame at 1 seconds
+                    # Extract frame at 0.1 seconds (works for short videos too)
                     subprocess.run([
-                        ffmpeg_path, '-i', filepath, '-ss', '1', '-vframes', '1',
-                        '-y', temp_frame_path
+                        ffmpeg_path, '-ss', '0.1', '-i', filepath, '-vframes', '1',
+                        '-strict', 'unofficial', '-y', temp_frame_path
                     ], check=True, capture_output=True)
                     # Now process the extracted frame as an image
                     with Image.open(temp_frame_path) as img:

@@ -147,8 +147,13 @@ def get_model_db_connection():
     needs_init = not os.path.exists(db_path)
     needs_migration = False
 
-    conn = sqlite3.connect(db_path)
+    # Set timeout to 30 seconds to wait for locks instead of failing immediately
+    conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
+
+    # Enable WAL mode for better concurrency (allows concurrent reads during writes)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
 
     # Initialize if needed
     if needs_init:
@@ -325,7 +330,9 @@ def init_model_database(db_path: Optional[str] = None) -> None:
     if db_path is None:
         db_path = get_model_db_path()
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, timeout=30.0)
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
     _init_connection(conn)
     conn.close()
 
@@ -354,9 +361,11 @@ def export_model_from_main_db(output_path: Optional[str] = None) -> str:
     # Copy data from main DB to model DB
     with get_db_connection() as main_conn:
         main_conn.row_factory = sqlite3.Row
-        with sqlite3.connect(output_path) as model_conn:
+        with sqlite3.connect(output_path, timeout=30.0) as model_conn:
             model_conn.row_factory = sqlite3.Row
-            
+            model_conn.execute("PRAGMA journal_mode = WAL")
+            model_conn.execute("PRAGMA synchronous = NORMAL")
+
             # Use the migration function which handles both old and new schemas
             _migrate_weights_from_main_db(model_conn, main_conn)
 
@@ -390,8 +399,10 @@ def import_model_to_main_db(model_path: Optional[str] = None) -> Dict:
         'metadata_items': 0
     }
 
-    with sqlite3.connect(model_path) as model_conn:
+    with sqlite3.connect(model_path, timeout=30.0) as model_conn:
         model_conn.row_factory = sqlite3.Row
+        model_conn.execute("PRAGMA journal_mode = WAL")
+        model_conn.execute("PRAGMA synchronous = NORMAL")
         with get_db_connection() as main_conn:
             model_cur = model_conn.cursor()
             main_cur = main_conn.cursor()
@@ -553,8 +564,10 @@ def get_model_info(model_path: Optional[str] = None) -> Dict:
             'path': model_path
         }
 
-    with sqlite3.connect(model_path) as conn:
+    with sqlite3.connect(model_path, timeout=30.0) as conn:
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
         cur = conn.cursor()
 
         # Get counts

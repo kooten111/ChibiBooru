@@ -474,6 +474,9 @@ def train_model() -> Dict:
             if abs(weight) >= pruning_threshold:
                 tag1_id = get_or_create_tag_id(conn, tag1)
                 tag2_id = get_or_create_tag_id(conn, tag2)
+                # Ensure tag1_id < tag2_id for database constraint
+                if tag1_id > tag2_id:
+                    tag1_id, tag2_id = tag2_id, tag1_id
                 rating_id = get_or_create_rating_id(conn, rating)
                 cur.execute(
                     "INSERT INTO rating_tag_pair_weights (tag1_id, tag2_id, rating_id, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",

@@ -16,7 +16,7 @@ from time import sleep
 
 # API configuration
 CHIBIBOORU_API_URL = "http://192.168.1.5:5000/api"  # ChibiBooru API base URL
-LM_STUDIO_URL = "http://192.168.1.122:1234/v1/chat/completions"
+LM_STUDIO_URL = "http://192.168.1.2:1234/v1/chat/completions"
 MODEL_NAME = "mistralai/ministral-3-14b-reasoning"  # Adjust if needed
 
 # Load category definitions from API

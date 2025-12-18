@@ -300,6 +300,11 @@ def _migrate_data(conn: sqlite3.Connection, config_data, tag_weights, pair_weigh
         tag1_id = _get_or_create_id(conn, 'tags', row['tag1'])
         tag2_id = _get_or_create_id(conn, 'tags', row['tag2'])
         rating_id = _get_or_create_id(conn, 'ratings', row['rating'])
+
+        # Ensure tag1_id < tag2_id to satisfy CHECK constraint
+        if tag1_id > tag2_id:
+            tag1_id, tag2_id = tag2_id, tag1_id
+
         cur.execute(
             "INSERT OR REPLACE INTO rating_tag_pair_weights (tag1_id, tag2_id, rating_id, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
             (tag1_id, tag2_id, rating_id, row['weight'], row['co_occurrence_count'])
