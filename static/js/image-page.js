@@ -343,9 +343,6 @@ function initSwipeNavigation() {
                     currentImageView.style.position = 'relative';
                 }
 
-                const containerWidth = currentImageView.clientWidth;
-                const containerHeight = currentImageView.clientHeight;
-
                 currentImage.style.transition = 'opacity 0.3s ease-in-out';
                 currentImage.style.opacity = '0';
 
@@ -372,21 +369,6 @@ function initSwipeNavigation() {
                 currentImageView.appendChild(overlay);
 
                 const onMediaReady = () => {
-                    const naturalWidth = preloadedData.isVideo ? newMediaElement.videoWidth : newMediaElement.naturalWidth;
-                    const naturalHeight = preloadedData.isVideo ? newMediaElement.videoHeight : newMediaElement.naturalHeight;
-
-                    if (naturalWidth && naturalHeight) {
-                        const scaleX = containerWidth / naturalWidth;
-                        const scaleY = containerHeight / naturalHeight;
-                        const scale = Math.min(scaleX, scaleY, 1);
-
-                        const displayWidth = Math.floor(naturalWidth * scale);
-                        const displayHeight = Math.floor(naturalHeight * scale);
-
-                        newMediaElement.style.width = displayWidth + 'px';
-                        newMediaElement.style.height = displayHeight + 'px';
-                    }
-
                     newMediaElement.style.opacity = '1';
 
                     requestAnimationFrame(() => {
