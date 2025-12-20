@@ -156,7 +156,8 @@ def check_missing_thumbnails(auto_fix=False):
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT filepath FROM images")
+            # Include md5 for zip animation thumbnail generation
+            cursor.execute("SELECT filepath, md5 FROM images")
             all_images = cursor.fetchall()
 
         missing = []
@@ -168,7 +169,8 @@ def check_missing_thumbnails(auto_fix=False):
             thumb_path = os.path.join(config.THUMB_DIR, bucket, base_name + '.webp')
 
             if not os.path.exists(thumb_path):
-                missing.append(filepath)
+                # Store both filepath and md5 for zip animations
+                missing.append({'filepath': filepath, 'md5': image['md5']})
 
         result.issues_found = len(missing)
 
@@ -180,10 +182,13 @@ def check_missing_thumbnails(auto_fix=False):
 
         if auto_fix:
             from services.processing_service import ensure_thumbnail
-            for filepath in missing:
+            for item in missing:
+                filepath = item['filepath']
+                md5 = item['md5']
                 full_path = os.path.join("static/images", filepath)
                 if os.path.exists(full_path):
-                    ensure_thumbnail(full_path)
+                    # Pass md5 for zip animation thumbnails
+                    ensure_thumbnail(full_path, md5=md5)
                     result.issues_fixed += 1
 
             result.add_message(f"Generated {result.issues_fixed} thumbnails")

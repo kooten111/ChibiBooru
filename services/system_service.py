@@ -320,9 +320,15 @@ def trigger_thumbnails():
     if secret != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
     try:
-        import scripts.generate_thumbnails as generate_thumbnails
-        generate_thumbnails.main()
-        return jsonify({"status": "success", "message": "Thumbnails generated"})
+        from services.health_service import check_missing_thumbnails
+        result = check_missing_thumbnails(auto_fix=True)
+        return jsonify({
+            "status": "success",
+            "message": f"Generated {result.issues_fixed} thumbnails (found {result.issues_found} missing)",
+            "issues_found": result.issues_found,
+            "issues_fixed": result.issues_fixed,
+            "messages": result.messages
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -11,5 +11,6 @@ from . import (
     system,
     saucenao,
     rating,
-    tag_categorization
+    tag_categorization,
+    animation
 )

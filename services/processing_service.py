@@ -604,10 +604,15 @@ def get_md5(filepath):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-def ensure_thumbnail(filepath, image_dir="./static/images"):
+def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
     """
-    Create a thumbnail for an image.
+    Create a thumbnail for an image, video, or zip animation.
     Handles both bucketed and legacy flat paths.
+    
+    Args:
+        filepath: Path to the media file
+        image_dir: Base image directory
+        md5: Optional MD5 hash (required for zip animations)
     """
     from utils.file_utils import get_hash_bucket
 
@@ -615,15 +620,36 @@ def ensure_thumbnail(filepath, image_dir="./static/images"):
     filename = os.path.basename(filepath)
     base_name = os.path.splitext(filename)[0]
 
-    # Use bucketed structure for thumbnails
+    # Use bucketed structure for thumbnails (based on filename, not MD5)
     bucket = get_hash_bucket(filename)
     thumb_path = os.path.join(THUMB_DIR, bucket, base_name + '.webp')
 
     if not os.path.exists(thumb_path):
         os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
         try:
+            # Check if this is a zip animation
+            if filepath.lower().endswith('.zip'):
+                if md5:
+                    from services import zip_animation_service
+                    # Get the first frame from the extracted animation
+                    first_frame = zip_animation_service.get_frame_path(md5, 0)
+                    if first_frame and os.path.exists(first_frame):
+                        # Create thumbnail from first frame
+                        with Image.open(first_frame) as img:
+                            if img.mode in ('RGBA', 'LA', 'P'):
+                                background = Image.new('RGB', img.size, (255, 255, 255))
+                                if img.mode == 'P': img = img.convert('RGBA')
+                                background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                                img = background
+                            img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
+                            img.save(thumb_path, 'WEBP', quality=85, method=6)
+                        print(f"[Thumbnail] Created thumbnail for zip animation: {os.path.basename(filepath)}")
+                    else:
+                        print(f"[Thumbnail] ERROR: Could not find first frame for zip animation: {os.path.basename(filepath)}")
+                else:
+                    print(f"[Thumbnail] ERROR: MD5 required for zip animation thumbnail: {os.path.basename(filepath)}")
             # Check if this is a video file
-            if filepath.lower().endswith(('.mp4', '.webm')):
+            elif filepath.lower().endswith(('.mp4', '.webm')):
                 # Extract first frame from video using ffmpeg
                 import subprocess
                 import tempfile
@@ -1030,6 +1056,7 @@ def process_image_file(filepath, move_from_ingest=False):
     # Get filename
     filename = os.path.basename(filepath)
     is_video = filepath.lower().endswith(('.mp4', '.webm'))
+    is_zip_animation = filepath.lower().endswith('.zip')
 
     # Check if this is a Pixiv image and if we should fetch the original instead
     if not is_video and move_from_ingest:
@@ -1124,9 +1151,27 @@ def process_image_file(filepath, move_from_ingest=False):
     saucenao_response = None
     used_saucenao = False
     used_local_tagger = False
+    animation_metadata = None
 
+    # Zip animations: Extract frames and tag using first frame
+    if is_zip_animation:
+        print(f"Zip animation detected, extracting frames...")
+        from services import zip_animation_service
+        animation_metadata = zip_animation_service.extract_zip_animation(filepath, md5)
+        if animation_metadata:
+            print(f"[ZipAnimation] Extracted {animation_metadata['frame_count']} frames")
+            # Tag using the first frame
+            local_tagger_result = zip_animation_service.tag_animation_with_first_frame(md5)
+            used_local_tagger = True
+            if local_tagger_result:
+                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                print(f"Tagged zip animation with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+        else:
+            print(f"[ZipAnimation] Failed to extract frames from {filepath}")
+            release_processing_lock(lock_fd)
+            return False
     # Videos: Skip online searches since boorus don't host videos, go straight to local tagging
-    if is_video:
+    elif is_video:
         print(f"Video file detected, using frame extraction for tagging...")
         local_tagger_result = tag_video_with_frames(filepath)
         used_local_tagger = True
@@ -1289,7 +1334,7 @@ def process_image_file(filepath, move_from_ingest=False):
     )
 
     if success:
-        ensure_thumbnail(filepath)
+        ensure_thumbnail(filepath, md5=md5)
         
         # Store local tagger predictions if available
         if 'local_tagger' in all_results:

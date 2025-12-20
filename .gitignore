@@ -6,6 +6,7 @@ metadata/
 models/
 static/images/
 static/thumbnails/
+static/animations/
 static/logo/
 venv/
 .vscode/

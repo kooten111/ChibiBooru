@@ -181,10 +181,9 @@ SIMILARITY_CATEGORY_WEIGHTS = {
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')
 SUPPORTED_VIDEO_EXTENSIONS = ('.mp4', '.webm')
-SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS + SUPPORTED_VIDEO_EXTENSIONS
-
-# For future use
+SUPPORTED_ZIP_EXTENSIONS = ('.zip',)
 SUPPORTED_ANIMATION_EXTENSIONS = ('.gif', '.webp', '.apng')
+SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS + SUPPORTED_VIDEO_EXTENSIONS + SUPPORTED_ZIP_EXTENSIONS
 
 
 def is_supported_media(filepath: str) -> bool:
@@ -205,6 +204,11 @@ def is_video(filepath: str) -> bool:
 def is_animated(filepath: str) -> bool:
     """Check if a file might be animated (gif, webp, apng)."""
     return filepath.lower().endswith(SUPPORTED_ANIMATION_EXTENSIONS)
+
+
+def is_zip_animation(filepath: str) -> bool:
+    """Check if a file is a zip-based animation."""
+    return filepath.lower().endswith(SUPPORTED_ZIP_EXTENSIONS)
 
 
 # ==================== DEFAULTS ====================

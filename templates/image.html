@@ -10,10 +10,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=24' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/saucenao-modal.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animation-player.css') + '?v=1' }}">
 
     {# Preload main image with high priority - start loading ASAP #}
     {% if not (filepath.endswith('.mp4') or filepath.endswith('.webm')) %}
-    <link rel="preload" href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}" as="image" fetchpriority="high">
+    <link rel="preload"
+        href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+        as="image" fetchpriority="high">
     {% endif %}
 
     {# Prefetch related images with lower priority - don't compete with main image #}
@@ -22,7 +25,9 @@
     {% if related_images %}
     {% for related in related_images[:3] %}
     {% if not (related.path.endswith('.mp4') or related.path.endswith('.webm')) %}
-    <link rel="prefetch" href="/static/{% if not related.path.startswith('images/') %}images/{% endif %}{{ related.path | urlencode_path }}" as="image">
+    <link rel="prefetch"
+        href="/static/{% if not related.path.startswith('images/') %}images/{% endif %}{{ related.path | urlencode_path }}"
+        as="image">
     {% endif %}
     {% endfor %}
     {% endif %}
@@ -441,21 +446,39 @@
 
         <div class="main-content">
             <div class="image-and-actions-container">
-                <div class="image-view skeleton" id="imageViewContainer" data-filepath="{{ filepath }}">
+                <div class="image-view skeleton" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
+                    filepath.endswith('.zip') %}data-animation-type="zip"
+                    data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="10" {% endif %}>
                     {% if filepath.endswith('.mp4') %}
                     <video controls loop preload="metadata"
                         onloadeddata="this.closest('.image-view').classList.add('has-image')">
-                        <source src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}" type="video/mp4">
+                        <source
+                            src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                            type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
                     {% elif filepath.endswith('.webm') %}
                     <video controls loop preload="metadata"
                         onloadeddata="this.closest('.image-view').classList.add('has-image')">
-                        <source src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}" type="video/webm">
+                        <source
+                            src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                            type="video/webm">
                         Your browser does not support the video tag.
                     </video>
+                    {% elif filepath.endswith('.zip') %}
+                    {# Zip animation - show thumbnail as poster, animation player will take over #}
+                    <img src="/static/{{ thumbnail_path | urlencode_path }}" alt="Animation" fetchpriority="high"
+                        onload="this.closest('.image-view').classList.add('has-image')" class="animation-poster">
+                    <span class="animation-badge">ZIP Animation</span>
+                    {% elif filepath.endswith(('.gif', '.webp', '.apng')) %}
+                    {# Animated images - play natively with their own embedded FPS #}
+                    <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                        alt="Animated Image" fetchpriority="high"
+                        onload="this.closest('.image-view').classList.add('has-image')">
+                    <span class="animation-badge">Animated</span>
                     {% else %}
-                    <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}" alt="Image" fetchpriority="high"
+                    <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                        alt="Image" fetchpriority="high"
                         onload="this.closest('.image-view').classList.add('has-image')">
                     {% endif %}
                 </div>
@@ -470,7 +493,8 @@
                     <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
                         🔍 Find Similar
                     </a>
-                    <a href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}" download class="btn btn-success">
+                    <a href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                        download class="btn btn-success">
                         💾 Download
                     </a>
                     <button id="deleteImageBtn" class="btn btn-danger">
@@ -505,7 +529,8 @@
                         <div class="related-grid-vertical">
                             {% for related in related_images %}
                             <a href="/view/{{ related.path | urlencode_path }}" class="related-thumb">
-                                <img src="/static/{% if not (related.thumb.startswith('thumbnails/') or related.thumb.startswith('images/')) %}images/{% endif %}{{ related.thumb | urlencode_path }}" alt="Related">
+                                <img src="/static/{% if not (related.thumb.startswith('thumbnails/') or related.thumb.startswith('images/')) %}images/{% endif %}{{ related.thumb | urlencode_path }}"
+                                    alt="Related">
                                 <span class="label {{ related.match_type }}">
                                     {% if related.match_type == 'parent' %}Parent
                                     {% elif related.match_type == 'child' %}Child
@@ -710,6 +735,7 @@
     <script type="module" src="{{ url_for('static', filename='js/pool-manager.js', v='2.0') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/animation-player.js', v='1.0') }}"></script>
 </body>
 
 </html>
