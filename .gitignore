@@ -37,3 +37,4 @@ TODO
 *.csv
 rating_model.db-shm
 rating_model.db-wal
+.xdp-booru*
