@@ -68,7 +68,8 @@ def initialize_database():
             'tags_meta': 'TEXT',
             'tags_general': 'TEXT',
             'score': 'INTEGER',
-            'fav_count': 'INTEGER'
+            'fav_count': 'INTEGER',
+            'phash': 'TEXT'  # Perceptual hash for visual similarity
         }
 
         cur.execute("PRAGMA table_info(images);")
@@ -173,6 +174,15 @@ def initialize_database():
             FOREIGN KEY (pool_id) REFERENCES pools (id) ON DELETE CASCADE,
             FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
             PRIMARY KEY (pool_id, image_id)
+        )
+        """)
+
+        # Favourites table - stores user's favourite images
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS favourites (
+            image_id INTEGER PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE
         )
         """)
 
@@ -319,6 +329,7 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_ingested_at ON images(ingested_at DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_score ON images(score DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_fav_count ON images(fav_count DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_phash ON images(phash)")  # For similarity lookups
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name_lower ON tags(LOWER(name))")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")

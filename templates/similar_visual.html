@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Visual Similar - {{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=25' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
+    <style>
+        .similarity-controls {
+            background: var(--bg-secondary);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .reference-image {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .reference-image img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+        }
+
+        .reference-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .reference-info .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .reference-info .filename {
+            font-weight: 500;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .threshold-control {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .threshold-control label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .threshold-control input[type="range"] {
+            width: 200px;
+            accent-color: var(--accent-primary);
+        }
+
+        .threshold-value {
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-weight: 600;
+            min-width: 40px;
+            text-align: center;
+        }
+
+        .filter-options {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .filter-options label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .result-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        .result-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        }
+
+        .result-card img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+
+        .result-info {
+            padding: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .distance-badge {
+            background: var(--accent-primary);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .distance-badge.identical {
+            background: #22c55e;
+        }
+
+        .distance-badge.similar {
+            background: #3b82f6;
+        }
+
+        .distance-badge.somewhat {
+            background: #f59e0b;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .result-actions button {
+            padding: 0.25rem 0.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: background 0.2s;
+        }
+
+        .btn-view {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-view:hover {
+            background: var(--accent-primary);
+        }
+
+        .btn-delete {
+            background: #dc2626;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #b91c1c;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .no-results .icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading-spinner.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="container">
+        <h2 style="margin-bottom: 1rem;">🔍 Visual Similarity Search</h2>
+
+        <div class="similarity-controls">
+            <div class="reference-image">
+                <a href="/view/{{ filepath }}">
+                    <img src="/static/{{ thumbnail_path }}" alt="Reference">
+                </a>
+                <div class="reference-info">
+                    <span class="label">Reference Image</span>
+                    <span class="filename">{{ filepath | basename }}</span>
+                </div>
+            </div>
+
+            <div class="threshold-control">
+                <label for="threshold">Similarity Threshold:</label>
+                <input type="range" id="threshold" min="0" max="30" value="{{ threshold }}" step="1">
+                <span class="threshold-value" id="thresholdValue">{{ threshold }}</span>
+            </div>
+
+            <div class="filter-options">
+                <label>
+                    <input type="checkbox" id="excludeFamily" {% if exclude_family %}checked{% endif %}>
+                    Exclude family (parent/child)
+                </label>
+            </div>
+        </div>
+
+        <div class="results-info" style="margin-bottom: 1rem;">
+            Found <span id="resultCount">{{ images | length }}</span> similar images
+        </div>
+
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner"></div>
+            <p>Searching for similar images...</p>
+        </div>
+
+        <div class="results-grid" id="resultsGrid">
+            {% for image in images %}
+            <div class="result-card" data-path="{{ image.path }}">
+                <a href="/view/{{ image.path | urlencode_path }}">
+                    <img src="/static/{{ image.thumb | urlencode_path }}" alt="Similar" loading="lazy">
+                </a>
+                <div class="result-info">
+                    <span
+                        class="distance-badge {% if image.distance <= 5 %}identical{% elif image.distance <= 10 %}similar{% else %}somewhat{% endif %}">
+                        Distance: {{ image.distance }}
+                    </span>
+                    <div class="result-actions">
+                        <a href="/view/{{ image.path | urlencode_path }}" class="btn-view">View</a>
+                        <button class="btn-delete" onclick="deleteImage('{{ image.path }}', this)">🗑</button>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="no-results" id="noResults">
+                <div class="icon">🔍</div>
+                <p>No visually similar images found.</p>
+                <p style="font-size: 0.875rem; margin-top: 0.5rem;">Try increasing the threshold or generate hashes for
+                    existing images.</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+
+    <script>
+        const filepath = '{{ filepath | replace("images/", "") }}';
+
+        // Debounce function
+        function debounce(func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        }
+
+        // Update threshold display
+        const thresholdSlider = document.getElementById('threshold');
+        const thresholdValue = document.getElementById('thresholdValue');
+
+        thresholdSlider.addEventListener('input', () => {
+            thresholdValue.textContent = thresholdSlider.value;
+        });
+
+        // Reload results when settings change
+        const reloadResults = debounce(async () => {
+            const threshold = thresholdSlider.value;
+            const excludeFamily = document.getElementById('excludeFamily').checked;
+
+            document.getElementById('loadingSpinner').classList.add('active');
+            document.getElementById('resultsGrid').style.opacity = '0.5';
+
+            try {
+                const response = await fetch(`/api/similar/${encodeURIComponent(filepath)}?threshold=${threshold}&exclude_family=${excludeFamily}&limit=100`);
+                const data = await response.json();
+
+                updateResults(data.similar);
+                document.getElementById('resultCount').textContent = data.count;
+            } catch (error) {
+                console.error('Error fetching results:', error);
+            } finally {
+                document.getElementById('loadingSpinner').classList.remove('active');
+                document.getElementById('resultsGrid').style.opacity = '1';
+            }
+        }, 300);
+
+        thresholdSlider.addEventListener('change', reloadResults);
+        document.getElementById('excludeFamily').addEventListener('change', reloadResults);
+
+        function updateResults(images) {
+            const grid = document.getElementById('resultsGrid');
+
+            if (images.length === 0) {
+                grid.innerHTML = `
+                    <div class="no-results" id="noResults">
+                        <div class="icon">🔍</div>
+                        <p>No visually similar images found.</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Try increasing the threshold.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = images.map(img => `
+                <div class="result-card" data-path="${img.path}">
+                    <a href="/view/${encodeURIComponent(img.path)}">
+                        <img src="/static/${img.thumb}" alt="Similar" loading="lazy">
+                    </a>
+                    <div class="result-info">
+                        <span class="distance-badge ${img.distance <= 5 ? 'identical' : img.distance <= 10 ? 'similar' : 'somewhat'}">
+                            Distance: ${img.distance}
+                        </span>
+                        <div class="result-actions">
+                            <a href="/view/${encodeURIComponent(img.path)}" class="btn-view">View</a>
+                            <button class="btn-delete" onclick="deleteImage('${img.path}', this)">🗑</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deleteImage(imagePath, button) {
+            if (!confirm('Delete this image?')) return;
+
+            const card = button.closest('.result-card');
+            card.style.opacity = '0.5';
+
+            try {
+                const secret = localStorage.getItem('system_secret');
+                if (!secret) {
+                    alert('Please configure system secret in System panel first');
+                    card.style.opacity = '1';
+                    return;
+                }
+
+                const cleanPath = imagePath.replace('images/', '');
+                const response = await fetch(`/api/delete/${encodeURIComponent(cleanPath)}?secret=${encodeURIComponent(secret)}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    card.remove();
+                    const count = document.querySelectorAll('.result-card').length;
+                    document.getElementById('resultCount').textContent = count;
+                } else {
+                    throw new Error('Failed to delete');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Failed to delete image');
+                card.style.opacity = '1';
+            }
+        }
+    </script>
+</body>
+
+</html>

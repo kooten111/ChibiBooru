@@ -428,6 +428,7 @@ def perform_search(search_query):
     pool_filter = None
     metadata_filter = None
     order_filter = None
+    favourite_filter = False
     category_filters = {}  # {category: [tags]}
     general_terms = []
     negative_terms = []
@@ -453,6 +454,10 @@ def perform_search(search_query):
             rel_type = token.split(':', 1)[1].strip()
             if rel_type in ['parent', 'child', 'relationship']:
                 relationship_filter = 'any' if rel_type == 'relationship' else rel_type
+        elif token.startswith('is:'):
+            is_type = token.split(':', 1)[1].strip()
+            if is_type in ['favourite', 'favorite', 'fav']:
+                favourite_filter = True
         elif token.startswith('-'):
             # Negative search: exclude this term
             # Keep the full term including any colons (e.g., -rating:explicit)
@@ -560,6 +565,11 @@ def perform_search(search_query):
 
         if filename_filter:
             results = [img for img in results if img and filename_filter in img['filepath'].lower()]
+
+        if favourite_filter:
+            from repositories import favourites_repository
+            favourite_filepaths = favourites_repository.get_favourite_filepaths()
+            results = [img for img in results if img and img['filepath'] in favourite_filepaths]
 
         if metadata_filter:
             # Handle metadata:missing - images that don't have any source data

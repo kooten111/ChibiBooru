@@ -115,6 +115,10 @@ class Autocomplete {
             type = 'filter';
             display = token;
             icon = '🔗';
+        } else if (token.startsWith('is:')) {
+            type = 'filter';
+            display = token;
+            icon = '❤️';
         } else if (token.startsWith('.')) {
             type = 'extension';
             display = token;

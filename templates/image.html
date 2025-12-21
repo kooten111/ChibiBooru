@@ -483,7 +483,16 @@
                     {% endif %}
                 </div>
 
+                {# Family badge data - parent/child images #}
+                {% if family_images %}
+                <script type="application/json" id="familyImagesData">{{ family_images | tojson }}</script>
+                {% endif %}
+
                 <div class="actions-bar">
+                    <button class="btn btn-favourite" id="favouriteBtn" data-filepath="{{ filepath }}">
+                        <span class="favourite-icon">🤍</span>
+                        <span class="favourite-text">Favourite</span>
+                    </button>
                     <button class="btn btn-primary" onclick="toggleTagEditor()">
                         📝 Edit Tags
                     </button>
@@ -492,6 +501,10 @@
                     </button>
                     <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
                         🔍 Find Similar
+                    </a>
+                    <a href="{{ url_for('main.similar_visual', filepath=filepath) }}" class="btn btn-secondary"
+                        title="Find visually similar images using perceptual hash">
+                        👁️ Visual Similar
                     </a>
                     <a href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
                         download class="btn btn-success">
@@ -509,9 +522,9 @@
                 {% if related_images %}
                 <div class="related-images-vertical panel">
                     <button class="panel-header mobile-toggle" data-section="related-images-content">
-                        <span class="section-icon">🔗</span>
+                        <span class="section-icon">�</span>
                         <span class="section-title">
-                            Related
+                            Similar
                             <span class="text-muted-tiny">
                                 ({{ related_images|length }} images)
                             </span>
@@ -519,8 +532,8 @@
                         <span class="section-arrow">▼</span>
                     </button>
                     <h3 class="desktop-only">
-                        <span>🔗</span>
-                        Related
+                        <span>�</span>
+                        Similar
                         <span class="text-muted-tiny">
                             ({{ related_images|length }} images)
                         </span>
@@ -531,11 +544,7 @@
                             <a href="/view/{{ related.path | urlencode_path }}" class="related-thumb">
                                 <img src="/static/{% if not (related.thumb.startswith('thumbnails/') or related.thumb.startswith('images/')) %}images/{% endif %}{{ related.thumb | urlencode_path }}"
                                     alt="Related">
-                                <span class="label {{ related.match_type }}">
-                                    {% if related.match_type == 'parent' %}Parent
-                                    {% elif related.match_type == 'child' %}Child
-                                    {% else %}Similar{% endif %}
-                                </span>
+                                <span class="label similar">Similar</span>
                             </a>
                             {% endfor %}
                         </div>
@@ -736,6 +745,8 @@
     <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/animation-player.js', v='1.0') }}"></script>
+    <script src="{{ url_for('static', filename='js/family-badge.js', v='1.0') }}"></script>
+    <script src="{{ url_for('static', filename='js/favourites.js', v='1.0') }}"></script>
 </body>
 
 </html>

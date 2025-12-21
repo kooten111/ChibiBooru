@@ -254,7 +254,19 @@ async def show_image(filepath):
         "meta": [(t, tag_counts.get(t, 0)) for t in meta_with_rating if t],
     }
 
-    similar_images = query_service.find_related_by_tags(filepath)
+    # Get similar images - use blended visual+tag similarity if enabled
+    if config.VISUAL_SIMILARITY_ENABLED:
+        from services import similarity_service
+        similar_images = similarity_service.find_blended_similar(
+            lookup_path,
+            visual_weight=config.VISUAL_SIMILARITY_WEIGHT,
+            tag_weight=config.TAG_SIMILARITY_WEIGHT,
+            threshold=config.VISUAL_SIMILARITY_THRESHOLD,
+            limit=20
+        )
+    else:
+        similar_images = query_service.find_related_by_tags(filepath)
+    
     parent_child_images = models.get_related_images(data.get('post_id'), data.get('parent_id'))
 
     # Add a 'match_type' to parent/child images and get their paths for deduplication
@@ -284,7 +296,8 @@ async def show_image(filepath):
         categorized_tags=categorized_tags,
         extended_grouped_tags=extended_grouped_tags,
         metadata=data.get('raw_metadata'),
-        related_images=combined_related,
+        family_images=parent_child_images,  # Parent/child for floating badge
+        related_images=filtered_similar,     # Only similar images in sidebar
         stats=stats,
         random_tags=[],
         data=data,
@@ -299,6 +312,39 @@ async def similar(filepath):
     similar_images = query_service.find_related_by_tags(filepath, limit=50)
     stats = query_service.get_enhanced_stats()
     return await render_template('index.html', images=similar_images, query=f"similar:{filepath}", stats=stats, show_similarity=True)
+
+@main_blueprint.route('/similar-visual/<path:filepath>')
+@login_required
+async def similar_visual(filepath):
+    """Visual similarity page with adjustable threshold."""
+    from services import similarity_service
+    from utils import get_thumbnail_path
+    
+    lookup_path = filepath.replace("images/", "", 1)
+    threshold = config.VISUAL_SIMILARITY_THRESHOLD
+    exclude_family = True  # Default to excluding family
+    
+    # Get visually similar images
+    similar_images = similarity_service.find_similar_images(
+        lookup_path,
+        threshold=threshold,
+        limit=100,
+        exclude_family=exclude_family
+    )
+    
+    stats = query_service.get_enhanced_stats()
+    thumbnail_path = get_thumbnail_path(filepath)
+    
+    return await render_template(
+        'similar_visual.html',
+        filepath=filepath,
+        thumbnail_path=thumbnail_path,
+        images=similar_images,
+        threshold=threshold,
+        exclude_family=exclude_family,
+        stats=stats,
+        app_name=config.APP_NAME
+    )
 
 @main_blueprint.route('/raw/<path:filepath>')
 @login_required

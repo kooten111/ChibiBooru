@@ -91,6 +91,8 @@ def autocomplete():
             ("source:local_tagger", "Locally tagged images", "local"),
             ("has:parent", "Images with parent", "parent"),
             ("has:child", "Images with children", "child"),
+            ("is:favourite", "Favourited images", "favourite"),
+            ("is:favourite", "Favourited images", "fav"),
             ("pool:", "Search pools", "pool"),
             ("order:new", "Newest first", "order"),
             ("order:newest", "Newest first", "newest"),

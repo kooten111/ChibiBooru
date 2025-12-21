@@ -177,6 +177,22 @@ SIMILARITY_CATEGORY_WEIGHTS = {
     'meta': 0.5         # Resolution, format, year - less relevant for similarity
 }
 
+# ==================== VISUAL SIMILARITY (PERCEPTUAL HASH) ====================
+
+# Enable visual similarity in the related images sidebar
+# When enabled, uses a blend of tag-based and visual perceptual hash similarity
+VISUAL_SIMILARITY_ENABLED = os.environ.get('VISUAL_SIMILARITY_ENABLED', 'true').lower() in ('true', '1', 'yes')
+
+# Weight for visual similarity vs tag-based similarity in blended results
+# Values from 0.0 to 1.0, visual_weight + tag_weight should equal 1.0
+VISUAL_SIMILARITY_WEIGHT = float(os.environ.get('VISUAL_SIMILARITY_WEIGHT', 0.3))
+TAG_SIMILARITY_WEIGHT = float(os.environ.get('TAG_SIMILARITY_WEIGHT', 0.7))
+
+# Hamming distance threshold for considering images similar
+# Lower = stricter matching (0-64 scale, 64-bit hash)
+# 0-5: Near identical, 6-10: Very similar, 11-15: Somewhat similar
+VISUAL_SIMILARITY_THRESHOLD = int(os.environ.get('VISUAL_SIMILARITY_THRESHOLD', 15))
+
 # ==================== FILE TYPES ====================
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')

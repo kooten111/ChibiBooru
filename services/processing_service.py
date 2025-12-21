@@ -1336,6 +1336,16 @@ def process_image_file(filepath, move_from_ingest=False):
     if success:
         ensure_thumbnail(filepath, md5=md5)
         
+        # Compute perceptual hash for visual similarity
+        try:
+            from services import similarity_service
+            phash = similarity_service.compute_phash_for_file(filepath, md5)
+            if phash:
+                similarity_service.update_image_phash(db_path, phash)
+                print(f"[pHash] Computed hash for {db_path}: {phash[:8]}...")
+        except Exception as e:
+            print(f"[pHash] Error computing hash for {db_path}: {e}")
+        
         # Store local tagger predictions if available
         if 'local_tagger' in all_results:
             local_data = all_results['local_tagger']

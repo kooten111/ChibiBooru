@@ -394,6 +394,11 @@ function systemGenerateThumbnails(event) {
     systemAction('/api/system/thumbnails', event.target, 'Generate Thumbnails');
 }
 
+function systemGenerateHashes(event) {
+    if (event) event.preventDefault();
+    systemAction('/api/similarity/generate-hashes', event.target, 'Generate Image Hashes');
+}
+
 function systemReloadData(event) {
     if (event) event.preventDefault();
     systemAction('/api/reload', event.target, 'Reload Data');
@@ -571,6 +576,7 @@ window.systemRebuildTags = systemRebuildTags;
 window.systemRebuildCategorized = systemRebuildCategorized;
 window.systemRecategorizeTags = systemRecategorizeTags;
 window.systemGenerateThumbnails = systemGenerateThumbnails;
+window.systemGenerateHashes = systemGenerateHashes;
 window.systemDeduplicate = systemDeduplicate;
 window.systemCleanOrphans = systemCleanOrphans;
 window.systemApplyMergedSources = systemApplyMergedSources;

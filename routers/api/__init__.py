@@ -12,5 +12,7 @@ from . import (
     saucenao,
     rating,
     tag_categorization,
-    animation
+    animation,
+    favourites,
+    similarity
 )

@@ -57,7 +57,9 @@ def create_app():
 
     # Register custom Jinja2 filters
     from utils import url_encode_path
+    import os
     app.jinja_env.filters['urlencode_path'] = url_encode_path
+    app.jinja_env.filters['basename'] = os.path.basename
 
     return app
 
