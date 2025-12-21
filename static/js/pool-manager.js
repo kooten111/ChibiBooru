@@ -274,6 +274,11 @@ function closeAddToPoolModal() {
     }
 }
 
+// Expose functions globally for use by other scripts
+window.showAddToPoolModal = showAddToPoolModal;
+window.closeAddToPoolModal = closeAddToPoolModal;
+window.loadPoolsForImage = loadPoolsForImage;
+
 // Close modal on outside click
 window.addEventListener('click', (event) => {
     const modal = document.getElementById('addToPoolModal');
