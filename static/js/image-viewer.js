@@ -45,7 +45,7 @@ function initImageViewer() {
     function toggleZoom() {
         if (scale === 1) {
             // Enter focus mode if not active
-            if (!body.classList.contains('ui-hidden')) {
+            if (!body.classList.contains('focus-mode')) {
                 enterFocusMode();
             }
             scale = 2;
@@ -90,11 +90,11 @@ function initImageViewer() {
     }
 
     // ============================================================================
-    // FOCUS MODE (uses existing ui-hidden class)
+    // FOCUS MODE
     // ============================================================================
 
     function enterFocusMode() {
-        body.classList.add('ui-hidden');
+        body.classList.add('focus-mode');
         toggleFocus?.classList.add('active');
 
         // Reset focus hint animation
@@ -106,7 +106,7 @@ function initImageViewer() {
     }
 
     function exitFocusMode() {
-        body.classList.remove('ui-hidden');
+        body.classList.remove('focus-mode');
         toggleFocus?.classList.remove('active');
         resetZoom();
         updateCursor();
@@ -159,7 +159,7 @@ function initImageViewer() {
     const imgClickHandler = function (event) {
         if (scale === 1) {
             event.stopPropagation();
-            if (body.classList.contains('ui-hidden')) {
+            if (body.classList.contains('focus-mode')) {
                 exitFocusMode();
             } else {
                 enterFocusMode();
@@ -169,7 +169,7 @@ function initImageViewer() {
 
     // Mouse wheel to zoom (only in focus mode)
     const wheelHandler = function (event) {
-        if (!body.classList.contains('ui-hidden') || !img) return;
+        if (!body.classList.contains('focus-mode') || !img) return;
 
         event.preventDefault();
 
@@ -236,14 +236,14 @@ function initImageViewer() {
             case 'f':
             case 'F':
                 event.preventDefault();
-                if (body.classList.contains('ui-hidden')) {
+                if (body.classList.contains('focus-mode')) {
                     exitFocusMode();
                 } else {
                     enterFocusMode();
                 }
                 break;
             case 'Escape':
-                if (body.classList.contains('ui-hidden')) {
+                if (body.classList.contains('focus-mode')) {
                     exitFocusMode();
                 }
                 break;
@@ -271,7 +271,7 @@ function initImageViewer() {
 
     // Click outside image to exit focus mode
     const imageViewClickHandler = function (event) {
-        if (event.target === imageView && body.classList.contains('ui-hidden')) {
+        if (event.target === imageView && body.classList.contains('focus-mode')) {
             exitFocusMode();
         }
     };
