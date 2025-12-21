@@ -32,27 +32,27 @@ function confirmDelete() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ filepath: filepath })
         })
-        .then(res => {
-            if (!res.ok) {
-                 return res.json().then(err => { throw new Error(err.error || 'Server error') });
-            }
-            return res.json();
-        })
-        .then(data => {
-            if (data.status === 'success') {
-                showNotification('Image deleted!', 'success');
-                const nextUrl = findNextImageUrl();
-                setTimeout(() => {
-                    window.location.href = nextUrl || '/';
-                }, 500);
-            } else {
-                throw new Error(data.error || 'Delete failed');
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            showNotification('Failed to delete: ' + err.message, 'error');
-        });
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => { throw new Error(err.error || 'Server error') });
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    showNotification('Image deleted!', 'success');
+                    const nextUrl = findNextImageUrl();
+                    setTimeout(() => {
+                        window.location.href = nextUrl || '/';
+                    }, 500);
+                } else {
+                    throw new Error(data.error || 'Delete failed');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showNotification('Failed to delete: ' + err.message, 'error');
+            });
     });
 }
 
@@ -68,15 +68,15 @@ function confirmRetryTagging() {
 
     // Add hover effects
     optionBtns.forEach(btn => {
-        btn.addEventListener('mouseenter', function() {
+        btn.addEventListener('mouseenter', function () {
             this.style.transform = 'translateY(-2px)';
             this.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
         });
-        btn.addEventListener('mouseleave', function() {
+        btn.addEventListener('mouseleave', function () {
             this.style.transform = 'translateY(0)';
             this.style.boxShadow = 'none';
         });
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             document.body.removeChild(overlay);
             retryTagging(this.dataset.option === 'online-only');
         });
@@ -110,33 +110,33 @@ function retryTagging(skipLocalFallback = false) {
             skip_local_fallback: skipLocalFallback
         })
     })
-    .then(res => {
-        if (!res.ok) {
-            return res.json().then(err => { throw new Error(err.error || 'Server error') });
-        }
-        return res.json();
-    })
-    .then(data => {
-        if (data.status === 'success') {
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(err => { throw new Error(err.error || 'Server error') });
+            }
+            return res.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
                 const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
-            notifier.showNotification(`Successfully retagged! Source: ${data.new_source} (${data.tag_count} tags)`, 'success');
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else if (data.status === 'no_online_results') {
+                notifier.showNotification(`Successfully retagged! Source: ${data.new_source} (${data.tag_count} tags)`, 'success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else if (data.status === 'no_online_results') {
+                const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
+                notifier.showNotification('No online sources found. Current tags kept.', 'info');
+            } else if (data.status === 'no_results') {
+                throw new Error('No metadata found from any source. The image may not exist in any booru database.');
+            } else {
+                throw new Error(data.error || 'Retry failed');
+            }
+        })
+        .catch(err => {
+            console.error('Retry tagging error:', err);
             const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
-            notifier.showNotification('No online sources found. Current tags kept.', 'info');
-        } else if (data.status === 'no_results') {
-            throw new Error('No metadata found from any source. The image may not exist in any booru database.');
-        } else {
-            throw new Error(data.error || 'Retry failed');
-        }
-    })
-    .catch(err => {
-        console.error('Retry tagging error:', err);
-        const notifier = window.tagEditor || { showNotification: (msg, type) => alert(`${type}: ${msg}`) };
-        notifier.showNotification('Failed to retry tagging: ' + err.message, 'error');
-    });
+            notifier.showNotification('Failed to retry tagging: ' + err.message, 'error');
+        });
 }
 
 
@@ -177,7 +177,7 @@ function initCollapsibleSections() {
 
 
 function initSwipeNavigation() {
-    const relatedLinks = Array.from(document.querySelectorAll('.related-thumb'));
+    const relatedLinks = Array.from(document.querySelectorAll('.related-thumb, .related-item'));
     if (relatedLinks.length === 0) return;
 
     let touchStartX = 0;
@@ -431,7 +431,7 @@ function initSwipeNavigation() {
             initSwipeNavigation();
             initCollapsibleSections();
 
-            const deleteBtn = document.getElementById('deleteImageBtn');
+            const deleteBtn = document.getElementById('deleteImageBtn') || document.getElementById('floatingDeleteBtn');
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', confirmDelete);
             }
@@ -470,7 +470,16 @@ document.addEventListener('DOMContentLoaded', () => {
     initCollapsibleSections();
     initSwipeNavigation();
 
-    const deleteBtn = document.getElementById('deleteImageBtn');
+    // Click to Zoom
+    const mediaContainer = document.getElementById('imageViewContainer');
+    if (mediaContainer) {
+        mediaContainer.addEventListener('click', (e) => {
+            if (e.target.tagName === 'VIDEO' || e.target.closest('.action-btn')) return;
+            mediaContainer.classList.toggle('zoomed');
+        });
+    }
+
+    const deleteBtn = document.getElementById('deleteImageBtn') || document.getElementById('floatingDeleteBtn');
     if (deleteBtn) {
         deleteBtn.addEventListener('click', confirmDelete);
     }
@@ -478,4 +487,17 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('popstate', () => {
         window.location.reload();
     });
+
+    // Header Search Handler
+    const headerSearch = document.getElementById('headerSearchInput');
+    if (headerSearch) {
+        headerSearch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                const query = e.target.value.trim();
+                if (query) {
+                    window.location.href = `/?query=${encodeURIComponent(query)}`;
+                }
+            }
+        });
+    }
 });

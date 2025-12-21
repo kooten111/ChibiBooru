@@ -1279,7 +1279,8 @@ def find_blended_similar(
     visual_threshold: int = 15,
     tag_threshold: float = 0.1,
     semantic_threshold: float = 0.3,
-    exclude_family: bool = False
+    exclude_family: bool = False,
+    limit: int = 12
 ) -> List[Dict]:
     """
     Find similar images using a weighted blend of visual, semantic, and tag similarity.
@@ -1293,9 +1294,10 @@ def find_blended_similar(
         tag_threshold: Min tag similarity score (0-1, higher = stricter)
         semantic_threshold: Min semantic similarity score (0-1, higher = stricter)
         exclude_family: If True, exclude images in the same parent/child chain
+        limit: Maximum number of results to return (default 12 for sidebar)
         
     Returns:
-        List of similar images (all matching candidates, no internal limit)
+        List of similar images, limited to specified count
     """
     from services import query_service
     
@@ -1362,4 +1364,4 @@ def find_blended_similar(
         })
         
     blended.sort(key=lambda x: x['score'], reverse=True)
-    return blended  # Return all matching candidates, frontend paginates
+    return blended[:limit] if limit else blended

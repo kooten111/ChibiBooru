@@ -15,38 +15,58 @@ class InfiniteScroll {
 
         this.PREFETCH_AHEAD = 3; // Number of pages to prefetch ahead
 
+        // Determine scroll container - use .gallery-content if in gallery-page layout
+        this.scrollContainer = document.querySelector('.gallery-content') || window;
+        this.useWindowScroll = this.scrollContainer === window;
+
         this.init();
     }
-    
+
     init() {
-        window.addEventListener('scroll', () => this.handleScroll());
-        
+        this.scrollContainer.addEventListener('scroll', () => this.handleScroll());
+
         // Start prefetching immediately
         setTimeout(() => {
             this.startPrefetching();
             this.checkIfNeedMore();
         }, 500);
     }
-    
+
     handleScroll() {
         if (!this.hasMore) return;
-        
-        const scrollPosition = window.innerHeight + window.scrollY;
-        const documentHeight = document.documentElement.scrollHeight;
-        
+
+        let scrollPosition, totalHeight;
+
+        if (this.useWindowScroll) {
+            scrollPosition = window.innerHeight + window.scrollY;
+            totalHeight = document.documentElement.scrollHeight;
+        } else {
+            // For container-based scrolling
+            scrollPosition = this.scrollContainer.scrollTop + this.scrollContainer.clientHeight;
+            totalHeight = this.scrollContainer.scrollHeight;
+        }
+
         // Display when 80% scrolled
-        if (scrollPosition >= documentHeight * 0.8) {
+        if (scrollPosition >= totalHeight * 0.8) {
             this.displayNextPage();
         }
     }
-    
+
     checkIfNeedMore() {
-        // If page isn't tall enough to scroll, display more
-        if (document.documentElement.scrollHeight <= window.innerHeight && this.hasMore) {
+        // If content doesn't fill the scroll container, display more
+        let needsMore = false;
+
+        if (this.useWindowScroll) {
+            needsMore = document.documentElement.scrollHeight <= window.innerHeight;
+        } else {
+            needsMore = this.scrollContainer.scrollHeight <= this.scrollContainer.clientHeight;
+        }
+
+        if (needsMore && this.hasMore) {
             this.displayNextPage();
         }
     }
-    
+
     startPrefetching() {
         // Queue up the next few pages for prefetching
         for (let i = 1; i <= this.PREFETCH_AHEAD; i++) {
@@ -55,21 +75,21 @@ class InfiniteScroll {
                 this.prefetchQueue.push(pageToFetch);
             }
         }
-        
+
         this.processPrefetchQueue();
     }
-    
+
     async processPrefetchQueue() {
         if (this.prefetchInProgress || this.prefetchQueue.length === 0) return;
-        
+
         this.prefetchInProgress = true;
-        
+
         while (this.prefetchQueue.length > 0) {
             const pageNum = this.prefetchQueue.shift();
-            
+
             // Skip if already cached
             if (this.pageCache.has(pageNum)) continue;
-            
+
             try {
                 const data = await this.fetchPage(pageNum);
                 this.pageCache.set(pageNum, data);
@@ -86,10 +106,10 @@ class InfiniteScroll {
                 console.error(`Error prefetching page ${pageNum}:`, error);
             }
         }
-        
+
         this.prefetchInProgress = false;
     }
-    
+
     async fetchPage(pageNum) {
         const params = new URLSearchParams({
             page: pageNum,
@@ -105,7 +125,7 @@ class InfiniteScroll {
 
         return await response.json();
     }
-    
+
     async displayNextPage() {
         if (this.loading || !this.hasMore) return;
 
@@ -125,19 +145,19 @@ class InfiniteScroll {
             // Not cached yet, fetch it now with loading indicator
             this.loading = true;
             this.showLoader();
-            
+
             try {
                 const data = await this.fetchPage(nextPage);
                 this.appendImages(data.images);
                 this.displayedPage = nextPage;
                 this.hasMore = data.has_more;
-                
+
                 // Check if we need to display more immediately
                 setTimeout(() => this.checkIfNeedMore(), 100);
-                
+
                 // Continue prefetching
                 this.startPrefetching();
-                
+
             } catch (error) {
                 console.error('Error loading page:', error);
                 this.showError();
@@ -147,7 +167,7 @@ class InfiniteScroll {
             }
         }
     }
-    
+
     appendImages(images) {
         const fragment = document.createDocumentFragment();
 
@@ -182,13 +202,13 @@ class InfiniteScroll {
 
         this.gallery.appendChild(fragment);
     }
-    
+
     setupMasonryForImage(img, container) {
         if (!img.naturalWidth || !img.naturalHeight) return;
-        
+
         const aspectRatio = img.naturalWidth / img.naturalHeight;
         const rowHeight = 12;
-        
+
         let colSpan = 1;
         if (aspectRatio > 2) {
             colSpan = 3;
@@ -206,18 +226,18 @@ class InfiniteScroll {
             colSpan = 1;
             container.classList.add('square');
         }
-        
+
         const containerWidth = container.offsetWidth || 300;
         const calculatedHeight = containerWidth / aspectRatio;
         const rowSpan = Math.round(calculatedHeight / rowHeight);
-        
+
         container.style.gridRowEnd = `span ${Math.max(rowSpan, 10)}`;
         container.style.gridColumnEnd = `span ${colSpan}`;
     }
-    
+
     showLoader() {
         if (document.getElementById('infiniteLoader')) return;
-        
+
         const loader = document.createElement('div');
         loader.id = 'infiniteLoader';
         loader.style.cssText = `
@@ -232,15 +252,15 @@ class InfiniteScroll {
                 Loading more images...
             </div>
         `;
-        
+
         this.gallery.parentElement.appendChild(loader);
     }
-    
+
     hideLoader() {
         const loader = document.getElementById('infiniteLoader');
         if (loader) loader.remove();
     }
-    
+
     showError() {
         const error = document.createElement('div');
         error.style.cssText = `
@@ -251,9 +271,9 @@ class InfiniteScroll {
             font-weight: 600;
         `;
         error.textContent = 'Error loading more images. Please refresh the page.';
-        
+
         this.gallery.parentElement.appendChild(error);
-        
+
         setTimeout(() => error.remove(), 5000);
     }
 }

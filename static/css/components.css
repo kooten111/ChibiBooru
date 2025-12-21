@@ -1348,6 +1348,7 @@ body.image-page {
     flex-direction: column;
     height: 100%;
     align-items: center;
+    position: relative;
 }
 
 .image-page .sidebar-right {
@@ -2048,6 +2049,209 @@ body.ui-hidden::after {
     }
 }
 
+/* ============================================================================
+   IMAGE PAGE - Collapsible Sidebars & Floating Actions (UI Overhaul)
+   ============================================================================ */
+
+/* Sidebar collapse transitions */
+.image-page .sidebar-left,
+.image-page .sidebar-right {
+    transition: width 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
+}
+
+.image-page .sidebar-left.collapsed,
+.image-page .sidebar-right.collapsed {
+    width: 0 !important;
+    min-width: 0;
+    opacity: 0;
+    padding: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* Grid adjustments for collapsed sidebars */
+.image-page.left-collapsed .container {
+    grid-template-columns: 0 1fr 300px;
+}
+
+.image-page.right-collapsed .container {
+    grid-template-columns: 300px 1fr 0;
+}
+
+.image-page.left-collapsed.right-collapsed .container {
+    grid-template-columns: 0 1fr 0;
+}
+
+/* Sidebar toggle buttons in header */
+.sidebar-toggles {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
+
+.sidebar-toggle {
+    padding: 6px 8px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    font-size: 1rem;
+}
+
+.sidebar-toggle:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.sidebar-toggle.active {
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+}
+
+/* Floating Action Bar - Fixed at bottom of viewport */
+.floating-actions {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-xl);
+    z-index: 100;
+    opacity: 0.85;
+    transition: opacity var(--transition-normal);
+}
+
+.floating-actions:hover {
+    opacity: 1;
+}
+
+.floating-actions .action-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    font-size: 1.1rem;
+    text-decoration: none;
+}
+
+.floating-actions .action-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.floating-actions .action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.floating-actions .action-btn.success:hover {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.floating-actions .action-btn.primary:hover {
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+}
+
+.floating-actions .action-btn.active {
+    color: #fbbf24;
+}
+
+.floating-actions .divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+
+/* Focus mode exit button */
+.focus-exit {
+    position: fixed;
+    top: var(--spacing-lg);
+    right: var(--spacing-lg);
+    width: 40px;
+    height: 40px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    z-index: calc(var(--z-modal) + 3);
+    transition: all var(--transition-normal);
+}
+
+.focus-exit:hover {
+    background: rgba(0, 0, 0, 0.8);
+    transform: scale(1.1);
+}
+
+body.ui-hidden .focus-exit {
+    display: flex;
+}
+
+/* Focus mode hint */
+.focus-hint {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    pointer-events: none;
+    z-index: calc(var(--z-modal) + 3);
+    display: none;
+}
+
+body.ui-hidden .focus-hint {
+    display: block;
+    animation: fadeOut 4s forwards;
+}
+
+@keyframes fadeOut {
+
+    0%,
+    70% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Floating actions in focus mode - higher z-index, slightly transparent */
+body.ui-hidden .floating-actions {
+    bottom: 32px;
+    opacity: 0.75;
+    z-index: calc(var(--z-modal) + 2);
+}
+
+body.ui-hidden .floating-actions:hover {
+    opacity: 1;
+}
 
 .image-page .btn-saucenao {
     width: 100%;
@@ -5285,5 +5489,256 @@ body.ui-hidden::after {
     .family-thumb {
         width: 200px;
         height: auto;
+    }
+}
+
+/* ============================================================================
+   IMAGE PAGE - Improved Layout
+   ============================================================================ */
+
+body.image-page {
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* Compact header for image page */
+.image-page .header {
+    height: 48px;
+    padding: 0 var(--spacing-lg);
+}
+
+.image-page .header-content {
+    height: 100%;
+}
+
+/* Grid Container - narrower sidebars */
+.image-page .container {
+    display: grid;
+    grid-template-columns: var(--sidebar-width, 256px) 1fr var(--sidebar-width, 256px);
+    max-width: none;
+    margin: 0;
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
+    height: calc(100vh - 48px);
+    overflow: hidden;
+}
+
+/* Sidebar collapse states */
+.image-page .sidebar-left,
+.image-page .sidebar-right {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    transition: width 0.2s ease, opacity 0.2s ease;
+}
+
+.image-page .sidebar-left.collapsed,
+.image-page .sidebar-right.collapsed {
+    width: 0 !important;
+    opacity: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.image-page.left-collapsed .container {
+    grid-template-columns: 0 1fr var(--sidebar-width, 256px);
+}
+
+.image-page.right-collapsed .container {
+    grid-template-columns: var(--sidebar-width, 256px) 1fr 0;
+}
+
+.image-page.left-collapsed.right-collapsed .container {
+    grid-template-columns: 0 1fr 0;
+}
+
+/* Main content area */
+.image-page .main-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Image view - takes all available space */
+.image-page .image-view {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 0;
+    overflow: hidden;
+    position: relative;
+    background: linear-gradient(to bottom, rgba(30, 58, 138, 0.2), rgba(88, 28, 135, 0.2));
+    /* blue-900/20 to purple-900/20 */
+    border-radius: var(--radius-lg);
+    margin: 4px;
+    /* Small margin to see the grid gap/container clearly */
+}
+
+
+.image-page .image-view img,
+.image-page .image-view video {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: var(--radius-lg);
+    cursor: zoom-in;
+}
+
+/* Floating action bar */
+.image-page .floating-actions {
+    position: absolute;
+    bottom: var(--spacing-lg);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-xl);
+    z-index: 10;
+}
+
+.floating-actions .action-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    font-size: 1.1rem;
+}
+
+.floating-actions .action-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.floating-actions .action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.floating-actions .action-btn.success:hover {
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
+}
+
+.floating-actions .divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+    margin: 0 4px;
+}
+
+/* Sidebar toggle buttons in header */
+.sidebar-toggles {
+    display: flex;
+    gap: 4px;
+}
+
+.sidebar-toggle {
+    padding: 6px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.sidebar-toggle:hover {
+    color: var(--text-primary);
+}
+
+.sidebar-toggle.active {
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+}
+
+/* Focus mode */
+body.focus-mode {
+    background: black;
+}
+
+body.focus-mode .header,
+body.focus-mode .sidebar-left,
+body.focus-mode .sidebar-right {
+    display: none !important;
+}
+
+body.focus-mode .container {
+    grid-template-columns: 1fr;
+    height: 100vh;
+    padding: 0;
+}
+
+body.focus-mode .image-view {
+    padding: var(--spacing-lg);
+}
+
+body.focus-mode .image-view img {
+    max-height: calc(100vh - 100px);
+    cursor: grab;
+}
+
+body.focus-mode .image-view img:active {
+    cursor: grabbing;
+}
+
+body.focus-mode .floating-actions {
+    bottom: var(--spacing-xl);
+}
+
+body.focus-mode .focus-exit {
+    position: fixed;
+    top: var(--spacing-lg);
+    right: var(--spacing-lg);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    z-index: 100;
+}
+
+body.focus-mode .focus-hint {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    pointer-events: none;
+    animation: fadeOut 3s forwards;
+}
+
+@keyframes fadeOut {
+
+    0%,
+    80% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
     }
 }

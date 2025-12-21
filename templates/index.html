@@ -9,9 +9,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=25' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') + '?v=1' }}">
 </head>
 
-<body>
+<body class="gallery-page">
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
             <div class="drop-zone-icon">📤</div>
@@ -22,30 +23,52 @@
     {% include 'header.html' %}
 
     <div class="container">
-        {% if query and total_results is defined %}
-        <div class="results-info">
-            Found {{ total_results }} result{% if total_results != 1 %}s{% endif %}
+        <!-- Active Filters Bar -->
+        <div class="active-filters-bar" id="activeFiltersBar">
+            <!-- Populated by gallery.js -->
         </div>
-        {% endif %}
 
-        <div class="gallery">
-            {% for image in images %}
-            <div class="thumbnail skeleton" data-image-path="{{ image.path }}">
-                <input type="checkbox" class="image-select-checkbox" data-image-path="{{ image.path }}"
-                    style="position: absolute; top: 8px; left: 8px; width: 20px; height: 20px; cursor: pointer; z-index: 10; display: none;">
-                <a href="/view/{{ image.path | urlencode_path }}">
-                    <img src="/static/{% if not (image.thumb.startswith('thumbnails/') or image.thumb.startswith('images/')) %}images/{% endif %}{{ image.thumb | urlencode_path }}" alt="Image" loading="lazy" onload="this.closest('.thumbnail').classList.add('has-image')">
-                    {% if image.path.endswith('.mp4') or image.path.endswith('.webm') %}
-                    <div class="video-badge">▶</div>
-                    {% endif %}
-                    {% if show_similarity and image.similarity %}
-                    <div class="similarity-badge">
-                        {{ "%.0f"|format(image.similarity * 100) }}%
-                    </div>
-                    {% endif %}
-                </a>
+        <div class="gallery-layout">
+            <!-- Filter Sidebar -->
+            <div class="filter-sidebar" id="filterSidebar">
+                <!-- Populated by gallery.js -->
             </div>
-            {% endfor %}
+
+            <!-- Gallery Content -->
+            <div class="gallery-content">
+                {% if query and total_results is defined %}
+                <div class="results-info" style="display: none;">
+                    Found {{ total_results }} result{% if total_results != 1 %}s{% endif %}
+                </div>
+                {% endif %}
+
+                <div class="gallery grid-medium" id="gallery">
+                    {% for image in images %}
+                    <div class="thumbnail skeleton" data-image-path="{{ image.path }}">
+                        <input type="checkbox" class="image-select-checkbox" data-image-path="{{ image.path }}"
+                            style="position: absolute; top: 8px; left: 8px; width: 20px; height: 20px; cursor: pointer; z-index: 10; display: none;">
+                        <a href="/view/{{ image.path | urlencode_path }}">
+                            <img src="/static/{% if not (image.thumb.startswith('thumbnails/') or image.thumb.startswith('images/')) %}images/{% endif %}{{ image.thumb | urlencode_path }}"
+                                alt="Image" loading="lazy"
+                                onload="this.closest('.thumbnail').classList.add('has-image')">
+                            {% if image.path.endswith('.mp4') or image.path.endswith('.webm') %}
+                            <div class="video-badge">▶</div>
+                            {% endif %}
+                            {% if show_similarity and image.similarity %}
+                            <div class="similarity-badge">
+                                {{ "%.0f"|format(image.similarity * 100) }}%
+                            </div>
+                            {% endif %}
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyboard Hint -->
+        <div class="keyboard-hint">
+            <kbd>J</kbd>/<kbd>K</kbd> navigate • <kbd>Enter</kbd> open • <kbd>Ctrl+F</kbd> search
         </div>
     </div>
 
@@ -90,6 +113,7 @@
     <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/image-preloader.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/bulk-delete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/gallery.js') }}"></script>
 </body>
 
 </html>

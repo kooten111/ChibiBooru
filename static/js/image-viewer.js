@@ -1,4 +1,6 @@
-// Store active event listeners for cleanup
+// Image Viewer Enhancements - UI Overhaul
+// Features: Collapsible sidebars, focus mode, keyboard navigation, zoom/pan
+
 let imageViewerCleanup = null;
 
 function initImageViewer() {
@@ -12,20 +14,125 @@ function initImageViewer() {
     const body = document.body;
     const img = imageView?.querySelector('img');
 
-    if (!imageView || !body.classList.contains('image-page') || !img) return;
+    if (!body.classList.contains('image-page')) return;
 
+    // Elements
+    const sidebarLeft = document.getElementById('sidebarLeft');
+    const sidebarRight = document.getElementById('sidebarRight');
+    const toggleLeft = document.getElementById('toggleLeft');
+    const toggleRight = document.getElementById('toggleRight');
+    const toggleFocus = document.getElementById('toggleFocus');
+    const focusBtn = document.getElementById('focusBtn');
+    const focusExit = document.getElementById('focusExit');
+    const focusHint = document.getElementById('focusHint');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const zoomBtn = document.getElementById('zoomBtn');
+    const floatingFavBtn = document.getElementById('floatingFavBtn');
+
+    const floatingDeleteBtn = document.getElementById('floatingDeleteBtn');
+
+    // Zoom/pan state
     let scale = 1;
     let translateX = 0;
     let translateY = 0;
     let isDragging = false;
     let startX = 0;
     let startY = 0;
-
     const MIN_SCALE = 1;
     const MAX_SCALE = 8;
 
+    function toggleZoom() {
+        if (scale === 1) {
+            // Enter focus mode if not active
+            if (!body.classList.contains('ui-hidden')) {
+                enterFocusMode();
+            }
+            scale = 2;
+        } else {
+            scale = 1;
+            translateX = 0;
+            translateY = 0;
+        }
+        updateTransform();
+        updateCursor();
+    }
+
+
+    // ============================================================================
+    // SIDEBAR TOGGLE
+    // ============================================================================
+
+    function toggleSidebar(side) {
+        if (side === 'left') {
+            body.classList.toggle('left-collapsed');
+            sidebarLeft?.classList.toggle('collapsed');
+            toggleLeft?.classList.toggle('active');
+            localStorage.setItem('sidebar-left', !body.classList.contains('left-collapsed'));
+        } else {
+            body.classList.toggle('right-collapsed');
+            sidebarRight?.classList.toggle('collapsed');
+            toggleRight?.classList.toggle('active');
+            localStorage.setItem('sidebar-right', !body.classList.contains('right-collapsed'));
+        }
+    }
+
+    // Restore sidebar preferences
+    if (localStorage.getItem('sidebar-left') === 'false') {
+        body.classList.add('left-collapsed');
+        sidebarLeft?.classList.add('collapsed');
+        toggleLeft?.classList.remove('active');
+    }
+    if (localStorage.getItem('sidebar-right') === 'false') {
+        body.classList.add('right-collapsed');
+        sidebarRight?.classList.add('collapsed');
+        toggleRight?.classList.remove('active');
+    }
+
+    // ============================================================================
+    // FOCUS MODE (uses existing ui-hidden class)
+    // ============================================================================
+
+    function enterFocusMode() {
+        body.classList.add('ui-hidden');
+        toggleFocus?.classList.add('active');
+
+        // Reset focus hint animation
+        if (focusHint) {
+            focusHint.style.animation = 'none';
+            focusHint.offsetHeight; // Trigger reflow
+            focusHint.style.animation = null;
+        }
+    }
+
+    function exitFocusMode() {
+        body.classList.remove('ui-hidden');
+        toggleFocus?.classList.remove('active');
+        resetZoom();
+        updateCursor();
+    }
+
+    // ============================================================================
+    // NAVIGATION
+    // ============================================================================
+
+    function navigate(direction) {
+        // Get related images from sidebar
+        const relatedLinks = document.querySelectorAll('.related-thumb');
+        if (relatedLinks.length > 0) {
+            const targetIndex = direction === 'next' ? 0 : relatedLinks.length - 1;
+            relatedLinks[targetIndex].click();
+        }
+    }
+
+    // ============================================================================
+    // ZOOM/PAN (preserved from original)
+    // ============================================================================
+
     function updateTransform() {
-        img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        if (img) {
+            img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        }
     }
 
     function resetZoom() {
@@ -36,6 +143,7 @@ function initImageViewer() {
     }
 
     function updateCursor() {
+        if (!img) return;
         if (scale > 1) {
             img.style.cursor = isDragging ? 'grabbing' : 'grab';
         } else {
@@ -43,22 +151,25 @@ function initImageViewer() {
         }
     }
 
-    // Single click to toggle fullscreen
-    const imgClickHandler = function(event) {
+    // ============================================================================
+    // EVENT HANDLERS
+    // ============================================================================
+
+    // Image click - toggle focus mode
+    const imgClickHandler = function (event) {
         if (scale === 1) {
             event.stopPropagation();
-            body.classList.toggle('ui-hidden');
-            // Reset position when exiting fullscreen
-            if (!body.classList.contains('ui-hidden')) {
-                resetZoom();
+            if (body.classList.contains('ui-hidden')) {
+                exitFocusMode();
+            } else {
+                enterFocusMode();
             }
         }
     };
-    img.addEventListener('click', imgClickHandler);
 
-    // Mouse wheel to zoom (only in fullscreen mode)
-    const wheelHandler = function(event) {
-        if (!body.classList.contains('ui-hidden')) return;
+    // Mouse wheel to zoom (only in focus mode)
+    const wheelHandler = function (event) {
+        if (!body.classList.contains('ui-hidden') || !img) return;
 
         event.preventDefault();
 
@@ -68,18 +179,12 @@ function initImageViewer() {
 
         if (newScale !== scale) {
             const rect = img.getBoundingClientRect();
-
-            // Calculate point on image where mouse is (in screen coordinates)
             const pointX = event.clientX;
             const pointY = event.clientY;
-
-            // Calculate the center of the image in screen coordinates
             const imgCenterX = rect.left + rect.width / 2;
             const imgCenterY = rect.top + rect.height / 2;
-
             const scaleChange = newScale / scale;
 
-            // New translation to keep point under cursor
             translateX = pointX - imgCenterX - (pointX - imgCenterX - translateX) * scaleChange;
             translateY = pointY - imgCenterY - (pointY - imgCenterY - translateY) * scaleChange;
 
@@ -88,11 +193,10 @@ function initImageViewer() {
             updateCursor();
         }
     };
-    imageView.addEventListener('wheel', wheelHandler, { passive: false });
 
     // Mouse drag to pan when zoomed in
-    const mouseDownHandler = function(event) {
-        if (scale > 1) {
+    const mouseDownHandler = function (event) {
+        if (scale > 1 && img) {
             event.preventDefault();
             isDragging = true;
             startX = event.clientX - translateX;
@@ -100,67 +204,179 @@ function initImageViewer() {
             updateCursor();
         }
     };
-    img.addEventListener('mousedown', mouseDownHandler);
 
-    const mouseMoveHandler = function(event) {
+    const mouseMoveHandler = function (event) {
         if (isDragging) {
             translateX = event.clientX - startX;
             translateY = event.clientY - startY;
             updateTransform();
         }
     };
-    document.addEventListener('mousemove', mouseMoveHandler);
 
-    const mouseUpHandler = function() {
+    const mouseUpHandler = function () {
         if (isDragging) {
             isDragging = false;
             updateCursor();
         }
     };
-    document.addEventListener('mouseup', mouseUpHandler);
 
     // Prevent context menu when dragging
-    const contextMenuHandler = function(event) {
+    const contextMenuHandler = function (event) {
         if (scale > 1) {
             event.preventDefault();
         }
     };
-    img.addEventListener('contextmenu', contextMenuHandler);
 
-    // ESC key to exit fullscreen and reset zoom
-    const keydownHandler = function(event) {
-        if (event.key === 'Escape' && body.classList.contains('ui-hidden')) {
-            body.classList.remove('ui-hidden');
-            resetZoom();
-            updateCursor();
+    // Keyboard shortcuts
+    const keydownHandler = function (event) {
+        // Ignore if typing in input
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') return;
+
+        switch (event.key) {
+            case 'f':
+            case 'F':
+                event.preventDefault();
+                if (body.classList.contains('ui-hidden')) {
+                    exitFocusMode();
+                } else {
+                    enterFocusMode();
+                }
+                break;
+            case 'Escape':
+                if (body.classList.contains('ui-hidden')) {
+                    exitFocusMode();
+                }
+                break;
+            case 'ArrowLeft':
+                navigate('prev');
+                break;
+            case 'ArrowRight':
+                navigate('next');
+                break;
+            case 'h':
+            case 'H':
+                toggleSidebar('left');
+                break;
+            case 'l':
+            case 'L':
+                toggleSidebar('right');
+                break;
+            case 'z':
+            case 'Z':
+                toggleZoom();
+                break;
+
         }
     };
-    document.addEventListener('keydown', keydownHandler);
 
-    // Click outside image to exit fullscreen and reset zoom
-    const imageViewClickHandler = function(event) {
-        // Check if click was on imageView (background) and not on the img itself
+    // Click outside image to exit focus mode
+    const imageViewClickHandler = function (event) {
         if (event.target === imageView && body.classList.contains('ui-hidden')) {
-            body.classList.remove('ui-hidden');
-            resetZoom();
-            updateCursor();
+            exitFocusMode();
         }
     };
-    imageView.addEventListener('click', imageViewClickHandler);
+
+    // ============================================================================
+    // BIND EVENTS
+    // ============================================================================
+
+    // Sidebar toggles
+    toggleLeft?.addEventListener('click', () => toggleSidebar('left'));
+    toggleRight?.addEventListener('click', () => toggleSidebar('right'));
+
+    // Focus mode controls
+    toggleFocus?.addEventListener('click', enterFocusMode);
+    toggleFocus?.addEventListener('click', enterFocusMode);
+    focusBtn?.addEventListener('click', enterFocusMode);
+    focusExit?.addEventListener('click', exitFocusMode);
+    zoomBtn?.addEventListener('click', toggleZoom);
+
+
+    // Navigation
+    prevBtn?.addEventListener('click', () => navigate('prev'));
+    nextBtn?.addEventListener('click', () => navigate('next'));
+
+    // Connect floating buttons to existing functionality
+    floatingFavBtn?.addEventListener('click', () => {
+        document.getElementById('favouriteBtn')?.click();
+    });
+    floatingDeleteBtn?.addEventListener('click', () => {
+        document.getElementById('deleteImageBtn')?.click();
+    });
+
+    // Connect Edit Tags and Add to Pool buttons
+    const floatingEditTagsBtn = document.getElementById('floatingEditTagsBtn');
+    const floatingAddPoolBtn = document.getElementById('floatingAddPoolBtn');
+
+    floatingEditTagsBtn?.addEventListener('click', () => {
+        if (typeof toggleTagEditor === 'function') {
+            toggleTagEditor();
+        }
+    });
+
+    floatingAddPoolBtn?.addEventListener('click', () => {
+        if (typeof showAddToPoolModal === 'function') {
+            showAddToPoolModal();
+        }
+    });
+
+    // Sync floating favourite button state with main button
+    const mainFavBtn = document.getElementById('favouriteBtn');
+    if (mainFavBtn && floatingFavBtn) {
+        const observer = new MutationObserver(() => {
+            const isFav = mainFavBtn.classList.contains('favourited');
+            floatingFavBtn.textContent = isFav ? '❤️' : '🤍';
+            floatingFavBtn.classList.toggle('active', isFav);
+        });
+        observer.observe(mainFavBtn, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    // Image zoom/pan events
+    if (img) {
+        img.addEventListener('click', imgClickHandler);
+        img.addEventListener('mousedown', mouseDownHandler);
+        img.addEventListener('contextmenu', contextMenuHandler);
+    }
+
+    if (imageView) {
+        imageView.addEventListener('wheel', wheelHandler, { passive: false });
+        imageView.addEventListener('click', imageViewClickHandler);
+    }
+
+    document.addEventListener('mousemove', mouseMoveHandler);
+    document.addEventListener('mouseup', mouseUpHandler);
+    document.addEventListener('keydown', keydownHandler);
 
     // Initial cursor
     updateCursor();
 
-    // Return cleanup function
-    imageViewerCleanup = function() {
-        img.removeEventListener('click', imgClickHandler);
-        imageView.removeEventListener('wheel', wheelHandler);
-        img.removeEventListener('mousedown', mouseDownHandler);
+    // ============================================================================
+    // CLEANUP
+    // ============================================================================
+
+    imageViewerCleanup = function () {
+        toggleLeft?.removeEventListener('click', () => toggleSidebar('left'));
+        toggleRight?.removeEventListener('click', () => toggleSidebar('right'));
+        toggleFocus?.removeEventListener('click', enterFocusMode);
+        focusBtn?.removeEventListener('click', enterFocusMode);
+        focusExit?.removeEventListener('click', exitFocusMode);
+        prevBtn?.removeEventListener('click', () => navigate('prev'));
+        nextBtn?.removeEventListener('click', () => navigate('next'));
+
+        if (img) {
+            img.removeEventListener('click', imgClickHandler);
+            img.removeEventListener('mousedown', mouseDownHandler);
+            img.removeEventListener('contextmenu', contextMenuHandler);
+        }
+
+        if (imageView) {
+            imageView.removeEventListener('wheel', wheelHandler);
+            imageView.removeEventListener('click', imageViewClickHandler);
+        }
+
         document.removeEventListener('mousemove', mouseMoveHandler);
         document.removeEventListener('mouseup', mouseUpHandler);
-        img.removeEventListener('contextmenu', contextMenuHandler);
         document.removeEventListener('keydown', keydownHandler);
-        imageView.removeEventListener('click', imageViewClickHandler);
     };
 }
 

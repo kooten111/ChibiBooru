@@ -1,0 +1,641 @@
+/* ============================================================================
+   GALLERY PAGE - New Improved Layout
+   Based on UI_Gallery.md specification
+   ============================================================================ */
+
+/* Gallery Page Root - Full height layout */
+.gallery-page {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Override container for gallery page */
+.gallery-page .container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    max-width: none;
+    margin: 0;
+}
+
+/* ============================================================================
+   COMPACT HEADER FOR GALLERY PAGE
+   Based on prototype: smaller height, compact mascot, inline controls
+   ============================================================================ */
+
+.gallery-page .header {
+    padding: 8px var(--spacing-lg);
+    min-height: auto;
+}
+
+.gallery-page .header-content {
+    gap: var(--spacing-md);
+}
+
+.gallery-page .header h1 {
+    font-size: 1.25rem;
+}
+
+.gallery-page .header-mascot {
+    height: 40px;
+    left: 100px;
+    top: -2px;
+}
+
+.gallery-page .search-bar {
+    max-width: 500px;
+}
+
+.gallery-page .search-bar input,
+.gallery-page .chip-input-wrapper {
+    min-height: 36px;
+    max-height: 36px;
+    padding: 6px 12px;
+    font-size: var(--font-size-sm);
+}
+
+.gallery-page .search-bar button,
+.gallery-page .search-submit {
+    padding: 6px 16px;
+    font-size: var(--font-size-sm);
+}
+
+/* Stats tabs bar - more compact, matching header style */
+.gallery-page .stats-tabs-bar {
+    padding: 0 var(--spacing-lg);
+    gap: 2px;
+}
+
+.gallery-page .stat-tab-button {
+    padding: 8px 12px;
+    font-size: var(--font-size-xs);
+    background: transparent;
+    border-radius: var(--radius-sm);
+}
+
+/* Hide chips in search bar - use filters bar instead */
+.gallery-page .chip-input-chips {
+    display: none;
+}
+
+/* Expand text input since no chips */
+.gallery-page .chip-input-wrapper #chipTextInput {
+    flex: 1;
+}
+
+/* ============================================================================
+   HEADER CONTROLS - Grid Size Toggle & Sidebar Toggle
+   ============================================================================ */
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-left: auto;
+}
+
+.grid-size-toggle {
+    display: flex;
+    background: var(--bg-tertiary, rgba(30, 30, 45, 0.5));
+    border-radius: var(--radius-md);
+    padding: 2px;
+    border: var(--border-width) solid var(--border-color);
+}
+
+.grid-size-btn {
+    padding: 6px 12px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.grid-size-btn:hover {
+    color: var(--text-primary);
+}
+
+.grid-size-btn.active {
+    background: var(--primary-blue);
+    color: white;
+}
+
+.header-btn {
+    padding: 8px 10px;
+    background: transparent;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    font-size: 1.1rem;
+}
+
+.header-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-color-hover);
+}
+
+.header-btn.active {
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+    border-color: var(--primary-blue);
+}
+
+/* ============================================================================
+   ACTIVE FILTERS BAR
+   ============================================================================ */
+
+.active-filters-bar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-lg);
+    background: var(--bg-secondary, rgba(20, 20, 30, 0.9));
+    border-bottom: var(--border-width) solid var(--border-color);
+    flex-wrap: wrap;
+    min-height: 44px;
+}
+
+.active-filters-bar:empty,
+.active-filters-bar.hidden {
+    display: none;
+}
+
+.filters-label {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.5px;
+}
+
+.active-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: var(--primary-blue-light);
+    border: var(--border-width) solid var(--primary-blue);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    color: var(--primary-blue);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.active-filter-chip:hover {
+    background: var(--primary-blue-medium);
+}
+
+.active-filter-chip .chip-text {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.active-filter-chip .chip-remove {
+    font-size: 14px;
+    opacity: 0.7;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all var(--transition-normal);
+}
+
+.active-filter-chip .chip-remove:hover {
+    opacity: 1;
+    background: rgba(255, 100, 100, 0.3);
+}
+
+/* Editable chip state */
+.active-filter-chip.editing {
+    padding: 2px 4px;
+    background: var(--bg-input);
+    border-color: var(--border-color-focus);
+}
+
+.active-filter-chip.editing .chip-edit-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    font-family: inherit;
+    min-width: 80px;
+    width: auto;
+}
+
+.clear-filters {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-left: var(--spacing-sm);
+}
+
+.clear-filters:hover {
+    color: var(--danger);
+}
+
+.results-count {
+    margin-left: auto;
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+/* ============================================================================
+   GALLERY LAYOUT - Sidebar + Content
+   ============================================================================ */
+
+.gallery-layout {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* ============================================================================
+   FILTER SIDEBAR
+   ============================================================================ */
+
+.filter-sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: var(--bg-secondary, rgba(20, 20, 30, 0.95));
+    border-right: var(--border-width) solid var(--border-color);
+    overflow-y: auto;
+    padding: var(--spacing-md);
+    transition: width 0.25s ease, opacity 0.25s ease, padding 0.25s ease;
+}
+
+.filter-sidebar.collapsed {
+    width: 0;
+    padding: 0;
+    opacity: 0;
+    overflow: hidden;
+}
+
+/* Filter Sections */
+.filter-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.filter-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) 0;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    user-select: none;
+    transition: color var(--transition-normal);
+}
+
+.filter-section-header:hover {
+    color: var(--text-secondary);
+}
+
+.filter-section-header .icon {
+    font-size: 1rem;
+    margin-right: var(--spacing-xs);
+}
+
+.filter-section-header .arrow {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+}
+
+.filter-section.collapsed .arrow {
+    transform: rotate(-90deg);
+}
+
+.filter-section-content {
+    padding-top: var(--spacing-xs);
+}
+
+.filter-section.collapsed .filter-section-content {
+    display: none;
+}
+
+/* Filter Items */
+.filter-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    margin: 2px 0;
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.filter-item:hover {
+    background: var(--bg-hover, rgba(40, 40, 60, 0.5));
+    color: var(--text-primary);
+}
+
+.filter-item.active {
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+}
+
+.filter-item .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.filter-item .count {
+    margin-left: auto;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+/* Rating colors */
+.filter-item .dot.general {
+    background: #22c55e;
+}
+
+.filter-item .dot.sensitive {
+    background: #eab308;
+}
+
+.filter-item .dot.questionable {
+    background: #f97316;
+}
+
+.filter-item .dot.explicit {
+    background: #ef4444;
+}
+
+/* ============================================================================
+   GALLERY CONTENT
+   ============================================================================ */
+
+.gallery-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md);
+}
+
+/* Preserve existing gallery grid but add size variations */
+.gallery-page .gallery {
+    display: grid;
+    gap: 10px;
+    grid-auto-flow: dense;
+}
+
+/* Grid Size Variations */
+.gallery.grid-small {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-auto-rows: 8px;
+}
+
+.gallery.grid-small .thumbnail {
+    grid-row: span 14;
+}
+
+.gallery.grid-small .thumbnail.wide {
+    grid-row: span 10;
+    grid-column: span 2;
+}
+
+.gallery.grid-small .thumbnail.tall {
+    grid-row: span 22;
+}
+
+.gallery.grid-medium {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-auto-rows: 10px;
+}
+
+.gallery.grid-medium .thumbnail {
+    grid-row: span 18;
+}
+
+.gallery.grid-medium .thumbnail.wide {
+    grid-row: span 13;
+    grid-column: span 2;
+}
+
+.gallery.grid-medium .thumbnail.tall {
+    grid-row: span 28;
+}
+
+.gallery.grid-large {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-auto-rows: 12px;
+}
+
+.gallery.grid-large .thumbnail {
+    grid-row: span 22;
+}
+
+.gallery.grid-large .thumbnail.wide {
+    grid-row: span 16;
+    grid-column: span 2;
+}
+
+.gallery.grid-large .thumbnail.tall {
+    grid-row: span 34;
+}
+
+/* ============================================================================
+   THUMBNAIL ENHANCEMENTS
+   ============================================================================ */
+
+/* Hover Overlay */
+.thumbnail .hover-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: var(--spacing-sm);
+    pointer-events: none;
+}
+
+.thumbnail:hover .hover-overlay {
+    opacity: 1;
+}
+
+.hover-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.hover-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+    backdrop-filter: blur(4px);
+}
+
+.hover-tag.character {
+    background: rgba(255, 182, 193, 0.35);
+}
+
+.hover-tag.copyright {
+    background: rgba(147, 112, 219, 0.35);
+}
+
+.hover-tag.artist {
+    background: rgba(255, 165, 0, 0.35);
+}
+
+/* Rating Indicator Dot */
+.thumbnail .rating-dot {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    z-index: 5;
+}
+
+.thumbnail .rating-dot.general {
+    background: #22c55e;
+}
+
+.thumbnail .rating-dot.sensitive {
+    background: #eab308;
+}
+
+.thumbnail .rating-dot.questionable {
+    background: #f97316;
+}
+
+.thumbnail .rating-dot.explicit {
+    background: #ef4444;
+}
+
+/* Focused thumbnail (keyboard nav) */
+.thumbnail.focused {
+    outline: 3px solid var(--primary-blue);
+    outline-offset: 2px;
+    z-index: 10;
+}
+
+/* ============================================================================
+   KEYBOARD HINT
+   ============================================================================ */
+
+.keyboard-hint {
+    position: fixed;
+    bottom: var(--spacing-md);
+    right: var(--spacing-md);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--bg-secondary, rgba(20, 20, 30, 0.9));
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    z-index: 50;
+    backdrop-filter: blur(8px);
+}
+
+.keyboard-hint kbd {
+    display: inline-block;
+    padding: 2px 6px;
+    background: var(--bg-tertiary, rgba(40, 40, 60, 0.8));
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85em;
+    margin: 0 2px;
+}
+
+/* ============================================================================
+   RESPONSIVE STYLES
+   ============================================================================ */
+
+@media (max-width: 1024px) {
+    .filter-sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 100;
+        padding-top: 70px;
+        box-shadow: var(--shadow-xl);
+        transform: translateX(0);
+    }
+
+    .filter-sidebar.collapsed {
+        transform: translateX(-100%);
+        width: 240px;
+        padding: var(--spacing-md);
+        padding-top: 70px;
+    }
+
+    /* Backdrop overlay when sidebar is open */
+    .filter-sidebar::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: -1;
+        opacity: 1;
+        transition: opacity 0.25s ease;
+    }
+
+    .filter-sidebar.collapsed::before {
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .header-controls {
+        gap: var(--spacing-sm);
+    }
+
+    .grid-size-toggle {
+        display: none;
+    }
+
+    .keyboard-hint {
+        display: none;
+    }
+
+    .gallery.grid-small,
+    .gallery.grid-medium,
+    .gallery.grid-large {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        grid-auto-rows: 8px;
+    }
+
+    .active-filters-bar {
+        padding: var(--spacing-xs) var(--spacing-md);
+    }
+}

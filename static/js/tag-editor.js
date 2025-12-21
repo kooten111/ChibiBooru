@@ -75,24 +75,37 @@ class TagEditor {
         };
 
         // Try to parse from the existing tag categories on the page
-        this.categories.forEach(category => {
-            const categoryDiv = document.querySelector(`.tag-category.${category}`);
-            if (categoryDiv) {
-                const tagItems = categoryDiv.querySelectorAll('.tag-item a');
-                tagItems.forEach(link => {
-                    // Skip delta items (manual modifications)
-                    if (link.closest('.delta-added') || link.closest('.delta-removed')) {
-                        return;
+        // We iterate all .tag-category elements found on page
+        const categoryDivs = document.querySelectorAll('.tag-category');
+        categoryDivs.forEach(categoryDiv => {
+            // Determine category key from data attribute or class
+            let categoryKey = categoryDiv.dataset.category;
+            if (!categoryKey) {
+                // Fallback to class checking
+                for (const cat of this.categories) {
+                    if (categoryDiv.classList.contains(cat)) {
+                        categoryKey = cat;
+                        break;
                     }
-
-                    const tag = link.textContent.trim();
-                    // Remove any leading + or - that might be from delta display
-                    const cleanTag = tag.replace(/^[+-]+/, '');
-                    if (cleanTag && !this.tags[category].includes(cleanTag)) {
-                        this.tags[category].push(cleanTag);
-                    }
-                });
+                }
             }
+
+            if (!categoryKey || !this.tags[categoryKey]) return;
+
+            const tagItems = categoryDiv.querySelectorAll('.tag-item a');
+            tagItems.forEach(link => {
+                // Skip delta items (manual modifications)
+                if (link.closest('.delta-added') || link.closest('.delta-removed')) {
+                    return;
+                }
+
+                const tag = link.textContent.trim();
+                // Remove any leading + or - that might be from delta display
+                const cleanTag = tag.replace(/^[+-]+/, '');
+                if (cleanTag && !this.tags[categoryKey].includes(cleanTag)) {
+                    this.tags[categoryKey].push(cleanTag);
+                }
+            });
         });
     }
 
@@ -543,34 +556,34 @@ class TagEditor {
                 categorized_tags: categorizedTags
             })
         })
-        .then(res => {
-            const contentType = res.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                console.error('Response is not JSON, got:', contentType);
-                return res.text().then(text => {
-                    console.error('Response body:', text.substring(0, 500));
-                    throw new Error('Server returned non-JSON response');
-                });
-            }
-            return res.json();
-        })
-        .then(data => {
-            if (data.status === 'success') {
-                showNotification('Tags saved!', 'success');
-                this.renderViewMode();
-                setTimeout(() => location.reload(), 500);
-            } else {
-                throw new Error(data.error || 'Save failed');
-            }
-        })
-        .catch(err => {
-            console.error('Save error:', err);
-            showNotification('Failed to save: ' + err.message, 'error');
-            if (editBtn) {
-                editBtn.textContent = '💾 Save Tags';
-                editBtn.disabled = false;
-            }
-        });
+            .then(res => {
+                const contentType = res.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.error('Response is not JSON, got:', contentType);
+                    return res.text().then(text => {
+                        console.error('Response body:', text.substring(0, 500));
+                        throw new Error('Server returned non-JSON response');
+                    });
+                }
+                return res.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    showNotification('Tags saved!', 'success');
+                    this.renderViewMode();
+                    setTimeout(() => location.reload(), 500);
+                } else {
+                    throw new Error(data.error || 'Save failed');
+                }
+            })
+            .catch(err => {
+                console.error('Save error:', err);
+                showNotification('Failed to save: ' + err.message, 'error');
+                if (editBtn) {
+                    editBtn.textContent = '💾 Save Tags';
+                    editBtn.disabled = false;
+                }
+            });
     }
 
     cancelEdit() {
