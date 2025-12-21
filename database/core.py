@@ -69,7 +69,8 @@ def initialize_database():
             'tags_general': 'TEXT',
             'score': 'INTEGER',
             'fav_count': 'INTEGER',
-            'phash': 'TEXT'  # Perceptual hash for visual similarity
+            'phash': 'TEXT',  # Perceptual hash for visual similarity
+            'colorhash': 'TEXT'  # Color hash for color similarity
         }
 
         cur.execute("PRAGMA table_info(images);")
@@ -330,6 +331,7 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_score ON images(score DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_fav_count ON images(fav_count DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_images_phash ON images(phash)")  # For similarity lookups
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_images_colorhash ON images(colorhash)")  # For color similarity
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_name_lower ON tags(LOWER(name))")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_tags_category ON tags(category)")

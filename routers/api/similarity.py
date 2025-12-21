@@ -26,6 +26,7 @@ async def get_similar_images(filepath):
     threshold = request.args.get('threshold', config.VISUAL_SIMILARITY_THRESHOLD, type=int)
     limit = request.args.get('limit', 50, type=int)
     exclude_family = request.args.get('exclude_family', 'false').lower() in ('true', '1', 'yes')
+    color_weight = request.args.get('color_weight', 0.0, type=float)
     
     # Run in thread to not block
     similar = await asyncio.to_thread(
@@ -33,7 +34,8 @@ async def get_similar_images(filepath):
         filepath,
         threshold=threshold,
         limit=limit,
-        exclude_family=exclude_family
+        exclude_family=exclude_family,
+        color_weight=color_weight
     )
     
     return {
@@ -41,6 +43,7 @@ async def get_similar_images(filepath):
         'count': len(similar),
         'threshold': threshold,
         'exclude_family': exclude_family,
+        'color_weight': color_weight,
         'reference': filepath
     }
 
@@ -125,63 +128,23 @@ async def generate_hashes():
     
     async def generate_hashes_task(task_id, manager):
         """Background task for generating hashes with progress updates."""
-        from database import get_db_connection
         from services import monitor_service as mon
-        import os
         
-        # Get count of images missing hashes
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT filepath, md5 FROM images WHERE phash IS NULL")
-            missing = cursor.fetchall()
+        mon.add_log("Starting hash generation...", "info")
         
-        total = len(missing)
-        if total == 0:
-            mon.add_log("All images already have hashes", "info")
-            return {'success': 0, 'failed': 0, 'total': 0, 'message': 'All images already have hashes'}
+        # Run synchronous service function in thread
+        # We rely on the service to log progress to the activity log
+        stats = await asyncio.to_thread(similarity_service.generate_missing_hashes)
         
-        mon.add_log(f"Starting hash generation for {total} images...", "info")
-        await manager.update_progress(task_id, 0, total, f"Processing 0/{total} images...")
-        
-        success = 0
-        failed = 0
-        
-        for i, row in enumerate(missing):
-            filepath = row['filepath']
-            md5 = row['md5']
-            full_path = os.path.join("static/images", filepath)
-            
-            # Run blocking hash computation in thread to avoid freezing the event loop
-            try:
-                phash = await asyncio.to_thread(similarity_service.compute_phash_for_file, full_path, md5)
-            except Exception as e:
-                mon.add_log(f"Error processing {filepath}: {e}", "error")
-                phash = None
-            
-            if phash:
-                # DB updates are fast enough, but could also be threaded if needed
-                similarity_service.update_image_phash(filepath, phash)
-                success += 1
-            else:
-                failed += 1
-            
-            # Determine log interval: every 1% or every 10 images, whichever is larger, capped at 1000
-            log_interval = max(10, int(total / 100))
-            if log_interval > 1000:
-                log_interval = 1000
-            
-            # Update progress
-            if (i + 1) % log_interval == 0 or i == total - 1:
-                progress_msg = f"Hash generation: {i + 1}/{total} ({success} success, {failed} failed)"
-                mon.add_log(progress_msg, "info")
-                await manager.update_progress(task_id, i + 1, total, progress_msg)
-                
-            # Yield control periodically to ensure server stays responsive
-            if i % 10 == 0:
-                await asyncio.sleep(0)
+        success = stats['success']
+        failed = stats['failed']
+        total = stats['total']
         
         result_msg = f"✓ Hash generation complete: {success} generated, {failed} failed"
         mon.add_log(result_msg, "success")
+        
+        # Update task to 100%
+        await manager.update_progress(task_id, total, total, "Complete")
         
         return {
             'success': success,

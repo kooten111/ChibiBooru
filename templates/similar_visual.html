@@ -220,9 +220,15 @@
             </div>
 
             <div class="threshold-control">
-                <label for="threshold">Similarity Threshold:</label>
+                <label for="threshold">Distance Threshold:</label>
                 <input type="range" id="threshold" min="0" max="30" value="{{ threshold }}" step="1">
                 <span class="threshold-value" id="thresholdValue">{{ threshold }}</span>
+            </div>
+
+            <div class="threshold-control">
+                <label for="colorWeight">Color Sensitivity:</label>
+                <input type="range" id="colorWeight" min="0" max="100" value="0" step="10">
+                <span class="threshold-value" id="colorWeightValue">0%</span>
             </div>
 
             <div class="filter-options">
@@ -251,7 +257,7 @@
                 <div class="result-info">
                     <span
                         class="distance-badge {% if image.distance <= 5 %}identical{% elif image.distance <= 10 %}similar{% else %}somewhat{% endif %}">
-                        Distance: {{ image.distance }}
+                        Dist: {{ image.distance }}
                     </span>
                     <div class="result-actions">
                         <a href="/view/{{ image.path | urlencode_path }}" class="btn-view">View</a>
@@ -287,24 +293,31 @@
             };
         }
 
-        // Update threshold display
+        // Update slider displays
         const thresholdSlider = document.getElementById('threshold');
         const thresholdValue = document.getElementById('thresholdValue');
+        const colorSlider = document.getElementById('colorWeight');
+        const colorValue = document.getElementById('colorWeightValue');
 
         thresholdSlider.addEventListener('input', () => {
             thresholdValue.textContent = thresholdSlider.value;
+        });
+
+        colorSlider.addEventListener('input', () => {
+            colorValue.textContent = colorSlider.value + '%';
         });
 
         // Reload results when settings change
         const reloadResults = debounce(async () => {
             const threshold = thresholdSlider.value;
             const excludeFamily = document.getElementById('excludeFamily').checked;
+            const colorWeight = colorSlider.value / 100.0;
 
             document.getElementById('loadingSpinner').classList.add('active');
             document.getElementById('resultsGrid').style.opacity = '0.5';
 
             try {
-                const response = await fetch(`/api/similar/${encodeURIComponent(filepath)}?threshold=${threshold}&exclude_family=${excludeFamily}&limit=100`);
+                const response = await fetch(`/api/similar/${encodeURIComponent(filepath)}?threshold=${threshold}&exclude_family=${excludeFamily}&color_weight=${colorWeight}&limit=100`);
                 const data = await response.json();
 
                 updateResults(data.similar);
@@ -318,6 +331,7 @@
         }, 300);
 
         thresholdSlider.addEventListener('change', reloadResults);
+        colorSlider.addEventListener('change', reloadResults);
         document.getElementById('excludeFamily').addEventListener('change', reloadResults);
 
         function updateResults(images) {

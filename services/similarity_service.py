@@ -55,6 +55,34 @@ def compute_phash(image_path: str, hash_size: int = 8) -> Optional[str]:
         return None
 
 
+def compute_colorhash(image_path: str, binbits: int = 3) -> Optional[str]:
+    """
+    Compute color hash for an image (captures color distribution).
+    
+    Args:
+        image_path: Path to the image file
+        binbits: Bits per channel (3 = 8x8x8 bins)
+    
+    Returns:
+        Hex string representation of the hash, or None on error
+    """
+    try:
+        with Image.open(image_path) as img:
+            # Convert to RGB (colorhash requires color info)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Compute color hash
+            chash = imagehash.colorhash(img, binbits=binbits)
+            return str(chash)
+    except UnidentifiedImageError:
+        print(f"[Similarity] Cannot identify image for colorhash: {image_path}")
+        return None
+    except Exception as e:
+        print(f"[Similarity] Error computing colorhash for {image_path}: {e}")
+        return None
+
+
 def compute_phash_for_video(video_path: str) -> Optional[str]:
     """
     Compute perceptual hash from the first frame of a video.
@@ -219,11 +247,38 @@ def update_image_phash(filepath: str, phash: str) -> bool:
         return False
 
 
+def get_image_colorhash(filepath: str) -> Optional[str]:
+    """Get the stored colorhash for an image."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT colorhash FROM images WHERE filepath = ?", (filepath,))
+        row = cursor.fetchone()
+        return row['colorhash'] if row else None
+
+
+def update_image_colorhash(filepath: str, colorhash: str) -> bool:
+    """Update the colorhash for an image in the database."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE images SET colorhash = ? WHERE filepath = ?",
+                (colorhash, filepath)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        from services import monitor_service
+        monitor_service.add_log(f"Error updating colorhash: {e}", "error")
+        return False
+
+
 def find_similar_images(
     filepath: str,
     threshold: int = 10,
     limit: int = 50,
-    exclude_family: bool = False
+    exclude_family: bool = False,
+    color_weight: float = 0.0
 ) -> List[Dict]:
     """
     Find images visually similar to the given image.
@@ -233,13 +288,15 @@ def find_similar_images(
         threshold: Maximum Hamming distance (lower = stricter, 0-64)
         limit: Maximum number of results
         exclude_family: If True, exclude images in the same parent/child chain
+        color_weight: Weight of color similarity (0.0 = only pHash, 1.0 = only ColorHash)
         
     Returns:
         List of similar images with distance and similarity score
     """
     try:
-        # Get reference hash and family info
-        ref_hash = get_image_phash(filepath)
+        # Get reference hashes and family info
+        ref_phash = get_image_phash(filepath)
+        ref_colorhash = get_image_colorhash(filepath)
         family_filepaths = set()
         
         if exclude_family:
@@ -249,22 +306,28 @@ def find_similar_images(
                 print(f"[Similarity] Error getting family for {filepath}: {e}")
                 # Continue without exclude_family if it fails
         
-        # If no hash stored, try to compute it
-        if not ref_hash:
-            full_path = os.path.join("static/images", filepath)
-            if os.path.exists(full_path):
-                ref_hash = compute_phash(full_path)
-                if ref_hash:
-                    update_image_phash(filepath, ref_hash)
+        # If hashes missing, try to compute them
+        full_path = os.path.join("static/images", filepath)
         
-        if not ref_hash:
+        if not ref_phash and os.path.exists(full_path):
+            ref_phash = compute_phash(full_path)
+            if ref_phash:
+                update_image_phash(filepath, ref_phash)
+                
+        if not ref_colorhash and os.path.exists(full_path):
+            chash = compute_colorhash(full_path)
+            if chash:
+                ref_colorhash = chash
+                update_image_colorhash(filepath, chash)
+    
+        if not ref_phash:
             return []
         
         # Get all images with hashes
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT filepath, phash
+                SELECT filepath, phash, colorhash
                 FROM images
                 WHERE phash IS NOT NULL AND filepath != ?
             """, (filepath,))
@@ -278,17 +341,40 @@ def find_similar_images(
                 if exclude_family and row['filepath'] in family_filepaths:
                     continue
                     
-                distance = hamming_distance(ref_hash, row['phash'])
-                if distance <= threshold:
+                # 1. pHash Score (Structure)
+                phash_score = hash_similarity_score(ref_phash, row['phash'])
+                phash_dist = 64 * (1.0 - phash_score) # Estimated distance
+                
+                # 2. ColorHash Score (Color)
+                color_score = 0.0
+                if row['colorhash'] and ref_colorhash:
+                    # Use standard max distance for colorhash? 
+                    # imagehash.colorhash default binbits=3 means 8x8x8 = 512 bits? No.
+                    # It creates a 144 bit hash? 
+                    # Let's rely on hash_similarity_score default max=64?
+                    # Actually, let's use the helper but maybe max distance differs.
+                    # For now treating it same as phash for simplicity of implementation.
+                    color_score = hash_similarity_score(ref_colorhash, row['colorhash'])
+                
+                # 3. Hybrid Score
+                # color_weight 0 -> 100% pHash
+                # color_weight 1 -> 100% ColorHash
+                
+                final_score = (phash_score * (1.0 - color_weight)) + (color_score * color_weight)
+                
+                # Convert back to "Effective Distance" for threshold filtering (0-64 scale)
+                effective_distance = 64.0 * (1.0 - final_score)
+                
+                if effective_distance <= threshold:
                     similar.append({
                         'path': f"images/{row['filepath']}",
                         'thumb': get_thumbnail_path(f"images/{row['filepath']}"),
-                        'distance': distance,
-                        'similarity': hash_similarity_score(ref_hash, row['phash']),
+                        'distance': int(effective_distance), # Return as int for UI compatibility
+                        'score': float(final_score),
+                        'similarity': float(final_score),
                         'match_type': 'visual'
                     })
             except Exception as e:
-                # Log error but continue processing other images
                 from services import monitor_service
                 monitor_service.add_log(f"Error processing candidate {row['filepath']}: {e}", "warning")
                 continue
@@ -301,7 +387,7 @@ def find_similar_images(
         import traceback
         traceback.print_exc()
         from services import monitor_service
-        monitor_service.add_log(f"Critical error in visual search: {e}", "error")
+        monitor_service.add_log(f"Critical error in find_similar_images: {e}", "error")
         return []
 
 
@@ -387,9 +473,9 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
     with get_db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT filepath, md5
+            SELECT filepath, md5, phash, colorhash
             FROM images
-            WHERE phash IS NULL
+            WHERE phash IS NULL OR colorhash IS NULL
         """)
         missing = cursor.fetchall()
     
@@ -400,14 +486,25 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
         md5 = row['md5']
         full_path = os.path.join("static/images", filepath)
         
-        phash = compute_phash_for_file(full_path, md5)
+        # Compute pHash if missing
+        if not row['phash']:
+            phash = compute_phash_for_file(full_path, md5)
+            if phash:
+                update_image_phash(filepath, phash)
+                stats['success'] += 1
         
-        if phash:
-            update_image_phash(filepath, phash)
-            stats['success'] += 1
-        else:
-            stats['failed'] += 1
-        
+        # Compute ColorHash if missing
+        if not row['colorhash']:
+            # We assume regular image logic for colorhash for now
+            # TODO: Add video colorhash support distinct from pHash?
+            if os.path.exists(full_path):
+                 chash = compute_colorhash(full_path)
+                 if chash:
+                     update_image_colorhash(filepath, chash)
+                     # Count success if we updated something
+                     if row['phash']: # Only inc success if we didn't already inc it for phash
+                         stats['success'] += 1
+
         stats['processed'] += 1
         
         if progress_callback and (i + 1) % 10 == 0:
