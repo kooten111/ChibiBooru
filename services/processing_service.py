@@ -135,15 +135,29 @@ class AdaptiveSauceNAORateLimiter:
             print(f"[SauceNAO Adaptive] Waiting {wait_time:.1f}s (current limit: {limit_str})")
             time.sleep(wait_time)
 
-    def record_success(self):
-        """Record a successful request."""
+    def record_success(self, actual_limit=None):
+        """
+        Record a successful request.
+        
+        Args:
+            actual_limit (int, optional): The actual short_limit returned by the API.
+        """
         with self.lock:
             current_time = time.time()
             self.requests.append(current_time)
             self.consecutive_successes += 1
 
-            # Periodically test if we can increase the limit
-            if (self.current_limit is not None and
+            # specific update logic: if the API gave us an explicit limit, use it!
+            if actual_limit is not None:
+                # If we were guessing, or if the limit changed, update it
+                if self.current_limit != actual_limit:
+                    print(f"[SauceNAO Adaptive] Updating limit from API header: {self.current_limit} -> {actual_limit}")
+                    self.current_limit = actual_limit
+                    # We can trust this limit, so we don't need to be in "testing" mode
+            
+            # Fallback to adaptive probing ONLY if we don't have an explicit limit
+            # (This shouldn't happen often if we're parsing headers correctly)
+            elif (self.current_limit is not None and
                 self.consecutive_successes >= self.test_threshold and
                 self.last_rate_limit_hit and
                 (current_time - self.last_rate_limit_hit) > 300):  # 5 minutes since last 429
@@ -788,8 +802,22 @@ def search_saucenao(filepath):
             response = requests.post('https://saucenao.com/search.php', files=files, params=params, timeout=20)
             response.raise_for_status()
 
-            # Record successful request
-            saucenao_rate_limiter.record_success()
+            response_json = response.json()
+            
+            # Try to extract explicit limits from the response header
+            # SauceNAO returns a 'header' object with 'short_limit', 'long_limit', etc.
+            actual_limit = None
+            if 'header' in response_json:
+                try:
+                    # short_limit is usually a string, e.g. "17"
+                    short_limit_val = response_json['header'].get('short_limit')
+                    if short_limit_val:
+                        actual_limit = int(short_limit_val)
+                except (ValueError, TypeError):
+                    pass
+
+            # Record successful request with the explicit limit if found
+            saucenao_rate_limiter.record_success(actual_limit)
 
             # Print current stats (only every 10 requests to reduce spam)
             stats = saucenao_rate_limiter.get_stats()
@@ -797,7 +825,7 @@ def search_saucenao(filepath):
                 limit_str = f"{stats['current_limit']}" if stats['current_limit'] else "unlimited"
                 print(f"[SauceNAO Adaptive] OK ({stats['requests_in_window']} in window, limit: {limit_str})")
 
-            return response.json()
+            return response_json
     except requests.exceptions.HTTPError as e:
         # Check if it's a 429 (Too Many Requests) error
         if e.response.status_code == 429:
@@ -1072,335 +1100,340 @@ def process_image_file(filepath, move_from_ingest=False):
                     if original_path and original_path != filepath and os.path.exists(original_path):
                         # Successfully downloaded original, remove the compressed version
                         print(f"[Pixiv] Replacing compressed version with original: {original_path}")
-                        try:
-                            os.remove(filepath)
-                            print(f"[Pixiv] Removed compressed version: {filepath}")
-                        except Exception as e:
-                            print(f"[Pixiv] Warning: Could not remove compressed version: {e}")
-                        # Process the original instead
-                        filepath = original_path
-                        filename = os.path.basename(filepath)
-
-    # Calculate MD5 before any moves
+def process_image_file(filepath, move_from_ingest=True):
+    """
+    Process a single image file (analyze + commit).
+    This acts as a synchronous wrapper around the split analyze/commit logic.
+    Use this for single-file uploads or legacy calls.
+    Для bulk ingestion, prefer running analyze_image_for_ingest in parallel 
+    and then calling commit_image_ingest.
+    """
+    print(f"[Processing] Starting synchronous processing for {os.path.basename(filepath)}")
     try:
-        md5 = get_md5(filepath)
-    except FileNotFoundError:
-        print(f"File disappeared during MD5 calculation (race condition): {filepath}")
-        return False
+        # 1. Analyze (Heavy lifting)
+        # Note: In this synchronous wrapper, we run analysis in the main process.
+        # This blocks, but it's safe.
+        analysis_result = analyze_image_for_ingest(filepath)
+        
+        # 2. Commit (DB/Disk ops)
+        return commit_image_ingest(analysis_result, move_from_ingest=move_from_ingest)
+        
     except Exception as e:
-        print(f"Error calculating MD5 for {filepath}: {e}")
+        print(f"[Processing] Error in process_image_file wrapper: {e}")
         return False
 
-    # Acquire lock to prevent concurrent processing of the same MD5
-    lock_fd, acquired = acquire_processing_lock(md5)
-    if not acquired:
-        print(f"File {filename} (MD5: {md5}) is being processed by another worker. Skipping.")
-        return False
+# ============================================================================
 
-    # Check for duplicates BEFORE moving the file
-    if models.md5_exists(md5):
-        print(f"Duplicate detected (MD5: {md5}). Removing file: {filepath}")
-        try:
-            os.remove(filepath)
-            print(f"Removed duplicate file: {filepath}")
-        except Exception as e:
-            print(f"Error removing duplicate {filepath}: {e}")
-        release_processing_lock(lock_fd)
-        return False
+def analyze_image_for_ingest(filepath, md5=None):
+    """
+    Perform CPU-bound and I/O-bound analysis on an image file for ingestion.
+    Designed to be run in a separate process (Worker) via ProcessPoolExecutor.
+    
+    Returns:
+        Dictionary containing all extracted metadata, tags, and computed hashes.
+    """
+    import os
+    import hashlib
+    # Re-import config locally to ensure it is available in worker process
+    import config
+    # Import services here to avoid top-level circular imports or pickling issues
+    from services.processing_service import (
+        search_all_sources, search_saucenao, 
+        extract_pixiv_id_from_filename, fetch_pixiv_metadata,
+        tag_with_local_tagger, tag_video_with_frames,
+        fetch_by_post_id
+    )
+    from services import similarity_service
+    
+    if not os.path.exists(filepath):
+        return {'error': 'File not found', 'filepath': filepath}
+        
+    filename = os.path.basename(filepath)
 
-    # Determine final destination path
-    if move_from_ingest:
-        # Move from ingest to bucketed structure
-        bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
-        dest_filepath = os.path.join(bucket_dir, filename)
-
-        # Check if destination already exists (race condition: another process moved same file)
-        if os.path.exists(dest_filepath):
-            # Another process already moved this file, remove our copy and use theirs
-            print(f"Destination already exists (race condition): {dest_filepath}")
-            print(f"Removing duplicate from ingest: {filepath}")
-            try:
-                os.remove(filepath)
-            except Exception as e:
-                print(f"Error removing duplicate from ingest: {e}")
-            filepath = dest_filepath
-        else:
-            # Move the file
-            shutil.move(filepath, dest_filepath)
-            filepath = dest_filepath
-            print(f"Moved to bucketed location: {dest_filepath}")
-
-    # Get relative path for database (relative to static/)
-    if filepath.startswith("./static/"):
-        rel_path = filepath[9:]  # Remove "./static/"
-    elif filepath.startswith("static/"):
-        rel_path = filepath[7:]  # Remove "static/"
-    else:
-        rel_path = os.path.relpath(filepath, "./static")
-
-    # Normalize to forward slashes
-    rel_path = rel_path.replace('\\', '/')
-
-    # Remove "images/" prefix if present for storage
-    if rel_path.startswith("images/"):
-        db_path = rel_path[7:]  # Store without "images/" prefix
-    else:
-        db_path = rel_path
-
+    # 1. Compute MD5 if not provided
+    if not md5:
+        md5_hash = hashlib.md5()
+        with open(filepath, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                md5_hash.update(chunk)
+        md5 = md5_hash.hexdigest()
+        
+    # 2. Identify file type
+    is_zip = filepath.lower().endswith('.zip')
+    is_video = filepath.lower().endswith(('.mp4', '.webm'))
+    
+    result = {
+        'filepath': filepath,
+        'md5': md5,
+        'is_zip': is_zip,
+        'is_video': is_video,
+        'all_results': {}, 
+        'hashes': {},     
+        'saucenao_used': False,
+        'local_tagger_used': False,
+        'saucenao_response': None,
+        # 'animation_metadata': None # Not extracting zip frames in worker yet (rare case)
+    }
+    
     all_results = search_all_sources(md5)
-    saucenao_response = None
-    used_saucenao = False
-    used_local_tagger = False
-    animation_metadata = None
-
-    # Zip animations: Extract frames and tag using first frame
-    if is_zip_animation:
-        print(f"Zip animation detected, extracting frames...")
-        from services import zip_animation_service
-        animation_metadata = zip_animation_service.extract_zip_animation(filepath, md5)
-        if animation_metadata:
-            print(f"[ZipAnimation] Extracted {animation_metadata['frame_count']} frames")
-            # Tag using the first frame
-            local_tagger_result = zip_animation_service.tag_animation_with_first_frame(md5)
-            used_local_tagger = True
-            if local_tagger_result:
-                all_results[local_tagger_result['source']] = local_tagger_result['data']
-                print(f"Tagged zip animation with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
-        else:
-            print(f"[ZipAnimation] Failed to extract frames from {filepath}")
-            release_processing_lock(lock_fd)
-            return False
-    # Videos: Skip online searches since boorus don't host videos, go straight to local tagging
+    
+    # 3. Type-Specific Logic (Video/Zip/Image)
+    if is_zip:
+        # Zip handling is complex (extraction), defer to commit phase for now?
+        # Or just skip advanced analysis here. Use MD5 lookup only.
+        pass
+            
     elif is_video:
-        print(f"Video file detected, using frame extraction for tagging...")
+        # Video tagging
         local_tagger_result = tag_video_with_frames(filepath)
-        used_local_tagger = True
         if local_tagger_result:
             all_results[local_tagger_result['source']] = local_tagger_result['data']
-            print(f"Tagged video with Local Tagger: {len([t for v in local_tagger_result['data']['tags'].values() for t in v])} tags found.")
+            result['local_tagger_used'] = True
+
     else:
-        # Images: Try online sources first
+        # Standard Image Logic
         if not all_results:
-            print(f"MD5 lookup failed for {db_path}, trying SauceNao...")
-            saucenao_response = search_saucenao(filepath)
-            used_saucenao = True
-            if saucenao_response and 'results' in saucenao_response:
-                for result in saucenao_response.get('results', []):
-                    if float(result['header']['similarity']) > 80:
-                        for url in result['data'].get('ext_urls', []):
-                            post_id, source = None, None
-                            if 'danbooru.donmai.us' in url:
-                                post_id = url.split('/posts/')[-1].split('?')[0]
-                                source = 'danbooru'
-                            elif 'e621.net' in url:
-                                post_id = url.split('/posts/')[-1].split('?')[0]
-                                source = 'e621'
+            # SauceNAO
+            saucenao_resp = search_saucenao(filepath)
+            if saucenao_resp:
+                result['saucenao_used'] = True
+                result['saucenao_response'] = saucenao_resp
+                if 'results' in saucenao_resp:
+                    for r in saucenao_resp.get('results', []):
+                         if float(r['header']['similarity']) > 80:
+                             for url in r['data'].get('ext_urls', []):
+                                 post_id, source = None, None
+                                 if 'danbooru.donmai.us' in url:
+                                     post_id = url.split('/posts/')[-1].split('?')[0]
+                                     source = 'danbooru'
+                                 elif 'e621.net' in url:
+                                     post_id = url.split('/posts/')[-1].split('?')[0]
+                                     source = 'e621'
 
-                            if post_id and source:
-                                print(f"Found high-confidence match on {source} via SauceNao.")
-                                fetched_data = fetch_by_post_id(source, post_id)
-                                if fetched_data:
-                                    all_results[fetched_data['source']] = fetched_data['data']
-                                    break
-                    if all_results:
-                        break
+                                 if post_id and source:
+                                     fetched = fetch_by_post_id(source, post_id)
+                                     if fetched:
+                                         all_results[fetched['source']] = fetched['data']
+                                         break
+                         if all_results: break
+            
+            # Pixiv ID
+            if not all_results:
+                pixiv_id = extract_pixiv_id_from_filename(filename)
+                if pixiv_id:
+                     pixiv_result = fetch_pixiv_metadata(pixiv_id)
+                     if pixiv_result:
+                         all_results[pixiv_result['source']] = pixiv_result['data']
 
-        # If SauceNAO failed, try extracting Pixiv ID from filename
-        if not all_results:
-            pixiv_id = extract_pixiv_id_from_filename(filename)
-            if pixiv_id:
-                print(f"Detected Pixiv ID {pixiv_id} from filename, fetching metadata...")
-                pixiv_result = fetch_pixiv_metadata(pixiv_id)
-                if pixiv_result:
-                    all_results[pixiv_result['source']] = pixiv_result['data']
-                    print(f"Tagged from Pixiv: {len([t for v in pixiv_result['data']['tags'].values() for t in v])} tags found.")
-                    # Note: Original image download happens earlier in process_image_file() if needed
-
-        # Run local tagger based on configuration
+        # Local Tagger
         pixiv_found = 'pixiv' in all_results
-        if config.LOCAL_TAGGER_ALWAYS_RUN:
-            # Always run mode: Run local tagger on ALL images for prediction storage
-            print(f"Running local AI tagger for prediction storage...")
-            local_tagger_result = tag_with_local_tagger(filepath)
-            used_local_tagger = True
-            if local_tagger_result:
-                all_results[local_tagger_result['source']] = local_tagger_result['data']
-                tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
-                pred_count = len(local_tagger_result['data'].get('all_predictions', []))
-                if all_results and len(all_results) > 1:
-                    print(f"Tagged with Local Tagger (complementing {list(all_results.keys())[0]}): {tag_count} display tags, {pred_count} stored predictions.")
-                else:
-                    print(f"Tagged with Local Tagger (primary source): {tag_count} display tags, {pred_count} stored predictions.")
-        elif pixiv_found and config.LOCAL_TAGGER_COMPLEMENT_PIXIV:
-            # Pixiv complement mode: Always run local tagger to complement Pixiv tags
-            print(f"Pixiv source detected, running local AI tagger to complement tags...")
-            local_tagger_result = tag_with_local_tagger(filepath)
-            used_local_tagger = True
-            if local_tagger_result:
-                all_results[local_tagger_result['source']] = local_tagger_result['data']
-                tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
-                pred_count = len(local_tagger_result['data'].get('all_predictions', []))
-                print(f"Tagged with Local Tagger (complementing Pixiv): {tag_count} display tags, {pred_count} stored predictions.")
-        elif not all_results:
-            # Fallback mode: Only run local tagger if no online sources found
-            print(f"No online sources found, using local AI tagger as fallback...")
-            local_tagger_result = tag_with_local_tagger(filepath)
-            used_local_tagger = True
-            if local_tagger_result:
-                all_results[local_tagger_result['source']] = local_tagger_result['data']
-                tag_count = len([t for v in local_tagger_result['data']['tags'].values() for t in v])
-                pred_count = len(local_tagger_result['data'].get('all_predictions', []))
-                print(f"Tagged with Local Tagger (fallback): {tag_count} display tags, {pred_count} stored predictions.")
+        should_run_tagger = False
+        if config.LOCAL_TAGGER_ALWAYS_RUN: should_run_tagger = True
+        elif pixiv_found and config.LOCAL_TAGGER_COMPLEMENT_PIXIV: should_run_tagger = True
+        elif not all_results: should_run_tagger = True
+        
+        if should_run_tagger:
+            lt_res = tag_with_local_tagger(filepath)
+            if lt_res:
+                all_results[lt_res['source']] = lt_res['data']
+                result['local_tagger_used'] = True
 
-    if not all_results:
-        print(f"No metadata found for {db_path}")
-        release_processing_lock(lock_fd)
-        return False
+    result['all_results'] = all_results
 
-    primary_source_data = None
-    source_name = None
-    priority = config.BOORU_PRIORITY
-    for src in priority:
-        if src in all_results:
-            primary_source_data = all_results[src]
-            source_name = src
-            break
+    # 4. Compute Hashes
+    try:
+        phash = similarity_service.compute_phash_for_file(filepath, md5)
+        if phash: result['hashes']['phash'] = phash
+        
+        chash = similarity_service.compute_colorhash_for_file(filepath)
+        if chash: result['hashes']['colorhash'] = chash
+        
+        if similarity_service.SEMANTIC_AVAILABLE:
+            engine = similarity_service.get_semantic_engine()
+            emb = engine.get_embedding(filepath)
+            if emb is not None:
+                result['hashes']['embedding'] = emb
+    except Exception as e:
+         print(f"[Analyze] Hash error: {e}")
+         
+    return result
+
+
+def commit_image_ingest(analysis_result, move_from_ingest=True):
+    """
+    Commit the analyzed image to the database and filesystem.
+    This MUST run in the main thread (or handle DB locking carefully).
     
-    # Extract tags from primary source using centralized utility
-    extracted_tags = extract_tags_from_source(primary_source_data, source_name)
-
-    # Special case: If Pixiv is the source, merge with local tagger tags
-    if source_name == 'pixiv' and 'local_tagger' in all_results:
-        print("Merging local tagger tags into Pixiv tags...")
-        local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
-        # Merge all categories except artist (Pixiv artist is usually accurate)
-        extracted_tags = merge_tag_sources(
-            extracted_tags,
-            local_tagger_tags,
-            merge_categories=['character', 'copyright', 'species', 'meta', 'general']
-        )
-
-    # Deduplicate tags across categories
-    extracted_tags = deduplicate_categorized_tags(extracted_tags)
-
-    # Convert to the format expected by the rest of the function
-    categorized_tags = {
-        'character': extracted_tags['tags_character'].split(),
-        'copyright': extracted_tags['tags_copyright'].split(),
-        'artist': extracted_tags['tags_artist'].split(),
-        'species': extracted_tags['tags_species'].split(),
-        'meta': extracted_tags['tags_meta'].split(),
-        'general': extracted_tags['tags_general'].split()
-    }
-
-    # Extract rating using centralized utility
-    rating, rating_source = extract_rating_from_source(primary_source_data, source_name)
-
-    # Add rating to categorized tags if present
-    if rating and rating_source:
-        # For now, add to meta category or create a rating-specific list
-        # We'll pass this separately to the add_image_with_metadata function
-        pass
-
-    parent_id = primary_source_data.get('parent_id')
-    if source_name == 'e621':
-        parent_id = primary_source_data.get('relationships', {}).get('parent_id')
-
-    image_info = {
-        'filepath': db_path,
-        'md5': md5,
-        'post_id': primary_source_data.get('id'),
-        'parent_id': parent_id,
-        'has_children': primary_source_data.get('has_children', False),
-        'saucenao_lookup': used_saucenao,
-        'rating': rating,
-        'rating_source': rating_source,
-    }
-
-    raw_metadata_to_save = {
-        "md5": md5,
-        "relative_path": db_path,
-        "saucenao_lookup": used_saucenao,
-        "saucenao_response": saucenao_response,
-        "local_tagger_lookup": used_local_tagger,
-        "sources": all_results
-    }
-
-    success = models.add_image_with_metadata(
-        image_info,
-        list(all_results.keys()),
-        categorized_tags,
-        raw_metadata_to_save
-    )
-
-    if success:
-        ensure_thumbnail(filepath, md5=md5)
+    Args:
+        analysis_result: The dict returned by analyze_image_for_ingest
+        move_from_ingest: Whether to move the file from its current location
         
-        # Compute perceptual hash for visual similarity
-        try:
-            from services import similarity_service
-            from services import similarity_db
-            
-            # 1. pHash
-            phash = similarity_service.compute_phash_for_file(filepath, md5)
-            if phash:
-                similarity_service.update_image_phash(db_path, phash)
-                print(f"[Similarity] Computed pHash for {db_path}")
-            
-            # 2. ColorHash
-            chash = similarity_service.compute_colorhash_for_file(filepath)
-            if chash:
-                similarity_service.update_image_colorhash(db_path, chash)
-                print(f"[Similarity] Computed ColorHash for {db_path}")
-                
-            # 3. Semantic Embedding
-            if similarity_service.SEMANTIC_AVAILABLE:
-                # We need the image ID for the embedding
-                with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
-                    row = cursor.fetchone()
-                    
-                if row:
-                    image_id = row['id']
-                    engine = similarity_service.get_semantic_engine()
-                    embedding = engine.get_embedding(filepath)
-                    if embedding is not None:
-                        similarity_db.save_embedding(image_id, embedding)
-                        print(f"[Similarity] Computed Sematic Embedding for {db_path}")
-                        
-        except Exception as e:
-            print(f"[Similarity] Error computing hashes/embeddings for {db_path}: {e}")
-        
-        # Store local tagger predictions if available
-        if 'local_tagger' in all_results:
-            local_data = all_results['local_tagger']
-            all_predictions = local_data.get('all_predictions', [])
-            if all_predictions:
-                from repositories import tagger_predictions_repository
-                # Get the image_id for the newly inserted image
-                with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
-                    row = cursor.fetchone()
-                    if row:
-                        image_id = row['id']
-                        stored_count = tagger_predictions_repository.store_predictions(
-                            image_id, 
-                            all_predictions,
-                            local_data.get('tagger_name')
-                        )
-                        print(f"[Local Tagger] Stored {stored_count} predictions for {db_path}")
-
-        release_processing_lock(lock_fd)
-        return True
-    else:
-        # Database insertion failed - likely due to race condition where another process
-        # added the same file. Do NOT delete the file here because:
-        # 1. If it's a race condition, another process owns this file in the DB
-        # 2. The file at 'filepath' might be the same file another process successfully added
-        # Just return False to indicate this process didn't add it
-        print(f"Failed to add image {db_path} to DB. It might be a duplicate from a concurrent process.")
-        print(f"File remains at: {filepath}")
-        release_processing_lock(lock_fd)
+    Returns:
+        Boolean success
+    """
+    if 'error' in analysis_result:
+        print(f"[Commit] Skipped due to analysis error: {analysis_result['error']}")
         return False
+        
+    filepath = analysis_result['filepath']
+    md5 = analysis_result['md5']
+    all_results = analysis_result['all_results']
+    hashes = analysis_result['hashes']
+    
+    # 1. Lock
+    lock_fd, acquired = acquire_processing_lock(md5)
+    if not acquired:
+        return False # Already processing
+        
+    try:
+        # 2. Check DB existence
+        if models.md5_exists(md5):
+             print(f"Image with MD5 {md5} already exists in DB.")
+             return False
+             
+        # 3. Move File
+        file_dest = filepath
+        if move_from_ingest:
+            from utils.file_utils import ensure_bucket_dir, get_hash_bucket
+            filename = os.path.basename(filepath)
+            bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
+            new_path = os.path.join(bucket_dir, filename)
+            
+            if os.path.exists(new_path):
+                 # Collision or already moved?
+                 if get_md5(new_path) == md5:
+                     os.remove(filepath) # Delete ingest copy
+                     file_dest = new_path
+                 else:
+                     # Name collision but different content? Rename?
+                     # For now, just fail or overwrite? 
+                     # Let's assume standard behavior:
+                     print(f"Destination file exists: {new_path}")
+                     # If we are bold we overwrite, but let's be safe
+                     return False
+            else:
+                shutil.move(filepath, new_path)
+                file_dest = new_path
+                
+        db_path = os.path.relpath(file_dest, "static/images").replace('\\', '/')
+        
+        # 4. Prepare Metadata (similar to process_image_file)
+        primary_source_data = None
+        source_name = None
+        priority = config.BOORU_PRIORITY
+        for src in priority:
+            if src in all_results:
+                primary_source_data = all_results[src]
+                source_name = src
+                break
+        
+        extracted_tags = extract_tags_from_source(primary_source_data, source_name)
+        
+        # Merge Pixiv + Local Tagger if needed
+        if source_name == 'pixiv' and 'local_tagger' in all_results:
+             local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
+             extracted_tags = merge_tag_sources(
+                 extracted_tags,
+                 local_tagger_tags,
+                 merge_categories=['character', 'copyright', 'species', 'meta', 'general']
+             )
+             
+        extracted_tags = deduplicate_categorized_tags(extracted_tags)
+        
+        categorized_tags = {
+            'character': extracted_tags['tags_character'].split(),
+            'copyright': extracted_tags['tags_copyright'].split(),
+            'artist': extracted_tags['tags_artist'].split(),
+            'species': extracted_tags['tags_species'].split(),
+            'meta': extracted_tags['tags_meta'].split(),
+            'general': extracted_tags['tags_general'].split()
+        }
+        
+        rating, rating_source = extract_rating_from_source(primary_source_data, source_name)
+        
+        parent_id = primary_source_data.get('parent_id')
+        if source_name == 'e621':
+            parent_id = primary_source_data.get('relationships', {}).get('parent_id')
+            
+        image_info = {
+            'filepath': db_path,
+            'md5': md5,
+            'post_id': primary_source_data.get('id'),
+            'parent_id': parent_id,
+            'has_children': primary_source_data.get('has_children', False),
+            'saucenao_lookup': analysis_result['saucenao_used'],
+            'rating': rating,
+            'rating_source': rating_source,
+        }
+        
+        raw_metadata_to_save = {
+            "md5": md5,
+            "relative_path": db_path,
+            "saucenao_lookup": analysis_result['saucenao_used'],
+            "saucenao_response": analysis_result['saucenao_response'],
+            "local_tagger_lookup": analysis_result['local_tagger_used'],
+            "sources": all_results
+        }
+        
+        # 5. DB Insert
+        success = models.add_image_with_metadata(
+            image_info,
+            list(all_results.keys()),
+            categorized_tags,
+            raw_metadata_to_save
+        )
+        
+        if success:
+            ensure_thumbnail(file_dest, md5=md5)
+            
+            # 6. Save Computed Hashes
+            try:
+                from services import similarity_service, similarity_db
+                
+                if 'phash' in hashes:
+                    similarity_service.update_image_phash(db_path, hashes['phash'])
+                    
+                if 'colorhash' in hashes:
+                    similarity_service.update_image_colorhash(db_path, hashes['colorhash'])
+                    
+                if 'embedding' in hashes:
+                    # Need image_id
+                    with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
+                        row = cursor.fetchone()
+                        if row:
+                            similarity_db.save_embedding(row['id'], hashes['embedding'])
+                            
+            except Exception as e:
+                print(f"[Commit] Error saving hashes: {e}")
+                
+            # Store predictions
+            if 'local_tagger' in all_results:
+                 local_data = all_results['local_tagger']
+                 all_predictions = local_data.get('all_predictions', [])
+                 if all_predictions:
+                      from repositories import tagger_predictions_repository
+                      with get_db_connection() as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
+                        row = cursor.fetchone()
+                        if row:
+                            tagger_predictions_repository.store_predictions(
+                                row['id'], 
+                                all_predictions, 
+                                local_data.get('tagger_name')
+                            )
+
+            print(f"[Commit] Successfully ingested {os.path.basename(file_dest)}")
+            return True
+            
+        else:
+            print(f"[Commit] DB Insert failed for {db_path}")
+            return False
+
+    except Exception as e:
+        print(f"[Commit] Error processing {filepath}: {e}")
+        return False
+    finally:
+        release_processing_lock(lock_fd)

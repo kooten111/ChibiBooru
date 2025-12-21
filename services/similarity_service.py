@@ -5,6 +5,7 @@ Provides visual similarity detection using perceptual hashing algorithms.
 Similar to Czkawka's duplicate detection approach.
 """
 import os
+import time
 from typing import Optional, List, Dict, Tuple
 from PIL import Image, UnidentifiedImageError
 import imagehash
@@ -799,45 +800,246 @@ def find_all_duplicate_groups(threshold: int = 5) -> List[List[Dict]]:
 # Batch Operations
 # ============================================================================
 
+# Global worker state
+_worker_semantic_engine = None
+
+def _init_worker():
+    """Initialize worker process state."""
+    global _worker_semantic_engine
+    # No longer load model in workers to save RAM!
+    _worker_semantic_engine = None
+
+def _process_semantic_single(row: dict) -> dict:
+    """
+    Process a single image for semantic embedding.
+    Designed to run in a THREAD (ProcessPoolExecutor would re-load model).
+    """
+    import os
+    # Uses the main process global semantic engine (shared memory)
+    # We don't import _worker_semantic_engine here, we use the module level one via get_semantic_engine or direct
+    # But wait, we are in the same process, so direct access is fine.
+    
+    result = {
+        'id': row['id'],
+        'filepath': row['filepath'],
+        'success': False,
+        'semantic_generated': False,
+        'errors': []
+    }
+    
+    try:
+        start_time = time.time()
+        filepath = row['filepath']
+        
+        # Zip handling
+        full_path = os.path.join("static/images", filepath)
+        if filepath.lower().endswith('.zip'):
+             from utils.file_utils import get_thumbnail_path
+             thumb_rel = get_thumbnail_path(filepath)
+             if thumb_rel != filepath:
+                 full_path = os.path.join("static", thumb_rel)
+
+        if not os.path.exists(full_path):
+            result['errors'].append(f"File not found: {full_path}")
+            return result
+
+        # Use global engine (which is thread-safe for inference usually, or we lock if needed, 
+        # but ORT is generally thread safe for independent runs)
+        engine = get_semantic_engine()
+        # Ensure loaded
+        if not engine.session:
+            # Load explicitly if not loaded (main thread should have loaded it, but self-repair is good)
+            print(f"[Semantic Worker {row['id']}] Loading model (latency expected)...")
+            engine.load_model()
+            
+        embedding = engine.get_embedding(full_path)
+        duration = time.time() - start_time
+        
+        if embedding is not None:
+             result['new_embedding'] = embedding
+             result['semantic_generated'] = True
+             result['success'] = True
+             print(f"[Semantic Worker {row['id']}] Processed {filepath} in {duration:.2f}s")
+        else:
+             print(f"[Semantic Worker {row['id']}] Failed to embed {filepath} in {duration:.2f}s")
+             
+    except Exception as e:
+        result['errors'].append(f"Semantic error: {e}")
+        print(f"[Semantic Worker {row['id']}] Exception: {e}")
+        
+    return result
+
+
+def _process_single_image(row: dict) -> dict:
+    """
+    Process a single image for hash generation.
+    Designed to run in a separate process.
+    """
+    import os
+    # Re-import dependencies inside worker
+    from services import similarity_db
+    from utils.file_utils import get_thumbnail_path
+    
+    # Avoid circular/recursive execution by importing specific functions if needed, 
+    # but since this is a library, importing module is standard.
+    from services.similarity_service import (
+        compute_phash_for_file, 
+        compute_colorhash_for_file, 
+        update_image_phash, 
+        update_image_colorhash,
+        SEMANTIC_AVAILABLE,
+        SemanticSearchEngine
+    )
+
+    result = {
+        'id': row['id'],
+        'filepath': row['filepath'],
+        'success': False,
+        'phash_generated': False,
+        'colorhash_generated': False,
+        'semantic_generated': False,
+        'errors': []
+    }
+    
+    try:
+        filepath = row['filepath']
+        md5 = row['md5']
+        full_path = os.path.join("static/images", filepath)
+        
+        # Special handling for ZIP files (animations) -> use thumbnail for hash/embedding
+        if filepath.lower().endswith('.zip'):
+             thumb_rel = get_thumbnail_path(filepath)
+             # get_thumbnail_path returns relative path like 'thumbnails/...' or original 'filepath' if not found
+             if thumb_rel != filepath:
+                 # Use the thumbnail instead
+                 full_path = os.path.join("static", thumb_rel)
+        
+        # Check if file exists
+        if not os.path.exists(full_path):
+            result['errors'].append(f"File not found: {full_path}")
+            return result
+
+        updated_something = False
+        
+        # 1. Compute pHash if missing
+        if not row['phash']:
+            try:
+                phash = compute_phash_for_file(full_path, md5)
+                if phash:
+                    # Return distinct value for saving later
+                    result['new_phash'] = phash
+                    result['phash_generated'] = True
+                    updated_something = True
+            except Exception as e:
+                result['errors'].append(f"pHash error: {e}")
+        
+        # 2. Compute ColorHash if missing
+        if not row['colorhash']:
+            try:
+                chash = compute_colorhash_for_file(full_path)
+                if chash:
+                    # Return distinct value for saving later
+                    result['new_colorhash'] = chash
+                    result['colorhash_generated'] = True
+                    updated_something = True
+            except Exception as e:
+                result['errors'].append(f"ColorHash error: {e}")
+
+        # 3. Semantic Embedding
+        if SEMANTIC_AVAILABLE:
+            try:
+                global _worker_semantic_engine
+                if _worker_semantic_engine:
+                    embedding = _worker_semantic_engine.get_embedding(full_path)
+                    if embedding is not None:
+                        # Return distinct value for saving later
+                        result['new_embedding'] = embedding
+                        result['semantic_generated'] = True
+                        updated_something = True
+            except Exception as e:
+                result['errors'].append(f"Semantic error: {e}")
+
+        result['success'] = updated_something
+        
+    except Exception as e:
+        result['errors'].append(f"Worker error: {e}")
+        
+    return result
+
+def _bulk_save_hashes(results: List[Dict]):
+    """
+    Save a batch of computed hashes to the database in a single transaction.
+    """
+    if not results:
+        return
+
+    try:
+        # Separate semantic updates (custom DB) from main DB updates
+        semantic_updates = []
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            for res in results:
+                # Update main DB hashes
+                if 'new_phash' in res:
+                    cursor.execute("UPDATE images SET phash = ? WHERE id = ?", (res['new_phash'], res['id']))
+                
+                if 'new_colorhash' in res:
+                    cursor.execute("UPDATE images SET colorhash = ? WHERE id = ?", (res['new_colorhash'], res['id']))
+                
+                # Collect semantic embeddings
+                if 'new_embedding' in res:
+                    semantic_updates.append((res['id'], res['new_embedding']))
+            
+            conn.commit()
+
+        # Save semantic embeddings if any (these use their own DB/file structure)
+        if semantic_updates:
+            for img_id, embedding in semantic_updates:
+                similarity_db.save_embedding(img_id, embedding)
+                
+    except Exception as e:
+        print(f"[Similarity] Error in bulk save: {e}")
+
+
 def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Dict:
     """
     Generate perceptual hashes and semantic embeddings for images that don't have them.
     Continuously loops until all missing hashes are generated.
+    Uses ProcessPoolExecutor for parallel execution.
     
     Args:
-        batch_size: Number of images to process at a time
+        batch_size: Number of images to process at a time (per chunk)
         progress_callback: Optional callback(current, total) for progress updates
         
     Returns:
         Dictionary with counts of processed, successful, failed
     """
+    import concurrent.futures
+    import multiprocessing
+    
     total_stats = {'processed': 0, 'success': 0, 'failed': 0, 'total': 0}
     
     # 1. Estimate total missing count for progress reporting
-    # This is an approximation to avoid complex cross-DB joins
     try:
         with get_db_connection() as conn:
-            # Count missing visual hashes
             cursor = conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM images WHERE phash IS NULL OR colorhash IS NULL")
             missing_visual_count = cursor.fetchone()[0]
             
-            # Count missing semantic (approximate)
             if SEMANTIC_AVAILABLE:
-                cursor.execute("SELECT COUNT(*) FROM images")
-                total_images = cursor.fetchone()[0]
-                embedded_count = len(similarity_db.get_all_embedding_ids())
-                missing_semantic_count = max(0, total_images - embedded_count)
+                cursor.execute("SELECT id FROM images")
+                all_db_ids = set(row[0] for row in cursor.fetchall())
+                embedded_ids = set(similarity_db.get_all_embedding_ids())
+                missing_semantic_count = len(all_db_ids - embedded_ids)
             else:
                 missing_semantic_count = 0
                 
-            # Total to process is roughly max of separate counts since one image might miss both
-            # But effectively we iterate until done, so let's just sum them or take max?
-            # Max is safer as a lower bound, sum is safer as upper bound?
-            # Let's use max for now as we process them together.
-            total_stats['total'] = max(missing_visual_count, missing_semantic_count)
+            # Sum is a better estimate for total tasks (ProcessPool + ThreadPool tasks)
+            # Even if same image, they are distinct tasks in our hybrid model
+            total_stats['total'] = missing_visual_count + missing_semantic_count
             
-            # If total is 0, return early
             if total_stats['total'] == 0:
                  return total_stats
 
@@ -845,134 +1047,145 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
         print(f"[Similarity] Error estimating total missing hashes: {e}")
         total_stats['total'] = 1000 # Fallback
     
-    while True:
-        # Check for missing visual hashes
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, filepath, md5, phash, colorhash
-                FROM images
-                WHERE phash IS NULL OR colorhash IS NULL
-                LIMIT ?
-            """, (batch_size,))
-            missing_hashes = cursor.fetchall()
-            
-        # If we didn't fill the batch, check for missing semantic embeddings
-        missing_semantic = []
-        if len(missing_hashes) < batch_size and SEMANTIC_AVAILABLE:
-            remaining = batch_size - len(missing_hashes)
-            
-            try:
-                embedded_ids = set(similarity_db.get_all_embedding_ids())
-                
-                with get_db_connection() as conn:
-                    cursor = conn.cursor()
-                    exclude_ids = [r['id'] for r in missing_hashes]
-                    
-                    # We need to query images that might be missing embeddings
-                    # Optimization: fetch recent images not in excluded IDs and check set membership
-                    
-                    # If remaining is large, this loop could be slow if we scan everything.
-                    # We rely on the fact that once processed, they are in embedded_ids.
-                    # So we need to find images NOT in embedded_ids.
-                    
-                    # Helper query: Get IDs of ALL images, filter in python?
-                    # Too big for memory if 100k images.
-                    # Let's iterate chunks of IDs from DB?
-                    
-                    # Better approach for the loop:
-                    # We can pick up where we left off if we sort by ID?
-                    # But holes might exist.
-                    
-                    # For now, stick to the sampling approach but make it more robust.
-                    # We simply fetch images and filter. If we scan 10x remaining and find nothing, we assume done?
-                    
-                    placeholders = ','.join('?' * len(exclude_ids)) if exclude_ids else '-1'
-                    
-                    # Fetch candidates that are POTENTIALLY missing
-                    # We can't easily know which ones are missing without checking the set.
-                    # So just fetch images we haven't planned to process yet.
-                    cursor.execute(f"""
-                        SELECT id, filepath, md5, phash, colorhash
-                        FROM images 
-                        WHERE id NOT IN ({placeholders})
-                        ORDER BY id DESC
-                        LIMIT ?
-                    """, (batch_size * 5,)) # Look at 5x candidates
-                    candidates = cursor.fetchall()
-                    
-                    found_semantic_candidates = False
-                    for row in candidates:
-                        if row['id'] not in embedded_ids:
-                            missing_semantic.append(row)
-                            found_semantic_candidates = True
-                            if len(missing_semantic) >= remaining:
-                                break
-                    
-                    # If we scanned candidates and found NOTHING missing semantic, 
-                    # AND we have no missing visual hashes, then we are probably done.
-                    if not missing_hashes and not found_semantic_candidates:
-                        # Double check end condition:
-                        # If total missing semantic > 0 but we found none in recent items,
-                        # we might need to scan older items? 
-                        # `ORDER BY id DESC` scans new first.
-                        # Maybe we need to random sample or scan ASC next time?
-                        # For now, to avoid infinite loops if we can't find them:
-                        break
-                        
-            except Exception as e:
-                print(f"[Similarity] Error finding missing semantic embeddings: {e}")
-
-        # Combine lists
-        processing_list = list(missing_hashes) + missing_semantic
+    # Determine number of workers
+    import config
+    try:
+        max_workers = config.MAX_WORKERS
+    except AttributeError:
+        max_workers = 4 # Fallback
         
-        if not processing_list:
-            break
-            
-        # Process the batch
-        for i, row in enumerate(processing_list):
-            filepath = row['filepath']
-            md5 = row['md5']
-            full_path = os.path.join("static/images", filepath)
-            
-            updated_something = False
-            
-            # 1. Compute pHash if missing
-            if not row['phash']:
-                phash = compute_phash_for_file(full_path, md5)
-                if phash:
-                    update_image_phash(filepath, phash)
-                    updated_something = True
-            
-            # 2. Compute ColorHash if missing
-            if not row['colorhash']:
-                 chash = compute_colorhash_for_file(full_path)
-                 if chash:
-                     update_image_colorhash(filepath, chash)
-                     updated_something = True
+    if max_workers <= 0:
+        max_workers = max(1, multiprocessing.cpu_count() - 1)
+        
+    print(f"[Similarity] Starting parallel hash generation with {max_workers} workers. Total to process: {total_stats['total']}")
+    
+    # Track failed IDs to avoid infinite loops
+    failed_visual_ids = set()
+    failed_semantic_ids = set()
+    
+    # Hybrid Approach:
+    # ProcessPool for Visual Hashing (CPU intensive, Python GIL blocks parallel CPU)
+    # ThreadPool for Semantic (Memory intensive, ONNX releases GIL, huge RAM savings)
+    
+    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, initializer=_init_worker) as process_executor, \
+         concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as thread_executor:
 
-            # 3. Semantic Embedding
+        while True:
+            # 1. Fetch Visual Candidates
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                # Exclude known failures
+                exclude_clause = ""
+                params = [batch_size]
+                if failed_visual_ids:
+                    placeholders = ','.join('?' * len(failed_visual_ids))
+                    exclude_clause = f"AND id NOT IN ({placeholders})"
+                    params = list(failed_visual_ids) + params
+                    
+                cursor.execute(f"""
+                    SELECT id, filepath, md5, phash, colorhash
+                    FROM images
+                    WHERE (phash IS NULL OR colorhash IS NULL)
+                    {exclude_clause}
+                    LIMIT ?
+                """, params)
+                missing_hashes = [dict(row) for row in cursor.fetchall()]
+
+            # 2. Fetch Semantic Candidates
+            missing_semantic = []
+            
             if SEMANTIC_AVAILABLE:
-                image_id = row['id']
-                if similarity_db.get_embedding(image_id) is None:
-                    engine = get_semantic_engine()
-                    embedding = engine.get_embedding(full_path)
-                    if embedding is not None:
-                        similarity_db.save_embedding(image_id, embedding)
-                        updated_something = True
+                try:
+                    # Get current state
+                    embedded_ids = set(similarity_db.get_all_embedding_ids())
+                    embedded_ids.update(failed_semantic_ids)
+                    
+                    # Compute missing IDs efficiently
+                    with get_db_connection() as conn:
+                         cursor = conn.cursor()
+                         cursor.execute("SELECT id FROM images")
+                         all_db_ids = set(row[0] for row in cursor.fetchall())
+                    
+                    # Exclude valid embeddings and already-queued visual tasks (if same ID)
+                    current_batch_ids = {r['id'] for r in missing_hashes}
+                    
+                    candidates_ids = list(all_db_ids - embedded_ids - current_batch_ids)
+                    candidates_ids.sort(reverse=True)
+                    
+                    target_ids = candidates_ids[:batch_size]
+                    
+                    if target_ids:
+                        target_placeholders = ','.join('?' * len(target_ids))
+                        params = tuple(target_ids)
+                        
+                        with get_db_connection() as conn:
+                            cursor = conn.cursor()
+                            cursor.execute(f"""
+                                SELECT id, filepath, md5, phash, colorhash
+                                FROM images 
+                                WHERE id IN ({target_placeholders})
+                            """, params)
+                            missing_semantic = [dict(row) for row in cursor.fetchall()]
 
-            total_stats['processed'] += 1
-            if updated_something:
-                total_stats['success'] += 1
+                except Exception as e:
+                    print(f"[Similarity] Error finding missing semantic: {e}")
+
+            if not missing_hashes and not missing_semantic:
+                break
                 
-            if progress_callback:
-                progress_callback(total_stats['processed'], total_stats['total'])
+            # Submit tasks
+            future_to_id = {}
+            
+            # Submit Visual -> ProcessPool
+            for row in missing_hashes:
+                future = process_executor.submit(_process_single_image, row)
+                future_to_id[future] = ('visual', row)
                 
-        # Small sleep to prevent freezing CPU completely if running synchronously
-        # (Though we are in a thread, so it's fine)
-        # Check if we should stop? (Assuming we want to do ALL)
-        pass 
-        
+            # Submit Semantic -> ThreadPool
+            for row in missing_semantic:
+                # _process_semantic_single uses the global model
+                future = thread_executor.submit(_process_semantic_single, row)
+                future_to_id[future] = ('semantic', row)
+            
+            # Collect results
+            results_buffer = []
+            
+            for future in concurrent.futures.as_completed(future_to_id):
+                task_type, row = future_to_id[future]
+                try:
+                    result = future.result()
+                    
+                    total_stats['processed'] += 1
+                    if result['success']:
+                        total_stats['success'] += 1
+                        results_buffer.append(result)
+                    
+                    # Failure handling
+                    if not result['success']:
+                         if task_type == 'visual':
+                             failed_visual_ids.add(result['id'])
+                         elif task_type == 'semantic':
+                             failed_semantic_ids.add(result['id'])
+                        
+                    if result.get('errors'):
+                         print(f"[Similarity] Error processing {result['filepath']}: {result['errors'][0]}")
+
+                    if progress_callback:
+                        progress_callback(total_stats['processed'], total_stats['total'])
+                        
+                except Exception as e:
+                    print(f"[Similarity] Exception in {task_type} result: {e}")
+                    total_stats['failed'] += 1
+                    if task_type == 'visual':
+                         failed_visual_ids.add(row['id'])
+                    elif task_type == 'semantic':
+                         failed_semantic_ids.add(row['id'])
+
+            # Bulk save
+            if results_buffer:
+                _bulk_save_hashes(results_buffer)
+                print(f"[Similarity] Batch complete. Saved {len(results_buffer)} results.")
+    
     return total_stats
 
 

@@ -2,6 +2,8 @@
 import threading
 import time
 import os
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 from database import models
 from services import processing_service as processing
 from watchdog.observers import Observer
@@ -10,6 +12,7 @@ from watchdog.events import FileSystemEventHandler
 # --- Shared Monitor State ---
 monitor_thread = None
 observer = None
+ingest_executor = None  # Global ProcessPoolExecutor
 monitor_status = {
     "running": False,
     "last_check": None,
@@ -41,7 +44,7 @@ class ImageFileHandler(FileSystemEventHandler):
 
     def __init__(self, watch_ingest=False):
         super().__init__()
-        self.processing_lock = threading.Lock()
+        # self.processing_lock = threading.Lock() # No longer needed for parallel submission
         # Debounce: track recently processed files to avoid duplicates
         self.recently_processed = {}
         self.debounce_seconds = 2
@@ -64,6 +67,26 @@ class ImageFileHandler(FileSystemEventHandler):
             return False
         self.recently_processed[filepath] = now
         return True
+        
+    def handle_ingest_completion(self, future, is_from_ingest, filename):
+        """Callback for when ingest analysis completes."""
+        try:
+            result = future.result()
+            
+            # Commit results in this thread (callback thread)
+            success = processing.commit_image_ingest(result, move_from_ingest=is_from_ingest)
+            
+            if success:
+                monitor_status["last_scan_found"] = 1
+                monitor_status["total_processed"] += 1
+                monitor_status["pending_reload"] = True
+                monitor_status["last_activity"] = time.time()
+                add_log(f"Successfully processed: {filename}", 'success')
+            else:
+                add_log(f"Skipped/Failed: {filename}", 'warning')
+                
+        except Exception as e:
+            add_log(f"Error processing {filename}: {e}", 'error')
 
     def on_created(self, event):
         """Called when a file is created."""
@@ -80,66 +103,31 @@ class ImageFileHandler(FileSystemEventHandler):
         # Small delay to ensure file is fully written
         time.sleep(0.5)
 
-        with self.processing_lock:
-            import config
-            from utils.file_utils import get_bucketed_path
+        import config
+        
+        # Determine if this is from ingest folder
+        abs_filepath = os.path.abspath(filepath)
+        abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+        is_from_ingest = self.watch_ingest and abs_filepath.startswith(abs_ingest)
+        filename = os.path.basename(filepath)
 
-            # Normalize paths for comparison
-            abs_filepath = os.path.abspath(filepath)
-            abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+        if not is_from_ingest:
+            # Check if already in DB for static/images files
+            rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+            if rel_path in models.get_all_filepaths():
+                return
 
-            # Determine if this is from ingest folder
-            is_from_ingest = self.watch_ingest and abs_filepath.startswith(abs_ingest)
+        add_log(f"Detected {filename}, queuing for analysis...", 'info')
+        
+        # Submit to global executor
+        if ingest_executor:
+            future = ingest_executor.submit(processing.analyze_image_for_ingest, filepath)
+            # Use partial to pass extra args to callback
+            from functools import partial
+            future.add_done_callback(partial(self.handle_ingest_completion, is_from_ingest=is_from_ingest, filename=filename))
+        else:
+            add_log("Executor not ready, skipping processing.", 'error')
 
-            if is_from_ingest:
-                # File from ingest - will be moved to bucketed structure
-                filename = os.path.basename(filepath)
-
-                # Check if file still exists (race condition check)
-                if not os.path.exists(filepath):
-                    # File was already processed by another thread/process
-                    return
-
-                try:
-                    add_log(f"New file detected in ingest: {filename}", 'info')
-                    if processing.process_image_file(filepath, move_from_ingest=True):
-                        monitor_status["last_scan_found"] = 1
-                        monitor_status["total_processed"] += 1
-
-                        # Mark for reload, but don't reload immediately to prevent UI hang
-                        monitor_status["pending_reload"] = True
-                        monitor_status["last_activity"] = time.time()
-
-                        add_log(f"Successfully processed from ingest: {filename}", 'success')
-                    else:
-                        add_log(f"Skipped (duplicate): {filename}", 'warning')
-                except FileNotFoundError:
-                    # File was moved/deleted by another process - this is normal in concurrent processing
-                    pass
-                except Exception as e:
-                    add_log(f"Error processing {filename}: {e}", 'error')
-            else:
-                # File directly in images directory - already in bucketed location
-                # Check if already in database
-                rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
-                if rel_path in models.get_all_filepaths():
-                    return
-
-                try:
-                    add_log(f"New file detected: {os.path.basename(filepath)}", 'info')
-                    if processing.process_image_file(filepath, move_from_ingest=False):
-                        monitor_status["last_scan_found"] = 1
-                        monitor_status["total_processed"] += 1
-                        
-                        # Mark for reload
-                        monitor_status["pending_reload"] = True
-                        monitor_status["last_activity"] = time.time()
-                        
-                        add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
-                    else:
-                        add_log(f"Skipped (duplicate): {os.path.basename(filepath)}", 'warning')
-                except Exception as e:
-                    add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
 
 # --- Core Monitor Logic ---
 
@@ -180,31 +168,50 @@ def find_unprocessed_images():
 
 def run_scan():
     """
-    Finds and processes all new images.
+    Finds and processes all new images using parallel workers.
     Returns the number of images processed.
     """
     import config
-    from utils.file_utils import get_bucketed_path
-
+    
     unprocessed_files = find_unprocessed_images()
     if not unprocessed_files:
         add_log("No new images found.")
         return 0
 
-    add_log(f"Found {len(unprocessed_files)} new images to process.")
-    processed_count = 0
-    for f in unprocessed_files:
-        # Determine if file is in ingest folder
-        abs_filepath = os.path.abspath(f)
-        abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
-        is_from_ingest = abs_filepath.startswith(abs_ingest)
+    add_log(f"Found {len(unprocessed_files)} new images. Starting parallel analysis...", 'info')
+    
+    # Store futures to track batch completion
+    futures = {}
+    
+    if not ingest_executor:
+        add_log("Executor died? Restarting...", 'error')
+        # Should not happen if start_monitor called
+        return 0
 
+    # Submit batches
+    for f in unprocessed_files:
+        future = ingest_executor.submit(processing.analyze_image_for_ingest, f)
+        futures[future] = f
+
+    processed_count = 0
+    from concurrent.futures import as_completed
+    
+    for future in as_completed(futures):
+        f = futures[future]
         try:
-            if processing.process_image_file(f, move_from_ingest=is_from_ingest):
+            result = future.result()
+            
+            # Determine logic for commit
+            abs_filepath = os.path.abspath(f)
+            abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+            is_from_ingest = abs_filepath.startswith(abs_ingest)
+            
+            if processing.commit_image_ingest(result, move_from_ingest=is_from_ingest):
                 processed_count += 1
                 add_log(f"Successfully processed: {os.path.basename(f)}", 'success')
             else:
-                add_log(f"Skipped (duplicate): {os.path.basename(f)}", 'warning')
+                 add_log(f"Skipped/Duplicate: {os.path.basename(f)}", 'warning')
+                 
         except Exception as e:
             add_log(f"Error processing {os.path.basename(f)}: {e}", 'error')
 
@@ -238,14 +245,34 @@ def monitor_loop():
 # --- Control Functions ---
 
 def start_monitor():
-    """Starts the background monitoring thread with watchdog."""
-    global monitor_thread, observer
+    """Starts the background monitoring thread with watchdog and parallel executor."""
+    global monitor_thread, observer, ingest_executor
     import config
+    from services import similarity_service # Needed for worker init
 
     if monitor_status["running"]:
         return False
 
     monitor_status["running"] = True
+    
+    # Initialize Executor
+    try:
+        max_workers = config.MAX_WORKERS
+    except AttributeError:
+        max_workers = 4 # Fallback if config is missing
+        
+    if max_workers <= 0:
+        cpu_count = multiprocessing.cpu_count()
+        max_workers = max(1, cpu_count - 1)
+        
+    add_log(f"Starting Ingest Executor with {max_workers} workers...", 'info')
+
+    # Use Semantic Init if available
+    init_func = None
+    if getattr(similarity_service, '_init_worker', None):
+        init_func = similarity_service._init_worker
+        
+    ingest_executor = ProcessPoolExecutor(max_workers=max_workers, initializer=init_func)
 
     if monitor_status["mode"] == "watchdog":
         # Use watchdog for real-time filesystem monitoring
@@ -254,47 +281,43 @@ def start_monitor():
             observer = Observer()
             observer.schedule(event_handler, "static/images", recursive=True)
 
-            # Also watch ingest folder if it exists (recursively to support folder structures)
+            # Also watch ingest folder
             if os.path.exists(config.INGEST_DIRECTORY):
                 observer.schedule(event_handler, config.INGEST_DIRECTORY, recursive=True)
-                add_log(f"Watching ingest folder (recursively): {config.INGEST_DIRECTORY}")
+                add_log(f"Watching ingest folder: {config.INGEST_DIRECTORY}")
 
             observer.start()
-            add_log("Background monitor started (watchdog mode - real-time detection).")
+            add_log("Background monitor started (watchdog mode).")
 
-            # Also do an initial scan to catch any existing unprocessed files
+            # Also do an initial scan
             monitor_thread = threading.Thread(target=initial_scan_then_idle, daemon=True)
             monitor_thread.start()
         except Exception as e:
-            add_log(f"Failed to start watchdog: {e}. Falling back to polling mode.", 'error')
+            add_log(f"Failed to start watchdog: {e}. Falling back to polling.", 'error')
             monitor_status["mode"] = "polling"
             monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
             monitor_thread.start()
-            add_log("Background monitor started (polling mode).")
     else:
         # Legacy polling mode
         monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         monitor_thread.start()
-        add_log("Background monitor started (polling mode).")
 
     return True
 
 def initial_scan_then_idle():
     """Do an initial scan for existing files, then idle."""
-    add_log("Running initial scan for existing unprocessed files...")
+    add_log("Running initial scan...")
     try:
         processed_count = run_scan()
         monitor_status["last_scan_found"] = processed_count
         monitor_status["total_processed"] += processed_count
-        add_log(f"Initial scan complete. Found {processed_count} unprocessed images.")
+        add_log(f"Initial scan complete. Processed {processed_count} images.")
     except Exception as e:
         add_log(f"Error during initial scan: {e}", 'error')
 
-    # Now just idle - watchdog will handle new files
-    # Check for pending reloads periodically
+    # Now just idle
     while monitor_status["running"]:
         if monitor_status["pending_reload"]:
-            # Check if enough time has passed since last activity (debounce)
             if time.time() - monitor_status["last_activity"] > 2.0:
                 try:
                     add_log("Reloading data after batch ingest...")
@@ -308,8 +331,8 @@ def initial_scan_then_idle():
         time.sleep(1)
 
 def stop_monitor():
-    """Stops the background monitoring thread."""
-    global observer
+    """Stops the background monitoring thread and executor."""
+    global observer, ingest_executor
 
     if not monitor_status["running"]:
         return False
@@ -325,5 +348,14 @@ def stop_monitor():
         except Exception as e:
             add_log(f"Error stopping observer: {e}", 'error')
         observer = None
+        
+    if ingest_executor:
+        add_log("Shutting down executor...")
+        try:
+            ingest_executor.shutdown(wait=False)
+            add_log("Executor shutdown.")
+        except Exception as e:
+             add_log(f"Error stopping executor: {e}", 'error')
+        ingest_executor = None
 
     return True

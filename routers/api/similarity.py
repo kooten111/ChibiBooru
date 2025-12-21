@@ -136,12 +136,21 @@ async def generate_hashes():
         
         loop = asyncio.get_running_loop()
         
+        import time
+        last_update_time = 0
+        
         def progress_callback(current, total):
-             future = asyncio.run_coroutine_threadsafe(
-                 manager.update_progress(task_id, current, total, "Generating hashes..."), 
-                 loop
-             )
-             # We don't wait for the future
+             nonlocal last_update_time
+             current_time = time.time()
+             
+             # Throttle updates: only update if 0.1s passed OR it's the final update
+             if (current_time - last_update_time > 0.1) or (current >= total):
+                 last_update_time = current_time
+                 future = asyncio.run_coroutine_threadsafe(
+                     manager.update_progress(task_id, current, total, "Generating hashes..."), 
+                     loop
+                 )
+                 # We don't wait for the future
         
         # Run synchronous service function in thread
         stats = await asyncio.to_thread(

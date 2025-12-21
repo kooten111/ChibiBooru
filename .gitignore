@@ -37,3 +37,4 @@ rating_model.db-wal
 .xdp-booru*
 similarity.db
 similarity.db-journal
+*.lock
