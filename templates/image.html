@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=26' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/image.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/saucenao-modal.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/animation-player.css') + '?v=1' }}">
 
@@ -41,356 +41,360 @@
 
     {% include 'header.html' %}
 
-    <div class="image-viewer-container">
+    <div class="container">
         <!-- Left Sidebar: Tags -->
-        <aside class="sidebar-panel sidebar-left" id="sidebarLeft">
-            <div class="sidebar-content" id="tags-content">
-                <div class="tag-section-header">
-                    <span class="tag-section-title">🏷️ Tags</span>
-                    <button class="btn-text-only" onclick="toggleTagEditor()" style="font-size: 11px;">Edit</button>
-                </div>
-
-                <!-- Hidden container for original tags list structure used by tag-editor.js to copy from -->
-                <div class="tags-list" style="display: none;">
-                    <!-- This structure mimics what tag-editor.js expects to crawl -->
-                    <!-- We need to ensure the standard classes exist even if hidden or different layout -->
-                </div>
-                <!-- Actually tag-editor.js crawls .tag-category classes. The new layout uses .tag-category-group.
-                     We need to add the class 'tag-category' and the specific category class to the groups -->
-
-                <div id="tags-panel-content">
-                    {# Simplified Tag Loop Logic preserved #}
-                    {% if categorized_tags %}
-                    {% for cat in ['artist', 'copyright', 'character', 'species'] %}
-                    {% if categorized_tags[cat] %}
-                    <div class="tag-category-group tag-category {{ cat }}">
-                        <div class="tag-category-name cat-{{ cat }}">{{ cat }}</div>
-                        {% for tag, count in categorized_tags[cat] %}
-                        <div class="tag-item"> <!-- Wrapper for editor to find -->
-                            <a href="{{ url_for('main.home', query=cat + ':' + tag) }}" class="tag-row">
-                                <span class="tag-name">{{ tag }}</span>
-                                <span class="tag-count">{{ count }}</span>
-                            </a>
+        <div class="sidebar-left" id="sidebarLeft">
+            <section class="section-content">
+                <div class="panel tags-list">
+                    <button class="panel-header" onclick="togglePanelCollapse(this)">
+                        <span>🏷️ Tags</span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <div class="panel-collapsible-content" id="tags-content">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <span style="font-size: 0.85em; color: var(--text-muted);">Click tag to search</span>
+                            <button class="btn-text-only" onclick="toggleTagEditor()" style="font-size: 11px;">Edit</button>
                         </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    {% endfor %}
 
-                    {% if extended_grouped_tags %}
-
-                    {# --- Group 1: Identity --- #}
-                    {% set group1_cats = [
-                    ('00_Subject_Count', 'Subject Count'), ('01_Body_Physique', 'Body Physique'),
-                    ('02_Body_Hair', 'Body Hair'), ('03_Body_Face', 'Body Face'),
-                    ('04_Body_Genitalia', 'Body Genitalia')
-                    ] %}
-
-                    {% set has_group1 = false %}
-                    {% for cat_key, _ in group1_cats %}
-                    {% if cat_key in extended_grouped_tags %}{% set has_group1 = true %}{% endif %}
-                    {% endfor %}
-
-                    {% if has_group1 %}
-                    <div class="tag-category-group tag-category general">
-                        <div class="tag-category-name cat-general"
-                            style="border-bottom: 1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
-                            Identity</div>
-                        {% for cat_key, cat_display_name in group1_cats %}
-                        {% if cat_key in extended_grouped_tags %}
-                        <div class="extended-sub-category" style="margin-left: 8px; margin-bottom: 8px;">
-                            <div class="extended-category-title"
-                                style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 2px;">{{
-                                cat_display_name }}</div>
-                            {% for tag, count in extended_grouped_tags[cat_key] %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query=tag) }}" class="tag-row">
-                                    <span class="tag-name">{{ tag }}</span>
-                                    <span class="tag-count">{{ count }}</span>
-                                </a>
+                                <div id="tags-panel-content">
+                            {# Simplified Tag Loop Logic preserved #}
+                            {% if categorized_tags %}
+                            {% for cat in ['artist', 'copyright', 'character', 'species'] %}
+                            {% if categorized_tags[cat] %}
+                            <div class="tag-category {{ cat }}">
+                                <div class="tag-category-title">{{ cat }}</div>
+                                {% for tag, count in categorized_tags[cat] %}
+                                <div class="tag-item">
+                                    <a href="{{ url_for('main.home', query=cat + ':' + tag) }}" class="tag-link">
+                                        <span class="tag-name">{{ tag }}</span>
+                                        <span class="tag-count">{{ count }}</span>
+                                    </a>
+                                </div>
+                                {% endfor %}
                             </div>
+                            {% endif %}
                             {% endfor %}
-                        </div>
-                        {% endif %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
 
-                    {# --- Group 2: Context --- #}
-                    {% set group2_cats = [
-                    ('05_Attire_Main', 'Attire Main'), ('06_Attire_Inner', 'Attire Inner'),
-                    ('07_Attire_Legwear', 'Attire Legwear'), ('08_Attire_Acc', 'Attire Accessories'),
-                    ('21_Status', 'Status'), ('09_Action', 'Action'), ('10_Pose', 'Pose'),
-                    ('11_Expression', 'Expression'), ('12_Sexual_Act', 'Sexual Act'),
-                    ('13_Object', 'Object'), ('14_Setting', 'Setting')
-                    ] %}
+                            {% if extended_grouped_tags %}
 
-                    {% set has_group2 = false %}
-                    {% for cat_key, _ in group2_cats %}
-                    {% if cat_key in extended_grouped_tags %}{% set has_group2 = true %}{% endif %}
-                    {% endfor %}
+                            {# --- Group 1: Identity --- #}
+                            {% set group1_cats = [
+                            ('00_Subject_Count', 'Subject Count'), ('01_Body_Physique', 'Body Physique'),
+                            ('02_Body_Hair', 'Body Hair'), ('03_Body_Face', 'Body Face'),
+                            ('04_Body_Genitalia', 'Body Genitalia')
+                            ] %}
 
-                    {% if has_group2 %}
-                    <div class="tag-category-group tag-category general">
-                        <div class="tag-category-name cat-general"
-                            style="border-bottom: 1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
-                            Context</div>
-                        {% for cat_key, cat_display_name in group2_cats %}
-                        {% if cat_key in extended_grouped_tags %}
-                        <div class="extended-sub-category" style="margin-left: 8px; margin-bottom: 8px;">
-                            <div class="extended-category-title"
-                                style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 2px;">{{
-                                cat_display_name }}</div>
-                            {% for tag, count in extended_grouped_tags[cat_key] %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query=tag) }}" class="tag-row">
-                                    <span class="tag-name">{{ tag }}</span>
-                                    <span class="tag-count">{{ count }}</span>
-                                </a>
+                            {% set has_group1 = false %}
+                            {% for cat_key, _ in group1_cats %}
+                            {% if cat_key in extended_grouped_tags %}{% set has_group1 = true %}{% endif %}
+                            {% endfor %}
+
+                            {% if has_group1 %}
+                            <div class="tag-category general">
+                                <div class="tag-category-title" style="border-bottom: 1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
+                                    Identity</div>
+                                {% for cat_key, cat_display_name in group1_cats %}
+                                {% if cat_key in extended_grouped_tags %}
+                                <div class="extended-sub-category" style="margin-left: 8px; margin-bottom: 8px;">
+                                    <div class="extended-category-title"
+                                        style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 2px;">{{
+                                        cat_display_name }}</div>
+                                    {% for tag, count in extended_grouped_tags[cat_key] %}
+                                    <div class="tag-item">
+                                        <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                                            <span class="tag-name">{{ tag }}</span>
+                                            <span class="tag-count">{{ count }}</span>
+                                        </a>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
                             </div>
+                            {% endif %}
+
+                            {# --- Group 2: Context --- #}
+                            {% set group2_cats = [
+                            ('05_Attire_Main', 'Attire Main'), ('06_Attire_Inner', 'Attire Inner'),
+                            ('07_Attire_Legwear', 'Attire Legwear'), ('08_Attire_Acc', 'Attire Accessories'),
+                            ('21_Status', 'Status'), ('09_Action', 'Action'), ('10_Pose', 'Pose'),
+                            ('11_Expression', 'Expression'), ('12_Sexual_Act', 'Sexual Act'),
+                            ('13_Object', 'Object'), ('14_Setting', 'Setting')
+                            ] %}
+
+                            {% set has_group2 = false %}
+                            {% for cat_key, _ in group2_cats %}
+                            {% if cat_key in extended_grouped_tags %}{% set has_group2 = true %}{% endif %}
                             {% endfor %}
-                        </div>
-                        {% endif %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
 
-                    {# --- Group 3: Technical/Meta --- #}
-                    {% set group3_cats = [
-                    ('15_Framing', 'Framing'), ('16_Focus', 'Focus'), ('17_Style_Art', 'Style Art'),
-                    ('18_Style_Tech', 'Style Tech'), ('19_Meta_Attributes', 'Meta Attributes'),
-                    ('20_Meta_Text', 'Meta Text')
-                    ] %}
-
-                    {% set has_group3 = false %}
-                    {% for cat_key, _ in group3_cats %}
-                    {% if cat_key in extended_grouped_tags %}{% set has_group3 = true %}{% endif %}
-                    {% endfor %}
-
-                    {% if has_group3 %}
-                    <div class="tag-category-group tag-category general">
-                        <div class="tag-category-name cat-general"
-                            style="border-bottom: 1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
-                            Technical / Meta</div>
-                        {% for cat_key, cat_display_name in group3_cats %}
-                        {% if cat_key in extended_grouped_tags %}
-                        <div class="extended-sub-category" style="margin-left: 8px; margin-bottom: 8px;">
-                            <div class="extended-category-title"
-                                style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 2px;">{{
-                                cat_display_name }}</div>
-                            {% for tag, count in extended_grouped_tags[cat_key] %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query=tag) }}" class="tag-row">
-                                    <span class="tag-name">{{ tag }}</span>
-                                    <span class="tag-count">{{ count }}</span>
-                                </a>
+                            {% if has_group2 %}
+                            <div class="tag-category general">
+                                <div class="tag-category-title" style="border-bottom: 1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
+                                    Context</div>
+                                {% for cat_key, cat_display_name in group2_cats %}
+                                {% if cat_key in extended_grouped_tags %}
+                                <div class="extended-sub-category" style="margin-left: 8px; margin-bottom: 8px;">
+                                    <div class="extended-category-title"
+                                        style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 2px;">{{
+                                        cat_display_name }}</div>
+                                    {% for tag, count in extended_grouped_tags[cat_key] %}
+                                    <div class="tag-item">
+                                        <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                                            <span class="tag-name">{{ tag }}</span>
+                                            <span class="tag-count">{{ count }}</span>
+                                        </a>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
                             </div>
+                            {% endif %}
+
+                            {# --- Group 3: Technical/Meta --- #}
+                            {% set group3_cats = [
+                            ('15_Framing', 'Framing'), ('16_Focus', 'Focus'), ('17_Style_Art', 'Style Art'),
+                            ('18_Style_Tech', 'Style Tech'), ('19_Meta_Attributes', 'Meta Attributes'),
+                            ('20_Meta_Text', 'Meta Text')
+                            ] %}
+
+                            {% set has_group3 = false %}
+                            {% for cat_key, _ in group3_cats %}
+                            {% if cat_key in extended_grouped_tags %}{% set has_group3 = true %}{% endif %}
                             {% endfor %}
+
+                            {% if has_group3 %}
+                            <div class="tag-category general">
+                                <div class="tag-category-title" style="border-bottom: 1px solid var(--border-color); padding-bottom:4px; margin-bottom:8px;">
+                                    Technical / Meta</div>
+                                {% for cat_key, cat_display_name in group3_cats %}
+                                {% if cat_key in extended_grouped_tags %}
+                                <div class="extended-sub-category" style="margin-left: 8px; margin-bottom: 8px;">
+                                    <div class="extended-category-title"
+                                        style="font-size: 0.8em; color: var(--text-muted); margin-bottom: 2px;">{{
+                                        cat_display_name }}</div>
+                                    {% for tag, count in extended_grouped_tags[cat_key] %}
+                                    <div class="tag-item">
+                                        <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                                            <span class="tag-name">{{ tag }}</span>
+                                            <span class="tag-count">{{ count }}</span>
+                                        </a>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {# --- Catch-all --- #}
+                            {% if None in extended_grouped_tags %}
+                            <div class="tag-category general">
+                                <div class="tag-category-title">Other</div>
+                                {% for tag, count in extended_grouped_tags[None] %}
+                                <div class="tag-item">
+                                    <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                                        <span class="tag-name">{{ tag }}</span>
+                                        <span class="tag-count">{{ count }}</span>
+                                    </a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% elif tags %}
+                            <div class="tag-category general">
+                                <div class="tag-category-title">General</div>
+                                {% for tag, count in tags %}
+                                <div class="tag-item">
+                                    <a href="{{ url_for('main.home', query=tag) }}" class="tag-link">
+                                        <span class="tag-name">{{ tag }}</span>
+                                        <span class="tag-count">{{ count }}</span>
+                                    </a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if categorized_tags.meta %}
+                            <div class="tag-category meta">
+                                <div class="tag-category-title">Meta</div>
+                                {% for tag, count in categorized_tags.meta %}
+                                <div class="tag-item">
+                                    <a href="{{ url_for('main.home', query='meta:' + tag) }}" class="tag-link">
+                                        <span class="tag-name">{{ tag }}</span>
+                                        <span class="tag-count">{{ count }}</span>
+                                    </a>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% endif %}
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="section-content">
+                <div class="panel pool-management">
+                    <button class="panel-header" onclick="togglePanelCollapse(this)">
+                        <span>📁 Pools</span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <div class="panel-collapsible-content" id="pools-content">
+                        <div id="poolsList" class="pools-list-container">
+                            <div class="loading-spinner">Loading pools...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Main Content: Image + Actions -->
+        <div class="main-content">
+            <div class="image-and-actions-container">
+                <div class="image-view" id="imageView">
+                    <div class="media-container" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
+                        filepath.endswith('.zip') %}data-animation-type="zip"
+                        data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="10" {% endif %}>
+
+                        {% if filepath.endswith('.mp4') %}
+                        <video controls loop preload="metadata"
+                            onloadeddata="this.closest('.media-container').style.opacity='1'">
+                            <source
+                                src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                                type="video/mp4">
+                        </video>
+                        {% elif filepath.endswith('.webm') %}
+                        <video controls loop preload="metadata"
+                            onloadeddata="this.closest('.media-container').style.opacity='1'">
+                            <source
+                                src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                                type="video/webm">
+                        </video>
+                        {% elif filepath.endswith('.zip') %}
+                        <img src="/static/{{ thumbnail_path | urlencode_path }}" alt="Animation" class="animation-poster">
+                        <span class="animation-badge">ZIP Animation</span>
+                        {% else %}
+                        <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                            alt="Image">
                         {% endif %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    {# --- Catch-all --- #}
-                    {% if None in extended_grouped_tags %}
-                    <div class="tag-category-group tag-category general">
-                        <div class="tag-category-name cat-general">Other</div>
-                        {% for tag, count in extended_grouped_tags[None] %}
-                        <div class="tag-item">
-                            <a href="{{ url_for('main.home', query=tag) }}" class="tag-row">
-                                <span class="tag-name">{{ tag }}</span>
-                                <span class="tag-count">{{ count }}</span>
-                            </a>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    {% elif tags %}
-                    <div class="tag-category-group">
-                        <div class="tag-category-name cat-general">General</div>
-                        {% for tag, count in tags %}
-                        <a href="{{ url_for('main.home', query=tag) }}" class="tag-row">
-                            <span class="tag-name">{{ tag }}</span>
-                            <span class="tag-count">{{ count }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-
-                    {% if categorized_tags.meta %}
-                    <div class="tag-category-group">
-                        <div class="tag-category-name cat-meta">Meta</div>
-                        {% for tag, count in categorized_tags.meta %}
-                        <a href="{{ url_for('main.home', query='meta:' + tag) }}" class="tag-row">
-                            <span class="tag-name">{{ tag }}</span>
-                            <span class="tag-count">{{ count }}</span>
-                        </a>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                </div>
-
-                <div id="pools-content">
-                    <div class="tag-section-header" style="margin-top: 20px;">
-                        <span class="tag-section-title">📁 Pools</span>
-                    </div>
-                    <div id="poolsList" class="pools-list-container">
-                        <div class="loading-spinner">Loading pools...</div>
                     </div>
                 </div>
-            </div>
-        </aside>
 
-        <!-- Main Content: Image + Floating Bar -->
-        <main class="main-image-area">
-            <div class="image-canvas image-view">
-                <div class="media-container" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
-                    filepath.endswith('.zip') %}data-animation-type="zip"
-                    data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="10" {% endif %}>
-
-                    {% if filepath.endswith('.mp4') %}
-                    <video controls loop preload="metadata"
-                        onloadeddata="this.closest('.media-container').style.opacity='1'">
-                        <source
-                            src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                            type="video/mp4">
-                    </video>
-                    {% elif filepath.endswith('.webm') %}
-                    <video controls loop preload="metadata"
-                        onloadeddata="this.closest('.media-container').style.opacity='1'">
-                        <source
-                            src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                            type="video/webm">
-                    </video>
-                    {% elif filepath.endswith('.zip') %}
-                    <img src="/static/{{ thumbnail_path | urlencode_path }}" alt="Animation" class="animation-poster">
-                    <span class="animation-badge">ZIP Animation</span>
-                    {% else %}
-                    <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                        alt="Image">
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Floating Action Bar -->
-            <div class="floating-bar-container">
-                <div class="floating-bar">
-                    <button class="action-btn" id="prevBtn" title="Previous (←)">◀</button>
-                    <div class="bar-divider"></div>
-                    <button class="action-btn" id="floatingFavBtn" title="Favourite">🤍</button>
-                    <button class="action-btn" id="floatingEditTagsBtn" title="Edit Tags">📝</button>
-                    <button class="action-btn" id="floatingAddPoolBtn" title="Add to Pool">📁</button>
-                    <button class="action-btn" id="zoomBtn" title="Zoom (Z)">⊕</button>
-                    <button class="action-btn primary" id="focusBtn" title="Focus mode (F)">⛶</button>
-
-                    <a href="{{ url_for('main.similar', filepath=filepath) }}" class="action-btn"
-                        title="Find similar">🔍</a>
-                    <a href="{{ url_for('main.similar_visual', filepath=filepath) }}" class="action-btn"
-                        title="Visual similar">👁️</a>
+                <!-- Horizontal Actions Bar -->
+                <div class="actions-bar">
+                    <button class="btn" id="prevBtn" title="Previous (←)">◀ Previous</button>
+                    <button class="btn" id="favouriteBtn" data-filepath="{{ filepath }}" title="Favourite">
+                        <span class="favourite-icon">🤍</span>
+                        <span class="favourite-text">Favourite</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="toggleTagEditor()" title="Edit Tags">📝 Edit Tags</button>
+                    <button class="btn btn-secondary" onclick="showAddToPoolModal()" title="Add to Pool">📁 Add to Pool</button>
+                    <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary"
+                        title="Find similar">🔍 Find Similar</a>
+                    <a href="{{ url_for('main.similar_visual', filepath=filepath) }}" class="btn btn-secondary"
+                        title="Visual similar">👁️ Visual Similar</a>
                     <a href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                        download class="action-btn success" title="Download">💾</a>
-                    <button class="action-btn danger" id="floatingDeleteBtn" title="Delete">🗑️</button>
-                    <div class="bar-divider"></div>
-                    <button class="action-btn" id="nextBtn" title="Next (→)">▶</button>
+                        download class="btn btn-success" title="Download">💾 Download</a>
+                    <button class="btn btn-danger" id="deleteImageBtn" onclick="confirmDelete()" title="Delete">🗑️ Delete</button>
+                    <button class="btn" id="nextBtn" title="Next (→)">Next ▶</button>
                 </div>
             </div>
-
-            <!-- Focus Mode Hints -->
-            <button class="focus-exit-btn" id="focusExit" title="Exit focus mode (ESC)">✕</button>
-            <div class="focus-hint" id="focusHint">ESC to exit • scroll to zoom • drag to pan</div>
-        </main>
+        </div>
 
         <!-- Right Sidebar: Info + Related -->
-        <aside class="sidebar-panel sidebar-right" id="sidebarRight">
-            <div class="sidebar-content" id="sidebar-right-content">
-                <div class="tag-section-header">
-                    <span class="tag-section-title">ℹ️ Info</span>
-                    <div style="display:flex; gap:8px;">
-                        <button class="btn-text-only" onclick="showSauceNaoFetcher()" style="font-size: 11px;">Check
-                            Source</button>
-                    </div>
-                </div>
+        <div class="sidebar-right" id="sidebarRight">
+            <section class="section-content">
+                <div class="panel metadata-info">
+                    <button class="panel-header" onclick="togglePanelCollapse(this)">
+                        <span>ℹ️ Info</span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <div class="panel-collapsible-content">
+                        <div style="display:flex; gap:8px; margin-bottom: 12px;">
+                            <button class="btn-text-only" onclick="showSauceNaoFetcher()" style="font-size: 11px;">Check
+                                Source</button>
+                        </div>
 
-                <div class="metadata-info-actions" style="margin-bottom: 12px; display: grid; gap: 6px;">
-                    <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="btn btn-secondary btn-sm"
-                        style="text-align:center; padding: 4px;">View Raw Data</a>
-                </div>
+                        <div class="metadata-info-actions" style="margin-bottom: 12px; display: grid; gap: 6px;">
+                            <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="btn btn-secondary btn-sm"
+                                style="text-align:center; padding: 4px;">View Raw Data</a>
+                        </div>
 
-                {% if metadata %}
-                <div class="metadata-info" style="font-size: 0.85em; color: var(--text-secondary);">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <span>Resolution</span>
-                        <span style="color:white;">
+                        {% if metadata %}
+                        <div style="font-size: 0.85em; color: var(--text-secondary);">
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span>Resolution</span>
+                                <span style="color:white;">
+                                    {% if metadata.sources %}
+                                    {% set first = metadata.sources.values()|list|first %}
+                                    {{ first.get('image_width', '?') }} × {{ first.get('image_height', '?') }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span>Size</span>
+                                <span style="color:white;">{{ (metadata.sources.values()|list|first).get('file_size') |
+                                    filesizeformat
+                                    if metadata.sources and (metadata.sources.values()|list|first).get('file_size') else 'N/A'
+                                    }}</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span>Rating</span>
+                                <span style="color:white;">{{ (metadata.sources.values()|list|first).get('rating', '?') | upper
+                                    if
+                                    metadata.sources else '?' }}</span>
+                            </div>
+
                             {% if metadata.sources %}
-                            {% set first = metadata.sources.values()|list|first %}
-                            {{ first.get('image_width', '?') }} × {{ first.get('image_height', '?') }}
+                            {% set first_source = metadata.sources.values()|list|first %}
+                            {% if first_source.tagger_name %}
+                            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                                <span>Tagger</span>
+                                <span style="color: var(--primary-blue);">{{ first_source.tagger_name }}</span>
+                            </div>
                             {% endif %}
-                        </span>
+                            {% endif %}
+                            {% if metadata.md5 %}
+                            <div
+                                style="margin-top:8px; word-break:break-all; font-family:monospace; font-size:10px; color:#666;">
+                                {{ metadata.md5 }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                     </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <span>Size</span>
-                        <span style="color:white;">{{ (metadata.sources.values()|list|first).get('file_size') |
-                            filesizeformat
-                            if metadata.sources and (metadata.sources.values()|list|first).get('file_size') else 'N/A'
-                            }}</span>
-                    </div>
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <span>Rating</span>
-                        <span style="color:white;">{{ (metadata.sources.values()|list|first).get('rating', '?') | upper
-                            if
-                            metadata.sources else '?' }}</span>
-                    </div>
-
-                    {% if metadata.sources %}
-                    {% set first_source = metadata.sources.values()|list|first %}
-                    {% if first_source.tagger_name %}
-                    <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-                        <span>Tagger</span>
-                        <span style="color: var(--primary-blue);">{{ first_source.tagger_name }}</span>
-                    </div>
-                    {% endif %}
-                    {% endif %}
-                    {% if metadata.md5 %}
-                    <div
-                        style="margin-top:8px; word-break:break-all; font-family:monospace; font-size:10px; color:#666;">
-                        {{ metadata.md5 }}
-                    </div>
-                    {% endif %}
                 </div>
-                {% endif %}
+            </section>
 
-                <div class="tag-section-header" style="margin-top: 20px;">
-                    <span class="tag-section-title">🖼️ Similar</span>
+            <section class="section-content">
+                <div class="panel related-images-vertical">
+                    <button class="panel-header" onclick="togglePanelCollapse(this)">
+                        <span>🖼️ Similar</span>
+                        <span class="section-arrow">▼</span>
+                    </button>
+                    <div class="panel-collapsible-content" id="related-images-content">
+                        {% if related_images %}
+                        <div class="related-grid">
+                            {% for related in related_images %}
+                            <a href="/view/{{ related.path | urlencode_path }}" class="related-item related-thumb">
+                                <img src="/static/{% if not (related.thumb.startswith('thumbnails/') or related.thumb.startswith('images/')) %}images/{% endif %}{{ related.thumb | urlencode_path }}"
+                                    alt="Related" loading="lazy">
+                                <span class="related-index">#{{ loop.index }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
-
-                {% if related_images %}
-                <div class="related-grid-compact">
-                    {% for related in related_images %}
-                    <a href="/view/{{ related.path | urlencode_path }}" class="related-item related-thumb">
-                        <img src="/static/{% if not (related.thumb.startswith('thumbnails/') or related.thumb.startswith('images/')) %}images/{% endif %}{{ related.thumb | urlencode_path }}"
-                            alt="Related" loading="lazy">
-                        <span class="related-index">#{{ loop.index }}</span>
-                    </a>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-        </aside>
+            </section>
+        </div>
     </div>
 
     <!-- Hidden Data Inputs for JS interactivity -->
     <input type="hidden" id="imageFilepath" value="{{ filepath }}">
     <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
-    
-    <!-- Hidden buttons for delegated functionality -->
-    <button id="favouriteBtn" data-filepath="{{ filepath }}" style="display: none;">
-        <span class="favourite-icon"></span>
-        <span class="favourite-text"></span>
-    </button>
-    <button id="deleteImageBtn" style="display: none;"></button>
     
     {% if family_images %}
     <script type="application/json" id="familyImagesData">{{ family_images | tojson }}</script>
@@ -466,6 +470,12 @@
     </template>
 
     <!-- Scripts -->
+    <script>
+        // Simple panel collapse toggle
+        function togglePanelCollapse(element) {
+            element.classList.toggle('collapsed');
+        }
+    </script>
     <script src="{{ url_for('static', filename='js/modal.js', v='1.3') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/autocomplete.js', v='1.g') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/tag-editor.js', v='1.7') }}"></script>
