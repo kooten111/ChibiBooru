@@ -384,6 +384,14 @@
     <!-- Hidden Data Inputs for JS interactivity -->
     <input type="hidden" id="imageFilepath" value="{{ filepath }}">
     <input type="hidden" id="allTags" value="{{ data.all_tags or '' }}">
+    
+    <!-- Hidden buttons for delegated functionality -->
+    <button id="favouriteBtn" data-filepath="{{ filepath }}" style="display: none;">
+        <span class="favourite-icon"></span>
+        <span class="favourite-text"></span>
+    </button>
+    <button id="deleteImageBtn" style="display: none;"></button>
+    
     {% if family_images %}
     <script type="application/json" id="familyImagesData">{{ family_images | tojson }}</script>
     {% endif %}

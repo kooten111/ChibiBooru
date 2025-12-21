@@ -324,11 +324,16 @@ function initImageViewer() {
     const mainFavBtn = document.getElementById('favouriteBtn');
     if (mainFavBtn && floatingFavBtn) {
         const observer = new MutationObserver(() => {
-            const isFav = mainFavBtn.classList.contains('favourited');
+            const isFav = mainFavBtn.classList.contains('is-favourite');
             floatingFavBtn.textContent = isFav ? '❤️' : '🤍';
             floatingFavBtn.classList.toggle('active', isFav);
         });
         observer.observe(mainFavBtn, { attributes: true, attributeFilter: ['class'] });
+        
+        // Initial state
+        const isFav = mainFavBtn.classList.contains('is-favourite');
+        floatingFavBtn.textContent = isFav ? '❤️' : '🤍';
+        floatingFavBtn.classList.toggle('active', isFav);
     }
 
     // Image zoom/pan events
