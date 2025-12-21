@@ -1938,24 +1938,24 @@ body.image-page {
 }
 
 /* Fullscreen / UI Hidden mode */
-body.ui-hidden {
+body.focus-mode {
     overflow: hidden;
 }
 
-body.ui-hidden .header-container {
+body.focus-mode .header-container {
     transform: translateY(-100%);
     transition: transform var(--transition-smooth);
 }
 
-body.ui-hidden .sidebar-left,
-body.ui-hidden .sidebar-right,
-body.ui-hidden .actions-bar {
+body.focus-mode .sidebar-left,
+body.focus-mode .sidebar-right,
+body.focus-mode .actions-bar {
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition-smooth);
 }
 
-body.ui-hidden .image-view {
+body.focus-mode .image-view {
     position: fixed;
     top: 0;
     left: 0;
@@ -1971,7 +1971,7 @@ body.ui-hidden .image-view {
     overflow: hidden;
 }
 
-body.ui-hidden .image-view img {
+body.focus-mode .image-view img {
     cursor: grab;
     max-height: 100vh;
     max-width: 100vw;
@@ -1981,12 +1981,12 @@ body.ui-hidden .image-view img {
     will-change: transform;
 }
 
-body.ui-hidden .image-view img:active {
+body.focus-mode .image-view img:active {
     cursor: grabbing;
 }
 
 /* Zoom indicator hint */
-body.ui-hidden::after {
+body.focus-mode::after {
     content: 'Scroll to zoom • Drag to pan • ESC to exit';
     position: fixed;
     bottom: var(--spacing-lg);
@@ -2208,7 +2208,7 @@ body.ui-hidden::after {
     transform: scale(1.1);
 }
 
-body.ui-hidden .focus-exit {
+body.focus-mode .focus-exit {
     display: flex;
 }
 
@@ -2225,7 +2225,7 @@ body.ui-hidden .focus-exit {
     display: none;
 }
 
-body.ui-hidden .focus-hint {
+body.focus-mode .focus-hint {
     display: block;
     animation: fadeOut 4s forwards;
 }
@@ -2243,13 +2243,13 @@ body.ui-hidden .focus-hint {
 }
 
 /* Floating actions in focus mode - higher z-index, slightly transparent */
-body.ui-hidden .floating-actions {
+body.focus-mode .floating-actions {
     bottom: 32px;
     opacity: 0.75;
     z-index: calc(var(--z-modal) + 2);
 }
 
-body.ui-hidden .floating-actions:hover {
+body.focus-mode .floating-actions:hover {
     opacity: 1;
 }
 

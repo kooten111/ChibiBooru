@@ -261,7 +261,7 @@ body.image-page {
 
 /* Focus Mode */
 body.focus-mode .sidebar-panel,
-body.focus-mode .compact-header {
+body.focus-mode .header-container {
     display: none !important;
     /* Force hide */
 }
