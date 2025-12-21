@@ -3,459 +3,1507 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Visual Similar - {{ app_name }}</title>
+    <title>Similarity Search - {{ app_name }}</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=25' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=26' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <style>
-        .similarity-controls {
-            background: var(--bg-secondary);
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .reference-image {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .reference-image img {
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 8px;
-            border: 2px solid var(--border-color);
-        }
-
-        .reference-info {
+        /* Similarity Search Page Layout */
+        .similarity-page {
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .reference-info .label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-        }
-
-        .reference-info .filename {
-            font-weight: 500;
-            max-width: 200px;
             overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
         }
 
-        .threshold-control {
+        .similarity-header {
+            flex-shrink: 0;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-panel-dark);
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
-        .threshold-control label {
-            font-size: 0.9rem;
-            color: var(--text-secondary);
-        }
-
-        .threshold-control input[type="range"] {
-            width: 200px;
-            accent-color: var(--accent-primary);
-        }
-
-        .threshold-value {
-            background: var(--bg-tertiary);
-            padding: 0.25rem 0.75rem;
-            border-radius: 6px;
+        .similarity-header h1 {
+            font-size: 1.1rem;
             font-weight: 600;
-            min-width: 40px;
+            color: var(--text-primary);
+            margin: 0;
+        }
+
+        .similarity-header a {
+            color: var(--primary-blue);
+            text-decoration: none;
+        }
+
+        .similarity-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Left Panel - Controls */
+        .controls-panel {
+            width: 320px;
+            flex-shrink: 0;
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            background: var(--bg-panel);
+        }
+
+        .control-section {
+            background: var(--bg-panel-dark);
+            border-radius: var(--radius-lg);
+            padding: 0.75rem;
+        }
+
+        .control-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .control-label .blend-note {
+            color: var(--primary-blue);
+        }
+
+        /* Reference Image */
+        .reference-preview {
+            aspect-ratio: 1;
+            background: var(--bg-input);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .reference-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .reference-preview .placeholder {
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .reference-preview .placeholder svg {
+            width: 3rem;
+            height: 3rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.5;
+        }
+
+        .reference-preview .placeholder span {
+            font-size: 0.7rem;
+            display: block;
+            padding: 0 0.5rem;
+            word-break: break-all;
+        }
+
+        /* Method Toggle Buttons */
+        .methods-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+
+        .method-btn {
+            padding: 0.5rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            background: transparent;
+            cursor: pointer;
+            text-align: left;
+            position: relative;
+            transition: all var(--transition-normal);
+        }
+
+        .method-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .method-btn:not(:disabled):hover {
+            border-color: var(--border-color-hover);
+        }
+
+        .method-btn.selected {
+            border-color: var(--method-color);
+            background: rgba(var(--method-color-rgb), 0.1);
+        }
+
+        .method-btn-content {
+            display: flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+
+        .method-btn svg {
+            width: 0.875rem;
+            height: 0.875rem;
+        }
+
+        .method-btn-name {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .method-btn-check {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            background: var(--method-color);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.5rem;
+            color: white;
+        }
+
+        .method-btn.selected .method-btn-check {
+            display: flex;
+        }
+
+        /* Weight Sliders */
+        .weights-container {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            display: none;
+        }
+
+        .weights-container.visible {
+            display: block;
+        }
+
+        .weight-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .weight-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .weight-row svg {
+            width: 0.875rem;
+            height: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .weight-row-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            min-width: 4.5rem;
+        }
+
+        .weights-header {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .weight-row input[type="range"] {
+            flex: 1;
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: rgba(255, 255, 255, 0.2);
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .weight-row input[type="range"]::-webkit-slider-runnable-track {
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .weight-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 1.125rem;
+            height: 1.125rem;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+            border: 3px solid var(--weight-color);
+            margin-top: -0.3125rem;
+        }
+
+        .weight-row input[type="range"]::-moz-range-thumb {
+            width: 1.125rem;
+            height: 1.125rem;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            border: 3px solid var(--weight-color);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+        }
+
+        .weight-row input[type="range"]::-moz-range-track {
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .weight-row input[type="range"]::-moz-range-progress {
+            height: 0.5rem;
+            border-radius: 0.25rem 0 0 0.25rem;
+            background: var(--weight-color);
+        }
+
+        .weight-value {
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: monospace;
+            color: var(--text-primary);
+            width: 2.5rem;
+            text-align: right;
+        }
+
+        .weight-row-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 5rem;
+        }
+
+        .weight-row-label {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .weight-row-desc {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+        }
+
+        /* Threshold Controls */
+        .threshold-row {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .threshold-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .threshold-row:first-of-type {
+            padding-top: 0;
+        }
+
+        .threshold-row-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .threshold-row-label {
+            flex: 1;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .threshold-row-value {
+            font-size: 0.75rem;
+            font-family: monospace;
+            font-weight: 600;
+            color: var(--text-primary);
+            background: var(--bg-input);
+            padding: 0.125rem 0.375rem;
+            border-radius: var(--radius-sm);
+            min-width: 2.5rem;
             text-align: center;
         }
 
-        .filter-options {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
+        .threshold-row-desc {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            margin-bottom: 0.375rem;
+            margin-left: 1.25rem;
         }
 
-        .filter-options label {
+        .threshold-slider {
+            width: 100%;
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: rgba(255, 255, 255, 0.2);
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            margin-top: 0.25rem;
+        }
+
+        .threshold-slider::-webkit-slider-runnable-track {
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .threshold-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--primary-blue);
+            margin-top: -0.25rem;
+        }
+
+        .threshold-slider::-moz-range-track {
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .threshold-slider::-moz-range-thumb {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--primary-blue);
+        }
+
+        /* Options */
+        .options-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-label {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             cursor: pointer;
-            font-size: 0.9rem;
         }
 
-        .results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 1rem;
-        }
-
-        .result-card {
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            overflow: hidden;
-            transition: transform 0.2s, box-shadow 0.2s;
+        .toggle-switch {
             position: relative;
+            width: 2rem;
+            height: 1rem;
+            background: var(--bg-input);
+            border-radius: 0.5rem;
+            transition: background var(--transition-normal);
         }
 
-        .result-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 0.125rem;
+            left: 0.125rem;
+            width: 0.75rem;
+            height: 0.75rem;
+            background: white;
+            border-radius: 50%;
+            transition: transform var(--transition-normal);
         }
 
-        .result-card img {
-            width: 100%;
-            aspect-ratio: 1;
-            object-fit: cover;
+        .toggle-checkbox {
+            display: none;
         }
 
-        .result-info {
-            padding: 0.75rem;
+        .toggle-checkbox:checked+.toggle-switch {
+            background: var(--primary-blue);
+        }
+
+        .toggle-checkbox:checked+.toggle-switch::after {
+            transform: translateX(1rem);
+        }
+
+        .toggle-text {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .more-btn {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            background: none;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .more-btn:hover {
+            color: var(--text-secondary);
+        }
+
+        .more-btn svg {
+            width: 0.75rem;
+            height: 0.75rem;
+        }
+
+        .advanced-options {
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-color);
+            display: none;
+        }
+
+        .advanced-options.visible {
+            display: block;
+        }
+
+        .limit-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .limit-row-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .distance-badge {
-            background: var(--accent-primary);
-            color: white;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
+        .limit-row-label {
             font-size: 0.75rem;
-            font-weight: 600;
-        }
-
-        .distance-badge.identical {
-            background: #22c55e;
-        }
-
-        .distance-badge.similar {
-            background: #3b82f6;
-        }
-
-        .distance-badge.somewhat {
-            background: #f59e0b;
-        }
-
-        .result-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .result-actions button {
-            padding: 0.25rem 0.5rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.75rem;
-            transition: background 0.2s;
-        }
-
-        .btn-view {
-            background: var(--bg-tertiary);
+            font-weight: 500;
             color: var(--text-primary);
         }
 
-        .btn-view:hover {
-            background: var(--accent-primary);
+        .limit-row-desc {
+            font-size: 0.65rem;
+            color: var(--text-muted);
         }
 
-        .btn-delete {
+        .limit-controls {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .limit-controls input[type="range"] {
+            flex: 1;
+            height: 0.5rem;
+            border-radius: 0.25rem;
+            background: rgba(255, 255, 255, 0.2);
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .limit-controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--primary-blue);
+            margin-top: -0.25rem;
+        }
+
+        .limit-controls input[type="range"]::-moz-range-thumb {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            border: 2px solid var(--primary-blue);
+        }
+
+        .limit-controls .limit-value {
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: monospace;
+            color: var(--text-primary);
+            min-width: 2rem;
+            text-align: right;
+        }
+
+        /* Search Button */
+        .search-btn {
+            width: 100%;
+            padding: 0.625rem;
+            background: var(--primary-blue-dark);
+            border: none;
+            border-radius: var(--radius-md);
+            color: white;
+            font-weight: 500;
+            font-size: 0.875rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: background var(--transition-normal);
+        }
+
+        .search-btn:hover:not(:disabled) {
+            background: var(--primary-blue);
+        }
+
+        .search-btn:disabled {
+            background: var(--bg-input);
+            cursor: wait;
+        }
+
+        .search-btn svg {
+            width: 1rem;
+            height: 1rem;
+        }
+
+        .search-btn .spinner {
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            font-size: 0.625rem;
+            color: var(--text-muted);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .legend-dot {
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+        }
+
+        /* Right Panel - Results */
+        .results-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .results-header {
+            flex-shrink: 0;
+            padding: 0.5rem 1rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-panel);
+        }
+
+        .results-header .title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .results-header .count {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .results-grid-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 0.75rem;
+        }
+
+        /* Result Card */
+        .result-card {
+            background: rgba(30, 30, 45, 0.5);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            transition: all var(--transition-normal);
+        }
+
+        .result-card:hover {
+            box-shadow: 0 0 0 1px rgba(74, 158, 255, 0.5);
+        }
+
+        .result-thumb {
+            position: relative;
+            aspect-ratio: 1;
+            background: var(--bg-input);
+        }
+
+        .result-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .result-thumb .placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--bg-input) 0%, var(--bg-panel-dark) 100%);
+            color: var(--text-muted);
+            font-size: 0.7rem;
+        }
+
+        .distance-badge {
+            position: absolute;
+            top: 0.25rem;
+            left: 0.25rem;
+            font-size: 0.625rem;
+            font-weight: 500;
+            padding: 0.125rem 0.25rem;
+            border-radius: var(--radius-sm);
+        }
+
+        .distance-badge.identical {
+            background: rgba(34, 197, 94, 0.3);
+            color: #22c55e;
+        }
+
+        .distance-badge.similar {
+            background: rgba(59, 130, 246, 0.3);
+            color: #3b82f6;
+        }
+
+        .distance-badge.loose {
+            background: rgba(245, 158, 11, 0.3);
+            color: #f59e0b;
+        }
+
+        .distance-badge.different {
+            background: rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+        }
+
+        .result-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            opacity: 0;
+            transition: opacity var(--transition-normal);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            font-size: 0.625rem;
+            color: var(--text-primary);
+        }
+
+        .result-card:hover .result-overlay {
+            opacity: 1;
+        }
+
+        .result-overlay .score-row {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .result-overlay .score-row svg {
+            width: 0.75rem;
+            height: 0.75rem;
+        }
+
+        .result-overlay .actions {
+            display: flex;
+            gap: 0.25rem;
+            margin-top: 0.25rem;
+        }
+
+        .result-overlay .action-btn {
+            padding: 0.25rem;
+            border-radius: var(--radius-sm);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .result-overlay .action-btn svg {
+            width: 0.75rem;
+            height: 0.75rem;
+        }
+
+        .result-overlay .btn-view {
+            background: var(--primary-blue-dark);
+            color: white;
+        }
+
+        .result-overlay .btn-view:hover {
+            background: var(--primary-blue);
+        }
+
+        .result-overlay .btn-delete {
             background: #dc2626;
             color: white;
         }
 
-        .btn-delete:hover {
+        .result-overlay .btn-delete:hover {
             background: #b91c1c;
         }
 
-        .no-results {
-            text-align: center;
-            padding: 3rem;
+        .score-bar {
+            height: 0.125rem;
+            background: var(--bg-input);
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: var(--primary-blue);
+        }
+
+        /* Empty State */
+        .empty-state {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             color: var(--text-muted);
         }
 
-        .no-results .icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-
-        .loading-spinner {
-            display: none;
+        .empty-state-content {
             text-align: center;
-            padding: 2rem;
         }
 
-        .loading-spinner.active {
-            display: block;
+        .empty-state-content svg {
+            width: 2.5rem;
+            height: 2.5rem;
+            opacity: 0.4;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state-content p {
+            font-size: 0.875rem;
+            margin: 0;
         }
     </style>
 </head>
 
-<body>
-    {% include 'header.html' %}
+<body class="similarity-page">
+    <!-- Header -->
+    <div class="similarity-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            style="color: var(--primary-blue);">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+        </svg>
+        <h1><a href="/">{{ app_name }}</a> / Similarity Search</h1>
+    </div>
 
-    <div class="container">
-        <h2 style="margin-bottom: 1rem;">🔍 Visual Similarity Search</h2>
-
-        <div class="similarity-controls">
-            <div class="reference-image">
-                <a href="/view/{{ filepath }}">
+    <!-- Main Content -->
+    <div class="similarity-content">
+        <!-- Left Panel - Controls -->
+        <div class="controls-panel">
+            <!-- Reference Image -->
+            <div class="control-section">
+                <div class="control-label">Reference</div>
+                <a href="/view/{{ filepath }}" class="reference-preview">
+                    {% if thumbnail_path %}
                     <img src="/static/{{ thumbnail_path }}" alt="Reference">
+                    {% else %}
+                    <div class="placeholder">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <span>{{ filepath | basename }}</span>
+                    </div>
+                    {% endif %}
                 </a>
-                <div class="reference-info">
-                    <span class="label">Reference Image</span>
-                    <span class="filename">{{ filepath | basename }}</span>
+            </div>
+
+            <!-- Methods Selection -->
+            <div class="control-section">
+                <div class="control-label">
+                    Methods <span class="blend-note" id="blendNote" style="display: none;">(blended)</span>
                 </div>
-            </div>
+                <div class="methods-grid">
+                    <button class="method-btn selected" data-method="vector"
+                        style="--method-color: #a855f7; --method-color-rgb: 168, 85, 247;">
+                        <div class="method-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#a855f7"
+                                stroke-width="2">
+                                <path
+                                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
+                                </path>
+                            </svg>
+                            <span class="method-btn-name">Vector</span>
+                        </div>
+                        <span class="method-btn-check">✓</span>
+                    </button>
+                    <button class="method-btn" data-method="phash"
+                        style="--method-color: #3b82f6; --method-color-rgb: 59, 130, 246;">
+                        <div class="method-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6"
+                                stroke-width="2">
+                                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                            <span class="method-btn-name">pHash</span>
+                        </div>
+                        <span class="method-btn-check">✓</span>
+                    </button>
+                    <button class="method-btn" data-method="colorhash"
+                        style="--method-color: #f59e0b; --method-color-rgb: 245, 158, 11;">
+                        <div class="method-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#f59e0b"
+                                stroke-width="2">
+                                <circle cx="13.5" cy="6.5" r="0.5" fill="#f59e0b"></circle>
+                                <circle cx="17.5" cy="10.5" r="0.5" fill="#f59e0b"></circle>
+                                <circle cx="8.5" cy="7.5" r="0.5" fill="#f59e0b"></circle>
+                                <circle cx="6.5" cy="12.5" r="0.5" fill="#f59e0b"></circle>
+                                <path
+                                    d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z">
+                                </path>
+                            </svg>
+                            <span class="method-btn-name">ColorHash</span>
+                        </div>
+                        <span class="method-btn-check">✓</span>
+                    </button>
+                    <button class="method-btn" data-method="tags"
+                        style="--method-color: #22c55e; --method-color-rgb: 34, 197, 94;">
+                        <div class="method-btn-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e"
+                                stroke-width="2">
+                                <path
+                                    d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z">
+                                </path>
+                                <path d="M7 7h.01"></path>
+                            </svg>
+                            <span class="method-btn-name">Tags</span>
+                        </div>
+                        <span class="method-btn-check">✓</span>
+                    </button>
+                </div>
 
-            <div class="threshold-control">
-                <label for="threshold">Distance Threshold:</label>
-                <input type="range" id="threshold" min="0" max="30" value="{{ threshold }}" step="1">
-                <span class="threshold-value" id="thresholdValue">{{ threshold }}</span>
-            </div>
-
-            <div class="threshold-control">
-                <label for="colorWeight">Color:</label>
-                <input type="range" id="colorWeight" min="0" max="100" value="0" step="10">
-                <span class="threshold-value" id="colorWeightValue">0%</span>
-            </div>
-
-            <div class="threshold-control">
-                <label for="semanticWeight">Structure (Semantic):</label>
-                <input type="range" id="semanticWeight" min="0" max="100" value="60" step="10">
-                <span class="threshold-value" id="semanticWeightValue">60%</span>
-            </div>
-
-            <div class="threshold-control">
-                <label for="tagWeight">Tags:</label>
-                <input type="range" id="tagWeight" min="0" max="100" value="20" step="10">
-                <span class="threshold-value" id="tagWeightValue">20%</span>
-            </div>
-
-            <div class="filter-options">
-                <label>
-                    <input type="checkbox" id="excludeFamily" {% if exclude_family %}checked{% endif %}>
-                    Exclude family (parent/child)
-                </label>
-            </div>
-        </div>
-
-        <div class="results-info" style="margin-bottom: 1rem;">
-            Found <span id="resultCount">{{ images | length }}</span> similar images
-        </div>
-
-        <div class="loading-spinner" id="loadingSpinner">
-            <div class="spinner"></div>
-            <p>Searching for similar images...</p>
-        </div>
-
-        <div class="results-grid" id="resultsGrid">
-            {% for image in images %}
-            <div class="result-card" data-path="{{ image.path }}">
-                <a href="/view/{{ image.path | urlencode_path }}">
-                    <img src="/static/{{ image.thumb | urlencode_path }}" alt="Similar" loading="lazy">
-                </a>
-                <div class="result-info">
-                    <span
-                        class="distance-badge {% if image.distance <= 5 %}identical{% elif image.distance <= 10 %}similar{% else %}somewhat{% endif %}">
-                        Dist: {{ image.distance }}
-                    </span>
-                    <div class="result-actions">
-                        <a href="/view/{{ image.path | urlencode_path }}" class="btn-view">View</a>
-                        <button class="btn-delete" onclick="deleteImage('{{ image.path }}', this)">🗑</button>
+                <!-- Weight Sliders -->
+                <div class="weights-container" id="weightsContainer">
+                    <div class="weights-header">
+                        <span>Method Priority</span>
+                        <span>Higher = more influence</span>
+                    </div>
+                    <div class="weight-row" data-weight="phash" style="--weight-color: #3b82f6;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6"
+                            stroke-width="2">
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <div class="weight-row-info">
+                            <span class="weight-row-label">Structure</span>
+                            <span class="weight-row-desc">Shape & layout</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="100" class="weight-slider">
+                        <span class="weight-value">100%</span>
+                    </div>
+                    <div class="weight-row" data-weight="colorhash" style="--weight-color: #f59e0b;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#f59e0b"
+                            stroke-width="2">
+                            <circle cx="13.5" cy="6.5" r="0.5" fill="#f59e0b"></circle>
+                            <path
+                                d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.555C21.965 6.012 17.461 2 12 2z">
+                            </path>
+                        </svg>
+                        <div class="weight-row-info">
+                            <span class="weight-row-label">Color</span>
+                            <span class="weight-row-desc">Color palette</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="100" class="weight-slider">
+                        <span class="weight-value">100%</span>
+                    </div>
+                    <div class="weight-row" data-weight="tags" style="--weight-color: #22c55e;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e"
+                            stroke-width="2">
+                            <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z">
+                            </path>
+                            <path d="M7 7h.01"></path>
+                        </svg>
+                        <div class="weight-row-info">
+                            <span class="weight-row-label">Tags</span>
+                            <span class="weight-row-desc">Shared labels</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="100" class="weight-slider">
+                        <span class="weight-value">100%</span>
+                    </div>
+                    <div class="weight-row" data-weight="vector" style="--weight-color: #a855f7;">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#a855f7"
+                            stroke-width="2">
+                            <path
+                                d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
+                            </path>
+                        </svg>
+                        <div class="weight-row-info">
+                            <span class="weight-row-label">Semantic</span>
+                            <span class="weight-row-desc">AI meaning</span>
+                        </div>
+                        <input type="range" min="0" max="100" value="100" class="weight-slider">
+                        <span class="weight-value">100%</span>
                     </div>
                 </div>
             </div>
-            {% else %}
-            <div class="no-results" id="noResults">
-                <div class="icon">🔍</div>
-                <p>No visually similar images found.</p>
-                <p style="font-size: 0.875rem; margin-top: 0.5rem;">Try increasing the threshold or generate hashes for
-                    existing images.</p>
+
+            <!-- Per-Method Thresholds -->
+            <div class="control-section" id="thresholdSection">
+                <div class="control-label">Threshold Settings</div>
+
+                <!-- Visual Threshold (pHash/ColorHash) -->
+                <div class="threshold-row" id="visualThresholdRow" data-method="visual" style="display: none;">
+                    <div class="threshold-row-header">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6"
+                            stroke-width="2" width="14" height="14">
+                            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                        <span class="threshold-row-label">Visual Distance</span>
+                        <span class="threshold-row-value" id="visualThresholdValue">15</span>
+                    </div>
+                    <div class="threshold-row-desc">Lower = stricter matching</div>
+                    <input type="range" class="threshold-slider" id="visualThresholdSlider" min="0" max="30" value="15">
+                </div>
+
+                <!-- Tag Threshold -->
+                <div class="threshold-row" id="tagThresholdRow" data-method="tags" style="display: none;">
+                    <div class="threshold-row-header">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e"
+                            stroke-width="2" width="14" height="14">
+                            <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z">
+                            </path>
+                            <path d="M7 7h.01"></path>
+                        </svg>
+                        <span class="threshold-row-label">Min Tag Similarity</span>
+                        <span class="threshold-row-value" id="tagThresholdValue">10%</span>
+                    </div>
+                    <div class="threshold-row-desc">Higher = stricter matching</div>
+                    <input type="range" class="threshold-slider" id="tagThresholdSlider" min="0" max="80" value="10">
+                </div>
+
+                <!-- Semantic Threshold -->
+                <div class="threshold-row" id="semanticThresholdRow" data-method="vector" style="display: none;">
+                    <div class="threshold-row-header">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#a855f7"
+                            stroke-width="2" width="14" height="14">
+                            <path
+                                d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z">
+                            </path>
+                        </svg>
+                        <span class="threshold-row-label">Min Semantic Similarity</span>
+                        <span class="threshold-row-value" id="semanticThresholdValue">30%</span>
+                    </div>
+                    <div class="threshold-row-desc">Higher = stricter matching</div>
+                    <input type="range" class="threshold-slider" id="semanticThresholdSlider" min="0" max="80"
+                        value="30">
+                </div>
             </div>
-            {% endfor %}
+
+            <!-- Options -->
+            <div class="control-section">
+                <div class="options-row">
+                    <label class="toggle-label">
+                        <input type="checkbox" class="toggle-checkbox" id="excludeFamily" {% if exclude_family
+                            %}checked{% endif %}>
+                        <span class="toggle-switch"></span>
+                        <span class="toggle-text">Exclude Family</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Search Button -->
+            <button class="search-btn" id="searchBtn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <path d="m21 21-4.3-4.3"></path>
+                </svg>
+                <span>Find Similar</span>
+            </button>
+
+            <!-- Legend -->
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #22c55e;"></div>
+                    <span>≤5</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #3b82f6;"></div>
+                    <span>≤10</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #f59e0b;"></div>
+                    <span>≤15</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background: #ef4444;"></div>
+                    <span>&gt;15</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Results -->
+        <div class="results-panel">
+            <div class="results-header">
+                <span class="title">Results</span>
+                <span class="count" id="resultCount">{{ images | length }} found</span>
+            </div>
+
+            <div class="results-grid-container">
+                {% if images %}
+                <div class="results-grid" id="resultsGrid">
+                    {% for image in images %}
+                    <div class="result-card" data-path="{{ image.path }}">
+                        <div class="result-thumb">
+                            <img src="/static/{{ image.thumb | urlencode_path }}" alt="Similar" loading="lazy">
+                            <span
+                                class="distance-badge {% if image.distance <= 5 %}identical{% elif image.distance <= 10 %}similar{% elif image.distance <= 15 %}loose{% else %}different{% endif %}">
+                                {{ image.distance }}
+                            </span>
+                            <div class="result-overlay">
+                                {% if image.visual_score is defined %}
+                                <div class="score-row">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="#3b82f6" stroke-width="2">
+                                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    <span>{{ (image.visual_score * 100) | round | int }}%</span>
+                                </div>
+                                {% endif %}
+                                {% if image.tag_score is defined %}
+                                <div class="score-row">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                        stroke="#22c55e" stroke-width="2">
+                                        <path
+                                            d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z">
+                                        </path>
+                                        <path d="M7 7h.01"></path>
+                                    </svg>
+                                    <span>{{ (image.tag_score * 100) | round | int }}%</span>
+                                </div>
+                                {% endif %}
+                                <div class="actions">
+                                    <a href="/view/{{ image.path | urlencode_path }}" class="action-btn btn-view">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6">
+                                            </path>
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                                        </svg>
+                                    </a>
+                                    <button class="action-btn btn-delete"
+                                        onclick="deleteImage('{{ image.path }}', this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M3 6h18"></path>
+                                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill"
+                                style="width: {{ (image.score or image.similarity or 0.5) * 100 }}%;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <div class="empty-state-content">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.3-4.3"></path>
+                        </svg>
+                        <p>No similar images found</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
-
     <script>
+        // State
         const filepath = '{{ filepath | replace("images/", "") }}';
+        let selectedMethods = ['vector'];
+        let methodWeights = { phash: 100, colorhash: 100, tags: 100, vector: 100 };
+        let methodThresholds = {
+            visual: 15,    // Max distance (0-30)
+            tags: 10,      // Min similarity % (0-80)
+            vector: 30     // Min similarity % (0-80)
+        };
+        let excludeFamily = {{ 'true' if exclude_family else 'false' }};
+        let isLoading = false;
 
-        // Debounce function
-        function debounce(func, wait) {
-            let timeout;
-            return function (...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), wait);
-            };
+        // Pagination state
+        let allResults = [];
+        let displayedCount = 0;
+        const PAGE_SIZE = 20;
+
+        // DOM Elements
+        const methodBtns = document.querySelectorAll('.method-btn');
+        const weightsContainer = document.getElementById('weightsContainer');
+        const weightRows = document.querySelectorAll('.weight-row');
+        const blendNote = document.getElementById('blendNote');
+        const thresholdSection = document.getElementById('thresholdSection');
+        const visualThresholdRow = document.getElementById('visualThresholdRow');
+        const tagThresholdRow = document.getElementById('tagThresholdRow');
+        const semanticThresholdRow = document.getElementById('semanticThresholdRow');
+        const visualThresholdSlider = document.getElementById('visualThresholdSlider');
+        const tagThresholdSlider = document.getElementById('tagThresholdSlider');
+        const semanticThresholdSlider = document.getElementById('semanticThresholdSlider');
+        const visualThresholdValue = document.getElementById('visualThresholdValue');
+        const tagThresholdValue = document.getElementById('tagThresholdValue');
+        const semanticThresholdValue = document.getElementById('semanticThresholdValue');
+        const excludeFamilyCheckbox = document.getElementById('excludeFamily');
+        const searchBtn = document.getElementById('searchBtn');
+        const resultsGrid = document.getElementById('resultsGrid');
+        const resultCount = document.getElementById('resultCount');
+        const resultsGridContainer = document.querySelector('.results-grid-container');
+
+        // Method Toggle
+        methodBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (btn.disabled) return;
+
+                const method = btn.dataset.method;
+                if (btn.classList.contains('selected')) {
+                    if (selectedMethods.length === 1) return; // Keep at least one
+                    selectedMethods = selectedMethods.filter(m => m !== method);
+                    btn.classList.remove('selected');
+                } else {
+                    selectedMethods.push(method);
+                    btn.classList.add('selected');
+                }
+
+                updateUI();
+                debouncedSearch();
+            });
+        });
+
+        // Update UI based on state
+        function updateUI() {
+            // Blend note
+            blendNote.style.display = selectedMethods.length > 1 ? 'inline' : 'none';
+
+            // Weights container - show only when multiple methods selected
+            weightsContainer.classList.toggle('visible', selectedMethods.length > 1);
+            weightRows.forEach(row => {
+                const method = row.dataset.weight;
+                row.style.display = selectedMethods.includes(method) ? 'flex' : 'none';
+            });
+
+            // Show/hide per-method threshold rows
+            const hasVisual = selectedMethods.includes('phash') || selectedMethods.includes('colorhash');
+            const hasTags = selectedMethods.includes('tags');
+            const hasVector = selectedMethods.includes('vector');
+
+            visualThresholdRow.style.display = hasVisual ? 'block' : 'none';
+            tagThresholdRow.style.display = hasTags ? 'block' : 'none';
+            semanticThresholdRow.style.display = hasVector ? 'block' : 'none';
+
+            // Hide threshold section if no methods need thresholds (unlikely but safe)
+            const anyThresholdVisible = hasVisual || hasTags || hasVector;
+            thresholdSection.style.display = anyThresholdVisible ? 'block' : 'none';
         }
 
-        // Update slider displays
-        const thresholdSlider = document.getElementById('threshold');
-        const thresholdValue = document.getElementById('thresholdValue');
-        const colorSlider = document.getElementById('colorWeight');
-        const colorValue = document.getElementById('colorWeightValue');
-        const semanticSlider = document.getElementById('semanticWeight');
-        const semanticValue = document.getElementById('semanticWeightValue');
-        const tagSlider = document.getElementById('tagWeight');
-        const tagValue = document.getElementById('tagWeightValue');
+        // Update slider fill for WebKit browsers
+        function updateSliderFill(slider) {
+            const value = slider.value;
+            const color = getComputedStyle(slider.parentElement).getPropertyValue('--weight-color').trim();
+            slider.style.background = `linear-gradient(to right, ${color} 0%, ${color} ${value}%, rgba(255, 255, 255, 0.2) ${value}%, rgba(255, 255, 255, 0.2) 100%)`;
+        }
 
-        thresholdSlider.addEventListener('input', () => {
-            thresholdValue.textContent = thresholdSlider.value;
+        // Weight sliders - trigger search on change
+        weightRows.forEach(row => {
+            const slider = row.querySelector('.weight-slider');
+            const value = row.querySelector('.weight-value');
+            const method = row.dataset.weight;
+
+            // Initialize fill
+            updateSliderFill(slider);
+
+            slider.addEventListener('input', () => {
+                value.textContent = slider.value + '%';
+                methodWeights[method] = parseInt(slider.value);
+                updateSliderFill(slider);
+                debouncedSearch();
+            });
         });
 
-        colorSlider.addEventListener('input', () => {
-            colorValue.textContent = colorSlider.value + '%';
+        // Per-method threshold sliders
+        visualThresholdSlider.addEventListener('input', () => {
+            methodThresholds.visual = parseInt(visualThresholdSlider.value);
+            visualThresholdValue.textContent = methodThresholds.visual;
+            debouncedSearch();
         });
 
-        semanticSlider.addEventListener('input', () => {
-            semanticValue.textContent = semanticSlider.value + '%';
+        tagThresholdSlider.addEventListener('input', () => {
+            methodThresholds.tags = parseInt(tagThresholdSlider.value);
+            tagThresholdValue.textContent = methodThresholds.tags + '%';
+            debouncedSearch();
         });
 
-        tagSlider.addEventListener('input', () => {
-            tagValue.textContent = tagSlider.value + '%';
+        semanticThresholdSlider.addEventListener('input', () => {
+            methodThresholds.vector = parseInt(semanticThresholdSlider.value);
+            semanticThresholdValue.textContent = methodThresholds.vector + '%';
+            debouncedSearch();
         });
 
-        // Reload results when settings change
-        const reloadResults = debounce(async () => {
-            const threshold = thresholdSlider.value;
-            const excludeFamily = document.getElementById('excludeFamily').checked;
-            const colorWeight = colorSlider.value / 100.0;
-            const semanticWeight = semanticSlider.value / 100.0;
-            const tagWeight = tagSlider.value / 100.0;
+        // Exclude family - trigger search on change
+        excludeFamilyCheckbox.addEventListener('change', () => {
+            excludeFamily = excludeFamilyCheckbox.checked;
+            debouncedSearch();
+        });
+
+        // Debounced search function
+        let searchTimeout = null;
+        function debouncedSearch() {
+            if (searchTimeout) clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(fetchResults, 300);
+        }
+
+        // Search
+        searchBtn.addEventListener('click', fetchResults);
+
+        async function fetchResults() {
+            if (isLoading) return;
+
+            isLoading = true;
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '<div class="spinner"></div><span>Searching...</span>';
 
             try {
-                // Visual weight in blended endpoint usually covers pHash+Color, but here we treat them distinct?
-                // The API interprets visual_weight as pHash+Color weight combined usually.
-                // But we want to control them separately. 
-                // Our UI has Color vs Structure? 
-                // Let's map: 
-                // visual_weight = phash (structure) - wait, phash is structure.
-                // User requested: "0.1 * pHash + 0.1 * color + 0.6 * embed + 0.2 * tag"
-                // My implemented `find_blended_similar` takes `visual_weight`, `tag_weight`, `semantic_weight`.
-                // And internally calls `find_similar_images` which takes `color_weight` (relative to visual).
-
-                // To simplify for UI:
-                // Let's just use the blended endpoint and pass these main weights.
-                // For now, let's say "Visual" slider controls the combination of pHash/Color?
-                // Or we just map "Color" slider to `color_weight` param of `similar` endpoint?
-
-                // Actually, we should probably switch to `/api/similar-blended` instead of `/api/similar`
-                // Current visual.html uses `/api/similar`.
-                // I will switch it to use `/api/similar-blended` to support semantic.
-
-                // Re-mapping weights for `find_blended_similar`:
-                // It maps: visual_weight * (find_similar result score).
-                // find_similar result score = (1-color_weight)*phash + color_weight*color.
-
-                // So if we want independent control:
-                // We need to pass `color_weight` to `find_blended_similar` -> `find_similar`.
-                // But `find_blended_similar` doesn't expose `color_weight`.
-                // I should update `find_blended_similar` to accept `color_weight` too.
-                // But for now, let's assume Visual = pHash (Structure). Color is ignored or fixed.
-
-                // Wait, I can pass color_weight in kwargs if I updated it? I didn't.
-
-                // Let's stick to: 
-                // Visual Weight = pHash weight.
-                // Semantic Weight = Embedding weight.
-                // Tag Weight = Tag weight.
-                // Color Weight = ColorHash weight.
-
-                // I will pass `visual_weight` based on pHash desire.
-                // But wait, `find_blended_similar` logic:
-                // `combined = v_score * v_weight + t_score * t_weight + s_score * s_weight`
-                // `v_score` comes from `find_similar_images` which mixes pHash and Color based on its internal `color_weight`.
-                // So if I want 0.1 pHash and 0.1 Color:
-                // I set `visual_weight` = 0.2.
-                // And `color_weight` (internal to visual) = 0.5 (since 0.1/0.2 = 0.5).
-
-                // This is getting complicated for the UI.
-                // Let's looks at the sliders I added: Color, Semantic, Tag.
-                // Where is "Structure/Visual"?
-                // I removed "Threshold" (no I didn't).
-                // I added semantic and tag.
-                // I see "Color: 0%".
-                // I see "Structure (Semantic): 60%". Wait, Semantic is content. pHash is structure.
-
-                // Let's add a "Visual Structure (pHash)" slider too?
-                // Or just reuse "Distance Threshold" for visual strictness, and weights for scoring.
-
-                // Let's add a "Visual (Shape)" slider.
-
-                const visualWeight = 0.2; // Default for now if not in slider?
-                // Actually, I should have added a Visual/Shape slider.
-                // Currently I have Color, Semantic, Tag. 
-                // Visual pHash is implicit?
-
-                // Let's assume the remaining weight is Visual pHash?
-                // Or just add the slider.
-
-                const response = await fetch(`/api/similar-blended/${encodeURIComponent(filepath)}?visual_weight=${0.2}&tag_weight=${tagWeight}&semantic_weight=${semanticWeight}&threshold=${threshold}&limit=100`);
+                const url = buildApiUrl();
+                const response = await fetch(url);
                 const data = await response.json();
 
-                updateResults(data.similar);
-                document.getElementById('resultCount').textContent = data.count;
+                // Store all results for pagination
+                allResults = data.similar || [];
+                displayedCount = 0;
+
+                resultCount.textContent = `${allResults.length} found`;
+
+                // Show first page
+                showInitialResults();
             } catch (error) {
-                console.error('Error fetching results:', error);
+                console.error('Search error:', error);
             } finally {
-                document.getElementById('loadingSpinner').classList.remove('active');
-                document.getElementById('resultsGrid').style.opacity = '1';
+                isLoading = false;
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.3-4.3"></path>
+                    </svg>
+                    <span>Find Similar</span>
+                `;
             }
-        }, 300);
+        }
 
-        thresholdSlider.addEventListener('change', reloadResults);
-        colorSlider.addEventListener('change', reloadResults);
-        semanticSlider.addEventListener('change', reloadResults);
-        tagSlider.addEventListener('change', reloadResults);
-        document.getElementById('excludeFamily').addEventListener('change', reloadResults);
+        function buildApiUrl() {
+            const excludeFamilyParam = excludeFamily ? 'true' : 'false';
+            const visualThreshold = methodThresholds.visual;
+            const tagThreshold = (methodThresholds.tags / 100).toFixed(2);  // Convert % to 0-1
+            const semanticThreshold = (methodThresholds.vector / 100).toFixed(2);  // Convert % to 0-1
 
-        function updateResults(images) {
-            const grid = document.getElementById('resultsGrid');
+            // If only visual methods (phash/colorhash), use /api/similar
+            const hasOnlyVisual = selectedMethods.every(m => m === 'phash' || m === 'colorhash');
+            if (hasOnlyVisual) {
+                // Calculate color_weight: how much weight goes to colorhash vs phash
+                let colorWeight = 0;
+                if (selectedMethods.includes('colorhash') && selectedMethods.includes('phash')) {
+                    const pW = methodWeights.phash;
+                    const cW = methodWeights.colorhash;
+                    colorWeight = cW / (pW + cW);
+                } else if (selectedMethods.includes('colorhash')) {
+                    colorWeight = 1;
+                }
+                return `/api/similar/${encodeURIComponent(filepath)}?threshold=${visualThreshold}&limit=500&exclude_family=${excludeFamilyParam}&color_weight=${colorWeight}`;
+            }
 
-            if (images.length === 0) {
-                grid.innerHTML = `
-                    <div class="no-results" id="noResults">
-                        <div class="icon">🔍</div>
-                        <p>No visually similar images found.</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Try increasing the threshold.</p>
+            // Mixed methods or single non-visual - use blended endpoint
+            // Normalize weights for selected methods
+            let totalWeight = 0;
+            selectedMethods.forEach(m => totalWeight += methodWeights[m] || 0);
+
+            // visual_weight = combined phash + colorhash weight
+            let visualWeight = 0;
+            if (selectedMethods.includes('phash')) visualWeight += methodWeights.phash / totalWeight;
+            if (selectedMethods.includes('colorhash')) visualWeight += methodWeights.colorhash / totalWeight;
+
+            const tagWeight = selectedMethods.includes('tags') ? methodWeights.tags / totalWeight : 0;
+            const semanticWeight = selectedMethods.includes('vector') ? methodWeights.vector / totalWeight : 0;
+
+            return `/api/similar-blended/${encodeURIComponent(filepath)}?visual_weight=${visualWeight.toFixed(2)}&tag_weight=${tagWeight.toFixed(2)}&semantic_weight=${semanticWeight.toFixed(2)}&visual_threshold=${visualThreshold}&tag_threshold=${tagThreshold}&semantic_threshold=${semanticThreshold}&exclude_family=${excludeFamilyParam}`;
+        }
+
+        function showInitialResults() {
+            const container = document.querySelector('.results-grid-container');
+
+            if (allResults.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-content">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.3-4.3"></path>
+                            </svg>
+                            <p>No similar images found</p>
+                        </div>
                     </div>
                 `;
                 return;
             }
 
-            grid.innerHTML = images.map(img => `
-                <div class="result-card" data-path="${img.path}">
-                    <a href="/view/${encodeURIComponent(img.path)}">
-                        <img src="/static/${img.thumb}" alt="Similar" loading="lazy">
-                    </a>
-                    <div class="result-info">
-                        <span class="distance-badge ${img.distance <= 5 ? 'identical' : img.distance <= 10 ? 'similar' : 'somewhat'}">
-                            Score: ${Math.round(img.score * 100)}%
-                        </span>
-                        <div class="result-actions">
-                            <a href="/view/${encodeURIComponent(img.path)}" class="btn-view">View</a>
-                            <button class="btn-delete" onclick="deleteImage('${img.path}', this)">🗑</button>
+            // Create grid and show first page
+            container.innerHTML = `<div class="results-grid" id="resultsGrid"></div>`;
+            displayedCount = 0;
+            loadMore();
+        }
+
+        function renderCard(img) {
+            const distance = img.distance ?? img.visual_distance ?? Math.round((1 - (img.score || 0)) * 64);
+            const distanceClass = distance <= 5 ? 'identical' : distance <= 10 ? 'similar' : distance <= 15 ? 'loose' : 'different';
+            const score = img.score || img.similarity || 0.5;
+            const visualScore = img.visual_score !== undefined ? Math.round(img.visual_score * 100) : null;
+            const tagScore = img.tag_score !== undefined ? Math.round(img.tag_score * 100) : null;
+            const semanticScore = img.semantic_score !== undefined ? Math.round(img.semantic_score * 100) : null;
+
+            return `
+                    <div class="result-card" data-path="${img.path}">
+                        <div class="result-thumb">
+                            <img src="/static/${img.thumb}" alt="Similar" loading="lazy">
+                            <span class="distance-badge ${distanceClass}">${distance}</span>
+                            <div class="result-overlay">
+                                ${visualScore !== null ? `
+                                <div class="score-row">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2">
+                                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                    <span>${visualScore}%</span>
+                                </div>
+                                ` : ''}
+                                ${tagScore !== null ? `
+                                <div class="score-row">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2">
+                                        <path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"></path>
+                                        <path d="M7 7h.01"></path>
+                                    </svg>
+                                    <span>${tagScore}%</span>
+                                </div>
+                                ` : ''}
+                                ${semanticScore !== null ? `
+                                <div class="score-row">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2">
+                                        <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path>
+                                    </svg>
+                                    <span>${semanticScore}%</span>
+                                </div>
+                                ` : ''}
+                                <div class="actions">
+                                    <a href="/view/${encodeURIComponent(img.path)}" class="action-btn btn-view">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                                        </svg>
+                                    </a>
+                                    <button class="action-btn btn-delete" onclick="deleteImage('${img.path}', this)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M3 6h18"></path>
+                                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill" style="width: ${score * 100}%;"></div>
                         </div>
                     </div>
-                </div>
-            `).join('');
+                `;
         }
+
+        function loadMore() {
+            const grid = document.getElementById('resultsGrid');
+            if (!grid || displayedCount >= allResults.length) return;
+
+            const nextBatch = allResults.slice(displayedCount, displayedCount + PAGE_SIZE);
+            const html = nextBatch.map(img => renderCard(img)).join('');
+            grid.insertAdjacentHTML('beforeend', html);
+            displayedCount += nextBatch.length;
+
+            // Update count to show displayed vs total
+            resultCount.textContent = `${displayedCount} / ${allResults.length} shown`;
+        }
+
+        // Infinite scroll
+        resultsGridContainer.addEventListener('scroll', () => {
+            const { scrollTop, scrollHeight, clientHeight } = resultsGridContainer;
+            // Load more when within 200px of bottom
+            if (scrollTop + clientHeight >= scrollHeight - 200) {
+                loadMore();
+            }
+        });
 
         async function deleteImage(imagePath, button) {
             if (!confirm('Delete this image?')) return;
@@ -478,8 +1526,10 @@
 
                 if (response.ok) {
                     card.remove();
-                    const count = document.querySelectorAll('.result-card').length;
-                    document.getElementById('resultCount').textContent = count;
+                    // Update allResults and counts
+                    allResults = allResults.filter(r => r.path !== imagePath);
+                    displayedCount = document.querySelectorAll('.result-card').length;
+                    resultCount.textContent = `${displayedCount} / ${allResults.length} shown`;
                 } else {
                     throw new Error('Failed to delete');
                 }
@@ -489,6 +1539,10 @@
                 card.style.opacity = '1';
             }
         }
+
+        // Initialize UI and auto-search
+        updateUI();
+        fetchResults();
     </script>
 </body>
 

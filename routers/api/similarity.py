@@ -54,7 +54,7 @@ async def get_blended_similar(filepath):
     """
     Find similar images using both visual hash and tag similarity.
     
-    GET /api/similar-blended/<filepath>?visual_weight=0.3&tag_weight=0.7&threshold=15&limit=20&exclude_family=true
+    GET /api/similar-blended/<filepath>?visual_weight=0.3&tag_weight=0.7&visual_threshold=15&tag_threshold=0.1&semantic_threshold=0.3&exclude_family=true
     """
     if filepath.startswith('images/'):
         filepath = filepath[7:]
@@ -62,8 +62,9 @@ async def get_blended_similar(filepath):
     visual_weight = request.args.get('visual_weight', 0.2, type=float)
     tag_weight = request.args.get('tag_weight', 0.2, type=float)
     semantic_weight = request.args.get('semantic_weight', 0.6, type=float)
-    threshold = request.args.get('threshold', config.VISUAL_SIMILARITY_THRESHOLD, type=int)
-    limit = request.args.get('limit', 20, type=int)
+    visual_threshold = request.args.get('visual_threshold', 15, type=int)
+    tag_threshold = request.args.get('tag_threshold', 0.1, type=float)
+    semantic_threshold = request.args.get('semantic_threshold', 0.3, type=float)
     exclude_family = request.args.get('exclude_family', 'false').lower() in ('true', '1', 'yes')
     
     similar = await asyncio.to_thread(
@@ -71,9 +72,10 @@ async def get_blended_similar(filepath):
         filepath,
         visual_weight=visual_weight,
         tag_weight=tag_weight,
-        semantic_weight=request.args.get('semantic_weight', 0.6, type=float),
-        threshold=threshold,
-        limit=limit,
+        semantic_weight=semantic_weight,
+        visual_threshold=visual_threshold,
+        tag_threshold=tag_threshold,
+        semantic_threshold=semantic_threshold,
         exclude_family=exclude_family
     )
     
@@ -82,7 +84,10 @@ async def get_blended_similar(filepath):
         'count': len(similar),
         'visual_weight': visual_weight,
         'tag_weight': tag_weight,
-        'threshold': threshold,
+        'semantic_weight': semantic_weight,
+        'visual_threshold': visual_threshold,
+        'tag_threshold': tag_threshold,
+        'semantic_threshold': semantic_threshold,
         'exclude_family': exclude_family,
         'reference': filepath
     }

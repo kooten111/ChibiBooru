@@ -1276,8 +1276,9 @@ def find_blended_similar(
     visual_weight: float = 0.2,
     tag_weight: float = 0.2,
     semantic_weight: float = 0.6,
-    threshold: int = 15,
-    limit: int = 20,
+    visual_threshold: int = 15,
+    tag_threshold: float = 0.1,
+    semantic_threshold: float = 0.3,
     exclude_family: bool = False
 ) -> List[Dict]:
     """
@@ -1288,11 +1289,13 @@ def find_blended_similar(
         visual_weight: Weight for pHash/ColorHash (structure/color)
         tag_weight: Weight for tag similarity
         semantic_weight: Weight for neural embeddings (content/vibe)
-        threshold: Max visual hamming distance to consider (for visual candidates)
-        limit: Results limit
+        visual_threshold: Max visual hamming distance (0-64, lower = stricter)
+        tag_threshold: Min tag similarity score (0-1, higher = stricter)
+        semantic_threshold: Min semantic similarity score (0-1, higher = stricter)
+        exclude_family: If True, exclude images in the same parent/child chain
         
     Returns:
-        List of similar images
+        List of similar images (all matching candidates, no internal limit)
     """
     from services import query_service
     
@@ -1309,22 +1312,29 @@ def find_blended_similar(
         tag_weight /= total_weight
         semantic_weight /= total_weight
     
-    # Fetch candidates from all sources
-    # 1. Visual (pHash/ColorHash)
-    visual_results = find_similar_images(filepath, threshold=threshold, limit=limit * 2, exclude_family=exclude_family)
+    # Fetch large candidate pools from all sources (500 each for good coverage)
+    POOL_SIZE = 500
+    
+    # 1. Visual (pHash/ColorHash) - filter by threshold
+    visual_results = find_similar_images(
+        filepath, 
+        threshold=visual_threshold, 
+        limit=POOL_SIZE, 
+        exclude_family=exclude_family
+    )
     visual_scores = {r['path']: r['similarity'] for r in visual_results}
     
-    # 2. Tag
-    tag_results = query_service.find_related_by_tags(f"images/{filepath}", limit=limit * 2)
-    tag_scores = {r['path']: r.get('score', 0) for r in tag_results}
+    # 2. Tag - fetch all then filter by threshold
+    tag_results = query_service.find_related_by_tags(f"images/{filepath}", limit=POOL_SIZE)
+    tag_scores = {r['path']: r.get('score', 0) for r in tag_results if r.get('score', 0) >= tag_threshold}
     
-    # 3. Semantic
+    # 3. Semantic - fetch all then filter by threshold
     semantic_scores = {}
     if SEMANTIC_AVAILABLE and semantic_weight > 0:
-        semantic_results = find_semantic_similar(filepath, limit=limit * 2)
-        semantic_scores = {r['path']: r['score'] for r in semantic_results}
+        semantic_results = find_semantic_similar(filepath, limit=POOL_SIZE)
+        semantic_scores = {r['path']: r['score'] for r in semantic_results if r.get('score', 0) >= semantic_threshold}
         
-    # Combine
+    # Combine all candidates that pass at least one threshold
     all_paths = set(visual_scores.keys()) | set(tag_scores.keys()) | set(semantic_scores.keys())
     if exclude_family:
         all_paths = all_paths - family_paths
@@ -1337,15 +1347,19 @@ def find_blended_similar(
         
         combined_score = (v_score * visual_weight) + (t_score * tag_weight) + (s_score * semantic_weight)
         
+        # Convert visual distance to display-friendly value
+        v_distance = int(64 * (1.0 - v_score)) if v_score > 0 else None
+        
         blended.append({
             'path': path,
             'thumb': get_thumbnail_path(path),
             'score': combined_score,
             'visual_score': v_score,
+            'visual_distance': v_distance,
             'tag_score': t_score,
             'semantic_score': s_score,
             'match_type': 'blended'
         })
         
     blended.sort(key=lambda x: x['score'], reverse=True)
-    return blended[:limit]
+    return blended  # Return all matching candidates, frontend paginates

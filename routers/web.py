@@ -261,8 +261,7 @@ async def show_image(filepath):
             lookup_path,
             visual_weight=config.VISUAL_SIMILARITY_WEIGHT,
             tag_weight=config.TAG_SIMILARITY_WEIGHT,
-            threshold=config.VISUAL_SIMILARITY_THRESHOLD,
-            limit=20
+            visual_threshold=config.VISUAL_SIMILARITY_THRESHOLD,
         )
     else:
         similar_images = query_service.find_related_by_tags(filepath)

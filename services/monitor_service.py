@@ -148,9 +148,16 @@ def find_ingest_files():
     return ingest_files
 
 def find_unprocessed_images():
-    """Finds image files on disk that are not in the database."""
+    """
+    Finds image files on disk that are not in the database.
+    Also checks for MD5 duplicates and removes them automatically.
+    """
+    import hashlib
+    from database import get_db_connection
+    
     db_filepaths = models.get_all_filepaths()
     unprocessed_files = []
+    duplicates_removed = 0
 
     # Check static/images directory
     for root, _, files in os.walk("static/images"):
@@ -158,11 +165,31 @@ def find_unprocessed_images():
             if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.zip')):
                 filepath = os.path.join(root, file)
                 rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+                
                 if rel_path not in db_filepaths:
+                    # Filepath not in DB - but check if MD5 already exists (duplicate file)
+                    try:
+                        with open(filepath, 'rb') as f:
+                            md5 = hashlib.md5(f.read()).hexdigest()
+                        
+                        with get_db_connection() as conn:
+                            row = conn.execute('SELECT filepath FROM images WHERE md5 = ?', (md5,)).fetchone()
+                            if row:
+                                # This is a duplicate file - same content, different name
+                                add_log(f"Auto-removing duplicate: {file} (same as {os.path.basename(row['filepath'])})", 'warning')
+                                os.remove(filepath)
+                                duplicates_removed += 1
+                                continue
+                    except Exception as e:
+                        add_log(f"Error checking MD5 for {file}: {e}", 'error')
+                    
                     unprocessed_files.append(filepath)
 
     # Check ingest directory (use helper function)
     unprocessed_files.extend(find_ingest_files())
+    
+    if duplicates_removed > 0:
+        add_log(f"Cleaned up {duplicates_removed} duplicate file(s)", 'info')
 
     return unprocessed_files
 
