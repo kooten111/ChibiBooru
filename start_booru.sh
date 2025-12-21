@@ -19,4 +19,4 @@ echo "Starting Booru with uvicorn on $HOST:$PORT"
 #uvicorn app:create_app --factory --host $HOST --port $PORT --reload --reload-exclude 'ingest/*' --reload-exclude 'storage/*'
 
 # Alternative without reload (for production):
-uvicorn app:create_app --factory --host $HOST --port $PORT --workers 4
+uvicorn app:create_app --factory --host $HOST --port $PORT --workers 1

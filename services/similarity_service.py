@@ -11,6 +11,20 @@ import imagehash
 import config
 from database import get_db_connection
 from utils.file_utils import get_thumbnail_path
+from services import similarity_db
+
+# Optional dependencies for Semantic Similarity
+try:
+    import onnxruntime as ort
+    import numpy as np
+    import faiss
+    SEMANTIC_AVAILABLE = True
+except ImportError:
+    SEMANTIC_AVAILABLE = False
+    print("[Similarity] Warning: semantic similarity dependencies missing (onnxruntime, numpy, faiss)")
+
+# Global state for semantic search
+_semantic_engine = None
 
 
 # ============================================================================
@@ -80,6 +94,53 @@ def compute_colorhash(image_path: str, binbits: int = 3) -> Optional[str]:
         return None
     except Exception as e:
         print(f"[Similarity] Error computing colorhash for {image_path}: {e}")
+        return None
+
+
+def compute_colorhash_for_video(video_path: str) -> Optional[str]:
+    """
+    Compute color hash from the first frame of a video.
+    
+    Args:
+        video_path: Path to the video file
+        
+    Returns:
+        Hex string representation of the hash, or None on error
+    """
+    import subprocess
+    import tempfile
+    
+    # Check for ffmpeg
+    try:
+        result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True)
+        if result.returncode != 0:
+            print("[Similarity] ffmpeg not found, cannot hash video")
+            return None
+    except Exception:
+        return None
+    
+    # Extract first frame to temp file
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+            tmp_path = tmp.name
+        
+        cmd = [
+            'ffmpeg', '-y', '-i', video_path,
+            '-vframes', '1', '-f', 'image2',
+            tmp_path
+        ]
+        subprocess.run(cmd, capture_output=True, timeout=30)
+        
+        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+            result = compute_colorhash(tmp_path)
+            os.unlink(tmp_path)
+            return result
+        
+        return None
+    except Exception as e:
+        print(f"[Similarity] Error extracting video frame: {e}")
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
         return None
 
 
@@ -170,6 +231,287 @@ def compute_phash_for_file(filepath: str, md5: str = None) -> Optional[str]:
         return None
     else:
         return compute_phash(filepath)
+
+
+def compute_colorhash_for_file(filepath: str) -> Optional[str]:
+    """
+    Compute color hash for any supported file type.
+    
+    Args:
+        filepath: Path to the file
+        
+    Returns:
+        Hex string representation of the hash, or None on error
+    """
+    if filepath.lower().endswith(config.SUPPORTED_VIDEO_EXTENSIONS):
+        return compute_colorhash_for_video(filepath)
+    # Zip animation colorhash? We could support it but maybe overkill for now.
+    # If we want consistency, we should. But let's skip for now or use thumb.
+    elif filepath.lower().endswith(config.SUPPORTED_ZIP_EXTENSIONS):
+        return None # TODO: Implement zip colorhash
+    else:
+        return compute_colorhash(filepath)
+
+
+# ============================================================================
+# Semantic Embedding & Search
+# ============================================================================
+
+class SemanticSearchEngine:
+    def __init__(self):
+        self.model_path = "/mnt/Server/ChibiBooru/models/Similarity/model.onnx"
+        self.session = None
+        self.index = None
+        self.image_ids = [] # map index ID to image ID
+        self.index_dirty = True
+        
+    def load_model(self):
+        if not SEMANTIC_AVAILABLE: return False
+        if self.session: return True
+        
+        if not os.path.exists(self.model_path):
+            print(f"[Similarity] Model not found at {self.model_path}")
+            return False
+            
+        try:
+            # Load ONNX model
+            self.session = ort.InferenceSession(self.model_path, providers=['CPUExecutionProvider'])
+            # Verify inputs/outputs
+            self.input_name = self.session.get_inputs()[0].name
+            # We expect the embedding output to be available (added via modification script)
+            # It's usually the second or third output now
+            self.output_names = [o.name for o in self.session.get_outputs()]
+            print(f"[Similarity] Loaded semantic model. Outputs: {self.output_names}")
+            return True
+        except Exception as e:
+            print(f"[Similarity] Error loading model: {e}")
+            return False
+
+    def get_embedding(self, image_path: str) -> Optional[np.ndarray]:
+        if not self.load_model(): return None
+        
+        try:
+            # Preprocess
+            img_tensor = self._preprocess(image_path)
+            if img_tensor is None: return None
+            
+            # Run inference
+            # We want the normalized embedding (usually the last added output)
+            # In our modified model, it is 'StatefulPartitionedCall/ConvNextBV1/predictions_norm/add:0'
+            # We can request all outputs and pick the one with shape (1, 1024)
+            outputs = self.session.run(None, {self.input_name: img_tensor})
+            
+            for out in outputs:
+                if out.shape == (1, 1024):
+                    return out[0] # Return 1D array
+            
+            # Fallback: if we can't find exact shape, maybe it's the 3rd output
+            if len(outputs) >= 3:
+                 return outputs[2][0]
+                 
+            return None
+        except Exception as e:
+            print(f"[Similarity] Inference error for {image_path}: {e}")
+            return None
+
+    def _get_image_for_embedding(self, image_path: str) -> Optional[Image.Image]:
+        """Load image or extract frame from video for embedding."""
+        try:
+            # Check extension
+            if image_path.lower().endswith(config.SUPPORTED_VIDEO_EXTENSIONS):
+                # Use existing helper to compute pHash which extracts a frame? 
+                # No, we need the PIL Image object.
+                # Reuse the logic from compute_phash_for_video but return Image not hash?
+                # Actually, duplicate logic or factor it out?
+                # Let's verify if a thumbnail exists first, as it's faster.
+                rel_path = os.path.relpath(image_path, "static/images").replace('\\', '/')
+                thumb_path = get_thumbnail_path(f"images/{rel_path}")
+                # thumb_path is /thumbnails/uuid.jpg relative to static usually? 
+                # get_thumbnail_path returns URL path e.g. /thumbnails/...
+                # We need filesystem path.
+                # standard: static/thumbnails/UUID.jpg
+                
+                # We can't easily guess UUID from here without DB lookup usually.
+                # But wait, compute_phash_for_video extracts a temp frame. 
+                
+                import subprocess
+                import tempfile
+                
+                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                    tmp_path = tmp.name
+                
+                cmd = [
+                    'ffmpeg', '-y', '-i', image_path,
+                    '-vframes', '1', '-f', 'image2',
+                    tmp_path
+                ]
+                # Suppress output
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+                
+                if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+                    img = Image.open(tmp_path).convert('RGB')
+                    # We have to load it into memory before deleting file, or keep file until closed
+                    img.load() 
+                    os.unlink(tmp_path)
+                    return img
+                return None
+            
+            # Use logic to open file
+            img = Image.open(image_path)
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            return img
+        except Exception as e:
+            print(f"[Similarity] Error loading image for embedding {image_path}: {e}")
+            return None
+
+    def _preprocess(self, image_path: str):
+        try:
+            # Get PIL Image (handles videos now)
+            img = self._get_image_for_embedding(image_path)
+            if img is None: return None
+            
+            # Setup transforms (manual to avoid torchvision dependency if possible, 
+            # but we likely have torchvision from requirements if using local tagger.
+            # If avoiding torchvision, we do numpy math)
+            # Resize to 448x448 (standard for v2? or 384? Model input says 448 in inspect output)
+            # Inspect output said: [1, 448, 448, 3] -> wait, inspect output said 448x448?
+            # Let's check my inspect output: "Shape: [1, 448, 448, 3]"
+            target_size = 448
+            
+            # Resize with aspect ratio preservation + padding
+            w, h = img.size
+            ratio = min(target_size/w, target_size/h)
+            new_w, new_h = int(w*ratio), int(h*ratio)
+            img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            
+            # Paste on gray background (128, 128, 128) or specific mean? 
+            # WD14 usually uses (255, 255, 255) for padding? check processing_service
+            # processing_service used (124, 116, 104)
+            new_img = Image.new('RGB', (target_size, target_size), (124, 116, 104))
+            new_img.paste(img, ((target_size-new_w)//2, (target_size-new_h)//2))
+            
+            # Convert to numpy float32, normalize
+            # mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+            data = np.array(new_img).astype(np.float32) / 255.0
+            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+            data = (data - mean) / std
+            
+            # Transpose to BCHW? Inspect output said [1, 448, 448, 3] which is BHWC?
+            # Wait. Inspect output: "Name: input_1:0, Shape: [1, 448, 448, 3], Type: tensor(float)"
+            # This suggests TF-style NHWC! WD14 models are often Keras/TF exported to ONNX.
+            # processed `data` is (448, 448, 3).
+            # Expand dims to (1, 448, 448, 3)
+            data = np.expand_dims(data, axis=0)
+            
+            return data
+        except Exception as e:
+            print(f"[Similarity] Preprocessing error: {e}")
+            return None
+
+    def build_index(self):
+        if not SEMANTIC_AVAILABLE: return
+        print("[Similarity] Building Semantic Index...")
+        ids, matrix = similarity_db.get_all_embeddings()
+        if len(ids) == 0:
+            print("[Similarity] No embeddings found in DB.")
+            self.index = None
+            self.image_ids = []
+            return
+
+        # Normalize metrics for Cosine Similarity (Inner Product on normalized vectors)
+        faiss.normalize_L2(matrix)
+        
+        dimension = matrix.shape[1]
+        self.index = faiss.IndexFlatIP(dimension)
+        self.index.add(matrix)
+        self.image_ids = ids
+        self.index_dirty = False
+        print(f"[Similarity] Index built with {len(ids)} items.")
+
+    def search(self, embedding: np.ndarray, k: int = 20):
+        if self.index is None or self.index_dirty:
+            self.build_index()
+        
+        if self.index is None: return [] # Still empty
+        
+        # Normalize query
+        query = embedding.reshape(1, -1).astype(np.float32)
+        faiss.normalize_L2(query)
+        
+        distances, indices = self.index.search(query, k)
+        
+        results = []
+        for dist, idx in zip(distances[0], indices[0]):
+            if idx == -1: continue
+            if idx < len(self.image_ids):
+                results.append((self.image_ids[idx], float(dist)))
+                
+        return results
+
+def get_semantic_engine():
+    global _semantic_engine
+    if _semantic_engine is None:
+        _semantic_engine = SemanticSearchEngine()
+    return _semantic_engine
+
+def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
+    """Find semantically similar images."""
+    if not SEMANTIC_AVAILABLE: return []
+    
+    # 1. Get embedding for query image
+    # First check DB
+    # We need image_id for DB lookup. Map filepath -> ID
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT id FROM images WHERE filepath = ?", (filepath,)).fetchone()
+        if not row: return []
+        image_id = row['id']
+
+    embedding = similarity_db.get_embedding(image_id)
+    
+    # If not in DB, compute it
+    if embedding is None:
+        full_path = os.path.join("static/images", filepath)
+        if os.path.exists(full_path):
+            engine = get_semantic_engine()
+            embedding = engine.get_embedding(full_path)
+            if embedding is not None:
+                # Save it
+                similarity_db.save_embedding(image_id, embedding)
+                engine.index_dirty = True # Mark index as needing update (or partial add?)
+    
+    if embedding is None: return []
+    
+    # 2. Search
+    engine = get_semantic_engine()
+    results = engine.search(embedding, k=limit)
+    
+    # 3. Resolve results
+    if not results: return []
+    
+    ids = [r[0] for r in results]
+    scores = {r[0]: r[1] for r in results}
+    
+    with get_db_connection() as conn:
+        placeholders = ','.join('?' * len(ids))
+        rows = conn.execute(f"SELECT id, filepath FROM images WHERE id IN ({placeholders})", ids).fetchall()
+        
+    resolved = []
+    for row in rows:
+        sim_score = scores.get(row['id'], 0)
+        # Convert cosine similarity (-1 to 1) to distance-like (0 to 1 where 0 is close? or just score)
+        # User wants similarity score.
+        resolved.append({
+            'path': f"images/{row['filepath']}",
+            'thumb': get_thumbnail_path(f"images/{row['filepath']}"),
+            'similarity': sim_score,
+            'match_type': 'semantic',
+            'score': sim_score
+        })
+        
+    resolved.sort(key=lambda x: x['score'], reverse=True)
+    return resolved
 
 
 # ============================================================================
@@ -459,7 +801,8 @@ def find_all_duplicate_groups(threshold: int = 5) -> List[List[Dict]]:
 
 def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Dict:
     """
-    Generate perceptual hashes for images that don't have one.
+    Generate perceptual hashes and semantic embeddings for images that don't have them.
+    Continuously loops until all missing hashes are generated.
     
     Args:
         batch_size: Number of images to process at a time
@@ -468,49 +811,170 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
     Returns:
         Dictionary with counts of processed, successful, failed
     """
-    stats = {'processed': 0, 'success': 0, 'failed': 0, 'total': 0}
+    total_stats = {'processed': 0, 'success': 0, 'failed': 0, 'total': 0}
     
-    with get_db_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT filepath, md5, phash, colorhash
-            FROM images
-            WHERE phash IS NULL OR colorhash IS NULL
-        """)
-        missing = cursor.fetchall()
+    # 1. Estimate total missing count for progress reporting
+    # This is an approximation to avoid complex cross-DB joins
+    try:
+        with get_db_connection() as conn:
+            # Count missing visual hashes
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM images WHERE phash IS NULL OR colorhash IS NULL")
+            missing_visual_count = cursor.fetchone()[0]
+            
+            # Count missing semantic (approximate)
+            if SEMANTIC_AVAILABLE:
+                cursor.execute("SELECT COUNT(*) FROM images")
+                total_images = cursor.fetchone()[0]
+                embedded_count = len(similarity_db.get_all_embedding_ids())
+                missing_semantic_count = max(0, total_images - embedded_count)
+            else:
+                missing_semantic_count = 0
+                
+            # Total to process is roughly max of separate counts since one image might miss both
+            # But effectively we iterate until done, so let's just sum them or take max?
+            # Max is safer as a lower bound, sum is safer as upper bound?
+            # Let's use max for now as we process them together.
+            total_stats['total'] = max(missing_visual_count, missing_semantic_count)
+            
+            # If total is 0, return early
+            if total_stats['total'] == 0:
+                 return total_stats
+
+    except Exception as e:
+        print(f"[Similarity] Error estimating total missing hashes: {e}")
+        total_stats['total'] = 1000 # Fallback
     
-    stats['total'] = len(missing)
-    
-    for i, row in enumerate(missing):
-        filepath = row['filepath']
-        md5 = row['md5']
-        full_path = os.path.join("static/images", filepath)
+    while True:
+        # Check for missing visual hashes
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, filepath, md5, phash, colorhash
+                FROM images
+                WHERE phash IS NULL OR colorhash IS NULL
+                LIMIT ?
+            """, (batch_size,))
+            missing_hashes = cursor.fetchall()
+            
+        # If we didn't fill the batch, check for missing semantic embeddings
+        missing_semantic = []
+        if len(missing_hashes) < batch_size and SEMANTIC_AVAILABLE:
+            remaining = batch_size - len(missing_hashes)
+            
+            try:
+                embedded_ids = set(similarity_db.get_all_embedding_ids())
+                
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    exclude_ids = [r['id'] for r in missing_hashes]
+                    
+                    # We need to query images that might be missing embeddings
+                    # Optimization: fetch recent images not in excluded IDs and check set membership
+                    
+                    # If remaining is large, this loop could be slow if we scan everything.
+                    # We rely on the fact that once processed, they are in embedded_ids.
+                    # So we need to find images NOT in embedded_ids.
+                    
+                    # Helper query: Get IDs of ALL images, filter in python?
+                    # Too big for memory if 100k images.
+                    # Let's iterate chunks of IDs from DB?
+                    
+                    # Better approach for the loop:
+                    # We can pick up where we left off if we sort by ID?
+                    # But holes might exist.
+                    
+                    # For now, stick to the sampling approach but make it more robust.
+                    # We simply fetch images and filter. If we scan 10x remaining and find nothing, we assume done?
+                    
+                    placeholders = ','.join('?' * len(exclude_ids)) if exclude_ids else '-1'
+                    
+                    # Fetch candidates that are POTENTIALLY missing
+                    # We can't easily know which ones are missing without checking the set.
+                    # So just fetch images we haven't planned to process yet.
+                    cursor.execute(f"""
+                        SELECT id, filepath, md5, phash, colorhash
+                        FROM images 
+                        WHERE id NOT IN ({placeholders})
+                        ORDER BY id DESC
+                        LIMIT ?
+                    """, (batch_size * 5,)) # Look at 5x candidates
+                    candidates = cursor.fetchall()
+                    
+                    found_semantic_candidates = False
+                    for row in candidates:
+                        if row['id'] not in embedded_ids:
+                            missing_semantic.append(row)
+                            found_semantic_candidates = True
+                            if len(missing_semantic) >= remaining:
+                                break
+                    
+                    # If we scanned candidates and found NOTHING missing semantic, 
+                    # AND we have no missing visual hashes, then we are probably done.
+                    if not missing_hashes and not found_semantic_candidates:
+                        # Double check end condition:
+                        # If total missing semantic > 0 but we found none in recent items,
+                        # we might need to scan older items? 
+                        # `ORDER BY id DESC` scans new first.
+                        # Maybe we need to random sample or scan ASC next time?
+                        # For now, to avoid infinite loops if we can't find them:
+                        break
+                        
+            except Exception as e:
+                print(f"[Similarity] Error finding missing semantic embeddings: {e}")
+
+        # Combine lists
+        processing_list = list(missing_hashes) + missing_semantic
         
-        # Compute pHash if missing
-        if not row['phash']:
-            phash = compute_phash_for_file(full_path, md5)
-            if phash:
-                update_image_phash(filepath, phash)
-                stats['success'] += 1
-        
-        # Compute ColorHash if missing
-        if not row['colorhash']:
-            # We assume regular image logic for colorhash for now
-            # TODO: Add video colorhash support distinct from pHash?
-            if os.path.exists(full_path):
-                 chash = compute_colorhash(full_path)
+        if not processing_list:
+            break
+            
+        # Process the batch
+        for i, row in enumerate(processing_list):
+            filepath = row['filepath']
+            md5 = row['md5']
+            full_path = os.path.join("static/images", filepath)
+            
+            updated_something = False
+            
+            # 1. Compute pHash if missing
+            if not row['phash']:
+                phash = compute_phash_for_file(full_path, md5)
+                if phash:
+                    update_image_phash(filepath, phash)
+                    updated_something = True
+            
+            # 2. Compute ColorHash if missing
+            if not row['colorhash']:
+                 chash = compute_colorhash_for_file(full_path)
                  if chash:
                      update_image_colorhash(filepath, chash)
-                     # Count success if we updated something
-                     if row['phash']: # Only inc success if we didn't already inc it for phash
-                         stats['success'] += 1
+                     updated_something = True
 
-        stats['processed'] += 1
+            # 3. Semantic Embedding
+            if SEMANTIC_AVAILABLE:
+                image_id = row['id']
+                if similarity_db.get_embedding(image_id) is None:
+                    engine = get_semantic_engine()
+                    embedding = engine.get_embedding(full_path)
+                    if embedding is not None:
+                        similarity_db.save_embedding(image_id, embedding)
+                        updated_something = True
+
+            total_stats['processed'] += 1
+            if updated_something:
+                total_stats['success'] += 1
+                
+            if progress_callback:
+                progress_callback(total_stats['processed'], total_stats['total'])
+                
+        # Small sleep to prevent freezing CPU completely if running synchronously
+        # (Though we are in a thread, so it's fine)
+        # Check if we should stop? (Assuming we want to do ALL)
+        pass 
         
-        if progress_callback and (i + 1) % 10 == 0:
-            progress_callback(stats['processed'], stats['total'])
-    
-    return stats
+    return total_stats
+
 
 
 def get_hash_coverage_stats() -> Dict:
@@ -596,25 +1060,26 @@ def _get_family_filepaths(filepath: str) -> set:
 
 def find_blended_similar(
     filepath: str,
-    visual_weight: float = 0.5,
-    tag_weight: float = 0.5,
+    visual_weight: float = 0.2,
+    tag_weight: float = 0.2,
+    semantic_weight: float = 0.6,
     threshold: int = 15,
     limit: int = 20,
     exclude_family: bool = False
 ) -> List[Dict]:
     """
-    Find similar images using both visual hash and tag similarity.
+    Find similar images using a weighted blend of visual, semantic, and tag similarity.
     
     Args:
-        filepath: Path to reference image (relative, without 'images/' prefix)
-        visual_weight: Weight for visual similarity (0.0 to 1.0)
-        tag_weight: Weight for tag similarity (0.0 to 1.0)
-        threshold: Maximum Hamming distance for visual candidates
-        limit: Maximum results to return
-        exclude_family: If True, exclude images in the same parent/child chain
+        filepath: Path to reference image
+        visual_weight: Weight for pHash/ColorHash (structure/color)
+        tag_weight: Weight for tag similarity
+        semantic_weight: Weight for neural embeddings (content/vibe)
+        threshold: Max visual hamming distance to consider (for visual candidates)
+        limit: Results limit
         
     Returns:
-        List of similar images with blended scores
+        List of similar images
     """
     from services import query_service
     
@@ -625,31 +1090,39 @@ def find_blended_similar(
         family_paths = {f"images/{fp}" for fp in family_filepaths}
     
     # Normalize weights
-    total_weight = visual_weight + tag_weight
+    total_weight = visual_weight + tag_weight + semantic_weight
     if total_weight > 0:
-        visual_weight = visual_weight / total_weight
-        tag_weight = tag_weight / total_weight
-    else:
-        visual_weight = tag_weight = 0.5
+        visual_weight /= total_weight
+        tag_weight /= total_weight
+        semantic_weight /= total_weight
     
-    # Get visual similar images (use higher threshold to get more candidates)
+    # Fetch candidates from all sources
+    # 1. Visual (pHash/ColorHash)
     visual_results = find_similar_images(filepath, threshold=threshold, limit=limit * 2, exclude_family=exclude_family)
     visual_scores = {r['path']: r['similarity'] for r in visual_results}
     
-    # Get tag-based similar images
+    # 2. Tag
     tag_results = query_service.find_related_by_tags(f"images/{filepath}", limit=limit * 2)
     tag_scores = {r['path']: r.get('score', 0) for r in tag_results}
     
-    # Combine all candidates, filtering out family if requested
-    all_paths = set(visual_scores.keys()) | set(tag_scores.keys())
+    # 3. Semantic
+    semantic_scores = {}
+    if SEMANTIC_AVAILABLE and semantic_weight > 0:
+        semantic_results = find_semantic_similar(filepath, limit=limit * 2)
+        semantic_scores = {r['path']: r['score'] for r in semantic_results}
+        
+    # Combine
+    all_paths = set(visual_scores.keys()) | set(tag_scores.keys()) | set(semantic_scores.keys())
     if exclude_family:
         all_paths = all_paths - family_paths
-    
+        
     blended = []
     for path in all_paths:
         v_score = visual_scores.get(path, 0)
         t_score = tag_scores.get(path, 0)
-        combined_score = (v_score * visual_weight) + (t_score * tag_weight)
+        s_score = semantic_scores.get(path, 0)
+        
+        combined_score = (v_score * visual_weight) + (t_score * tag_weight) + (s_score * semantic_weight)
         
         blended.append({
             'path': path,
@@ -657,9 +1130,9 @@ def find_blended_similar(
             'score': combined_score,
             'visual_score': v_score,
             'tag_score': t_score,
+            'semantic_score': s_score,
             'match_type': 'blended'
         })
-    
-    # Sort by combined score
+        
     blended.sort(key=lambda x: x['score'], reverse=True)
     return blended[:limit]

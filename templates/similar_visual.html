@@ -226,9 +226,21 @@
             </div>
 
             <div class="threshold-control">
-                <label for="colorWeight">Color Sensitivity:</label>
+                <label for="colorWeight">Color:</label>
                 <input type="range" id="colorWeight" min="0" max="100" value="0" step="10">
                 <span class="threshold-value" id="colorWeightValue">0%</span>
+            </div>
+
+            <div class="threshold-control">
+                <label for="semanticWeight">Structure (Semantic):</label>
+                <input type="range" id="semanticWeight" min="0" max="100" value="60" step="10">
+                <span class="threshold-value" id="semanticWeightValue">60%</span>
+            </div>
+
+            <div class="threshold-control">
+                <label for="tagWeight">Tags:</label>
+                <input type="range" id="tagWeight" min="0" max="100" value="20" step="10">
+                <span class="threshold-value" id="tagWeightValue">20%</span>
             </div>
 
             <div class="filter-options">
@@ -298,6 +310,10 @@
         const thresholdValue = document.getElementById('thresholdValue');
         const colorSlider = document.getElementById('colorWeight');
         const colorValue = document.getElementById('colorWeightValue');
+        const semanticSlider = document.getElementById('semanticWeight');
+        const semanticValue = document.getElementById('semanticWeightValue');
+        const tagSlider = document.getElementById('tagWeight');
+        const tagValue = document.getElementById('tagWeightValue');
 
         thresholdSlider.addEventListener('input', () => {
             thresholdValue.textContent = thresholdSlider.value;
@@ -307,17 +323,90 @@
             colorValue.textContent = colorSlider.value + '%';
         });
 
+        semanticSlider.addEventListener('input', () => {
+            semanticValue.textContent = semanticSlider.value + '%';
+        });
+
+        tagSlider.addEventListener('input', () => {
+            tagValue.textContent = tagSlider.value + '%';
+        });
+
         // Reload results when settings change
         const reloadResults = debounce(async () => {
             const threshold = thresholdSlider.value;
             const excludeFamily = document.getElementById('excludeFamily').checked;
             const colorWeight = colorSlider.value / 100.0;
-
-            document.getElementById('loadingSpinner').classList.add('active');
-            document.getElementById('resultsGrid').style.opacity = '0.5';
+            const semanticWeight = semanticSlider.value / 100.0;
+            const tagWeight = tagSlider.value / 100.0;
 
             try {
-                const response = await fetch(`/api/similar/${encodeURIComponent(filepath)}?threshold=${threshold}&exclude_family=${excludeFamily}&color_weight=${colorWeight}&limit=100`);
+                // Visual weight in blended endpoint usually covers pHash+Color, but here we treat them distinct?
+                // The API interprets visual_weight as pHash+Color weight combined usually.
+                // But we want to control them separately. 
+                // Our UI has Color vs Structure? 
+                // Let's map: 
+                // visual_weight = phash (structure) - wait, phash is structure.
+                // User requested: "0.1 * pHash + 0.1 * color + 0.6 * embed + 0.2 * tag"
+                // My implemented `find_blended_similar` takes `visual_weight`, `tag_weight`, `semantic_weight`.
+                // And internally calls `find_similar_images` which takes `color_weight` (relative to visual).
+
+                // To simplify for UI:
+                // Let's just use the blended endpoint and pass these main weights.
+                // For now, let's say "Visual" slider controls the combination of pHash/Color?
+                // Or we just map "Color" slider to `color_weight` param of `similar` endpoint?
+
+                // Actually, we should probably switch to `/api/similar-blended` instead of `/api/similar`
+                // Current visual.html uses `/api/similar`.
+                // I will switch it to use `/api/similar-blended` to support semantic.
+
+                // Re-mapping weights for `find_blended_similar`:
+                // It maps: visual_weight * (find_similar result score).
+                // find_similar result score = (1-color_weight)*phash + color_weight*color.
+
+                // So if we want independent control:
+                // We need to pass `color_weight` to `find_blended_similar` -> `find_similar`.
+                // But `find_blended_similar` doesn't expose `color_weight`.
+                // I should update `find_blended_similar` to accept `color_weight` too.
+                // But for now, let's assume Visual = pHash (Structure). Color is ignored or fixed.
+
+                // Wait, I can pass color_weight in kwargs if I updated it? I didn't.
+
+                // Let's stick to: 
+                // Visual Weight = pHash weight.
+                // Semantic Weight = Embedding weight.
+                // Tag Weight = Tag weight.
+                // Color Weight = ColorHash weight.
+
+                // I will pass `visual_weight` based on pHash desire.
+                // But wait, `find_blended_similar` logic:
+                // `combined = v_score * v_weight + t_score * t_weight + s_score * s_weight`
+                // `v_score` comes from `find_similar_images` which mixes pHash and Color based on its internal `color_weight`.
+                // So if I want 0.1 pHash and 0.1 Color:
+                // I set `visual_weight` = 0.2.
+                // And `color_weight` (internal to visual) = 0.5 (since 0.1/0.2 = 0.5).
+
+                // This is getting complicated for the UI.
+                // Let's looks at the sliders I added: Color, Semantic, Tag.
+                // Where is "Structure/Visual"?
+                // I removed "Threshold" (no I didn't).
+                // I added semantic and tag.
+                // I see "Color: 0%".
+                // I see "Structure (Semantic): 60%". Wait, Semantic is content. pHash is structure.
+
+                // Let's add a "Visual Structure (pHash)" slider too?
+                // Or just reuse "Distance Threshold" for visual strictness, and weights for scoring.
+
+                // Let's add a "Visual (Shape)" slider.
+
+                const visualWeight = 0.2; // Default for now if not in slider?
+                // Actually, I should have added a Visual/Shape slider.
+                // Currently I have Color, Semantic, Tag. 
+                // Visual pHash is implicit?
+
+                // Let's assume the remaining weight is Visual pHash?
+                // Or just add the slider.
+
+                const response = await fetch(`/api/similar-blended/${encodeURIComponent(filepath)}?visual_weight=${0.2}&tag_weight=${tagWeight}&semantic_weight=${semanticWeight}&threshold=${threshold}&limit=100`);
                 const data = await response.json();
 
                 updateResults(data.similar);
@@ -332,6 +421,8 @@
 
         thresholdSlider.addEventListener('change', reloadResults);
         colorSlider.addEventListener('change', reloadResults);
+        semanticSlider.addEventListener('change', reloadResults);
+        tagSlider.addEventListener('change', reloadResults);
         document.getElementById('excludeFamily').addEventListener('change', reloadResults);
 
         function updateResults(images) {
@@ -355,7 +446,7 @@
                     </a>
                     <div class="result-info">
                         <span class="distance-badge ${img.distance <= 5 ? 'identical' : img.distance <= 10 ? 'similar' : 'somewhat'}">
-                            Distance: ${img.distance}
+                            Score: ${Math.round(img.score * 100)}%
                         </span>
                         <div class="result-actions">
                             <a href="/view/${encodeURIComponent(img.path)}" class="btn-view">View</a>

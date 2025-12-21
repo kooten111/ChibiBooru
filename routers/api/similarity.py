@@ -59,8 +59,9 @@ async def get_blended_similar(filepath):
     if filepath.startswith('images/'):
         filepath = filepath[7:]
     
-    visual_weight = request.args.get('visual_weight', config.VISUAL_SIMILARITY_WEIGHT, type=float)
-    tag_weight = request.args.get('tag_weight', config.TAG_SIMILARITY_WEIGHT, type=float)
+    visual_weight = request.args.get('visual_weight', 0.2, type=float)
+    tag_weight = request.args.get('tag_weight', 0.2, type=float)
+    semantic_weight = request.args.get('semantic_weight', 0.6, type=float)
     threshold = request.args.get('threshold', config.VISUAL_SIMILARITY_THRESHOLD, type=int)
     limit = request.args.get('limit', 20, type=int)
     exclude_family = request.args.get('exclude_family', 'false').lower() in ('true', '1', 'yes')
@@ -70,6 +71,7 @@ async def get_blended_similar(filepath):
         filepath,
         visual_weight=visual_weight,
         tag_weight=tag_weight,
+        semantic_weight=request.args.get('semantic_weight', 0.6, type=float),
         threshold=threshold,
         limit=limit,
         exclude_family=exclude_family
@@ -132,9 +134,21 @@ async def generate_hashes():
         
         mon.add_log("Starting hash generation...", "info")
         
+        loop = asyncio.get_running_loop()
+        
+        def progress_callback(current, total):
+             future = asyncio.run_coroutine_threadsafe(
+                 manager.update_progress(task_id, current, total, "Generating hashes..."), 
+                 loop
+             )
+             # We don't wait for the future
+        
         # Run synchronous service function in thread
-        # We rely on the service to log progress to the activity log
-        stats = await asyncio.to_thread(similarity_service.generate_missing_hashes)
+        stats = await asyncio.to_thread(
+            similarity_service.generate_missing_hashes, 
+            batch_size=100, 
+            progress_callback=progress_callback
+        )
         
         success = stats['success']
         failed = stats['failed']

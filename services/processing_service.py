@@ -1339,12 +1339,38 @@ def process_image_file(filepath, move_from_ingest=False):
         # Compute perceptual hash for visual similarity
         try:
             from services import similarity_service
+            from services import similarity_db
+            
+            # 1. pHash
             phash = similarity_service.compute_phash_for_file(filepath, md5)
             if phash:
                 similarity_service.update_image_phash(db_path, phash)
-                print(f"[pHash] Computed hash for {db_path}: {phash[:8]}...")
+                print(f"[Similarity] Computed pHash for {db_path}")
+            
+            # 2. ColorHash
+            chash = similarity_service.compute_colorhash_for_file(filepath)
+            if chash:
+                similarity_service.update_image_colorhash(db_path, chash)
+                print(f"[Similarity] Computed ColorHash for {db_path}")
+                
+            # 3. Semantic Embedding
+            if similarity_service.SEMANTIC_AVAILABLE:
+                # We need the image ID for the embedding
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
+                    row = cursor.fetchone()
+                    
+                if row:
+                    image_id = row['id']
+                    engine = similarity_service.get_semantic_engine()
+                    embedding = engine.get_embedding(filepath)
+                    if embedding is not None:
+                        similarity_db.save_embedding(image_id, embedding)
+                        print(f"[Similarity] Computed Sematic Embedding for {db_path}")
+                        
         except Exception as e:
-            print(f"[pHash] Error computing hash for {db_path}: {e}")
+            print(f"[Similarity] Error computing hashes/embeddings for {db_path}: {e}")
         
         # Store local tagger predictions if available
         if 'local_tagger' in all_results:
