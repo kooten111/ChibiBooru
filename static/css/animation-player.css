@@ -264,7 +264,7 @@
 }
 
 /* Fullscreen mode adjustments */
-body.ui-hidden .animation-controls {
+body.focus-mode .animation-controls {
     opacity: 1;
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
 }
