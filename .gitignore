@@ -35,3 +35,4 @@ TODO
 rating_model.db-shm
 rating_model.db-wal
 .xdp-booru*
+similarity.db
