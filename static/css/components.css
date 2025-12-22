@@ -1374,18 +1374,21 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
 body.image-page {
     overflow: hidden;
     height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Grid Container */
+/* Grid Container - fills remaining viewport */
 .image-page .container {
     display: grid;
     grid-template-columns: 300px 1fr 300px;
-    grid-template-rows: auto;
+    grid-template-rows: 1fr;
     max-width: 2200px;
-    margin: auto;
-    padding: var(--spacing-xl);
-    gap: 25px;
-    height: calc(100vh - 81px);
+    margin: 0 auto;
+    padding: var(--spacing-lg);
+    gap: 20px;
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
 }
 
@@ -1400,14 +1403,15 @@ body.image-page {
     grid-row: 1;
     display: flex;
     flex-direction: column;
-    height: 100%;
+    min-height: 0;
     overflow: hidden;
 }
 
 .image-page .image-and-actions-container {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    flex: 1;
+    min-height: 0;
     align-items: center;
 }
 
@@ -1416,15 +1420,30 @@ body.image-page {
     grid-row: 1;
 }
 
-/* Sidebars - Flex containers */
+/* Sidebars - Flex containers that fill height */
 .image-page .sidebar-left,
 .image-page .sidebar-right {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    min-height: 0;
     overflow: hidden;
-    gap: var(--spacing-lg);
+    gap: var(--spacing-md);
     position: relative;
+}
+
+/* Hide scrollbars on image page sidebars while keeping scroll functionality */
+.image-page .sidebar-left *,
+.image-page .sidebar-right * {
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE/Edge */
+}
+
+.image-page .sidebar-left *::-webkit-scrollbar,
+.image-page .sidebar-right *::-webkit-scrollbar {
+    display: none;
+    /* Chrome/Safari/Opera */
 }
 
 .image-page .tags-list {
@@ -2786,8 +2805,81 @@ body:is(.ui-hidden, .focus-mode)::after {
     max-width: 100%;
 }
 
+/* Compact pill variant */
+.actions-bar.pill {
+    padding: 8px 12px;
+    gap: 6px;
+    border-radius: 50px;
+    background: rgba(20, 20, 35, 0.85);
+    border-color: rgba(135, 206, 235, 0.2);
+    margin: var(--spacing-sm);
+    margin-top: auto;
+}
+
 .actions-bar:hover {
     border-color: var(--border-color-hover);
+}
+
+/* Icon-only action buttons */
+.action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: var(--border-width) solid transparent;
+    background: rgba(40, 40, 60, 0.6);
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    text-decoration: none;
+}
+
+.action-btn:hover {
+    background: rgba(60, 60, 90, 0.8);
+    transform: scale(1.1);
+    border-color: var(--border-color-hover);
+}
+
+/* Action button variants */
+.action-btn.primary:hover {
+    background: var(--primary-blue-light);
+    border-color: var(--primary-blue);
+}
+
+.action-btn.success:hover {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: var(--success);
+}
+
+.action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: var(--danger);
+}
+
+.action-btn.favourite {
+    position: relative;
+}
+
+.action-btn.favourite:hover {
+    background: rgba(255, 100, 150, 0.2);
+    border-color: #ff6b9d;
+}
+
+.action-btn.favourite.active {
+    background: rgba(255, 100, 150, 0.3);
+    border-color: #ff6b9d;
+}
+
+.action-btn.favourite.active .favourite-icon {
+    filter: none;
+}
+
+.action-btn .favourite-icon {
+    font-size: 1.2rem;
+    transition: transform var(--transition-normal);
 }
 
 /* Tag Editor (Legacy - kept for compatibility if needed) */

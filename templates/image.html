@@ -7,7 +7,8 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=24' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=26' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/saucenao-modal.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/animation-player.css') + '?v=1' }}">
@@ -488,30 +489,31 @@
                 <script type="application/json" id="familyImagesData">{{ family_images | tojson }}</script>
                 {% endif %}
 
-                <div class="actions-bar">
-                    <button class="btn btn-favourite" id="favouriteBtn" data-filepath="{{ filepath }}">
+                <div class="actions-bar pill">
+                    <button class="action-btn favourite" id="favouriteBtn" data-filepath="{{ filepath }}"
+                        title="Add to Favourites">
                         <span class="favourite-icon">🤍</span>
-                        <span class="favourite-text">Favourite</span>
                     </button>
-                    <button class="btn btn-primary" onclick="toggleTagEditor()">
-                        📝 Edit Tags
+                    <button class="action-btn primary" onclick="toggleTagEditor()" title="Edit Tags">
+                        📝
                     </button>
-                    <button class="btn btn-secondary" id="addToPoolBtn" onclick="showAddToPoolModal()">
-                        📁 Add to Pool
+                    <button class="action-btn" id="addToPoolBtn" onclick="showAddToPoolModal()" title="Add to Pool">
+                        📁
                     </button>
-                    <a href="{{ url_for('main.similar', filepath=filepath) }}" class="btn btn-secondary">
-                        🔍 Find Similar
+                    <a href="{{ url_for('main.similar', filepath=filepath) }}" class="action-btn"
+                        title="Find Similar by Tags">
+                        🔍
                     </a>
-                    <a href="{{ url_for('main.similar_visual', filepath=filepath) }}" class="btn btn-secondary"
-                        title="Find visually similar images using perceptual hash">
-                        👁️ Visual Similar
+                    <a href="{{ url_for('main.similar_visual', filepath=filepath) }}" class="action-btn"
+                        title="Find Visually Similar">
+                        👁️
                     </a>
                     <a href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                        download class="btn btn-success">
-                        💾 Download
+                        download class="action-btn success" title="Download">
+                        💾
                     </a>
-                    <button id="deleteImageBtn" class="btn btn-danger">
-                        🗑️ Delete Image
+                    <button id="deleteImageBtn" class="action-btn danger" title="Delete Image">
+                        🗑️
                     </button>
                 </div>
             </div>
