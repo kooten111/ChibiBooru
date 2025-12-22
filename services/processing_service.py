@@ -1060,264 +1060,193 @@ def download_pixiv_image(pixiv_id, image_url, output_dir="./ingest"):
         print(f"[Pixiv] Error downloading image for ID {pixiv_id}: {e}")
         return None
 
-def process_image_file(filepath, move_from_ingest=False):
+def process_image_file(filepath, move_from_ingest=True):
     """
-    Process an image file, fetch metadata, and add to database.
-
+    Process a single image file with unified flow.
+    
+    This is the main entry point for processing images. It handles:
+    1. Pre-flight checks (file exists, MD5 calculation, duplicate detection)
+    2. Metadata fetching (MD5 lookup, SauceNao, local tagger)
+    3. Hash computation (phash, colorhash, embedding - all in one pass)
+    4. File operations (move from ingest if needed)
+    5. Database commit (single transaction)
+    6. Post-processing (thumbnail, cache updates)
+    
     Args:
         filepath: Path to the image file
         move_from_ingest: If True, move file from ingest folder to bucketed structure
-
+        
     Returns:
         Boolean indicating success
     """
-    from utils.file_utils import ensure_bucket_dir, get_bucketed_path
+    from utils.file_utils import ensure_bucket_dir, get_hash_bucket
     import shutil
-
+    
+    # ========== STAGE 1: PRE-FLIGHT CHECKS ==========
     # Check if file exists (race condition check for concurrent processing)
     if not os.path.exists(filepath):
-        print(f"File not found (likely processed by another thread): {filepath}")
+        print(f"[Processing] File not found (likely processed by another thread): {filepath}")
         return False
-
-    print(f"Processing: {filepath}")
-
-    # Get filename
+    
     filename = os.path.basename(filepath)
-    is_video = filepath.lower().endswith(('.mp4', '.webm'))
-    is_zip_animation = filepath.lower().endswith('.zip')
-
-    # Check if this is a Pixiv image and if we should fetch the original instead
-    if not is_video and move_from_ingest:
-        pixiv_id = extract_pixiv_id_from_filename(filename)
-        if pixiv_id:
-            print(f"[Pixiv] Detected Pixiv ID {pixiv_id} from filename, checking for original...")
-            pixiv_result = fetch_pixiv_metadata(pixiv_id)
-            if pixiv_result:
-                image_url = pixiv_result['data'].get('image_url')
-                if image_url:
-                    print(f"[Pixiv] Downloading original quality image instead...")
-                    original_path = download_pixiv_image(pixiv_id, image_url, output_dir=config.INGEST_DIRECTORY)
-                    if original_path and original_path != filepath and os.path.exists(original_path):
-                        # Successfully downloaded original, remove the compressed version
-                        print(f"[Pixiv] Replacing compressed version with original: {original_path}")
-def process_image_file(filepath, move_from_ingest=True):
-    """
-    Process a single image file (analyze + commit).
-    This acts as a synchronous wrapper around the split analyze/commit logic.
-    Use this for single-file uploads or legacy calls.
-    Для bulk ingestion, prefer running analyze_image_for_ingest in parallel 
-    and then calling commit_image_ingest.
-    """
-    print(f"[Processing] Starting synchronous processing for {os.path.basename(filepath)}")
+    print(f"[Processing] Starting: {filename}")
+    
+    # Calculate MD5 immediately
     try:
-        # 1. Analyze (Heavy lifting)
-        # Note: In this synchronous wrapper, we run analysis in the main process.
-        # This blocks, but it's safe.
-        analysis_result = analyze_image_for_ingest(filepath)
-        
-        # 2. Commit (DB/Disk ops)
-        return commit_image_ingest(analysis_result, move_from_ingest=move_from_ingest)
-        
+        md5 = get_md5(filepath)
     except Exception as e:
-        print(f"[Processing] Error in process_image_file wrapper: {e}")
+        print(f"[Processing] ERROR: Failed to calculate MD5 for {filename}: {e}")
         return False
-
-# ============================================================================
-
-def analyze_image_for_ingest(filepath, md5=None):
-    """
-    Perform CPU-bound and I/O-bound analysis on an image file for ingestion.
-    Designed to be run in a separate process (Worker) via ProcessPoolExecutor.
     
-    Returns:
-        Dictionary containing all extracted metadata, tags, and computed hashes.
-    """
-    import os
-    import hashlib
-    # Re-import config locally to ensure it is available in worker process
-    import config
-    # Import services here to avoid top-level circular imports or pickling issues
-    from services.processing_service import (
-        search_all_sources, search_saucenao, 
-        extract_pixiv_id_from_filename, fetch_pixiv_metadata,
-        tag_with_local_tagger, tag_video_with_frames,
-        fetch_by_post_id
-    )
-    from services import similarity_service
-    
-    if not os.path.exists(filepath):
-        return {'error': 'File not found', 'filepath': filepath}
-        
-    filename = os.path.basename(filepath)
-
-    # 1. Compute MD5 if not provided
-    if not md5:
-        md5_hash = hashlib.md5()
-        with open(filepath, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                md5_hash.update(chunk)
-        md5 = md5_hash.hexdigest()
-        
-    # 2. Identify file type
-    is_zip = filepath.lower().endswith('.zip')
-    is_video = filepath.lower().endswith(('.mp4', '.webm'))
-    
-    result = {
-        'filepath': filepath,
-        'md5': md5,
-        'is_zip': is_zip,
-        'is_video': is_video,
-        'all_results': {}, 
-        'hashes': {},     
-        'saucenao_used': False,
-        'local_tagger_used': False,
-        'saucenao_response': None,
-        # 'animation_metadata': None # Not extracting zip frames in worker yet (rare case)
-    }
-    
-    all_results = search_all_sources(md5)
-    
-    # 3. Type-Specific Logic (Video/Zip/Image)
-    if is_zip:
-        # Zip handling is complex (extraction), defer to commit phase for now?
-        # Or just skip advanced analysis here. Use MD5 lookup only.
-        pass
-            
-    elif is_video:
-        # Video tagging
-        local_tagger_result = tag_video_with_frames(filepath)
-        if local_tagger_result:
-            all_results[local_tagger_result['source']] = local_tagger_result['data']
-            result['local_tagger_used'] = True
-
-    else:
-        # Standard Image Logic
-        if not all_results:
-            # SauceNAO
-            saucenao_resp = search_saucenao(filepath)
-            if saucenao_resp:
-                result['saucenao_used'] = True
-                result['saucenao_response'] = saucenao_resp
-                if 'results' in saucenao_resp:
-                    for r in saucenao_resp.get('results', []):
-                         if float(r['header']['similarity']) > 80:
-                             for url in r['data'].get('ext_urls', []):
-                                 post_id, source = None, None
-                                 if 'danbooru.donmai.us' in url:
-                                     post_id = url.split('/posts/')[-1].split('?')[0]
-                                     source = 'danbooru'
-                                 elif 'e621.net' in url:
-                                     post_id = url.split('/posts/')[-1].split('?')[0]
-                                     source = 'e621'
-
-                                 if post_id and source:
-                                     fetched = fetch_by_post_id(source, post_id)
-                                     if fetched:
-                                         all_results[fetched['source']] = fetched['data']
-                                         break
-                         if all_results: break
-            
-            # Pixiv ID
-            if not all_results:
-                pixiv_id = extract_pixiv_id_from_filename(filename)
-                if pixiv_id:
-                     pixiv_result = fetch_pixiv_metadata(pixiv_id)
-                     if pixiv_result:
-                         all_results[pixiv_result['source']] = pixiv_result['data']
-
-        # Local Tagger
-        pixiv_found = 'pixiv' in all_results
-        should_run_tagger = False
-        if config.LOCAL_TAGGER_ALWAYS_RUN: should_run_tagger = True
-        elif pixiv_found and config.LOCAL_TAGGER_COMPLEMENT_PIXIV: should_run_tagger = True
-        elif not all_results: should_run_tagger = True
-        
-        if should_run_tagger:
-            lt_res = tag_with_local_tagger(filepath)
-            if lt_res:
-                all_results[lt_res['source']] = lt_res['data']
-                result['local_tagger_used'] = True
-
-    result['all_results'] = all_results
-
-    # 4. Compute Hashes
-    try:
-        phash = similarity_service.compute_phash_for_file(filepath, md5)
-        if phash: result['hashes']['phash'] = phash
-        
-        chash = similarity_service.compute_colorhash_for_file(filepath)
-        if chash: result['hashes']['colorhash'] = chash
-        
-        if similarity_service.SEMANTIC_AVAILABLE:
-            engine = similarity_service.get_semantic_engine()
-            emb = engine.get_embedding(filepath)
-            if emb is not None:
-                result['hashes']['embedding'] = emb
-    except Exception as e:
-         print(f"[Analyze] Hash error: {e}")
-         
-    return result
-
-
-def commit_image_ingest(analysis_result, move_from_ingest=True):
-    """
-    Commit the analyzed image to the database and filesystem.
-    This MUST run in the main thread (or handle DB locking carefully).
-    
-    Args:
-        analysis_result: The dict returned by analyze_image_for_ingest
-        move_from_ingest: Whether to move the file from its current location
-        
-    Returns:
-        Boolean success
-    """
-    if 'error' in analysis_result:
-        print(f"[Commit] Skipped due to analysis error: {analysis_result['error']}")
-        return False
-        
-    filepath = analysis_result['filepath']
-    md5 = analysis_result['md5']
-    all_results = analysis_result['all_results']
-    hashes = analysis_result['hashes']
-    
-    # 1. Lock
+    # Check for duplicate in database (with lock)
     lock_fd, acquired = acquire_processing_lock(md5)
     if not acquired:
-        return False # Already processing
-        
+        print(f"[Processing] Skipped: {filename} (already being processed by another thread)")
+        return False
+    
     try:
-        # 2. Check DB existence
+        # Re-check duplicate inside lock
         if models.md5_exists(md5):
-             print(f"Image with MD5 {md5} already exists in DB.")
-             return False
-             
-        # 3. Move File
+            existing_filepath = None
+            with get_db_connection() as conn:
+                row = conn.execute('SELECT filepath FROM images WHERE md5 = ?', (md5,)).fetchone()
+                if row:
+                    existing_filepath = row['filepath']
+            
+            print(f"[Processing] Duplicate detected: {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})")
+            
+            # Remove duplicate file if it exists
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                    print(f"[Processing] Removed duplicate file: {filename}")
+                except Exception as e:
+                    print(f"[Processing] WARNING: Could not remove duplicate file {filename}: {e}")
+            
+            return False
+        
+        # ========== STAGE 2: METADATA FETCHING ==========
+        is_video = filepath.lower().endswith(('.mp4', '.webm'))
+        is_zip_animation = filepath.lower().endswith('.zip')
+        
+        # Parallel metadata fetching
+        all_results = search_all_sources(md5)
+        saucenao_used = False
+        local_tagger_used = False
+        
+        if is_zip_animation:
+            # Minimal processing for zip files
+            pass
+        elif is_video:
+            # Video tagging via local tagger
+            local_tagger_result = tag_video_with_frames(filepath)
+            if local_tagger_result:
+                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                local_tagger_used = True
+        else:
+            # Standard image processing
+            if not all_results:
+                # Try SauceNao if no MD5 match
+                saucenao_resp = search_saucenao(filepath)
+                if saucenao_resp:
+                    saucenao_used = True
+                    if 'results' in saucenao_resp:
+                        for r in saucenao_resp.get('results', []):
+                            if float(r['header']['similarity']) > 80:
+                                for url in r['data'].get('ext_urls', []):
+                                    post_id, source = None, None
+                                    if 'danbooru.donmai.us' in url:
+                                        post_id = url.split('/posts/')[-1].split('?')[0]
+                                        source = 'danbooru'
+                                    elif 'e621.net' in url:
+                                        post_id = url.split('/posts/')[-1].split('?')[0]
+                                        source = 'e621'
+                                    
+                                    if post_id and source:
+                                        fetched = fetch_by_post_id(source, post_id)
+                                        if fetched:
+                                            all_results[fetched['source']] = fetched['data']
+                                            break
+                                if all_results:
+                                    break
+                
+                # Try Pixiv ID extraction
+                if not all_results:
+                    pixiv_id = extract_pixiv_id_from_filename(filename)
+                    if pixiv_id:
+                        pixiv_result = fetch_pixiv_metadata(pixiv_id)
+                        if pixiv_result:
+                            all_results[pixiv_result['source']] = pixiv_result['data']
+            
+            # Local tagger logic
+            pixiv_found = 'pixiv' in all_results
+            should_run_tagger = False
+            if config.LOCAL_TAGGER_ALWAYS_RUN:
+                should_run_tagger = True
+            elif pixiv_found and config.LOCAL_TAGGER_COMPLEMENT_PIXIV:
+                should_run_tagger = True
+            elif not all_results:
+                should_run_tagger = True
+            
+            if should_run_tagger:
+                lt_res = tag_with_local_tagger(filepath)
+                if lt_res:
+                    all_results[lt_res['source']] = lt_res['data']
+                    local_tagger_used = True
+        
+        # ========== STAGE 3: HASH COMPUTATION (ALL IN ONE PASS) ==========
+        hashes = {}
+        try:
+            from services import similarity_service
+            
+            # Compute perceptual hash
+            phash = similarity_service.compute_phash_for_file(filepath, md5)
+            if phash:
+                hashes['phash'] = phash
+            
+            # Compute color hash
+            colorhash = similarity_service.compute_colorhash_for_file(filepath)
+            if colorhash:
+                hashes['colorhash'] = colorhash
+            
+            # Compute semantic embedding if available
+            if similarity_service.SEMANTIC_AVAILABLE:
+                engine = similarity_service.get_semantic_engine()
+                if engine.load_model():
+                    embedding = engine.get_embedding(filepath)
+                    if embedding is not None:
+                        hashes['embedding'] = embedding
+        except Exception as e:
+            print(f"[Processing] WARNING: Hash computation error for {filename}: {e}")
+            # Continue processing even if hashes fail
+        
+        # ========== STAGE 4: FILE OPERATIONS ==========
         file_dest = filepath
         if move_from_ingest:
-            from utils.file_utils import ensure_bucket_dir, get_hash_bucket
-            filename = os.path.basename(filepath)
             bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
             new_path = os.path.join(bucket_dir, filename)
             
             if os.path.exists(new_path):
-                 # Collision or already moved?
-                 if get_md5(new_path) == md5:
-                     os.remove(filepath) # Delete ingest copy
-                     file_dest = new_path
-                 else:
-                     # Name collision but different content? Rename?
-                     # For now, just fail or overwrite? 
-                     # Let's assume standard behavior:
-                     print(f"Destination file exists: {new_path}")
-                     # If we are bold we overwrite, but let's be safe
-                     return False
+                # File already exists at destination
+                if get_md5(new_path) == md5:
+                    # Same file, remove ingest copy
+                    os.remove(filepath)
+                    file_dest = new_path
+                    print(f"[Processing] File already at destination: {filename}")
+                else:
+                    # Different file with same name - this shouldn't happen often
+                    print(f"[Processing] ERROR: Filename collision at {new_path}")
+                    return False
             else:
+                # Move file to destination
                 shutil.move(filepath, new_path)
                 file_dest = new_path
-                
+                print(f"[Processing] Moved to: {new_path}")
+        
         db_path = os.path.relpath(file_dest, "static/images").replace('\\', '/')
         
-        # 4. Prepare Metadata (similar to process_image_file)
+        # ========== STAGE 5: DATABASE COMMIT ==========
+        # Prepare metadata
         primary_source_data = None
         source_name = None
         priority = config.BOORU_PRIORITY
@@ -1331,13 +1260,15 @@ def commit_image_ingest(analysis_result, move_from_ingest=True):
         
         # Merge Pixiv + Local Tagger if needed
         if source_name == 'pixiv' and 'local_tagger' in all_results:
-             local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
-             extracted_tags = merge_tag_sources(
-                 extracted_tags,
-                 local_tagger_tags,
-                 merge_categories=['character', 'copyright', 'species', 'meta', 'general']
-             )
-             
+            from utils.tag_extraction import merge_tag_sources, deduplicate_categorized_tags
+            local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
+            extracted_tags = merge_tag_sources(
+                extracted_tags,
+                local_tagger_tags,
+                merge_categories=['character', 'copyright', 'species', 'meta', 'general']
+            )
+        
+        from utils.tag_extraction import deduplicate_categorized_tags
         extracted_tags = deduplicate_categorized_tags(extracted_tags)
         
         categorized_tags = {
@@ -1351,31 +1282,37 @@ def commit_image_ingest(analysis_result, move_from_ingest=True):
         
         rating, rating_source = extract_rating_from_source(primary_source_data, source_name)
         
-        parent_id = primary_source_data.get('parent_id')
-        if source_name == 'e621':
+        parent_id = primary_source_data.get('parent_id') if primary_source_data else None
+        if source_name == 'e621' and primary_source_data:
             parent_id = primary_source_data.get('relationships', {}).get('parent_id')
-            
+        
         image_info = {
             'filepath': db_path,
             'md5': md5,
-            'post_id': primary_source_data.get('id'),
+            'post_id': primary_source_data.get('id') if primary_source_data else None,
             'parent_id': parent_id,
-            'has_children': primary_source_data.get('has_children', False),
-            'saucenao_lookup': analysis_result['saucenao_used'],
+            'has_children': primary_source_data.get('has_children', False) if primary_source_data else False,
+            'saucenao_lookup': saucenao_used,
             'rating': rating,
             'rating_source': rating_source,
         }
         
+        # Add computed hashes to image_info
+        if 'phash' in hashes:
+            image_info['phash'] = hashes['phash']
+        if 'colorhash' in hashes:
+            image_info['colorhash'] = hashes['colorhash']
+        
         raw_metadata_to_save = {
             "md5": md5,
             "relative_path": db_path,
-            "saucenao_lookup": analysis_result['saucenao_used'],
-            "saucenao_response": analysis_result['saucenao_response'],
-            "local_tagger_lookup": analysis_result['local_tagger_used'],
+            "saucenao_lookup": saucenao_used,
+            "saucenao_response": None,  # Don't save full response to save space
+            "local_tagger_lookup": local_tagger_used,
             "sources": all_results
         }
         
-        # 5. DB Insert
+        # Insert into database
         success = models.add_image_with_metadata(
             image_info,
             list(all_results.keys()),
@@ -1383,38 +1320,33 @@ def commit_image_ingest(analysis_result, move_from_ingest=True):
             raw_metadata_to_save
         )
         
-        if success:
-            ensure_thumbnail(file_dest, md5=md5)
-            
-            # 6. Save Computed Hashes
+        if not success:
+            print(f"[Processing] ERROR: Database insert failed for {filename}")
+            return False
+        
+        # ========== STAGE 6: POST-PROCESSING ==========
+        # Save semantic embedding if computed
+        if 'embedding' in hashes:
             try:
-                from services import similarity_service, similarity_db
-                
-                if 'phash' in hashes:
-                    similarity_service.update_image_phash(db_path, hashes['phash'])
-                    
-                if 'colorhash' in hashes:
-                    similarity_service.update_image_colorhash(db_path, hashes['colorhash'])
-                    
-                if 'embedding' in hashes:
-                    # Need image_id
-                    with get_db_connection() as conn:
-                        cursor = conn.cursor()
-                        cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
-                        row = cursor.fetchone()
-                        if row:
-                            similarity_db.save_embedding(row['id'], hashes['embedding'])
-                            
+                from services import similarity_db
+                # Get image ID
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
+                    row = cursor.fetchone()
+                    if row:
+                        similarity_db.save_embedding(row['id'], hashes['embedding'])
             except Exception as e:
-                print(f"[Commit] Error saving hashes: {e}")
-                
-            # Store predictions
-            if 'local_tagger' in all_results:
-                 local_data = all_results['local_tagger']
-                 all_predictions = local_data.get('all_predictions', [])
-                 if all_predictions:
-                      from repositories import tagger_predictions_repository
-                      with get_db_connection() as conn:
+                print(f"[Processing] WARNING: Failed to save embedding for {filename}: {e}")
+        
+        # Store tagger predictions if available
+        if 'local_tagger' in all_results:
+            local_data = all_results['local_tagger']
+            all_predictions = local_data.get('all_predictions', [])
+            if all_predictions:
+                try:
+                    from repositories import tagger_predictions_repository
+                    with get_db_connection() as conn:
                         cursor = conn.cursor()
                         cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
                         row = cursor.fetchone()
@@ -1424,16 +1356,21 @@ def commit_image_ingest(analysis_result, move_from_ingest=True):
                                 all_predictions, 
                                 local_data.get('tagger_name')
                             )
-
-            print(f"[Commit] Successfully ingested {os.path.basename(file_dest)}")
-            return True
-            
-        else:
-            print(f"[Commit] DB Insert failed for {db_path}")
-            return False
-
+                except Exception as e:
+                    print(f"[Processing] WARNING: Failed to save predictions for {filename}: {e}")
+        
+        # Generate thumbnail
+        ensure_thumbnail(file_dest, md5=md5)
+        
+        print(f"[Processing] Successfully processed: {filename}")
+        return True
+        
     except Exception as e:
-        print(f"[Commit] Error processing {filepath}: {e}")
+        print(f"[Processing] ERROR processing {filename}: {e}")
+        import traceback
+        traceback.print_exc()
         return False
     finally:
         release_processing_lock(lock_fd)
+
+# Old split architecture removed - now using unified process_image_file() function above

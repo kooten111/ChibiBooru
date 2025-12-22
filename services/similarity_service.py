@@ -800,14 +800,7 @@ def find_all_duplicate_groups(threshold: int = 5) -> List[List[Dict]]:
 # Batch Operations
 # ============================================================================
 
-# Global worker state
-_worker_semantic_engine = None
-
-def _init_worker():
-    """Initialize worker process state."""
-    global _worker_semantic_engine
-    # No longer load model in workers to save RAM!
-    _worker_semantic_engine = None
+# Worker state management removed - ThreadPoolExecutor shares memory space
 
 def _process_semantic_single(row: dict) -> dict:
     """
@@ -870,27 +863,14 @@ def _process_semantic_single(row: dict) -> dict:
     return result
 
 
-def _process_single_image(row: dict) -> dict:
+def _process_single_image_threaded(row: dict) -> dict:
     """
-    Process a single image for hash generation.
-    Designed to run in a separate process.
+    Process a single image for hash generation in a thread.
+    This is the threaded version that doesn't need to re-import modules.
     """
     import os
-    # Re-import dependencies inside worker
-    from services import similarity_db
     from utils.file_utils import get_thumbnail_path
     
-    # Avoid circular/recursive execution by importing specific functions if needed, 
-    # but since this is a library, importing module is standard.
-    from services.similarity_service import (
-        compute_phash_for_file, 
-        compute_colorhash_for_file, 
-        update_image_phash, 
-        update_image_colorhash,
-        SEMANTIC_AVAILABLE,
-        SemanticSearchEngine
-    )
-
     result = {
         'id': row['id'],
         'filepath': row['filepath'],
@@ -926,7 +906,6 @@ def _process_single_image(row: dict) -> dict:
             try:
                 phash = compute_phash_for_file(full_path, md5)
                 if phash:
-                    # Return distinct value for saving later
                     result['new_phash'] = phash
                     result['phash_generated'] = True
                     updated_something = True
@@ -938,26 +917,11 @@ def _process_single_image(row: dict) -> dict:
             try:
                 chash = compute_colorhash_for_file(full_path)
                 if chash:
-                    # Return distinct value for saving later
                     result['new_colorhash'] = chash
                     result['colorhash_generated'] = True
                     updated_something = True
             except Exception as e:
                 result['errors'].append(f"ColorHash error: {e}")
-
-        # 3. Semantic Embedding
-        if SEMANTIC_AVAILABLE:
-            try:
-                global _worker_semantic_engine
-                if _worker_semantic_engine:
-                    embedding = _worker_semantic_engine.get_embedding(full_path)
-                    if embedding is not None:
-                        # Return distinct value for saving later
-                        result['new_embedding'] = embedding
-                        result['semantic_generated'] = True
-                        updated_something = True
-            except Exception as e:
-                result['errors'].append(f"Semantic error: {e}")
 
         result['success'] = updated_something
         
@@ -965,6 +929,12 @@ def _process_single_image(row: dict) -> dict:
         result['errors'].append(f"Worker error: {e}")
         
     return result
+
+
+# Remove old ProcessPoolExecutor worker function
+# def _process_single_image(row: dict) -> dict:
+#     """Old ProcessPool version - no longer used"""
+#     pass
 
 def _bulk_save_hashes(results: List[Dict]):
     """
@@ -1007,7 +977,7 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
     """
     Generate perceptual hashes and semantic embeddings for images that don't have them.
     Continuously loops until all missing hashes are generated.
-    Uses ProcessPoolExecutor for parallel execution.
+    Uses ThreadPoolExecutor for parallel execution.
     
     Args:
         batch_size: Number of images to process at a time (per chunk)
@@ -1036,8 +1006,7 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
             else:
                 missing_semantic_count = 0
                 
-            # Sum is a better estimate for total tasks (ProcessPool + ThreadPool tasks)
-            # Even if same image, they are distinct tasks in our hybrid model
+            # Total tasks to process
             total_stats['total'] = missing_visual_count + missing_semantic_count
             
             if total_stats['total'] == 0:
@@ -1060,27 +1029,23 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
     print(f"[Similarity] Starting parallel hash generation with {max_workers} workers. Total to process: {total_stats['total']}")
     
     # Track failed IDs to avoid infinite loops
-    failed_visual_ids = set()
-    failed_semantic_ids = set()
+    failed_ids = set()
     
-    # Hybrid Approach:
-    # ProcessPool for Visual Hashing (CPU intensive, Python GIL blocks parallel CPU)
-    # ThreadPool for Semantic (Memory intensive, ONNX releases GIL, huge RAM savings)
-    
-    with concurrent.futures.ProcessPoolExecutor(max_workers=max_workers, initializer=_init_worker) as process_executor, \
-         concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as thread_executor:
+    # Use ThreadPoolExecutor for all hash computation
+    # This avoids the overhead of ProcessPoolExecutor and works better with I/O-bound tasks
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="HashGen") as executor:
 
         while True:
-            # 1. Fetch Visual Candidates
+            # Fetch candidates that need hashes
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 # Exclude known failures
                 exclude_clause = ""
                 params = [batch_size]
-                if failed_visual_ids:
-                    placeholders = ','.join('?' * len(failed_visual_ids))
+                if failed_ids:
+                    placeholders = ','.join('?' * len(failed_ids))
                     exclude_clause = f"AND id NOT IN ({placeholders})"
-                    params = list(failed_visual_ids) + params
+                    params = list(failed_ids) + params
                     
                 cursor.execute(f"""
                     SELECT id, filepath, md5, phash, colorhash
@@ -1091,14 +1056,14 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
                 """, params)
                 missing_hashes = [dict(row) for row in cursor.fetchall()]
 
-            # 2. Fetch Semantic Candidates
+            # Also fetch semantic candidates if available
             missing_semantic = []
             
             if SEMANTIC_AVAILABLE:
                 try:
                     # Get current state
                     embedded_ids = set(similarity_db.get_all_embedding_ids())
-                    embedded_ids.update(failed_semantic_ids)
+                    embedded_ids.update(failed_ids)  # Don't retry failed ones
                     
                     # Compute missing IDs efficiently
                     with get_db_connection() as conn:
@@ -1106,7 +1071,7 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
                          cursor.execute("SELECT id FROM images")
                          all_db_ids = set(row[0] for row in cursor.fetchall())
                     
-                    # Exclude valid embeddings and already-queued visual tasks (if same ID)
+                    # Exclude images already being processed for visual hashes
                     current_batch_ids = {r['id'] for r in missing_hashes}
                     
                     candidates_ids = list(all_db_ids - embedded_ids - current_batch_ids)
@@ -1133,25 +1098,24 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
             if not missing_hashes and not missing_semantic:
                 break
                 
-            # Submit tasks
-            future_to_id = {}
+            # Submit all tasks to thread pool
+            futures = {}
             
-            # Submit Visual -> ProcessPool
+            # Submit visual hash tasks
             for row in missing_hashes:
-                future = process_executor.submit(_process_single_image, row)
-                future_to_id[future] = ('visual', row)
+                future = executor.submit(_process_single_image_threaded, row)
+                futures[future] = ('visual', row)
                 
-            # Submit Semantic -> ThreadPool
+            # Submit semantic tasks
             for row in missing_semantic:
-                # _process_semantic_single uses the global model
-                future = thread_executor.submit(_process_semantic_single, row)
-                future_to_id[future] = ('semantic', row)
+                future = executor.submit(_process_semantic_single, row)
+                futures[future] = ('semantic', row)
             
             # Collect results
             results_buffer = []
             
-            for future in concurrent.futures.as_completed(future_to_id):
-                task_type, row = future_to_id[future]
+            for future in concurrent.futures.as_completed(futures):
+                task_type, row = futures[future]
                 try:
                     result = future.result()
                     
@@ -1159,14 +1123,10 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
                     if result['success']:
                         total_stats['success'] += 1
                         results_buffer.append(result)
+                    else:
+                        total_stats['failed'] += 1
+                        failed_ids.add(result['id'])
                     
-                    # Failure handling
-                    if not result['success']:
-                         if task_type == 'visual':
-                             failed_visual_ids.add(result['id'])
-                         elif task_type == 'semantic':
-                             failed_semantic_ids.add(result['id'])
-                        
                     if result.get('errors'):
                          print(f"[Similarity] Error processing {result['filepath']}: {result['errors'][0]}")
 
@@ -1176,10 +1136,7 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
                 except Exception as e:
                     print(f"[Similarity] Exception in {task_type} result: {e}")
                     total_stats['failed'] += 1
-                    if task_type == 'visual':
-                         failed_visual_ids.add(row['id'])
-                    elif task_type == 'semantic':
-                         failed_semantic_ids.add(row['id'])
+                    failed_ids.add(row['id'])
 
             # Bulk save
             if results_buffer:
@@ -1187,6 +1144,8 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
                 print(f"[Similarity] Batch complete. Saved {len(results_buffer)} results.")
     
     return total_stats
+
+
 
 
 
