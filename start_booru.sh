@@ -12,11 +12,12 @@ fi
 # Get host and port from environment or use defaults
 HOST=${FLASK_HOST:-0.0.0.0}
 PORT=${FLASK_PORT:-5000}
+WORKERS=${UVICORN_WORKERS:-4}
 
 # Start uvicorn with hot reload
 # Exclude temporary file directories from reload monitoring to prevent crashes
-echo "Starting Booru with uvicorn on $HOST:$PORT"
+echo "Starting Booru with uvicorn on $HOST:$PORT with $WORKERS workers"
 #uvicorn app:create_app --factory --host $HOST --port $PORT --reload --reload-exclude 'ingest/*' --reload-exclude 'storage/*'
 
-# Alternative without reload (for production):
-uvicorn app:create_app --factory --host $HOST --port $PORT --workers 1
+# Production mode with multiple workers (now compatible with ThreadPoolExecutor)
+uvicorn app:create_app --factory --host $HOST --port $PORT --workers $WORKERS
