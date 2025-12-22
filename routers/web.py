@@ -260,7 +260,13 @@ async def show_image(filepath):
     for img in parent_child_images:
         img['match_type'] = img['type'] # 'parent' or 'child'
         img['thumb'] = get_thumbnail_path(img['path'])
-        parent_child_paths.add(img['path'])
+        
+        # Normalize path to include 'images/' prefix for consistency with similarity results
+        # DB usually stores bare filename, but similarity/query services return 'images/filename'
+        p = img['path']
+        if not p.startswith('images/'):
+            p = f"images/{p}"
+        parent_child_paths.add(p)
 
     # Get similar images - use mix of visual and tag-based if enabled
     if config.VISUAL_SIMILARITY_ENABLED:
@@ -291,7 +297,7 @@ async def show_image(filepath):
         # Filter out self-match and family from semantic results
         visual_candidates = [
             c for c in visual_candidates 
-            if c['path'] != f"images/{lookup_path}" and c['path'] not in parent_child_paths
+            if c['path'].replace("images/", "") != lookup_path and c['path'] not in parent_child_paths
         ]
 
         # Fallback or supplement with visual hash if semantic didn't return enough (or was disabled)
@@ -306,8 +312,10 @@ async def show_image(filepath):
             # Add non-duplicate hash candidates
             existing_paths = {c['path'] for c in visual_candidates}
             for hc in hash_candidates:
+                # Robust filtering
+                hc_path_norm = hc['path'].replace("images/", "")
                 if (hc['path'] not in existing_paths 
-                    and hc['path'] != f"images/{lookup_path}" 
+                    and hc_path_norm != lookup_path
                     and hc['path'] not in parent_child_paths):
                     
                     visual_candidates.append(hc)
@@ -321,7 +329,7 @@ async def show_image(filepath):
             # Filter out self-match and family
             tag_candidates = [
                 c for c in tag_candidates 
-                if c['path'] != f"images/{lookup_path}" and c['path'] not in parent_child_paths
+                if c['path'].replace("images/", "") != lookup_path and c['path'] not in parent_child_paths
             ]
             tag_candidates = tag_candidates[:tag_limit]
         else:
