@@ -1079,7 +1079,7 @@ def process_image_file(filepath, move_from_ingest=True):
     Returns:
         Boolean indicating success
     """
-    from utils.file_utils import ensure_bucket_dir, get_hash_bucket
+    from utils.file_utils import ensure_bucket_dir
     import shutil
     
     # ========== STAGE 1: PRE-FLIGHT CHECKS ==========
@@ -1267,9 +1267,10 @@ def process_image_file(filepath, move_from_ingest=True):
                 local_tagger_tags,
                 merge_categories=['character', 'copyright', 'species', 'meta', 'general']
             )
-        
-        from utils.tag_extraction import deduplicate_categorized_tags
-        extracted_tags = deduplicate_categorized_tags(extracted_tags)
+            extracted_tags = deduplicate_categorized_tags(extracted_tags)
+        else:
+            from utils.tag_extraction import deduplicate_categorized_tags
+            extracted_tags = deduplicate_categorized_tags(extracted_tags)
         
         categorized_tags = {
             'character': extracted_tags['tags_character'].split(),
