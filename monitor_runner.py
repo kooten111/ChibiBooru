@@ -60,8 +60,13 @@ def is_main_app_running():
         return False
     except Exception as e:
         # If we can't determine, assume it's running to avoid premature shutdown
-        logger = get_logger('MonitorRunner')
-        logger.warning(f"Error checking for main app process: {e}")
+        # Use basic logging in case get_logger fails
+        try:
+            logger = get_logger('MonitorRunner')
+            logger.warning(f"Error checking for main app process: {e}")
+        except:
+            import logging
+            logging.warning(f"Error checking for main app process: {e}")
         return True
 
 def main():

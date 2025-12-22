@@ -20,6 +20,14 @@ echo "=========================================="
 echo "Starting ChibiBooru"
 echo "=========================================="
 
+# Function to cleanup on exit
+cleanup() {
+    echo "Stopping monitor..."
+    kill $MONITOR_PID 2>/dev/null
+    wait $MONITOR_PID 2>/dev/null
+    echo "✓ Monitor stopped"
+}
+
 # Start monitor in background (standalone process)
 echo "Starting monitor service..."
 python monitor_runner.py &
@@ -28,7 +36,7 @@ echo "✓ Monitor started (PID: $MONITOR_PID)"
 
 # Trap to ensure monitor is killed when script exits
 # This handles Ctrl+C, script termination, or any exit
-trap "echo 'Stopping monitor...'; kill $MONITOR_PID 2>/dev/null; wait $MONITOR_PID 2>/dev/null; echo '✓ Monitor stopped'; exit" INT TERM EXIT
+trap cleanup INT TERM EXIT
 
 # Give monitor a moment to initialize
 sleep 2
@@ -38,9 +46,5 @@ echo "Starting web server on $HOST:$PORT with $WORKERS workers..."
 echo "=========================================="
 uvicorn app:create_app --factory --host $HOST --port $PORT --workers $WORKERS
 
-# Cleanup happens via trap, but explicit for clarity
-echo "Stopping monitor..."
-kill $MONITOR_PID 2>/dev/null
-wait $MONITOR_PID 2>/dev/null
-echo "✓ Monitor stopped"
+# Note: cleanup happens automatically via trap
 

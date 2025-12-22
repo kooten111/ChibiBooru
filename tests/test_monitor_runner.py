@@ -9,9 +9,6 @@ import signal
 import os
 import sys
 
-# Add project root to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 
 class TestMonitorRunner:
     """Tests for the standalone monitor runner process."""
@@ -98,10 +95,13 @@ class TestAppPyModification:
         with open(app_path, 'r') as f:
             content = f.read()
         
-        # Check that the monitor startup code is removed or commented out
-        assert 'monitor_service.start_monitor()' not in content or \
-               '# Note: Monitor service is now run as a standalone process' in content, \
-               "app.py should not start the monitor service directly anymore"
+        # Check that monitor_service.start_monitor() is not called
+        assert 'monitor_service.start_monitor()' not in content, \
+               "app.py should not call monitor_service.start_monitor() anymore"
+        
+        # Check for explanatory comment about standalone process
+        assert 'standalone' in content.lower(), \
+               "app.py should have a comment explaining the standalone monitor architecture"
     
     def test_app_py_has_comment_explaining_monitor(self):
         """Verify that app.py has a comment explaining the monitor architecture."""
