@@ -1155,10 +1155,12 @@ def process_image_file(filepath, move_from_ingest=True):
                             if float(r['header']['similarity']) > 80:
                                 for url in r['data'].get('ext_urls', []):
                                     post_id, source = None, None
-                                    if 'danbooru.donmai.us' in url:
+                                    # Parse URL to extract source and post ID
+                                    # Use startswith for more secure URL matching
+                                    if url.startswith('https://danbooru.donmai.us/'):
                                         post_id = url.split('/posts/')[-1].split('?')[0]
                                         source = 'danbooru'
-                                    elif 'e621.net' in url:
+                                    elif url.startswith('https://e621.net/'):
                                         post_id = url.split('/posts/')[-1].split('?')[0]
                                         source = 'e621'
                                     
