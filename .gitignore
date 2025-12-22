@@ -1,40 +1,75 @@
-# Python cache
-__pycache__/
+# ===========================
+# System & Environment
+# ===========================
+.env
+.env.local
+venv/
+.vscode/
+.python-version
+.DS_Store
 
-# Folders to ignore
-metadata/
-models/
+# ===========================
+# Runtime & Logs
+# ===========================
+__pycache__/
+*.py[cod]
+*.log
+*.logs
+*.pid
+monitor.logs
+monitor.pid
+
+# ===========================
+# Database & Data Persistence
+# ===========================
+# Main database files including WAL and SHM files
+*.db
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Specific SQLite databases
+booru.db
+rating_model.db
+similarity.db
+database.db
+
+# Lock files
+.xdp-booru*
+*.lock
+
+# ===========================
+# Media & Static Assets
+# ===========================
+# User uploaded or generated content
 static/images/
 static/thumbnails/
 static/animations/
 static/logo/
-venv/
-.vscode/
+
+# ===========================
+# Project Specific & Temporary
+# ===========================
+# Ingestion and metadata
 ingest/
+metadata/
+models/
 
-# Testing and documentation
-
-# docs/ - Now tracked for project documentation
-pytest.ini
-requirements-dev.txt
-
-# Specific files to ignore
-booru.db
-booru*.db
-database.db
-rating_model.db
+# Data exports
 tags.json
+*.csv
+
+# Temporary files and diffs
+components_diff.txt
+
+# Personal tracking
 todo.txt
 todo.md
-.env
-booru.db-shm
-booru.db-wal
 TODO
-.python-version
-*.csv
-rating_model.db-shm
-rating_model.db-wal
-.xdp-booru*
-similarity.db
-similarity.db-journal
-*.lock
+
+# ===========================
+# Testing & Documentation
+# ===========================
+pytest.ini
+requirements-dev.txt
+# docs/ is intentionally tracked
