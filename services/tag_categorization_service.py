@@ -103,7 +103,7 @@ def get_uncategorized_tags_by_frequency(limit: int = 100, include_simple_categor
             WHERE t.extended_category IS NULL
             AND t.category IN ('general', 'meta')
             GROUP BY t.id, t.name, t.category, t.extended_category
-            HAVING usage_count > 0
+
             ORDER BY usage_count DESC
             LIMIT ?
         """, (limit,))
