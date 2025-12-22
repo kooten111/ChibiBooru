@@ -77,12 +77,12 @@
     border-radius: var(--radius-sm);
 }
 
-/* Hide chips in search bar - use filters bar instead */
+/* Chips visible in search bar */
 .gallery-page .chip-input-chips {
-    display: none;
+    display: flex;
 }
 
-/* Expand text input since no chips */
+/* Text input shrinks when chips are present */
 .gallery-page .chip-input-wrapper #chipTextInput {
     flex: 1;
 }

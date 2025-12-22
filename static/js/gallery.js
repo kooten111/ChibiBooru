@@ -32,7 +32,7 @@
         filterSidebar: document.querySelector('.filter-sidebar'),
         sidebarToggle: document.getElementById('sidebarToggle'),
         gridSizeBtns: document.querySelectorAll('.grid-size-btn'),
-        activeFiltersBar: document.querySelector('.active-filters-bar'),
+
         searchInput: document.querySelector('#chipTextInput') || document.querySelector('.search-bar input'),
         thumbnails: document.querySelectorAll('.thumbnail'),
         galleryContent: document.querySelector('.gallery-content')
@@ -43,6 +43,12 @@
     // ========================================================================
 
     const quickFilters = {
+        sort: [
+            { label: 'Newest', query: 'order:new', icon: '🕒' },
+            { label: 'Oldest', query: 'order:old', icon: '📜' },
+            { label: 'Score', query: 'order:score', icon: '📈' },
+            { label: 'Favorites', query: 'order:fav', icon: '❤️' }
+        ],
         rating: [
             { label: 'General', query: 'rating:general', color: '#22c55e' },
             { label: 'Sensitive', query: 'rating:sensitive', color: '#eab308' },
@@ -80,7 +86,7 @@
 
         // Render dynamic content
         renderFilterSidebar();
-        renderActiveFiltersBar();
+
 
         // Bind events
         bindEvents();
@@ -146,6 +152,9 @@
         } else if (isSource) {
             // Remove any existing source filters  
             state.activeFilters = state.activeFilters.filter(f => !f.startsWith('source:'));
+        } else if (query.startsWith('order:')) {
+            // Remove any existing order filters
+            state.activeFilters = state.activeFilters.filter(f => !f.startsWith('order:'));
         }
 
         if (!state.activeFilters.includes(query)) {
@@ -181,98 +190,7 @@
         }
     }
 
-    function renderActiveFiltersBar() {
-        const els = getElements();
-        if (!els.activeFiltersBar) return;
 
-        if (state.activeFilters.length === 0) {
-            els.activeFiltersBar.classList.add('hidden');
-            return;
-        }
-
-        els.activeFiltersBar.classList.remove('hidden');
-
-        const chips = state.activeFilters.map(f => `
-            <div class="active-filter-chip" data-filter="${escapeHtml(f)}">
-                <span class="chip-text">${escapeHtml(f)}</span>
-                <span class="chip-remove" title="Remove filter">✕</span>
-            </div>
-        `).join('');
-
-        els.activeFiltersBar.innerHTML = `
-            <span class="filters-label">Filters:</span>
-            ${chips}
-            <button class="clear-filters">Clear all</button>
-            <span class="results-count"></span>
-        `;
-
-        // Update results count
-        const resultsInfo = document.querySelector('.results-info');
-        if (resultsInfo) {
-            const countEl = els.activeFiltersBar.querySelector('.results-count');
-            if (countEl) countEl.textContent = resultsInfo.textContent;
-        }
-
-        // Bind chip click for editing
-        els.activeFiltersBar.querySelectorAll('.active-filter-chip').forEach(chip => {
-            chip.addEventListener('click', e => {
-                if (e.target.classList.contains('chip-remove')) {
-                    removeFilter(chip.dataset.filter);
-                } else {
-                    makeChipEditable(chip);
-                }
-            });
-        });
-
-        // Bind clear button
-        els.activeFiltersBar.querySelector('.clear-filters')?.addEventListener('click', clearFilters);
-    }
-
-    function makeChipEditable(chip) {
-        if (chip.classList.contains('editing')) return;
-
-        const currentValue = chip.dataset.filter;
-        chip.classList.add('editing');
-
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'chip-edit-input';
-        input.value = currentValue;
-
-        const textEl = chip.querySelector('.chip-text');
-        const removeEl = chip.querySelector('.chip-remove');
-
-        textEl.style.display = 'none';
-        removeEl.style.display = 'none';
-        chip.insertBefore(input, textEl);
-
-        input.focus();
-        input.select();
-
-        const finishEditing = () => {
-            const newValue = input.value.trim();
-            if (newValue && newValue !== currentValue) {
-                updateFilter(currentValue, newValue);
-            } else {
-                // Restore original display
-                chip.classList.remove('editing');
-                input.remove();
-                textEl.style.display = '';
-                removeEl.style.display = '';
-            }
-        };
-
-        input.addEventListener('blur', finishEditing);
-        input.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                input.blur();
-            } else if (e.key === 'Escape') {
-                input.value = currentValue;
-                input.blur();
-            }
-        });
-    }
 
     // ========================================================================
     // FILTER SIDEBAR
@@ -283,6 +201,23 @@
         if (!els.filterSidebar) return;
 
         let html = '';
+
+        // Sort section
+        html += `
+            <div class="filter-section" data-section="sort">
+                <div class="filter-section-header">
+                    <span><span class="icon">🔃</span> Sort</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="filter-section-content">
+                    ${quickFilters.sort.map(f => `
+                        <div class="filter-item${state.activeFilters.includes(f.query) ? ' active' : ''}" data-query="${f.query}">
+                            <span><span class="icon">${f.icon}</span> ${f.label}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
 
         // Rating section
         html += `
@@ -304,7 +239,7 @@
 
         // Source section (collapsed by default)
         html += `
-            <div class="filter-section collapsed" data-section="source">
+            <div class="filter-section" data-section="source">
                 <div class="filter-section-header">
                     <span><span class="icon">📚</span> Source</span>
                     <span class="arrow">▼</span>
@@ -321,7 +256,7 @@
 
         // Special section (collapsed by default)
         html += `
-            <div class="filter-section collapsed" data-section="special">
+            <div class="filter-section" data-section="special">
                 <div class="filter-section-header">
                     <span><span class="icon">🔧</span> Special</span>
                     <span class="arrow">▼</span>
@@ -388,6 +323,9 @@
     // ========================================================================
 
     function handleKeyboard(e) {
+        // Explicitly ignore Tab to prevent any conflicts
+        if (e.key === 'Tab') return;
+
         const els = getElements();
 
         // Ignore if typing in an input (except for Escape and Ctrl+F)
@@ -505,20 +443,7 @@
         });
 
         // Intercept space key in search input to add to filters bar instead of chips
-        const searchInput = document.querySelector('#chipTextInput');
-        if (searchInput) {
-            searchInput.addEventListener('keydown', (e) => {
-                if (e.key === ' ' || e.key === 'Enter') {
-                    const text = searchInput.value.trim();
-                    if (text) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        addFilter(text);
-                        searchInput.value = '';
-                    }
-                }
-            }, true); // Use capture to intercept before autocomplete.js
-        }
+
     }
 
     // ========================================================================

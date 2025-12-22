@@ -373,6 +373,9 @@ class Autocomplete {
     }
 
     handleKeydown(e) {
+        // Stop ALL other listeners on this element (and bubbling)
+        e.stopImmediatePropagation();
+
         const hasActiveSuggestions = this.suggestions.classList.contains('active');
 
         // Backspace: Delete last chip if input is empty
@@ -382,25 +385,29 @@ class Autocomplete {
             return;
         }
 
-        // Enter: Create chip from current text OR select from autocomplete
+        // Enter: Create chip from current text OR select from autocomplete AND SUBMIT
         if (e.key === 'Enter') {
+            e.preventDefault();
+
             if (hasActiveSuggestions && this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
-                e.preventDefault();
+                // If a suggestion is selected, used it
                 const suggestion = this.currentSuggestions[this.selectedIndex];
                 this.addChipFromAutocomplete(suggestion.tag, suggestion.category);
             } else {
+                // Otherwise use the typed text
                 const currentText = this.chipTextInput.value.trim();
                 if (currentText) {
-                    e.preventDefault();
                     this.addChipFromText(currentText);
                     this.chipTextInput.value = '';
                     this.suggestions.classList.remove('active');
-                    // Automatically submit the form after creating the chip
-                    if (this.searchForm) {
-                        this.searchForm.submit();
-                    }
                 }
-                // If empty and has chips, allow form submission
+            }
+
+            // ALWAYS Submit form if we have a form
+            if (this.searchForm) {
+                setTimeout(() => {
+                    this.searchForm.submit();
+                }, 10);
             }
             return;
         }
@@ -418,11 +425,23 @@ class Autocomplete {
         }
 
         // Tab: Select from autocomplete if available
-        if (e.key === 'Tab' && hasActiveSuggestions) {
-            if (this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
-                e.preventDefault();
-                const suggestion = this.currentSuggestions[this.selectedIndex];
-                this.addChipFromAutocomplete(suggestion.tag, suggestion.category);
+        if (e.key === 'Tab') {
+            // ALWAYS prevent default Tab behavior when in search input
+            e.preventDefault();
+
+            if (hasActiveSuggestions) {
+                // If nothing selected, default to the first item
+                let targetIndex = this.selectedIndex;
+                if (targetIndex < 0 && this.currentSuggestions.length > 0) {
+                    targetIndex = 0;
+                }
+
+                if (targetIndex >= 0 && targetIndex < this.currentSuggestions.length) {
+                    const suggestion = this.currentSuggestions[targetIndex];
+                    if (suggestion) {
+                        this.addChipFromAutocomplete(suggestion.tag, suggestion.category);
+                    }
+                }
             }
             return;
         }
