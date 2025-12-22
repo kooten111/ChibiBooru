@@ -117,8 +117,12 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your settings (set APP_PASSWORD, SECRET_KEY, RELOAD_SECRET)
 
-# Run
+# Run (production mode with multiple workers and monitor service)
+./start_booru.sh
+
+# Or run in development mode (single worker, no monitor)
 python app.py
+
 # Visit http://127.0.0.1:5000
 ```
 
@@ -273,8 +277,13 @@ Images dropped here will be automatically detected, processed, and moved to the 
 
 1. **Start the application:**
    ```bash
+   ./start_booru.sh
+   # This starts both the web server (with multiple workers) and the monitor service
+   ```
+   
+   For development (single worker, no monitor):
+   ```bash
    python app.py
-   # Or use: ./start_uvicorn.sh
    ```
 
 2. **Open the web interface** at `http://127.0.0.1:5000`
@@ -288,7 +297,16 @@ Images dropped here will be automatically detected, processed, and moved to the 
    - This fetches metadata for all images (may take time for large collections)
    - Progress is shown in real-time
 
-6. **Optional: Start the Monitor** to automatically process new images added to `static/images/` or `ingest/`
+6. **Automatic Monitoring:** When using `./start_booru.sh`, the monitor service runs automatically in a separate process, watching for new images in `static/images/` and `ingest/` folders.
+
+### Architecture Note
+
+ChibiBooru uses a **two-process architecture** for production deployment:
+
+- **Web Workers (uvicorn):** Handle HTTP requests with multiple workers for scalability (default: 4 workers)
+- **Monitor Service (standalone):** Single background process that watches for new files and processes them automatically
+
+This design ensures only one monitor runs regardless of how many web workers are active, preventing duplicate processing and resource waste. Both processes start together via `./start_booru.sh` and shut down gracefully on Ctrl+C.
 
 ### Searching Images
 
