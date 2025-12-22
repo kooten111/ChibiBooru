@@ -2,8 +2,7 @@
 import threading
 import time
 import os
-import multiprocessing
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from database import models
 from services import processing_service as processing
 from watchdog.observers import Observer
@@ -12,7 +11,7 @@ from watchdog.events import FileSystemEventHandler
 # --- Shared Monitor State ---
 monitor_thread = None
 observer = None
-ingest_executor = None  # Global ProcessPoolExecutor
+ingest_executor = None  # Global ThreadPoolExecutor (changed from ProcessPoolExecutor)
 monitor_status = {
     "running": False,
     "last_check": None,
@@ -44,7 +43,6 @@ class ImageFileHandler(FileSystemEventHandler):
 
     def __init__(self, watch_ingest=False):
         super().__init__()
-        # self.processing_lock = threading.Lock() # No longer needed for parallel submission
         # Debounce: track recently processed files to avoid duplicates
         self.recently_processed = {}
         self.debounce_seconds = 2
@@ -68,13 +66,10 @@ class ImageFileHandler(FileSystemEventHandler):
         self.recently_processed[filepath] = now
         return True
         
-    def handle_ingest_completion(self, future, is_from_ingest, filename):
-        """Callback for when ingest analysis completes."""
+    def handle_file_completion(self, future, is_from_ingest, filename):
+        """Callback for when file processing completes."""
         try:
-            result = future.result()
-            
-            # Commit results in this thread (callback thread)
-            success = processing.commit_image_ingest(result, move_from_ingest=is_from_ingest)
+            success = future.result()
             
             if success:
                 monitor_status["last_scan_found"] = 1
@@ -83,7 +78,9 @@ class ImageFileHandler(FileSystemEventHandler):
                 monitor_status["last_activity"] = time.time()
                 add_log(f"Successfully processed: {filename}", 'success')
             else:
-                add_log(f"Skipped/Failed: {filename}", 'warning')
+                # Success = False could mean duplicate or error
+                # The processing function already logs the specific reason
+                pass
                 
         except Exception as e:
             add_log(f"Error processing {filename}: {e}", 'error')
@@ -117,14 +114,14 @@ class ImageFileHandler(FileSystemEventHandler):
             if rel_path in models.get_all_filepaths():
                 return
 
-        add_log(f"Detected {filename}, queuing for analysis...", 'info')
+        add_log(f"Detected {filename}, queuing for processing...", 'info')
         
-        # Submit to global executor
+        # Submit to global executor with unified processing function
         if ingest_executor:
-            future = ingest_executor.submit(processing.analyze_image_for_ingest, filepath)
+            future = ingest_executor.submit(processing.process_image_file, filepath, is_from_ingest)
             # Use partial to pass extra args to callback
             from functools import partial
-            future.add_done_callback(partial(self.handle_ingest_completion, is_from_ingest=is_from_ingest, filename=filename))
+            future.add_done_callback(partial(self.handle_file_completion, is_from_ingest=is_from_ingest, filename=filename))
         else:
             add_log("Executor not ready, skipping processing.", 'error')
 
@@ -205,42 +202,40 @@ def run_scan():
         add_log("No new images found.")
         return 0
 
-    add_log(f"Found {len(unprocessed_files)} new images. Starting parallel analysis...", 'info')
+    add_log(f"Found {len(unprocessed_files)} new images. Starting parallel processing...", 'info')
     
     # Store futures to track batch completion
     futures = {}
     
     if not ingest_executor:
         add_log("Executor died? Restarting...", 'error')
-        # Should not happen if start_monitor called
         return 0
 
-    # Submit batches
-    for f in unprocessed_files:
-        future = ingest_executor.submit(processing.analyze_image_for_ingest, f)
-        futures[future] = f
+    # Submit all files for processing
+    for filepath in unprocessed_files:
+        # Determine if from ingest folder
+        abs_filepath = os.path.abspath(filepath)
+        abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+        is_from_ingest = abs_filepath.startswith(abs_ingest)
+        
+        future = ingest_executor.submit(processing.process_image_file, filepath, is_from_ingest)
+        futures[future] = filepath
 
     processed_count = 0
     from concurrent.futures import as_completed
     
     for future in as_completed(futures):
-        f = futures[future]
+        filepath = futures[future]
         try:
-            result = future.result()
+            success = future.result()
             
-            # Determine logic for commit
-            abs_filepath = os.path.abspath(f)
-            abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
-            is_from_ingest = abs_filepath.startswith(abs_ingest)
-            
-            if processing.commit_image_ingest(result, move_from_ingest=is_from_ingest):
+            if success:
                 processed_count += 1
-                add_log(f"Successfully processed: {os.path.basename(f)}", 'success')
-            else:
-                 add_log(f"Skipped/Duplicate: {os.path.basename(f)}", 'warning')
-                 
+                add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
+            # If not success, the processing function already logged the reason (duplicate, error, etc.)
+                  
         except Exception as e:
-            add_log(f"Error processing {os.path.basename(f)}: {e}", 'error')
+            add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
 
     # For bulk operations, full reload is acceptable
     if processed_count > 0:
@@ -272,34 +267,31 @@ def monitor_loop():
 # --- Control Functions ---
 
 def start_monitor():
-    """Starts the background monitoring thread with watchdog and parallel executor."""
+    """Starts the background monitoring thread with watchdog and ThreadPoolExecutor."""
     global monitor_thread, observer, ingest_executor
     import config
-    from services import similarity_service # Needed for worker init
 
     if monitor_status["running"]:
         return False
 
     monitor_status["running"] = True
     
-    # Initialize Executor
+    # Initialize ThreadPoolExecutor (changed from ProcessPoolExecutor)
     try:
         max_workers = config.MAX_WORKERS
     except AttributeError:
         max_workers = 4 # Fallback if config is missing
         
     if max_workers <= 0:
+        import multiprocessing
         cpu_count = multiprocessing.cpu_count()
         max_workers = max(1, cpu_count - 1)
         
-    add_log(f"Starting Ingest Executor with {max_workers} workers...", 'info')
+    add_log(f"Starting ThreadPoolExecutor with {max_workers} workers...", 'info')
 
-    # Use Semantic Init if available
-    init_func = None
-    if getattr(similarity_service, '_init_worker', None):
-        init_func = similarity_service._init_worker
-        
-    ingest_executor = ProcessPoolExecutor(max_workers=max_workers, initializer=init_func)
+    # ThreadPoolExecutor doesn't need special initializer for semantic engine
+    # since all threads share the same memory space
+    ingest_executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="IngestWorker")
 
     if monitor_status["mode"] == "watchdog":
         # Use watchdog for real-time filesystem monitoring
@@ -358,7 +350,12 @@ def initial_scan_then_idle():
         time.sleep(1)
 
 def stop_monitor():
-    """Stops the background monitoring thread and executor."""
+    """
+    Stops the background monitoring thread and executor with proper cleanup.
+    
+    Note: This function blocks until all active tasks complete. If tasks are stuck,
+    the application may hang. In production, consider monitoring this with a watchdog.
+    """
     global observer, ingest_executor
 
     if not monitor_status["running"]:
@@ -367,22 +364,33 @@ def stop_monitor():
     monitor_status["running"] = False
     add_log("Stopping background monitor...")
 
+    # Stop watchdog observer first
     if observer:
         try:
             observer.stop()
-            observer.join(timeout=2)
+            observer.join(timeout=5)
             add_log("Watchdog observer stopped.")
         except Exception as e:
             add_log(f"Error stopping observer: {e}", 'error')
         observer = None
-        
+    
+    # Shutdown executor with proper wait
     if ingest_executor:
-        add_log("Shutting down executor...")
+        add_log("Shutting down executor (waiting for active tasks)...")
         try:
-            ingest_executor.shutdown(wait=False)
-            add_log("Executor shutdown.")
+            # Shutdown with wait=True to allow current tasks to complete
+            # Note: This blocks until tasks finish. Tasks should be designed to complete quickly.
+            # ThreadPoolExecutor.shutdown(timeout=...) requires Python 3.9+
+            # For compatibility, we use wait=True without timeout parameter
+            ingest_executor.shutdown(wait=True)
+            add_log("Executor shutdown complete.")
         except Exception as e:
-             add_log(f"Error stopping executor: {e}", 'error')
+            add_log(f"Error stopping executor: {e}", 'error')
+            # Try force shutdown on error
+            try:
+                ingest_executor.shutdown(wait=False)
+            except:
+                pass
         ingest_executor = None
 
     return True
