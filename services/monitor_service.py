@@ -350,7 +350,12 @@ def initial_scan_then_idle():
         time.sleep(1)
 
 def stop_monitor():
-    """Stops the background monitoring thread and executor with proper cleanup."""
+    """
+    Stops the background monitoring thread and executor with proper cleanup.
+    
+    Note: This function blocks until all active tasks complete. If tasks are stuck,
+    the application may hang. In production, consider monitoring this with a watchdog.
+    """
     global observer, ingest_executor
 
     if not monitor_status["running"]:
@@ -374,7 +379,8 @@ def stop_monitor():
         add_log("Shutting down executor (waiting for active tasks)...")
         try:
             # Shutdown with wait=True to allow current tasks to complete
-            # Note: ThreadPoolExecutor.shutdown(timeout=...) requires Python 3.9+
+            # Note: This blocks until tasks finish. Tasks should be designed to complete quickly.
+            # ThreadPoolExecutor.shutdown(timeout=...) requires Python 3.9+
             # For compatibility, we use wait=True without timeout parameter
             ingest_executor.shutdown(wait=True)
             add_log("Executor shutdown complete.")

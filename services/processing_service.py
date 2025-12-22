@@ -1373,4 +1373,19 @@ def process_image_file(filepath, move_from_ingest=True):
     finally:
         release_processing_lock(lock_fd)
 
-# Old split architecture removed - now using unified process_image_file() function above
+###############################################################################
+# LEGACY ARCHITECTURE REMOVED
+###############################################################################
+# The old split-phase architecture with analyze_image_for_ingest() and 
+# commit_image_ingest() has been consolidated into the unified process_image_file()
+# function above. This eliminates the complexity of coordinating analysis and commit
+# phases across process boundaries, and allows all hashes to be computed in a single
+# pass during ingest.
+#
+# Key improvements in the unified approach:
+# - Single MD5 check with lock (prevents duplicates)
+# - All hashes computed before DB insert (no re-computation needed)
+# - Single transaction for all database operations
+# - Better error handling and cleanup
+# - Compatible with ThreadPoolExecutor for I/O-bound tasks
+###############################################################################

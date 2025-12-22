@@ -1033,7 +1033,7 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
     
     # Use ThreadPoolExecutor for all hash computation
     # This avoids the overhead of ProcessPoolExecutor and works better with I/O-bound tasks
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="HashGen") as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="IngestWorker") as executor:
 
         while True:
             # Fetch candidates that need hashes
