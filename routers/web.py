@@ -254,28 +254,109 @@ async def show_image(filepath):
         "meta": [(t, tag_counts.get(t, 0)) for t in meta_with_rating if t],
     }
 
-    # Get similar images - use blended visual+tag similarity if enabled
-    if config.VISUAL_SIMILARITY_ENABLED:
-        from services import similarity_service
-        similar_images = similarity_service.find_blended_similar(
-            lookup_path,
-            visual_weight=config.VISUAL_SIMILARITY_WEIGHT,
-            tag_weight=config.TAG_SIMILARITY_WEIGHT,
-            visual_threshold=config.VISUAL_SIMILARITY_THRESHOLD,
-        )
-    else:
-        similar_images = query_service.find_related_by_tags(filepath)
-    
+    # Fetch family images first to exclude them from similarity results
     parent_child_images = models.get_related_images(data.get('post_id'), data.get('parent_id'))
-
-    # Add a 'match_type' to parent/child images and get their paths for deduplication
     parent_child_paths = set()
     for img in parent_child_images:
         img['match_type'] = img['type'] # 'parent' or 'child'
         img['thumb'] = get_thumbnail_path(img['path'])
         parent_child_paths.add(img['path'])
 
+    # Get similar images - use mix of visual and tag-based if enabled
+    if config.VISUAL_SIMILARITY_ENABLED:
+        from services import similarity_service
+        
+        # Calculate split based on configured weights (total 40)
+        total_slots = 40
+        total_weight = config.VISUAL_SIMILARITY_WEIGHT + config.TAG_SIMILARITY_WEIGHT
+        
+        # Avoid division by zero
+        if total_weight <= 0:
+            v_weight_norm = 0.5
+            t_weight_norm = 0.5
+        else:
+            v_weight_norm = config.VISUAL_SIMILARITY_WEIGHT / total_weight
+            t_weight_norm = config.TAG_SIMILARITY_WEIGHT / total_weight
+            
+        visual_limit = int(total_slots * v_weight_norm)
+        tag_limit = total_slots - visual_limit # Assign remainder to tags
+        
+        # 1. Fetch Visual/Semantic matches (Fetch extra to account for filtering)
+        visual_candidates = []
+        
+        # Try semantic first if enabled and available
+        if config.ENABLE_SEMANTIC_SIMILARITY and similarity_service.SEMANTIC_AVAILABLE and visual_limit > 0:
+            visual_candidates = similarity_service.find_semantic_similar(lookup_path, limit=visual_limit * 2) 
+        
+        # Filter out self-match and family from semantic results
+        visual_candidates = [
+            c for c in visual_candidates 
+            if c['path'] != f"images/{lookup_path}" and c['path'] not in parent_child_paths
+        ]
+
+        # Fallback or supplement with visual hash if semantic didn't return enough (or was disabled)
+        if len(visual_candidates) < visual_limit and visual_limit > 0:
+            remaining = visual_limit - len(visual_candidates)
+            hash_candidates = similarity_service.find_similar_images(
+                lookup_path, 
+                threshold=config.VISUAL_SIMILARITY_THRESHOLD, 
+                limit=remaining + 20, # Fetch extra for filtering
+                exclude_family=True
+            )
+            # Add non-duplicate hash candidates
+            existing_paths = {c['path'] for c in visual_candidates}
+            for hc in hash_candidates:
+                if (hc['path'] not in existing_paths 
+                    and hc['path'] != f"images/{lookup_path}" 
+                    and hc['path'] not in parent_child_paths):
+                    
+                    visual_candidates.append(hc)
+            
+        # Trim to target limit
+        visual_candidates = visual_candidates[:visual_limit]
+
+        # 2. Fetch Tag matches (Fetch extra to account for filtering)
+        if tag_limit > 0:
+            tag_candidates = query_service.find_related_by_tags(filepath, limit=tag_limit * 2)
+            # Filter out self-match and family
+            tag_candidates = [
+                c for c in tag_candidates 
+                if c['path'] != f"images/{lookup_path}" and c['path'] not in parent_child_paths
+            ]
+            tag_candidates = tag_candidates[:tag_limit]
+        else:
+            tag_candidates = []
+        
+        # 3. Interleave them (Visual, Tag, Visual, Tag...)
+        mixed_related = []
+        max_len = max(len(visual_candidates), len(tag_candidates))
+        
+        param_seen_paths = set()
+        
+        for i in range(max_len):
+            # Add visual match
+            if i < len(visual_candidates):
+                item = visual_candidates[i]
+                if item['path'] not in param_seen_paths:
+                    mixed_related.append(item)
+                    param_seen_paths.add(item['path'])
+            
+            # Add tag match
+            if i < len(tag_candidates):
+                item = tag_candidates[i]
+                if item['path'] not in param_seen_paths:
+                    # ensure consistent structure
+                    if 'similarity' not in item:
+                        item['similarity'] = item.get('score', 0) # Fallback for tag results
+                    mixed_related.append(item)
+                    param_seen_paths.add(item['path'])
+                    
+        similar_images = mixed_related
+    else:
+        similar_images = query_service.find_related_by_tags(filepath, limit=40)
+    
     # Filter similar images to remove any that are already in the parent/child list
+    # (Note: we already filtered them from 'mixed' lists above, but 'filtered_similar' variable is used for combination)
     filtered_similar = [img for img in similar_images if img['path'] not in parent_child_paths]
 
     # Combine the lists, parents/children first

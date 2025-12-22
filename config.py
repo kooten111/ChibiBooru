@@ -193,6 +193,11 @@ TAG_SIMILARITY_WEIGHT = float(os.environ.get('TAG_SIMILARITY_WEIGHT', 0.7))
 # 0-5: Near identical, 6-10: Very similar, 11-15: Somewhat similar
 VISUAL_SIMILARITY_THRESHOLD = int(os.environ.get('VISUAL_SIMILARITY_THRESHOLD', 15))
 
+# Enable semantic (vector-based) similarity
+# This requires significant RAM and CPU. Disable for weaker machines.
+# If False, visual similarity will rely only on fast pHash/ColorHash.
+ENABLE_SEMANTIC_SIMILARITY = os.environ.get('ENABLE_SEMANTIC_SIMILARITY', 'true').lower() in ('true', '1', 'yes')
+
 # ==================== FILE TYPES ====================
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')
