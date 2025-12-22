@@ -128,6 +128,7 @@ def main():
             logger.error("✗ Failed to start monitor service (may already be running)")
             return 1
         
+        write_pid_file()
         logger.info("Monitor runner is now active")
         logger.info("Press Ctrl+C to stop, or kill the main app to auto-shutdown")
         
@@ -157,14 +158,40 @@ def main():
             logger.warning("⚠ Monitor service was not running")
         
         logger.info("Monitor runner shutdown complete")
+        remove_pid_file()
         return 0
         
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received")
+        remove_pid_file()
         return 0
     except Exception as e:
         logger.error(f"Fatal error in monitor runner: {e}", exc_info=True)
+        remove_pid_file()
         return 1
+
+def write_pid_file():
+    """Write the current PID to a file."""
+    try:
+        pid = os.getpid()
+        with open("monitor.pid", "w") as f:
+            f.write(str(pid))
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to write PID file: {e}")
+        else:
+            print(f"Failed to write PID file: {e}")
+
+def remove_pid_file():
+    """Remove the PID file."""
+    try:
+        if os.path.exists("monitor.pid"):
+            os.remove("monitor.pid")
+    except Exception as e:
+        if logger:
+            logger.error(f"Failed to remove PID file: {e}")
+        else:
+            print(f"Failed to remove PID file: {e}")
 
 if __name__ == '__main__':
     sys.exit(main())

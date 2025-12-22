@@ -24,17 +24,90 @@ monitor_status = {
     "last_activity": 0
 }
 
+LOG_FILE = "monitor.logs"
+
+def check_external_monitor():
+    """Check if the external monitor process is running via PID file."""
+    try:
+        import psutil
+        if os.path.exists("monitor.pid"):
+            with open("monitor.pid", "r") as f:
+                pid = int(f.read().strip())
+            
+            if psutil.pid_exists(pid):
+                # Verify it's actually our python process
+                try:
+                    proc = psutil.Process(pid)
+                    if 'python' in proc.name().lower():
+                        return True
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
+            
+            # If we get here, PID file exists but process doesn't (stale)
+            # Optional: could clean it up here, but maybe safer to let runner handle it
+            pass
+    except Exception:
+        pass
+    return False
+
 def get_status():
     """Return the current status of the monitor."""
+    # Check external monitor status if not running locally
+    if not monitor_status["running"]:
+        if check_external_monitor():
+             monitor_status["running"] = True
+             monitor_status["mode"] = "external"
+    
+    # If we think it's running but it died, update
+    elif monitor_status["mode"] == "external":
+        if not check_external_monitor():
+            monitor_status["running"] = False
+            monitor_status["mode"] = "watchdog" # Reset to default
+
+    # Always try to load latest logs from file
+    try:
+        if os.path.exists(LOG_FILE):
+            import json
+            with open(LOG_FILE, 'r') as f:
+                monitor_status['logs'] = json.load(f)
+    except Exception:
+        pass
+            
     return monitor_status
 
 def add_log(message, type='info'):
-    """Adds a log entry to the monitor status."""
+    """Adds a log entry to the monitor status and persistent file."""
+    import json
+    
     log_entry = {'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"), 'message': message, 'type': type}
-    monitor_status['logs'].insert(0, log_entry)
-    # Keep the log size manageable
-    if len(monitor_status['logs']) > 100:
-        monitor_status['logs'] = monitor_status['logs'][:100]
+    
+    # Load existing logs from file first to ensure we have the latest state
+    current_logs = []
+    try:
+        if os.path.exists(LOG_FILE):
+             with open(LOG_FILE, 'r') as f:
+                content = f.read().strip()
+                if content:
+                    current_logs = json.loads(content)
+    except Exception as e:
+        print(f"Error reading log file: {e}")
+        
+    # Insert new log at start
+    current_logs.insert(0, log_entry)
+    
+    # Keep size manageable
+    if len(current_logs) > 100:
+        current_logs = current_logs[:100]
+        
+    # Write back to file
+    try:
+        with open(LOG_FILE, 'w') as f:
+            json.dump(current_logs, f)
+    except Exception as e:
+        print(f"Error writing log file: {e}")
+
+    # Update memory
+    monitor_status['logs'] = current_logs
 
 # --- Watchdog Event Handler ---
 
@@ -360,6 +433,23 @@ def stop_monitor():
 
     if not monitor_status["running"]:
         return False
+        
+    # Handle external monitor stop
+    if monitor_status.get("mode") == "external":
+        try:
+            if os.path.exists("monitor.pid"):
+                with open("monitor.pid", "r") as f:
+                    pid = int(f.read().strip())
+                
+                import psutil
+                if psutil.pid_exists(pid):
+                    os.kill(pid, 15) # SIGTERM
+                    add_log("Sent stop signal to external monitor.")
+                    monitor_status["running"] = False
+                    return True
+        except Exception as e:
+            add_log(f"Error stopping external monitor: {e}", 'error')
+            return False
 
     monitor_status["running"] = False
     add_log("Stopping background monitor...")

@@ -13,6 +13,8 @@ import config
 from database import get_db_connection
 from utils.file_utils import get_thumbnail_path
 from services import similarity_db
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Optional dependencies for Semantic Similarity
 try:
@@ -1128,7 +1130,12 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
                         failed_ids.add(result['id'])
                     
                     if result.get('errors'):
-                         print(f"[Similarity] Error processing {result['filepath']}: {result['errors'][0]}")
+                         error_msg = result['errors'][0]
+                         if "File not found" in error_msg:
+                             # Warning level for missing files (clean_orphans should run)
+                             print(f"[Similarity] Warning: {result['filepath']} - {error_msg}")
+                         else:
+                             print(f"[Similarity] Error processing {result['filepath']}: {error_msg}")
 
                     if progress_callback:
                         progress_callback(total_stats['processed'], total_stats['total'])

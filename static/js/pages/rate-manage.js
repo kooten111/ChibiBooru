@@ -64,16 +64,16 @@ async function loadStats() {
 function updateDistribution(distribution) {
     const grid = document.getElementById('distributionGrid');
     const ratings = [
-        {key: 'rating:general', label: 'General', color: '#4ade80'},
-        {key: 'rating:sensitive', label: 'Sensitive', color: '#60a5fa'},
-        {key: 'rating:questionable', label: 'Questionable', color: '#fb923c'},
-        {key: 'rating:explicit', label: 'Explicit', color: '#f87171'}
+        { key: 'rating:general', label: 'General', color: '#4ade80' },
+        { key: 'rating:sensitive', label: 'Sensitive', color: '#60a5fa' },
+        { key: 'rating:questionable', label: 'Questionable', color: '#fb923c' },
+        { key: 'rating:explicit', label: 'Explicit', color: '#f87171' }
     ];
 
     const maxCount = Math.max(...ratings.map(r => distribution[r.key]?.total || 0));
 
     grid.innerHTML = ratings.map(rating => {
-        const data = distribution[rating.key] || {total: 0, ai: 0, user: 0, original: 0};
+        const data = distribution[rating.key] || { total: 0, ai: 0, user: 0, original: 0 };
         const percentage = maxCount > 0 ? (data.total / maxCount) * 100 : 0;
 
         return `
@@ -97,16 +97,16 @@ function updateConfig(config) {
     const grid = document.getElementById('configGrid');
 
     const configItems = [
-        {key: 'threshold_general', label: 'General Threshold', min: 0, max: 1, step: 0.05},
-        {key: 'threshold_sensitive', label: 'Sensitive Threshold', min: 0, max: 1, step: 0.05},
-        {key: 'threshold_questionable', label: 'Questionable Threshold', min: 0, max: 1, step: 0.05},
-        {key: 'threshold_explicit', label: 'Explicit Threshold', min: 0, max: 1, step: 0.05},
-        {key: 'min_confidence', label: 'Min Confidence', min: 0, max: 1, step: 0.05},
-        {key: 'pair_weight_multiplier', label: 'Pair Weight Multiplier', min: 0.5, max: 3, step: 0.1},
-        {key: 'min_training_samples', label: 'Min Training Samples', min: 10, max: 200, step: 10},
-        {key: 'min_pair_cooccurrence', label: 'Min Pair Co-occurrence', min: 2, max: 20, step: 1},
-        {key: 'min_tag_frequency', label: 'Min Tag Frequency', min: 5, max: 50, step: 5},
-        {key: 'max_pair_count', label: 'Max Tag Pairs', min: 5000, max: 200000, step: 5000},
+        { key: 'threshold_general', label: 'General Threshold', min: 0, max: 1, step: 0.05 },
+        { key: 'threshold_sensitive', label: 'Sensitive Threshold', min: 0, max: 1, step: 0.05 },
+        { key: 'threshold_questionable', label: 'Questionable Threshold', min: 0, max: 1, step: 0.05 },
+        { key: 'threshold_explicit', label: 'Explicit Threshold', min: 0, max: 1, step: 0.05 },
+        { key: 'min_confidence', label: 'Min Confidence', min: 0, max: 1, step: 0.05 },
+        { key: 'pair_weight_multiplier', label: 'Pair Weight Multiplier', min: 0.5, max: 3, step: 0.1 },
+        { key: 'min_training_samples', label: 'Min Training Samples', min: 10, max: 200, step: 10 },
+        { key: 'min_pair_cooccurrence', label: 'Min Pair Co-occurrence', min: 2, max: 20, step: 1 },
+        { key: 'min_tag_frequency', label: 'Min Tag Frequency', min: 5, max: 50, step: 5 },
+        { key: 'max_pair_count', label: 'Max Tag Pairs', min: 5000, max: 200000, step: 5000 },
     ];
 
     grid.innerHTML = configItems.map(item => {
@@ -129,7 +129,7 @@ async function trainModel() {
         try {
             const response = await fetch('/api/rate/train', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
             });
             const result = await response.json();
@@ -161,7 +161,7 @@ async function inferRatings() {
         try {
             const response = await fetch('/api/rate/infer', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
             });
             const result = await response.json();
@@ -193,7 +193,7 @@ async function clearAI() {
         try {
             const response = await fetch('/api/rate/clear_ai', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
             });
             const result = await response.json();
@@ -224,7 +224,7 @@ async function retrainAll() {
         try {
             const response = await fetch('/api/rate/retrain_all', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
             });
             const result = await response.json();
@@ -264,7 +264,7 @@ async function saveConfig() {
     try {
         const response = await fetch('/api/rate/config', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(configData)
         });
 
@@ -318,8 +318,8 @@ async function loadImages() {
 
             const ratingLabel = rating === 'unrated' ? 'Unrated' : rating.replace('rating:', '').toUpperCase();
             const sourceLabel = img.rating_source === 'ai_inference' ? '🤖 AI' :
-                               img.rating_source === 'user' ? '👤 User' :
-                               img.rating_source === 'original' ? '📦 Original' : '';
+                img.rating_source === 'user' ? '👤 User' :
+                    img.rating_source === 'original' ? '📦 Original' : '';
 
             // URL encode paths for special characters
             const encodedFilepath = urlEncodePath(img.filepath);
@@ -398,4 +398,4 @@ loadStats();
 loadImages();
 
 // Auto-refresh stats every 30 seconds
-setInterval(loadStats, 30000);
+setInterval(loadStats, 2000);

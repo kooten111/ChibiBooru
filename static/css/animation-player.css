@@ -235,26 +235,27 @@
         padding: 20px 12px 12px;
         gap: 8px;
     }
-    
+
     .animation-toolbar {
         gap: 8px;
     }
-    
+
     .animation-play-btn {
         width: 36px;
         height: 36px;
         font-size: 16px;
     }
-    
+
     .animation-fps-control {
-        display: none;  /* Hide on mobile for simplicity */
+        display: none;
+        /* Hide on mobile for simplicity */
     }
-    
+
     .animation-frame-info {
         font-size: 12px;
         min-width: 60px;
     }
-    
+
     .animation-prev-btn,
     .animation-next-btn {
         width: 28px;
@@ -264,7 +265,7 @@
 }
 
 /* Fullscreen mode adjustments */
-body.focus-mode .animation-controls {
+body:is(.focus-mode, .ui-hidden) .animation-controls {
     opacity: 1;
     background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
 }
