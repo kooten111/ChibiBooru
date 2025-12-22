@@ -24,58 +24,9 @@
 
 /* ============================================================================
    COMPACT HEADER FOR GALLERY PAGE
-   Based on prototype: smaller height, compact mascot, inline controls
+   Note: Core compact header styles are now in components.css for all pages.
+   Gallery-specific overrides only below.
    ============================================================================ */
-
-.gallery-page .header {
-    padding: 8px var(--spacing-lg);
-    min-height: auto;
-}
-
-.gallery-page .header-content {
-    gap: var(--spacing-md);
-}
-
-.gallery-page .header h1 {
-    font-size: 1.25rem;
-}
-
-.gallery-page .header-mascot {
-    height: 40px;
-    left: 100px;
-    top: -2px;
-}
-
-.gallery-page .search-bar {
-    max-width: 500px;
-}
-
-.gallery-page .search-bar input,
-.gallery-page .chip-input-wrapper {
-    min-height: 36px;
-    max-height: 36px;
-    padding: 6px 12px;
-    font-size: var(--font-size-sm);
-}
-
-.gallery-page .search-bar button,
-.gallery-page .search-submit {
-    padding: 6px 16px;
-    font-size: var(--font-size-sm);
-}
-
-/* Stats tabs bar - more compact, matching header style */
-.gallery-page .stats-tabs-bar {
-    padding: 0 var(--spacing-lg);
-    gap: 2px;
-}
-
-.gallery-page .stat-tab-button {
-    padding: 8px 12px;
-    font-size: var(--font-size-xs);
-    background: transparent;
-    border-radius: var(--radius-sm);
-}
 
 /* Chips visible in search bar */
 .gallery-page .chip-input-chips {

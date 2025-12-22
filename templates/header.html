@@ -27,9 +27,10 @@
                     <button class="grid-size-btn" data-size="large" title="Large thumbnails">L</button>
                 </div>
                 <button class="header-btn" id="sidebarToggle" title="Toggle filters">◧</button>
-                <a href="#" class="header-btn" id="randomBtn" title="Random image (coming soon)"
-                    style="opacity: 0.5; cursor: not-allowed;">🎲</a>
             </div>
+            {% else %}
+            <!-- Empty spacer to maintain consistent header grid layout -->
+            <div class="header-controls-spacer"></div>
             {% endif %}
 
             <button id="tabs-toggle-button" class="tabs-toggle-button">

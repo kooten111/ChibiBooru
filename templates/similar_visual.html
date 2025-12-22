@@ -19,28 +19,6 @@
             background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
         }
 
-        .similarity-header {
-            flex-shrink: 0;
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid var(--border-color);
-            background: var(--bg-panel-dark);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .similarity-header h1 {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin: 0;
-        }
-
-        .similarity-header a {
-            color: var(--primary-blue);
-            text-decoration: none;
-        }
-
         .similarity-content {
             flex: 1;
             display: flex;
@@ -833,16 +811,7 @@
 </head>
 
 <body class="similarity-page">
-    <!-- Header -->
-    <div class="similarity-header">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-            style="color: var(--primary-blue);">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.3-4.3"></path>
-        </svg>
-        <h1><a href="/">{{ app_name }}</a> / Similarity Search</h1>
-    </div>
+    {% include 'header.html' %}
 
     <!-- Main Content -->
     <div class="similarity-content">
@@ -1544,6 +1513,9 @@
         updateUI();
         fetchResults();
     </script>
+    <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
 </body>
 
 </html>

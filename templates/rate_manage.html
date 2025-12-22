@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Rating Management - {{ app_name }}</title>
@@ -7,9 +8,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/rating.css') + '?v=2' }}">
 </head>
+
 <body>
+    {% include 'header.html' %}
+
     <div class="loading-overlay" id="loadingOverlay">
         <div class="loading-content">
             <div class="loading-spinner">⏳</div>
@@ -18,8 +23,6 @@
     </div>
 
     <div class="rate-container">
-        <a href="{{ url_for('main.home') }}" class="back-link">← Back to Home</a>
-
         <div class="page-header">
             <h1>Rating Management</h1>
             <p>Train and manage the automatic rating inference system</p>
@@ -108,7 +111,8 @@
             <div style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center;">
                 <div>
                     <label for="imageFilter" style="margin-right: 10px;">Filter:</label>
-                    <select id="imageFilter" onchange="loadImages()" style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel);">
+                    <select id="imageFilter" onchange="loadImages()"
+                        style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel);">
                         <option value="ai_predicted">🤖 AI-Inferred Only</option>
                         <option value="unrated">❓ Unrated Only</option>
                         <option value="all">📋 All Images</option>
@@ -116,8 +120,8 @@
                 </div>
                 <div>
                     <label for="imageLimit" style="margin-right: 10px;">Limit:</label>
-                    <input type="number" id="imageLimit" value="50" min="10" max="500" step="10"
-                           onchange="loadImages()" style="width: 80px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel);">
+                    <input type="number" id="imageLimit" value="50" min="10" max="500" step="10" onchange="loadImages()"
+                        style="width: 80px; padding: 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-panel);">
                 </div>
                 <button onclick="loadImages()" class="action-btn action-btn-primary">
                     🔄 Refresh
@@ -127,7 +131,8 @@
                 </div>
             </div>
 
-            <div id="imagesContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+            <div id="imagesContainer"
+                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
                 <!-- Will be populated by JavaScript -->
             </div>
         </div>
@@ -135,10 +140,14 @@
 
 
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/rate-manage.js') }}"></script>
     <script type="module">
         import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
         window.showNotification = showNotification;
     </script>
 </body>
+
 </html>

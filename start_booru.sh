@@ -22,10 +22,31 @@ echo "=========================================="
 
 # Function to cleanup on exit
 cleanup() {
-    if [ -n "$MONITOR_PID" ] && kill -0 $MONITOR_PID 2>/dev/null; then
+    # Avoid double cleanup
+    if [ -z "$MONITOR_PID" ]; then
+        return
+    fi
+    
+    local pid=$MONITOR_PID
+    MONITOR_PID=""  # Clear immediately to prevent double cleanup
+    
+    if kill -0 $pid 2>/dev/null; then
         echo "Stopping monitor..."
-        kill $MONITOR_PID 2>/dev/null
-        wait $MONITOR_PID 2>/dev/null
+        kill $pid 2>/dev/null
+        
+        # Wait with timeout (max 5 seconds)
+        local count=0
+        while kill -0 $pid 2>/dev/null && [ $count -lt 50 ]; do
+            sleep 0.1
+            count=$((count + 1))
+        done
+        
+        # Force kill if still running
+        if kill -0 $pid 2>/dev/null; then
+            echo "Force killing monitor..."
+            kill -9 $pid 2>/dev/null
+        fi
+        
         echo "✓ Monitor stopped"
     fi
 }
@@ -37,8 +58,8 @@ MONITOR_PID=$!
 echo "✓ Monitor started (PID: $MONITOR_PID)"
 
 # Trap to ensure monitor is killed when script exits
-# This handles Ctrl+C, script termination, or any exit
-trap cleanup INT TERM EXIT
+# Use only INT and TERM (not EXIT) to avoid double cleanup on Ctrl+C
+trap 'cleanup; exit 0' INT TERM
 
 # Give monitor a moment to initialize
 sleep 2
