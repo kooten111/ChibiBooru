@@ -22,10 +22,12 @@ echo "=========================================="
 
 # Function to cleanup on exit
 cleanup() {
-    echo "Stopping monitor..."
-    kill $MONITOR_PID 2>/dev/null
-    wait $MONITOR_PID 2>/dev/null
-    echo "✓ Monitor stopped"
+    if [ -n "$MONITOR_PID" ] && kill -0 $MONITOR_PID 2>/dev/null; then
+        echo "Stopping monitor..."
+        kill $MONITOR_PID 2>/dev/null
+        wait $MONITOR_PID 2>/dev/null
+        echo "✓ Monitor stopped"
+    fi
 }
 
 # Start monitor in background (standalone process)

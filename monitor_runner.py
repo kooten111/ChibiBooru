@@ -32,12 +32,18 @@ import config
 # Global flag for graceful shutdown
 shutdown_requested = False
 
+# Initialize logger at module level for use in signal handlers
+logger = None
+
 def signal_handler(signum, frame):
     """Handle shutdown signals (SIGINT, SIGTERM)."""
     global shutdown_requested
-    logger = get_logger('MonitorRunner')
-    logger.info(f"Received signal {signum}, initiating graceful shutdown...")
     shutdown_requested = True
+    # Use module-level logger with fallback
+    if logger:
+        logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+    else:
+        print(f"Received signal {signum}, initiating graceful shutdown...")
 
 def is_main_app_running():
     """
@@ -71,7 +77,7 @@ def is_main_app_running():
 
 def main():
     """Main entry point for the monitor runner."""
-    global shutdown_requested
+    global shutdown_requested, logger
     
     # Initialize logging
     log_level = getattr(config, 'LOG_LEVEL', 'INFO')
