@@ -70,17 +70,6 @@ async def tag_categorize():
     return await render_template('tag_categorize.html', app_name=config.APP_NAME)
 
 
-# ============================================================================
-# System Dashboard Route
-# ============================================================================
-
-@main_blueprint.route('/system')
-@login_required
-async def system_dashboard():
-    """Full-page system dashboard."""
-    return await render_template('system.html', app_name=config.APP_NAME)
-
-
 @main_blueprint.route('/')
 @login_required
 async def home():
