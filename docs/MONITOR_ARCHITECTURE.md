@@ -392,7 +392,6 @@ Potential improvements to the architecture:
 - `app.py` - Web application (monitor code removed)
 - `start_booru.sh` - Startup script with process coordination
 - `services/monitor_service.py` - Monitor service implementation (unchanged)
-- `tests/test_monitor_runner.py` - Tests for new architecture
 
 **Related Documentation:**
 - [README.md](../README.MD) - Updated usage instructions
