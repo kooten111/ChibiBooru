@@ -32,7 +32,7 @@ async def system_logs():
 @api_handler()
 async def trigger_scan():
     """Scan for new images and process them."""
-    return await asyncio.to_thread(system_service.scan_and_process_service)
+    return await system_service.scan_and_process_service()
 
 @api_blueprint.route('/system/rebuild', methods=['POST'])
 @api_handler()
@@ -44,7 +44,7 @@ async def trigger_rebuild():
 @api_handler()
 async def trigger_rebuild_categorized():
     """Rebuild the database with categorized tags."""
-    return await asyncio.to_thread(system_service.rebuild_categorized_service)
+    return await system_service.rebuild_categorized_service()
 
 @api_blueprint.route('/system/recategorize', methods=['POST'])
 @api_handler()
@@ -56,7 +56,7 @@ async def trigger_recategorize():
 @api_handler()
 async def trigger_thumbnails():
     """Generate thumbnails for all images."""
-    return await asyncio.to_thread(system_service.trigger_thumbnails)
+    return await system_service.trigger_thumbnails()
 
 @api_blueprint.route('/system/reindex', methods=['POST'])
 @api_handler()
@@ -80,7 +80,7 @@ async def clean_orphans():
 @api_handler()
 async def apply_merged_sources():
     """Apply merged metadata sources to all images."""
-    return await asyncio.to_thread(system_service.apply_merged_sources_service)
+    return await system_service.apply_merged_sources_service()
 
 @api_blueprint.route('/system/recount_tags', methods=['POST'])
 @api_handler()
@@ -118,4 +118,4 @@ async def database_health_check():
 @api_handler()
 async def bulk_retag_local():
     """Wipe all local tagger predictions and re-run local tagger for all images."""
-    return await asyncio.to_thread(system_service.bulk_retag_local_service)
+    return await system_service.bulk_retag_local_service()
