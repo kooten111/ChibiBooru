@@ -576,6 +576,7 @@ def reindex_database_service():
         import traceback
         traceback.print_exc()
         monitor_service.add_log(f"Database optimization failed: {str(e)}", "error")
+        return jsonify({"error": str(e)}), 500
 
 async def get_task_status_service():
     """Service to get the status of a background task."""

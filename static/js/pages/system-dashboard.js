@@ -343,6 +343,8 @@ async function performAction(endpoint, actionName, buttonElement, confirmMessage
         body: body ? JSON.stringify(body) : null
     };
     
+    let isBackgroundTask = false;
+    
     try {
         const response = await fetch(url, options);
         const contentType = response.headers.get('content-type');
@@ -355,20 +357,22 @@ async function performAction(endpoint, actionName, buttonElement, confirmMessage
         
         const data = await response.json();
         
-        if (data.status === 'success') {
+        // Check for unauthorized first
+        if (data.error === 'Unauthorized') {
+            localStorage.removeItem('system_secret');
+            SYSTEM_SECRET = null;
+            showNotification('Invalid system secret', 'error');
+            updateSecretUI();
+        } else if (data.status === 'success') {
             const msg = data.message || `${actionName} completed`;
             showNotification(msg, 'success');
             await loadActivityLog();
             await loadSystemStatus();
         } else if (data.status === 'started' && data.task_id) {
             // Background task started
+            isBackgroundTask = true;
             showNotification(`${actionName} started in background`, 'info');
             trackTask(data.task_id, actionName, buttonElement, originalText);
-        } else if (data.error === 'Unauthorized') {
-            localStorage.removeItem('system_secret');
-            SYSTEM_SECRET = null;
-            showNotification('Invalid system secret', 'error');
-            updateSecretUI();
         } else {
             throw new Error(data.error || 'Unknown error');
         }
@@ -377,7 +381,8 @@ async function performAction(endpoint, actionName, buttonElement, confirmMessage
         showNotification(errMsg, 'error');
         console.error('Full error:', err);
     } finally {
-        if (buttonElement && !activeTasks.size) {
+        // Only reset button if it's not a background task
+        if (buttonElement && !isBackgroundTask) {
             buttonElement.innerHTML = originalText;
             buttonElement.disabled = false;
         }
