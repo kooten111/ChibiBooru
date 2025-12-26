@@ -37,7 +37,7 @@ def extract_tags_from_source(source_data: dict, source_name: str) -> dict:
     All services should use this function instead of inline extraction.
 
     Args:
-        source_data: Raw metadata dict from the booru source
+        source_data: Raw metadata dict from the booru source (can be None)
         source_name: Name of the source ('danbooru', 'e621', 'pixiv', 'local_tagger', etc.)
 
     Returns:
@@ -45,6 +45,10 @@ def extract_tags_from_source(source_data: dict, source_name: str) -> dict:
                        tags_species, tags_meta, tags_general
         All values are space-separated strings.
     """
+    # Handle None source_data
+    if source_data is None:
+        return {f'tags_{cat}': '' for cat in TAG_CATEGORIES}
+
     if source_name == 'danbooru':
         return _extract_danbooru_tags(source_data)
     elif source_name == 'e621':
@@ -113,6 +117,10 @@ def _extract_gelbooru_tags(source_data: dict) -> dict:
 
 def _extract_generic_tags(source_data: dict) -> dict:
     """Fallback extraction for unknown sources."""
+    # Handle None or invalid source_data
+    if not source_data or not isinstance(source_data, dict):
+        return {f'tags_{cat}': '' for cat in TAG_CATEGORIES}
+
     # Try e621-style first
     if "tags" in source_data and isinstance(source_data["tags"], dict):
         return _extract_e621_tags(source_data)
@@ -130,7 +138,7 @@ def extract_rating_from_source(source_data: dict, source_name: str) -> Tuple[Opt
     Extract rating information from source data.
 
     Args:
-        source_data: Raw metadata dict
+        source_data: Raw metadata dict (can be None)
         source_name: Name of the source
 
     Returns:
@@ -138,6 +146,10 @@ def extract_rating_from_source(source_data: dict, source_name: str) -> Tuple[Opt
         rating_tag is like 'rating:general', 'rating:explicit', etc.
         rating_source is 'original' or 'ai_inference'
     """
+    # Handle None source_data
+    if source_data is None:
+        return None, None
+
     rating_char = source_data.get('rating', '').lower()
     rating_tag = RATING_MAP.get(rating_char)
 
