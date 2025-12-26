@@ -196,22 +196,47 @@ function initSwipeNavigation() {
     const preloadedImages = new Map();
 
     function preloadImage(url) {
-        if (preloadedImages.has(url)) return preloadedImages.get(url);
+        if (preloadedImages.has(url)) return Promise.resolve(preloadedImages.get(url));
 
         return fetch(url)
             .then(response => response.text())
             .then(html => {
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
+                const imageViewContainer = doc.querySelector('.image-view');
                 const imgElement = doc.querySelector('.image-view img, .image-view video');
                 const videoElement = doc.querySelector('.image-view video source');
 
                 if (imgElement) {
                     const imgSrc = videoElement ? videoElement.src : imgElement.src;
-                    const img = new Image();
-                    img.src = imgSrc;
-                    preloadedImages.set(url, { html, imgSrc, isVideo: !!videoElement });
-                    return { html, imgSrc, isVideo: !!videoElement };
+
+                    // Extract dimensions from data attributes
+                    const width = imageViewContainer?.dataset.width ? parseInt(imageViewContainer.dataset.width) : null;
+                    const height = imageViewContainer?.dataset.height ? parseInt(imageViewContainer.dataset.height) : null;
+
+                    // Actually wait for the image to load before returning
+                    return new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const data = { html, imgSrc, isVideo: !!videoElement, width, height, loaded: true };
+                            preloadedImages.set(url, data);
+                            resolve(data);
+                        };
+                        img.onerror = () => {
+                            // Still cache it but mark as not fully loaded
+                            const data = { html, imgSrc, isVideo: !!videoElement, width, height, loaded: false };
+                            preloadedImages.set(url, data);
+                            resolve(data);
+                        };
+                        img.src = imgSrc;
+
+                        // If already cached by browser, onload may have fired synchronously
+                        if (img.complete) {
+                            const data = { html, imgSrc, isVideo: !!videoElement, width, height, loaded: true };
+                            preloadedImages.set(url, data);
+                            resolve(data);
+                        }
+                    });
                 }
                 return null;
             })
@@ -221,11 +246,32 @@ function initSwipeNavigation() {
             });
     }
 
-    if (relatedLinks.length > 0) {
-        preloadImage(relatedLinks[0].href);
-        if (relatedLinks.length > 1) {
-            preloadImage(relatedLinks[relatedLinks.length - 1].href);
+    // Function to start preloading sidebar images
+    function startSidebarPreloads() {
+        if (relatedLinks.length > 0) {
+            preloadImage(relatedLinks[0].href);
+            if (relatedLinks.length > 1) {
+                preloadImage(relatedLinks[relatedLinks.length - 1].href);
+            }
         }
+    }
+
+    // Wait for main image to load before preloading sidebar images
+    const mainImage = document.querySelector('.image-view img, .image-view video');
+    if (mainImage) {
+        if (mainImage.complete || mainImage.readyState >= 2) {
+            // Main image already loaded, start preloads after a short delay
+            setTimeout(startSidebarPreloads, 100);
+        } else {
+            // Wait for main image to load first
+            const loadEvent = mainImage.tagName === 'VIDEO' ? 'loadeddata' : 'load';
+            mainImage.addEventListener(loadEvent, () => {
+                setTimeout(startSidebarPreloads, 100);
+            }, { once: true });
+        }
+    } else {
+        // No main image found, just preload sidebar
+        startSidebarPreloads();
     }
 
     relatedLinks.forEach((link) => {
@@ -349,6 +395,11 @@ function initSwipeNavigation() {
                 const overlay = document.createElement('div');
                 overlay.className = 'crossfade-overlay';
 
+                // Pre-size the overlay using known dimensions to prevent snap
+                if (preloadedData.width && preloadedData.height) {
+                    overlay.style.aspectRatio = `${preloadedData.width} / ${preloadedData.height}`;
+                }
+
                 let newMediaElement;
                 if (preloadedData.isVideo) {
                     newMediaElement = document.createElement('video');
@@ -362,6 +413,9 @@ function initSwipeNavigation() {
                     newMediaElement = document.createElement('img');
                     newMediaElement.src = preloadedData.imgSrc;
                     newMediaElement.alt = 'Image';
+                    // Set dimensions on the img element to help browser layout
+                    if (preloadedData.width) newMediaElement.width = preloadedData.width;
+                    if (preloadedData.height) newMediaElement.height = preloadedData.height;
                 }
 
                 newMediaElement.className = 'crossfade-media';
@@ -386,8 +440,11 @@ function initSwipeNavigation() {
                         onMediaReady();
                     }
                 } else {
-                    if (newMediaElement.complete) {
-                        onMediaReady();
+                    // If image was fully preloaded, browser should have it cached
+                    // Check complete first, then fall back to load event
+                    if (newMediaElement.complete || preloadedData.loaded) {
+                        // Use requestAnimationFrame to ensure DOM is ready
+                        requestAnimationFrame(() => onMediaReady());
                     } else {
                         newMediaElement.addEventListener('load', onMediaReady, { once: true });
                     }
@@ -410,6 +467,28 @@ function initSwipeNavigation() {
         const newContainer = newDoc.querySelector('.container');
         if (container && newContainer) {
             container.innerHTML = newContainer.innerHTML;
+
+            // Immediately remove skeleton and add has-image to prevent flash
+            // since the image is already cached from preload
+            const newImageView = container.querySelector('.image-view');
+            if (newImageView) {
+                newImageView.classList.remove('skeleton');
+                newImageView.classList.add('has-image');
+
+                // Set aspect-ratio to prevent size snap using data attributes
+                const width = newImageView.dataset.width;
+                const height = newImageView.dataset.height;
+                if (width && height) {
+                    // Set aspect-ratio on container
+                    newImageView.style.aspectRatio = `${width} / ${height}`;
+
+                    // Also set on the img element
+                    const imgElement = newImageView.querySelector('img');
+                    if (imgElement) {
+                        imgElement.style.aspectRatio = `${width} / ${height}`;
+                    }
+                }
+            }
 
             const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
             sectionHeaders.forEach(header => {

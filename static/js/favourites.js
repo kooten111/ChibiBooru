@@ -23,12 +23,12 @@
     function updateButtonState(isFavourite) {
         if (isFavourite) {
             favouriteBtn.classList.add('is-favourite');
-            iconSpan.textContent = ICON_FAVOURITE;
-            textSpan.textContent = 'Favourited';
+            if (iconSpan) iconSpan.textContent = ICON_FAVOURITE;
+            if (textSpan) textSpan.textContent = 'Favourited';
         } else {
             favouriteBtn.classList.remove('is-favourite');
-            iconSpan.textContent = ICON_NOT_FAVOURITE;
-            textSpan.textContent = 'Favourite';
+            if (iconSpan) iconSpan.textContent = ICON_NOT_FAVOURITE;
+            if (textSpan) textSpan.textContent = 'Favourite';
         }
     }
 

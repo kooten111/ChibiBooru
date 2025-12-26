@@ -20,18 +20,8 @@
         as="image" fetchpriority="high">
     {% endif %}
 
-    {# Prefetch related images with lower priority - don't compete with main image #}
-    {# Limit to first 3 to avoid bandwidth competition #}
-    {# Skip videos to prevent aggressive buffering and log spam #}
-    {% if related_images %}
-    {% for related in related_images[:3] %}
-    {% if not (related.path.endswith('.mp4') or related.path.endswith('.webm')) %}
-    <link rel="prefetch"
-        href="/static/{% if not related.path.startswith('images/') %}images/{% endif %}{{ related.path | urlencode_path }}"
-        as="image">
-    {% endif %}
-    {% endfor %}
-    {% endif %}
+    {# Related images are now preloaded via JavaScript AFTER main image loads #}
+    {# This prevents bandwidth competition on initial page load #}
 </head>
 
 <body class="image-page">
@@ -448,8 +438,10 @@
         <div class="main-content">
             <div class="image-and-actions-container">
                 <div class="image-view skeleton" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
-                    filepath.endswith('.zip') %}data-animation-type="zip"
-                    data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="10" {% endif %}>
+                    data.image_width and data.image_height %}data-width="{{ data.image_width }}"
+                    data-height="{{ data.image_height }}" {% endif %} {% if filepath.endswith('.zip')
+                    %}data-animation-type="zip" data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="10" {% endif
+                    %}>
                     {% if filepath.endswith('.mp4') %}
                     <video controls loop preload="metadata"
                         onloadeddata="this.closest('.image-view').classList.add('has-image')">

@@ -70,7 +70,9 @@ def initialize_database():
             'score': 'INTEGER',
             'fav_count': 'INTEGER',
             'phash': 'TEXT',  # Perceptual hash for visual similarity
-            'colorhash': 'TEXT'  # Color hash for color similarity
+            'colorhash': 'TEXT',  # Color hash for color similarity
+            'image_width': 'INTEGER',  # Original image width in pixels
+            'image_height': 'INTEGER',  # Original image height in pixels
         }
 
         cur.execute("PRAGMA table_info(images);")

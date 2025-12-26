@@ -1298,7 +1298,42 @@ def process_image_file(filepath, move_from_ingest=True):
             'saucenao_lookup': saucenao_used,
             'rating': rating,
             'rating_source': rating_source,
+            'image_width': None,
+            'image_height': None,
         }
+        
+        # Get image dimensions using PIL
+        try:
+            if is_zip_animation:
+                # For zip animations, get dimensions from first frame
+                from services import zip_animation_service
+                first_frame = zip_animation_service.get_frame_path(md5, 0)
+                if first_frame and os.path.exists(first_frame):
+                    with Image.open(first_frame) as img:
+                        image_info['image_width'] = img.width
+                        image_info['image_height'] = img.height
+            elif is_video:
+                # For videos, try to get dimensions using ffprobe
+                import subprocess
+                ffprobe_path = shutil.which('ffprobe')
+                if ffprobe_path:
+                    result = subprocess.run([
+                        ffprobe_path, '-v', 'error', '-select_streams', 'v:0',
+                        '-show_entries', 'stream=width,height', '-of', 'csv=p=0',
+                        file_dest
+                    ], capture_output=True, text=True)
+                    if result.returncode == 0 and result.stdout.strip():
+                        parts = result.stdout.strip().split(',')
+                        if len(parts) == 2:
+                            image_info['image_width'] = int(parts[0])
+                            image_info['image_height'] = int(parts[1])
+            else:
+                # Regular image - read dimensions with PIL
+                with Image.open(file_dest) as img:
+                    image_info['image_width'] = img.width
+                    image_info['image_height'] = img.height
+        except Exception as e:
+            print(f"[Processing] WARNING: Could not read dimensions for {filename}: {e}")
         
         # Add computed hashes to image_info
         if 'phash' in hashes:
