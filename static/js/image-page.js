@@ -466,7 +466,26 @@ function initSwipeNavigation() {
         const container = document.querySelector('.container');
         const newContainer = newDoc.querySelector('.container');
         if (container && newContainer) {
+            // Reset tag editor state if active
+            if (window.tagEditor && window.tagEditor.isEditing) {
+                window.tagEditor.isEditing = false;
+                window.tagEditor.tags = {};
+            }
+
             container.innerHTML = newContainer.innerHTML;
+
+            // Update hidden inputs that are outside the container
+            const currentFilepathInput = document.getElementById('imageFilepath');
+            const newFilepathInput = newDoc.getElementById('imageFilepath');
+            if (currentFilepathInput && newFilepathInput) {
+                currentFilepathInput.value = newFilepathInput.value;
+            }
+
+            const currentAllTagsInput = document.getElementById('allTags');
+            const newAllTagsInput = newDoc.getElementById('allTags');
+            if (currentAllTagsInput && newAllTagsInput) {
+                currentAllTagsInput.value = newAllTagsInput.value;
+            }
 
             // Immediately remove skeleton and add has-image to prevent flash
             // since the image is already cached from preload

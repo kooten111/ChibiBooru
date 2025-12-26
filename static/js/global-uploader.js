@@ -44,10 +44,18 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         dragCounter = 0;
 
+        // Check if overlay was actually shown (timeout completed)
+        // If drop happens too fast (before 300ms), we treat it as accidental and ignore it
+        const wasActive = dropZone.classList.contains('active');
+
         // Clear timeout if drop happens before delay completes
         if (dragTimeout) {
             clearTimeout(dragTimeout);
             dragTimeout = null;
+        }
+
+        if (!wasActive) {
+            return;
         }
 
         const files = e.dataTransfer.files;
@@ -100,24 +108,24 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'POST',
             body: formData,
         })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'success') {
-                showNotification(data.message, 'success');
-                // If the server sent a redirect URL, go there after a delay
-                if (data.redirect_url) {
-                    setTimeout(() => {
-                        window.location.href = data.redirect_url;
-                    }, 1500); // 1.5 second delay
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showNotification(data.message, 'success');
+                    // If the server sent a redirect URL, go there after a delay
+                    if (data.redirect_url) {
+                        setTimeout(() => {
+                            window.location.href = data.redirect_url;
+                        }, 1500); // 1.5 second delay
+                    }
+                } else {
+                    throw new Error(data.error || 'Unknown upload error');
                 }
-            } else {
-                throw new Error(data.error || 'Unknown upload error');
-            }
-        })
-        .catch(err => {
-            showNotification(`Upload failed: ${err.message}`, 'error');
-            console.error('Upload error:', err);
-        });
+            })
+            .catch(err => {
+                showNotification(`Upload failed: ${err.message}`, 'error');
+                console.error('Upload error:', err);
+            });
     }
 
 });
