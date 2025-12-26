@@ -35,9 +35,10 @@ class TagEditor {
         this.renderEditMode();
 
         // Update button
-        const editBtn = document.querySelector('.actions-bar .btn-primary');
+        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
         if (editBtn) {
-            editBtn.textContent = '💾 Save Tags';
+            editBtn.textContent = '💾';
+            editBtn.title = 'Save Tags';
             editBtn.classList.add('editing-mode');
         }
 
@@ -45,9 +46,10 @@ class TagEditor {
         let cancelBtn = document.getElementById('cancelEditBtn');
         if (!cancelBtn) {
             cancelBtn = document.createElement('button');
-            cancelBtn.className = 'btn btn-secondary';
-            cancelBtn.textContent = '✖️ Cancel';
+            cancelBtn.className = 'action-btn danger';
+            cancelBtn.textContent = '❌'; // Cross mark
             cancelBtn.id = 'cancelEditBtn';
+            cancelBtn.title = 'Cancel Editing';
             editBtn.after(cancelBtn);
         }
 
@@ -55,10 +57,29 @@ class TagEditor {
         let clearDeltasBtn = document.getElementById('clearDeltasBtn');
         if (!clearDeltasBtn) {
             clearDeltasBtn = document.createElement('button');
-            clearDeltasBtn.className = 'btn btn-warning';
-            clearDeltasBtn.textContent = '🗑️ Clear Deltas';
+            clearDeltasBtn.className = 'action-btn success'; // Use success for now as we don't have warning variant in snippet, or stick to default
+            // Actually, let's use a custom style or just action-btn if warning isn't defined, but I saw success/danger/primary/favourite.
+            // Let's try to stick to what we saw. I didn't see warning. I'll use success for "cleaning" or just base action-btn.
+            // Let's use base action-btn with a specific color via style if needed, but for now just action-btn is safe.
+            // Better yet, I'll check if I can check for warning class existence. I didn't see it in grep.
+            // I'll use 'action-btn' and maybe add a style or just leave it.
+            // Wait, previous code used 'btn-warning'.
+            // I'll usage 'action-btn' and add a inline style for color if needed, or just let it be default.
+            // Actually, let's look at the grep output again.
+            // I saw primary, success, danger, favourite. No warning.
+            // So I will use 'action-btn' and maybe add a class 'warning' assuming I might add it to CSS later or it inherits something,
+            // but to be safe and consistent with the plan, I will use 'action-btn' and maybe 'danger' isn't right for cleaning.
+            // Let's use 'action-btn' and let the icon speak for itself, or reusing 'primary'.
+            // 'Clear Deltas' is kind of specific.
+            // I'll make it 'action-btn' and adding a specific class for potential future styling.
+            cancelBtn.after(clearDeltasBtn);
+
+            clearDeltasBtn = document.createElement('button');
+            clearDeltasBtn.className = 'action-btn';
+            clearDeltasBtn.textContent = '🧹';
             clearDeltasBtn.id = 'clearDeltasBtn';
-            clearDeltasBtn.title = 'Clear manual modification markers for this image';
+            clearDeltasBtn.title = 'Clear manual modification markers';
+            // Add a little margin or specific style if needed, but pills usually handle themselves.
             cancelBtn.after(clearDeltasBtn);
         }
     }
@@ -500,9 +521,10 @@ class TagEditor {
         }
 
         // Reset button
-        const editBtn = document.querySelector('.actions-bar .btn-primary');
+        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
         if (editBtn) {
-            editBtn.textContent = '📝 Edit Tags';
+            editBtn.textContent = '📝';
+            editBtn.title = 'Edit Tags';
             editBtn.classList.remove('editing-mode');
         }
 
@@ -532,9 +554,9 @@ class TagEditor {
             return;
         }
 
-        const editBtn = document.querySelector('.actions-bar .btn-primary');
+        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
         if (editBtn) {
-            editBtn.textContent = 'Saving...';
+            editBtn.textContent = '💾'; // Keep icon
             editBtn.disabled = true;
         }
 
@@ -580,7 +602,7 @@ class TagEditor {
                 console.error('Save error:', err);
                 showNotification('Failed to save: ' + err.message, 'error');
                 if (editBtn) {
-                    editBtn.textContent = '💾 Save Tags';
+                    editBtn.textContent = '💾';
                     editBtn.disabled = false;
                 }
             });
@@ -677,7 +699,7 @@ function toggleTagEditor() {
     console.log('toggleTagEditor called');
 
     if (window.tagEditor.isEditing) {
-        const editBtn = document.querySelector('.actions-bar .btn-primary');
+        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
         if (editBtn && editBtn.classList.contains('editing-mode')) {
             window.tagEditor.saveTags();
         } else {
