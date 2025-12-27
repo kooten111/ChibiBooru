@@ -440,8 +440,8 @@ def batch_apply_implications_to_all_images() -> int:
         for img_row in images:
             image_id = img_row['id']
 
-            # Import from models to reuse existing function
-            from database_models import apply_implications_for_image
+            # Import from repository to reuse existing function
+            from repositories.tag_repository import apply_implications_for_image
             if apply_implications_for_image(image_id):
                 count += 1
 

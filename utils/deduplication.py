@@ -69,13 +69,14 @@ def remove_duplicate(filepath):
     Permanently remove a duplicate image file and its thumbnail.
     Returns: bool: True if successfully removed.
     """
+    from utils.file_utils import get_bucketed_thumbnail_path_on_disk
     full_path = os.path.join(STATIC_IMAGES, filepath) if not filepath.startswith(STATIC_IMAGES) else filepath
     try:
         if os.path.exists(full_path):
             os.remove(full_path)
             print(f"Removed duplicate image: {filepath}")
         rel_path = os.path.relpath(full_path, STATIC_IMAGES)
-        thumb_path = os.path.join("./static/thumbnails", os.path.splitext(rel_path)[0] + '.webp')
+        thumb_path = get_bucketed_thumbnail_path_on_disk(rel_path)
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
             print(f"Removed thumbnail for duplicate: {thumb_path}")

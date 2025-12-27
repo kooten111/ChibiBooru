@@ -73,9 +73,9 @@ async def delete_image_service():
         # Construct the full path to the image file.
         full_image_path = os.path.join("static/images", filepath)
         
-        # Construct the thumbnail path directly and more reliably.
-        # This creates 'static/thumbnails/folder/image.webp'
-        thumb_path = os.path.join("static/thumbnails", os.path.splitext(filepath)[0] + '.webp')
+        # Construct the bucketed thumbnail path
+        from utils.file_utils import get_bucketed_thumbnail_path_on_disk
+        thumb_path = get_bucketed_thumbnail_path_on_disk(filepath)
 
         # --- Attempt to delete the files ---
         image_deleted = False
@@ -139,7 +139,7 @@ async def delete_images_bulk_service():
 
             # Construct file paths
             full_image_path = os.path.join("static/images", clean_filepath)
-            thumb_path = os.path.join("static/thumbnails", os.path.splitext(clean_filepath)[0] + '.webp')
+            thumb_path = get_bucketed_thumbnail_path_on_disk(clean_filepath)
 
             # Delete files
             image_deleted = False

@@ -262,7 +262,7 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
 
 class SemanticSearchEngine:
     def __init__(self):
-        self.model_path = "/mnt/Server/ChibiBooru/models/Similarity/model.onnx"
+        self.model_path = config.SEMANTIC_MODEL_PATH
         self.session = None
         self.index = None
         self.image_ids = [] # map index ID to image ID
