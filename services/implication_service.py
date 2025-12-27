@@ -5,6 +5,7 @@ Handles automatic pattern detection and suggestion generation for tag implicatio
 import re
 from database import get_db_connection
 from typing import List, Dict, Tuple, Set
+from repositories.tag_repository import apply_implications_for_image
 
 
 class ImplicationSuggestion:
@@ -413,13 +414,18 @@ def preview_implication_impact(source_tag: str, implied_tag: str) -> Dict:
         # Get chain implications
         chain = get_implication_chain(implied_tag)
         chain_tags = _flatten_chain(chain)
+        
+        # Detect circular implications
+        conflicts = []
+        if source_tag in chain_tags:
+            conflicts.append(f"Circular implication detected: {source_tag} -> {implied_tag} -> ... -> {source_tag}")
 
         return {
             'total_images': total_images,
             'already_has_tag': already_has,
             'will_gain_tag': will_gain,
             'chain_implications': chain_tags,
-            'conflicts': []  # TODO: Detect conflicts (e.g., circular implications)
+            'conflicts': conflicts
         }
 
 
@@ -440,8 +446,6 @@ def batch_apply_implications_to_all_images() -> int:
         for img_row in images:
             image_id = img_row['id']
 
-            # Import from models to reuse existing function
-            from database_models import apply_implications_for_image
             if apply_implications_for_image(image_id):
                 count += 1
 

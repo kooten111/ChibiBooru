@@ -1,6 +1,7 @@
 from quart import request, jsonify
 from database import models
 from database import get_db_connection
+from utils.file_utils import normalize_image_path
 import traceback
 
 async def edit_tags_service():
@@ -10,7 +11,7 @@ async def edit_tags_service():
     across database rebuilds.
     """
     data = await request.json
-    filepath = data.get('filepath', '').replace('images/', '', 1)
+    filepath = normalize_image_path(data.get('filepath', ''))
 
     # Check if we have categorized tags (new format) or plain tags (old format)
     categorized_tags = data.get('categorized_tags')

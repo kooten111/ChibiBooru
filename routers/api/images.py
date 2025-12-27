@@ -4,6 +4,7 @@ from services import image_service, tag_service
 from services.switch_source_db import switch_metadata_source_db, merge_all_sources
 from database import models
 from utils import api_handler
+from utils.file_utils import normalize_image_path
 import asyncio
 
 @api_blueprint.route('/images')
@@ -69,7 +70,7 @@ async def switch_source():
 
     # Selective reload: only update this image
     from core.cache_manager import invalidate_image_cache
-    invalidate_image_cache(filepath.replace('images/', '', 1))
+    invalidate_image_cache(normalize_image_path(filepath))
 
     return result
 
@@ -84,7 +85,7 @@ async def clear_deltas():
         raise ValueError("Missing filepath")
 
     # Normalize filepath
-    filepath = filepath.replace('images/', '', 1)
+    filepath = normalize_image_path(filepath)
 
     # Clear deltas for this image
     count = models.clear_deltas_for_image(filepath)

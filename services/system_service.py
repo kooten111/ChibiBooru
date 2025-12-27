@@ -102,7 +102,6 @@ def scan_and_process_service():
             "message": message,
             "processed": processed_count,
             "cleaned": cleaned_count,
-            "cleaned": cleaned_count,
             "orphaned_tags_cleaned": orphaned_tags_count
         })
     except Exception as e:

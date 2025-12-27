@@ -95,15 +95,52 @@ def get_thumbnail_path(image_path):
     return image_path
 
 
+def get_bucketed_thumbnail_path_on_disk(filepath: str) -> str:
+    """
+    Get the bucketed thumbnail path on disk for a filepath.
+    
+    Args:
+        filepath: The image filepath (e.g., "abc/image.jpg" or "images/abc/image.jpg")
+    
+    Returns:
+        Full disk path like "./static/thumbnails/[bucket]/image.webp" where [bucket] 
+        is a 3-character hash based on the filename
+    """
+    # Remove "images/" prefix if present
+    rel_path = filepath.replace("images/", "", 1)
+    
+    # Extract just the filename (handles both flat and bucketed paths)
+    filename = os.path.basename(rel_path)
+    
+    # Generate thumbnail name
+    thumb_filename = os.path.splitext(filename)[0] + '.webp'
+    
+    # Use bucketed structure based on filename
+    bucket = get_hash_bucket(filename)
+    return os.path.join("./static/thumbnails", bucket, thumb_filename)
+
+
 def get_file_md5(filepath):
-    """Calculate MD5 hash of a file"""
+    """
+    Calculate MD5 hash of a file.
+    
+    Args:
+        filepath: Either a relative path (without 'static/') or an absolute path
+        
+    Returns:
+        MD5 hash as hex string, or None if file not found/error
+    """
     try:
+        # If filepath doesn't start with ./ or /, assume it's relative to static/
+        if not filepath.startswith('./') and not filepath.startswith('/'):
+            filepath = f"static/{filepath}"
+        
         hash_md5 = hashlib.md5()
-        with open(f"static/{filepath}", "rb") as f:
+        with open(filepath, "rb") as f:
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
-    except:
+    except (IOError, OSError):
         return None
 
 

@@ -10,9 +10,9 @@ from typing import Optional, List, Dict, Tuple
 from PIL import Image, UnidentifiedImageError
 import imagehash
 import config
-from database import get_db_connection
+from database import get_db_connection, models
 from utils.file_utils import get_thumbnail_path
-from services import similarity_db
+from services import similarity_db, zip_animation_service
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -248,10 +248,21 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
     """
     if filepath.lower().endswith(config.SUPPORTED_VIDEO_EXTENSIONS):
         return compute_colorhash_for_video(filepath)
-    # Zip animation colorhash? We could support it but maybe overkill for now.
-    # If we want consistency, we should. But let's skip for now or use thumb.
     elif filepath.lower().endswith(config.SUPPORTED_ZIP_EXTENSIONS):
-        return None # TODO: Implement zip colorhash
+        # Compute colorhash from first frame of zip animation
+        # Get MD5 to find extracted frames
+        image_data = models.get_image_details(filepath)
+        if image_data and image_data.get('md5'):
+            md5 = image_data['md5']
+            first_frame_path = zip_animation_service.get_frame_path(md5, 0)
+            if first_frame_path and os.path.exists(first_frame_path):
+                try:
+                    img = Image.open(first_frame_path)
+                    return str(imagehash.colorhash(img))
+                except (OSError, IOError, UnidentifiedImageError) as e:
+                    print(f"Error computing colorhash for zip animation {filepath}: {e}")
+                    return None
+        return None
     else:
         return compute_colorhash(filepath)
 
@@ -262,7 +273,7 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
 
 class SemanticSearchEngine:
     def __init__(self):
-        self.model_path = "/mnt/Server/ChibiBooru/models/Similarity/model.onnx"
+        self.model_path = config.SEMANTIC_MODEL_PATH
         self.session = None
         self.index = None
         self.image_ids = [] # map index ID to image ID

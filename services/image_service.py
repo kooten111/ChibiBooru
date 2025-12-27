@@ -3,6 +3,7 @@ from database import models
 from database import get_db_connection
 from services import processing_service as processing
 from utils import get_thumbnail_path
+from utils.file_utils import normalize_image_path, get_bucketed_thumbnail_path_on_disk
 from utils.tag_extraction import (
     extract_tags_from_source,
     extract_rating_from_source,
@@ -54,7 +55,7 @@ async def delete_image_service():
     data = await request.json
     # The filepath from the frontend is 'images/folder/image.jpg'
     # We need the path relative to the 'static/images' directory, which is 'folder/image.jpg'
-    filepath = data.get('filepath', '').replace('images/', '', 1)
+    filepath = normalize_image_path(data.get('filepath', ''))
 
     print(f"[DELETE] Received filepath from frontend: {data.get('filepath')}")
     print(f"[DELETE] Processed filepath for deletion: {filepath}")
@@ -73,9 +74,8 @@ async def delete_image_service():
         # Construct the full path to the image file.
         full_image_path = os.path.join("static/images", filepath)
         
-        # Construct the thumbnail path directly and more reliably.
-        # This creates 'static/thumbnails/folder/image.webp'
-        thumb_path = os.path.join("static/thumbnails", os.path.splitext(filepath)[0] + '.webp')
+        # Construct the bucketed thumbnail path
+        thumb_path = get_bucketed_thumbnail_path_on_disk(filepath)
 
         # --- Attempt to delete the files ---
         image_deleted = False
@@ -131,7 +131,7 @@ async def delete_images_bulk_service():
     for filepath in filepaths:
         # The filepath from the frontend is 'images/folder/image.jpg'
         # We need the path relative to the 'static/images' directory
-        clean_filepath = filepath.replace('images/', '', 1)
+        clean_filepath = normalize_image_path(filepath)
 
         try:
             # Remove from database
@@ -139,7 +139,7 @@ async def delete_images_bulk_service():
 
             # Construct file paths
             full_image_path = os.path.join("static/images", clean_filepath)
-            thumb_path = os.path.join("static/thumbnails", os.path.splitext(clean_filepath)[0] + '.webp')
+            thumb_path = get_bucketed_thumbnail_path_on_disk(clean_filepath)
 
             # Delete files
             image_deleted = False
@@ -199,7 +199,7 @@ async def download_images_bulk_service():
         for filepath in filepaths:
             # The filepath from the frontend is 'images/folder/image.jpg'
             # We need the path relative to the 'static/images' directory
-            clean_filepath = filepath.replace('images/', '', 1)
+            clean_filepath = normalize_image_path(filepath)
             full_image_path = os.path.join("static/images", clean_filepath)
 
             try:
@@ -243,7 +243,7 @@ async def download_images_bulk_service():
 async def retry_tagging_service():
     """Service to retry tagging for an image that was previously tagged with local_tagger."""
     data = await request.json
-    filepath = data.get('filepath', '').replace('images/', '', 1)
+    filepath = normalize_image_path(data.get('filepath', ''))
     skip_local_fallback = data.get('skip_local_fallback', False)
 
     if not filepath:
