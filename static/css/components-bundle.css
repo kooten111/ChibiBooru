@@ -1,0 +1,18 @@
+/* Components Bundle - imports all component CSS files */
+/* This single file can be referenced by templates to load all component styles */
+
+@import url('components/header.css');
+@import url('components/search.css');
+@import url('components/system-panel.css');
+@import url('components/image-page.css');
+@import url('components/tags-browser.css');
+@import url('components/actions.css');
+@import url('components/tag-editor.css');
+@import url('components/carousel.css');
+@import url('components/source-selector.css');
+@import url('components/pools.css');
+@import url('components/implications.css');
+@import url('components/uploader.css');
+@import url('components/selection.css');
+@import url('components/utilities.css');
+@import url('components/filmstrip.css');

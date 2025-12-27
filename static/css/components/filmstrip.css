@@ -1,0 +1,275 @@
+/* SETTINGS MENU OVERHAUL */
+.settings-group {
+    background: rgba(30, 30, 45, 0.4);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.settings-group h5 {
+    margin: 0 0 var(--spacing-md) 0;
+    font-size: var(--font-size-lg);
+    color: var(--text-primary);
+    border-bottom: var(--border-width) solid var(--border-color);
+    padding-bottom: var(--spacing-xs);
+}
+
+.settings-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) 0;
+    border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.05);
+}
+
+.settings-item:last-child {
+    border-bottom: none;
+}
+
+.settings-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    margin-right: var(--spacing-md);
+}
+
+.settings-label {
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+}
+
+.settings-desc {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+}
+
+.settings-group.danger-zone {
+    border-color: rgba(255, 100, 100, 0.3);
+    background: rgba(40, 20, 20, 0.3);
+}
+
+.settings-group.danger-zone h5 {
+    color: var(--danger);
+    border-bottom-color: rgba(255, 100, 100, 0.3);
+}
+
+/* ============================================================================
+   FAMILY FILMSTRIP - Compact filmstrip-style Parent/Child Indicator
+   ============================================================================ */
+
+/* Main container - positioned beside action bar */
+.family-filmstrip {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    transition: all 0.25s ease-out;
+    flex-shrink: 0;
+    margin-left: var(--spacing-md, 12px);
+}
+
+/* Hidden state - shrinks to just the toggle button */
+.family-filmstrip.hidden .filmstrip-content {
+    max-width: 0;
+    opacity: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Filmstrip content container - matches action bar theming */
+.filmstrip-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--bg-secondary, rgba(20, 20, 30, 0.95));
+    backdrop-filter: var(--blur-md);
+    border-radius: var(--radius-lg, 12px) 0 0 var(--radius-lg, 12px);
+    border: none;
+    max-width: 600px;
+    transition: all 0.25s ease-out;
+}
+
+/* Toggle button - matches action bar theming */
+.filmstrip-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 100%;
+    min-height: 52px;
+    padding: 0 12px;
+    border: none;
+    background: var(--bg-secondary, rgba(20, 20, 30, 0.95));
+    backdrop-filter: var(--blur-md);
+    border-radius: 0 var(--radius-lg, 12px) var(--radius-lg, 12px) 0;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 18px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.family-filmstrip.hidden .filmstrip-toggle {
+    border-radius: var(--radius-lg, 12px);
+    padding: 0 14px;
+    font-size: 14px;
+}
+
+.filmstrip-toggle:hover {
+    background: rgba(60, 60, 90, 0.8);
+    color: var(--text-primary);
+}
+
+/* Individual filmstrip thumbnail - larger size */
+.filmstrip-thumb {
+    position: relative;
+    display: block;
+    height: 64px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm, 6px);
+    overflow: visible;
+}
+
+.filmstrip-thumb img {
+    height: 100%;
+    width: auto;
+    display: block;
+    border-radius: var(--radius-sm, 6px);
+    border: 2px solid rgba(60, 60, 90, 0.6);
+}
+
+.filmstrip-thumb:hover {
+    transform: scale(1.15) translateY(-4px);
+    z-index: 10;
+}
+
+/* Filmstrip perforations (decorative) */
+.filmstrip-perfs {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    height: 3px;
+    display: flex;
+    justify-content: space-around;
+    pointer-events: none;
+}
+
+.filmstrip-perfs.top {
+    top: -1px;
+}
+
+.filmstrip-perfs.bottom {
+    bottom: -1px;
+}
+
+.filmstrip-perfs::before,
+.filmstrip-perfs::after {
+    content: '';
+    width: 4px;
+    height: 3px;
+    background: rgba(80, 80, 100, 0.8);
+    border-radius: 1px;
+}
+
+/* Type badge (P for parent, C for child) */
+.filmstrip-type-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm, 4px);
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.filmstrip-thumb-parent .filmstrip-type-badge {
+    background: rgba(74, 222, 128, 0.9);
+    color: #0a2010;
+}
+
+.filmstrip-thumb-child .filmstrip-type-badge {
+    background: rgba(192, 132, 252, 0.9);
+    color: #1a0a2a;
+}
+
+/* Parent thumbnail border accent */
+.filmstrip-thumb-parent img {
+    border-color: rgba(74, 222, 128, 0.5);
+}
+
+.filmstrip-thumb-parent:hover img {
+    border-color: #4ade80;
+    box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+}
+
+/* Child thumbnail border accent */
+.filmstrip-thumb-child img {
+    border-color: rgba(192, 132, 252, 0.5);
+}
+
+.filmstrip-thumb-child:hover img {
+    border-color: #c084fc;
+    box-shadow: 0 4px 12px rgba(192, 132, 252, 0.4);
+}
+
+/* Current image marker */
+.filmstrip-current {
+    color: var(--primary-blue, #60a5fa);
+    font-size: 14px;
+    padding: 0 8px;
+    text-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
+    user-select: none;
+}
+
+/* Hover preview - enlarged thumbnail */
+.filmstrip-preview {
+    position: fixed;
+    z-index: 9999;
+    transform: translateX(-50%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.filmstrip-preview.visible {
+    opacity: 1;
+}
+
+.filmstrip-preview img {
+    max-height: 280px;
+    max-width: 400px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .filmstrip-content {
+        padding: 6px 10px;
+        gap: 4px;
+    }
+
+    .filmstrip-thumb {
+        height: 48px;
+    }
+
+    .filmstrip-type-badge {
+        font-size: 8px;
+        padding: 1px 4px;
+    }
+
+    .filmstrip-preview img {
+        max-height: 180px;
+        max-width: 260px;
+    }
+}

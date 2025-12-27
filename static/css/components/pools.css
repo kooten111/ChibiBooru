@@ -1,0 +1,353 @@
+
+
+/* Pools Browser Header */
+.pools-browser-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: var(--spacing-lg);
+    border-bottom: var(--border-width-thick) solid var(--border-color);
+}
+
+.pools-browser-header h2 {
+    margin: 0;
+    color: var(--primary-blue);
+}
+
+.pools-header-actions {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+#poolSearchInput {
+    padding: 10px 15px;
+    width: 300px;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-lg);
+    font-size: var(--font-size-sm);
+    transition: all var(--transition-smooth);
+}
+
+#poolSearchInput:focus {
+    outline: none;
+    border-color: var(--border-color-focus);
+    box-shadow: 0 0 15px var(--primary-blue-light);
+}
+
+/* Pool List */
+.pools-list-container {
+    display: grid;
+    gap: 15px;
+}
+
+.pool-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    background: rgba(30, 30, 45, 0.5);
+    border-radius: var(--radius-xl);
+    border: var(--border-width) solid var(--primary-blue-light);
+    transition: all var(--transition-smooth);
+}
+
+.pool-item:hover {
+    background: var(--blue-accent-light);
+    border-color: var(--border-color-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px var(--primary-blue-light);
+}
+
+.pool-info {
+    flex: 1;
+}
+
+.pool-name {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-medium);
+    color: var(--primary-blue);
+    text-decoration: none;
+    display: block;
+    margin-bottom: var(--spacing-sm);
+    transition: color var(--transition-normal);
+}
+
+.pool-name:hover {
+    color: var(--primary-blue-dark);
+}
+
+.pool-description {
+    color: var(--text-muted);
+    margin: 5px 0;
+    font-size: var(--font-size-base);
+}
+
+.pool-image-count {
+    display: inline-block;
+    margin-top: var(--spacing-sm);
+    padding: var(--spacing-xs) 10px;
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+    border-radius: 15px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.pool-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.no-pools-message {
+    text-align: center;
+    padding: 60px var(--spacing-lg);
+    color: var(--text-muted);
+    font-size: var(--font-size-lg);
+}
+
+/* Pool Detail Page */
+.pool-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: var(--border-width-thick) solid var(--border-color);
+}
+
+.pool-title-section h2 {
+    margin: 0 0 10px 0;
+    color: var(--primary-blue);
+    font-size: var(--font-size-2xl);
+}
+
+.pool-title-section .pool-description {
+    color: var(--text-muted);
+    margin: 10px 0;
+    font-size: var(--font-size-lg);
+}
+
+.pool-title-section .pool-image-count {
+    display: inline-block;
+    margin-top: 10px;
+    padding: var(--spacing-xs) 14px;
+    background: var(--primary-blue-light);
+    color: var(--primary-blue);
+    border-radius: 15px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.pool-header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Pool Gallery */
+.pool-gallery {
+    position: relative;
+}
+
+.pool-image-item {
+    position: relative;
+}
+
+.image-order-badge {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    background: var(--primary-blue);
+    color: var(--bg-dark);
+    padding: var(--spacing-xs) 10px;
+    border-radius: 15px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
+    z-index: var(--z-dropdown);
+}
+
+.image-actions {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.pool-image-item:hover .image-actions {
+    opacity: 1;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: var(--font-size-sm);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.btn-remove {
+    background: var(--danger);
+    color: #fff;
+    font-weight: var(--font-weight-medium);
+}
+
+.btn-remove:hover {
+    background: var(--danger-hover);
+    transform: scale(1.05);
+}
+
+.no-images-message {
+    text-align: center;
+    padding: 80px var(--spacing-lg);
+    color: var(--text-muted);
+    font-size: var(--font-size-lg);
+}
+
+/* Pool Management on Image Page */
+.pool-management {
+    margin-bottom: var(--spacing-lg);
+}
+
+.pool-management h3 {
+    color: var(--primary-blue);
+    margin-bottom: 15px;
+}
+
+.pool-management .pools-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.pool-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    gap: var(--spacing-md);
+    background: var(--primary-blue-light);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-sm);
+    transition: all var(--transition-normal);
+}
+
+.pool-list-item:hover {
+    background: var(--primary-blue-medium);
+}
+
+.pool-list-item a {
+    color: var(--primary-blue);
+    text-decoration: none;
+    flex: 1;
+    font-weight: var(--font-weight-medium);
+}
+
+.pool-list-item a:hover {
+    color: var(--primary-blue-dark);
+}
+
+.pool-list-item button {
+    padding: 5px 10px;
+    margin-left: 10px;
+    font-size: var(--font-size-sm);
+    background: rgba(255, 107, 107, 0.3);
+    color: var(--danger);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-weight: var(--font-weight-medium);
+    transition: all var(--transition-normal);
+}
+
+.pool-list-item button:hover {
+    background: rgba(255, 107, 107, 0.5);
+}
+
+.loading-spinner {
+    text-align: center;
+    padding: var(--spacing-lg);
+    color: var(--text-muted);
+}
+
+/* Add to Pool Modal */
+.pool-selector-list {
+    max-height: 400px;
+    overflow-y: auto;
+    margin: var(--spacing-lg) 0;
+}
+
+.pool-selector-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-md) 15px;
+    background: rgba(30, 30, 45, 0.5);
+    border-radius: var(--radius-md);
+    margin-bottom: 10px;
+    border: var(--border-width) solid var(--primary-blue-light);
+    transition: all var(--transition-normal);
+    cursor: pointer;
+}
+
+.pool-selector-item:hover {
+    background: var(--blue-accent-light);
+    border-color: var(--border-color-hover);
+}
+
+.pool-selector-item.in-pool {
+    background: var(--primary-blue-light);
+    border-color: var(--border-color-hover);
+}
+
+.pool-selector-name {
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+    flex: 1;
+}
+
+.pool-selector-badge {
+    padding: var(--spacing-xs) 10px;
+    background: var(--primary-blue-medium);
+    color: var(--primary-blue);
+    border-radius: 10px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.pool-selector-item.in-pool .pool-selector-badge {
+    background: var(--primary-blue-strong);
+    color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pools-browser-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    #poolSearchInput {
+        width: 100%;
+    }
+
+    .pool-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .pool-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+
+    .pool-detail-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+}

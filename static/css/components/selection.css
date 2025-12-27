@@ -1,0 +1,250 @@
+/* ==================== SKELETON SCREENS ==================== */
+/* Loading placeholders for images before content loads */
+
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(90deg,
+            rgba(30, 30, 45, 0.8) 0%,
+            rgba(40, 45, 60, 0.9) 50%,
+            rgba(30, 30, 45, 0.8) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Skeleton for thumbnail images in gallery */
+.thumbnail.skeleton::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    border: 2px solid rgba(135, 206, 235, 0.2);
+    border-radius: 8px;
+    opacity: 0.4;
+}
+
+/* Hide skeleton state when image is loading */
+.thumbnail.skeleton.has-image {
+    animation: none;
+    background: rgba(30, 30, 45, 0.5);
+}
+
+.thumbnail.skeleton.has-image::before {
+    display: none;
+}
+
+/* Skeleton for main image view */
+.image-view.skeleton {
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-view.skeleton::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border: 3px solid rgba(135, 206, 235, 0.3);
+    border-radius: 12px;
+    opacity: 0.5;
+}
+
+/* Hide skeleton when main image loads */
+.image-view.skeleton.has-image {
+    animation: none;
+    background: transparent;
+}
+
+.image-view.skeleton.has-image::before {
+    display: none;
+}
+
+/* Smooth fade-in for main image */
+.image-view.skeleton img {
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.image-view.has-image img,
+.image-view img {
+    opacity: 1;
+}
+
+/* ==================== SELECTION MODE & BULK ACTIONS ==================== */
+
+/* Header Selection Mode Button */
+.selection-mode-btn {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.selection-mode-btn .selection-icon {
+    font-size: 1.1em;
+    transition: transform 0.2s ease;
+}
+
+.selection-mode-btn.active {
+    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%) !important;
+    border-color: rgba(74, 158, 255, 0.5) !important;
+    color: white !important;
+    box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+}
+
+.selection-mode-btn.active .selection-icon {
+    transform: scale(1.1);
+}
+
+/* Floating Bulk Actions Panel */
+.bulk-actions-panel {
+    position: fixed;
+    top: 180px;
+    right: 16px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(40, 45, 60, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    min-width: 160px;
+    animation: slideInFromRight 0.25s ease-out;
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Action Buttons in Panel */
+.bulk-actions-panel .bulk-action-btn {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.bulk-actions-panel .bulk-action-btn .btn-icon {
+    font-size: 14px;
+}
+
+/* Select All Button */
+#select-all-btn {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+#select-all-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--primary-blue);
+}
+
+/* Download Button */
+#download-selected-btn {
+    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    color: white;
+    border: none;
+}
+
+#download-selected-btn:hover {
+    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
+}
+
+/* Delete Selected Button */
+#delete-selected-btn {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    border: none;
+}
+
+#delete-selected-btn:hover {
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+}
+
+#delete-selected-btn:disabled {
+    background: var(--bg-disabled);
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Selection Badge */
+.selection-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    background: rgba(255, 255, 255, 0.9);
+    color: #1f2937;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* Responsive positioning */
+@media (max-width: 768px) {
+    .bulk-actions-panel {
+        top: auto;
+        bottom: 16px;
+        right: 16px;
+    }
+
+    .selection-mode-btn .selection-icon {
+        font-size: 1em;
+    }
+}
+
+/* Checkbox styling on thumbnails */
+.thumbnail {
+    position: relative;
+}
+
+.image-select-checkbox {
+    accent-color: var(--primary-blue);
+    transform: scale(1.2);
+}
+
+.image-select-checkbox:checked {
+    accent-color: var(--success);
+}
+
+.thumbnail:has(.image-select-checkbox:checked) {
+    outline: 3px solid var(--primary-blue);
+    outline-offset: -3px;
+}
+
