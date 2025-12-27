@@ -259,7 +259,7 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
                 try:
                     img = Image.open(first_frame_path)
                     return str(imagehash.colorhash(img))
-                except Exception as e:
+                except (OSError, IOError, UnidentifiedImageError) as e:
                     print(f"Error computing colorhash for zip animation {filepath}: {e}")
                     return None
         return None
