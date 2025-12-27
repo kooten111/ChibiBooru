@@ -2,6 +2,7 @@ from quart import request, jsonify, url_for
 from database import models
 from services import processing_service as processing
 from utils import get_thumbnail_path
+from utils.file_utils import normalize_image_path
 import os
 import requests
 from urllib.parse import urlparse
@@ -99,7 +100,7 @@ async def saucenao_apply_service():
     if data.get('secret', '') != RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
-    original_filepath = data.get('filepath', '').replace('images/', '', 1)
+    original_filepath = normalize_image_path(data.get('filepath', ''))
     source = data.get('source')
     post_id = data.get('post_id')
     download_image = data.get('download_image', False)

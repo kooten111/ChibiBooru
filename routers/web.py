@@ -10,6 +10,7 @@ from database import models
 from services import processing_service as processing
 from services import query_service, system_service, monitor_service
 from utils import get_thumbnail_path
+from utils.file_utils import normalize_image_path
 
 main_blueprint = Blueprint('main', __name__)
 
@@ -204,7 +205,7 @@ async def view_pool(pool_id):
 @main_blueprint.route('/view/<path:filepath>')
 @login_required
 async def show_image(filepath):
-    lookup_path = filepath.replace("images/", "", 1)
+    lookup_path = normalize_image_path(filepath)
     
     # Use the merged tags function to include high-confidence local tagger predictions
     from repositories.data_access import get_image_details_with_merged_tags
@@ -304,7 +305,7 @@ async def show_image(filepath):
         # Filter out self-match and family from semantic results
         visual_candidates = [
             c for c in visual_candidates 
-            if c['path'].replace("images/", "") != lookup_path and c['path'] not in parent_child_paths
+            if normalize_image_path(c['path']) != lookup_path and c['path'] not in parent_child_paths
         ]
 
         # Fallback or supplement with visual hash if semantic didn't return enough (or was disabled)
@@ -320,7 +321,7 @@ async def show_image(filepath):
             existing_paths = {c['path'] for c in visual_candidates}
             for hc in hash_candidates:
                 # Robust filtering
-                hc_path_norm = hc['path'].replace("images/", "")
+                hc_path_norm = normalize_image_path(hc['path'])
                 if (hc['path'] not in existing_paths 
                     and hc_path_norm != lookup_path
                     and hc['path'] not in parent_child_paths):
@@ -336,7 +337,7 @@ async def show_image(filepath):
             # Filter out self-match and family
             tag_candidates = [
                 c for c in tag_candidates 
-                if c['path'].replace("images/", "") != lookup_path and c['path'] not in parent_child_paths
+                if normalize_image_path(c['path']) != lookup_path and c['path'] not in parent_child_paths
             ]
             tag_candidates = tag_candidates[:tag_limit]
         else:
@@ -415,7 +416,7 @@ async def similar_visual(filepath):
     from services import similarity_service
     from utils import get_thumbnail_path
     
-    lookup_path = filepath.replace("images/", "", 1)
+    lookup_path = normalize_image_path(filepath)
     threshold = config.VISUAL_SIMILARITY_THRESHOLD
     exclude_family = True  # Default to excluding family
     
@@ -444,7 +445,7 @@ async def similar_visual(filepath):
 @main_blueprint.route('/raw/<path:filepath>')
 @login_required
 async def show_raw_data(filepath):
-    lookup_path = filepath.replace("images/", "", 1)
+    lookup_path = normalize_image_path(filepath)
     data = models.get_image_details(lookup_path)
     if not data or not data.get('raw_metadata'):
         return "Raw metadata not found", 404

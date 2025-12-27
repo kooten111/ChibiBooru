@@ -2,6 +2,7 @@ from quart import request, jsonify
 from . import api_blueprint
 from database import models
 from utils import api_handler
+from utils.file_utils import normalize_image_path
 
 @api_blueprint.route('/pools/create', methods=['POST'])
 @api_handler()
@@ -46,7 +47,7 @@ async def delete_pool(pool_id):
 async def add_image_to_pool(pool_id):
     """Add an image to a pool."""
     data = await request.json
-    filepath = data.get('filepath', '').replace('images/', '', 1)
+    filepath = normalize_image_path(data.get('filepath', ''))
 
     # Get image ID from filepath
     image_data = models.get_image_details(filepath)
@@ -62,7 +63,7 @@ async def add_image_to_pool(pool_id):
 async def remove_image_from_pool(pool_id):
     """Remove an image from a pool."""
     data = await request.json
-    filepath = data.get('filepath', '').replace('images/', '', 1)
+    filepath = normalize_image_path(data.get('filepath', ''))
 
     # Get image ID from filepath
     image_data = models.get_image_details(filepath)
@@ -78,7 +79,7 @@ async def remove_image_from_pool(pool_id):
 async def reorder_pool(pool_id):
     """Reorder images in a pool."""
     data = await request.json
-    filepath = data.get('filepath', '').replace('images/', '', 1)
+    filepath = normalize_image_path(data.get('filepath', ''))
     new_position = data.get('position')
 
     if new_position is None:
@@ -97,7 +98,7 @@ async def reorder_pool(pool_id):
 @api_handler()
 async def get_pools_for_image():
     """Get all pools containing a specific image."""
-    filepath = request.args.get('filepath', '').replace('images/', '', 1)
+    filepath = normalize_image_path(request.args.get('filepath', ''))
 
     # Get image ID from filepath
     image_data = models.get_image_details(filepath)
