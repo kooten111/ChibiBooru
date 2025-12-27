@@ -70,7 +70,7 @@ def is_main_app_running():
         try:
             logger = get_logger('MonitorRunner')
             logger.warning(f"Error checking for main app process: {e}")
-        except:
+        except Exception:
             import logging
             logging.warning(f"Error checking for main app process: {e}")
         return True

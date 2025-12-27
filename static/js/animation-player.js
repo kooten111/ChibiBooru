@@ -188,8 +188,6 @@ class AnimationPlayer {
             // Draw first frame
             this.drawFrame(0);
 
-            console.log(`[AnimationPlayer] Loaded ${this.frames.length} frames`);
-
         } catch (error) {
             console.error('[AnimationPlayer] Error loading zip frames:', error);
         }
@@ -240,8 +238,6 @@ class AnimationPlayer {
 
             // Draw first frame
             this.drawFrame(0);
-
-            console.log(`[AnimationPlayer] Loaded ${this.frames.length} GIF frames`);
 
         } catch (error) {
             console.error('[AnimationPlayer] Error loading GIF frames:', error);

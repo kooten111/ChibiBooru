@@ -93,7 +93,7 @@ def _load_data_from_db_impl():
                             post_id = data.get('id')
                             if post_id:
                                 temp_post_id_to_md5[post_id] = md5
-                except:
+                except (json.JSONDecodeError, KeyError, TypeError):
                     continue
 
             if i + BATCH_SIZE < total_rows:

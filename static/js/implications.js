@@ -6,7 +6,7 @@ let currentImplications = [];
 let impliedTags = [];
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     initializeTabs();
     loadSuggestions();
     loadExistingImplications();
@@ -117,7 +117,7 @@ function createPatternGroup(title, type, suggestions, description) {
 
 function createSuggestionItem(suggestion, type, idx) {
     const confidenceClass = suggestion.confidence >= 0.9 ? 'high-confidence' :
-                           suggestion.confidence >= 0.7 ? 'medium-confidence' : '';
+        suggestion.confidence >= 0.7 ? 'medium-confidence' : '';
 
     const confidencePercent = Math.round(suggestion.confidence * 100);
 
@@ -196,10 +196,10 @@ async function previewSuggestion(type, idx) {
         const preview = await response.json();
 
         showInfo(`Preview for ${suggestion.source_tag} → ${suggestion.implied_tag}\n\n` +
-              `Total images with source tag: ${preview.total_images}\n` +
-              `Already have implied tag: ${preview.already_has_tag}\n` +
-              `Will gain tag: ${preview.will_gain_tag}\n` +
-              `Chain implications: ${preview.chain_implications.join(', ') || 'None'}`);
+            `Total images with source tag: ${preview.total_images}\n` +
+            `Already have implied tag: ${preview.already_has_tag}\n` +
+            `Will gain tag: ${preview.will_gain_tag}\n` +
+            `Chain implications: ${preview.chain_implications.join(', ') || 'None'}`);
 
     } catch (error) {
         console.error('Error previewing:', error);
@@ -229,7 +229,7 @@ async function approveSuggestionData(suggestion, type) {
         const result = await response.json();
 
         if (result.status === 'success') {
-            console.log('Approved:', suggestion);
+            // Successfully approved
         } else {
             showError('Failed to approve: ' + (result.error || 'Unknown error'));
         }
@@ -245,7 +245,6 @@ function rejectSuggestion(type, idx) {
     // Just remove from UI - we could add a rejected_implications table later
     const item = document.querySelector(`[data-type="${type}"][data-index="${idx}"]`);
     item.style.display = 'none';
-    console.log('Rejected:', suggestion);
 }
 
 // Manual Creation Form

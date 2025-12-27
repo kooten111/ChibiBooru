@@ -592,7 +592,7 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                             if 'sources' in raw_data and 'pixiv' in raw_data['sources']:
                                 all_results['pixiv'] = raw_data['sources']['pixiv']
                                 print(f"[Bulk Retry Tagging] Found existing Pixiv data")
-                        except:
+                        except (json.JSONDecodeError, KeyError, TypeError):
                             pass
                 
                 # Run local tagger to complement

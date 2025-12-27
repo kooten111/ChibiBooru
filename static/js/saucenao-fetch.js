@@ -242,16 +242,14 @@ async function selectSauceNaoResult(idx) {
                     throw new Error('Server returned non-JSON response');
                 }
                 const data = await r.json();
-                console.log(`Metadata result from ${source.type}:`, data);
-                return {...data, source: source.type};
+                return { ...data, source: source.type };
             }).catch(err => {
                 console.error(`Failed to fetch ${source.type}:`, err);
-                return {status: 'error', error: err.message, source: source.type};
+                return { status: 'error', error: err.message, source: source.type };
             })
         );
 
         const metadataResults = await Promise.all(metadataPromises);
-        console.log('All metadata results:', metadataResults);
         displayMetadataOptions(metadataResults);
 
     } catch (error) {

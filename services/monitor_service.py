@@ -479,7 +479,7 @@ def stop_monitor():
             # Try force shutdown on error
             try:
                 ingest_executor.shutdown(wait=False)
-            except:
+            except Exception:
                 pass
         ingest_executor = None
 

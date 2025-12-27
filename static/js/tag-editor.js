@@ -12,8 +12,6 @@ class TagEditor {
     }
 
     toggleEditMode() {
-        console.log('toggleEditMode called, current state:', this.isEditing);
-
         if (!this.isEditing) {
             this.startEditing();
         } else {
@@ -22,14 +20,10 @@ class TagEditor {
     }
 
     startEditing() {
-        console.log('Starting edit mode');
-
         // Get current tags from the page
         this.loadCurrentTags();
         this.originalTags = JSON.parse(JSON.stringify(this.tags)); // Deep copy
         this.isEditing = true;
-
-        console.log('Current tags:', this.tags);
 
         // Transform the display
         this.renderEditMode();
@@ -188,8 +182,6 @@ class TagEditor {
         }
 
         this.attachEditEvents();
-
-        console.log('Edit mode rendered');
     }
 
     renderCategoriesHTML() {
@@ -491,8 +483,6 @@ class TagEditor {
     }
 
     renderViewMode() {
-        console.log('Rendering view mode');
-
         const editContainer = document.getElementById('inlineTagEditor');
         if (editContainer) {
             editContainer.remove();
@@ -545,8 +535,6 @@ class TagEditor {
     }
 
     saveTags() {
-        console.log('Saving tags:', this.tags);
-
         const filepath = document.getElementById('imageFilepath')?.value;
         if (!filepath) {
             console.error('No filepath found');
@@ -609,15 +597,12 @@ class TagEditor {
     }
 
     cancelEdit() {
-        console.log('Cancelling edit');
         this.tags = JSON.parse(JSON.stringify(this.originalTags));
         this.renderViewMode();
         showNotification('Changes cancelled', 'info');
     }
 
     async clearDeltas() {
-        console.log('Clearing deltas for current image');
-
         // Get the current filepath from the data attribute
         const imageViewContainer = document.getElementById('imageViewContainer');
         if (!imageViewContainer) {
@@ -696,8 +681,6 @@ window.tagEditor = new TagEditor();
 
 // Global function for the button
 function toggleTagEditor() {
-    console.log('toggleTagEditor called');
-
     if (window.tagEditor.isEditing) {
         const editBtn = document.querySelector('.actions-bar .action-btn.primary');
         if (editBtn && editBtn.classList.contains('editing-mode')) {
@@ -728,4 +711,3 @@ function saveTags() {
     window.tagEditor.saveTags();
 }
 
-console.log('Tag editor loaded');

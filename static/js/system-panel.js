@@ -18,7 +18,6 @@ async function validateStoredSecret() {
             // Stored secret is invalid, clear it
             SYSTEM_SECRET = null;
             localStorage.removeItem('system_secret');
-            console.log('Stored secret was invalid and has been cleared');
         }
     } catch (err) {
         console.error('Error validating stored secret:', err);
@@ -318,8 +317,6 @@ function pollTaskProgress(taskId, actionName, buttonElement, originalText) {
         fetch(`/api/task_status?task_id=${encodeURIComponent(taskId)}`)
             .then(res => res.json())
             .then(status => {
-                console.log('Task status:', status);
-
                 updateButton(status);
 
                 if (status.status === 'completed') {

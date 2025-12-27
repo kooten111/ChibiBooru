@@ -271,7 +271,7 @@ def get_related_images(post_id, parent_id, post_id_to_md5_mapping):
                                         })
                                         existing_children.add(child_path)
                                     break  # Don't add same child twice
-                    except:
+                    except (json.JSONDecodeError, KeyError, TypeError):
                         continue
 
     return related
@@ -343,7 +343,7 @@ def search_images_by_relationship(relationship_type):
                                     break
                             if has_child:
                                 break
-                        except:
+                        except (json.JSONDecodeError, KeyError, TypeError):
                             continue
 
                 # Add to results based on type
@@ -354,7 +354,7 @@ def search_images_by_relationship(relationship_type):
                 elif relationship_type == 'any' and (has_parent or has_child):
                     matching_filepaths.add(filepath)
 
-            except:
+            except (json.JSONDecodeError, KeyError, TypeError):
                 continue
 
         # Get full image data with tags

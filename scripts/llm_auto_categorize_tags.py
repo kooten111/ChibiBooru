@@ -14,10 +14,10 @@ import requests
 from typing import Optional, List, Dict
 from time import sleep
 
-# API configuration
-CHIBIBOORU_API_URL = "http://192.168.1.5:5000/api"  # ChibiBooru API base URL
-LM_STUDIO_URL = "http://192.168.1.2:1234/v1/chat/completions"
-MODEL_NAME = "mistralai/ministral-3-14b-reasoning"  # Adjust if needed
+# API configuration (can be overridden via environment variables)
+CHIBIBOORU_API_URL = os.environ.get('CHIBIBOORU_API_URL', 'http://localhost:5000/api')
+LM_STUDIO_URL = os.environ.get('LM_STUDIO_URL', 'http://localhost:1234/v1/chat/completions')
+MODEL_NAME = os.environ.get('LM_STUDIO_MODEL', 'mistralai/ministral-3-14b-reasoning')
 
 # Load category definitions from API
 TAG_CATEGORIES = None
@@ -299,7 +299,7 @@ def main():
         print("✓ LLM connection successful\n")
     except Exception as e:
         print(f"✗ Failed to connect to LLM: {e}")
-        print("Make sure LM Studio is running at http://192.168.1.122:1234")
+        print(f"Make sure LM Studio is running at {LM_STUDIO_URL.replace('/v1/chat/completions', '')}")
         return 1
 
     # Get uncategorized tags
