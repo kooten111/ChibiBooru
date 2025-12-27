@@ -2824,13 +2824,24 @@ body:is(.ui-hidden, .focus-mode)::after {
     max-width: 100%;
 }
 
+/* Horizontal container for action bar + filmstrip */
+.actions-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0;
+    margin: var(--spacing-md);
+    margin-top: var(--spacing-lg);
+}
+
 /* Compact pill variant */
 .actions-bar.pill {
     padding: 10px 16px;
     gap: 8px;
     border-radius: var(--radius-lg, 12px);
-    margin: var(--spacing-md);
-    margin-top: var(--spacing-lg);
+    margin: 0;
 }
 
 .actions-bar:hover {
@@ -4836,10 +4847,32 @@ body:is(.ui-hidden, .focus-mode)::after {
     opacity: 1;
 }
 
-/* ==================== FLOATING BULK ACTIONS PANEL (RIGHT-SIDE) ==================== */
+/* ==================== SELECTION MODE & BULK ACTIONS ==================== */
 
-/* Panel Container - Fixed position on right side */
-.bulk-fab-container {
+/* Header Selection Mode Button */
+.selection-mode-btn {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.selection-mode-btn .selection-icon {
+    font-size: 1.1em;
+    transition: transform 0.2s ease;
+}
+
+.selection-mode-btn.active {
+    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%) !important;
+    border-color: rgba(74, 158, 255, 0.5) !important;
+    color: white !important;
+    box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+}
+
+.selection-mode-btn.active .selection-icon {
+    transform: scale(1.1);
+}
+
+/* Floating Bulk Actions Panel */
+.bulk-actions-panel {
     position: fixed;
     top: 180px;
     right: 16px;
@@ -4847,120 +4880,43 @@ body:is(.ui-hidden, .focus-mode)::after {
     display: flex;
     flex-direction: column;
     gap: 8px;
-}
-
-/* Hide the main FAB button */
-.bulk-fab-button {
-    display: none;
-}
-
-/* Panel Menu - Minimal, flat design */
-.bulk-fab-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
     padding: 12px;
     background: rgba(40, 45, 60, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    width: 180px;
-}
-
-/* Remove the pill container - make toggle switch standalone */
-.bulk-fab-menu .selection-toggle-container {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0;
-    background: none;
-    border: none;
-    cursor: pointer;
-    user-select: none;
-}
-
-.bulk-fab-menu .selection-toggle-container:hover {
-    opacity: 0.8;
-}
-
-/* Toggle Switch - Simplified */
-.toggle-switch {
-    position: relative;
-    width: 44px;
-    height: 24px;
-    background: rgba(60, 60, 80, 0.9);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    flex-shrink: 0;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    min-width: 160px;
+    animation: slideInFromRight 0.25s ease-out;
 }
 
-.toggle-switch.active {
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
-    border-color: rgba(74, 158, 255, 0.5);
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
-.toggle-slider {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 18px;
-    height: 18px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.3s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-.toggle-switch.active .toggle-slider {
-    transform: translateX(20px);
-}
-
-/* Toggle Label - Simplified */
-.toggle-label {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-secondary);
-    cursor: pointer;
-}
-
-.toggle-switch.active~.toggle-label {
-    color: var(--primary-blue);
-}
-
-.toggle-icon {
-    display: none;
-}
-
-.toggle-text {
-    white-space: nowrap;
-    min-width: 85px;
-    display: inline-block;
-}
-
-/* Action Buttons - Minimal flat design */
-.bulk-action-btn {
-    padding: 8px 12px;
+/* Action Buttons in Panel */
+.bulk-actions-panel .bulk-action-btn {
+    padding: 10px 14px;
     border-radius: 8px;
     font-weight: 500;
     font-size: 13px;
     cursor: pointer;
     transition: all 0.2s ease;
-    display: none;
+    display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     white-space: nowrap;
 }
 
-.bulk-action-btn.visible {
-    display: flex;
-}
-
-.bulk-action-btn .btn-icon {
+.bulk-actions-panel .bulk-action-btn .btn-icon {
     font-size: 14px;
 }
 
@@ -4974,6 +4930,17 @@ body:is(.ui-hidden, .focus-mode)::after {
 #select-all-btn:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: var(--primary-blue);
+}
+
+/* Download Button */
+#download-selected-btn {
+    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    color: white;
+    border: none;
+}
+
+#download-selected-btn:hover {
+    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
 }
 
 /* Delete Selected Button */
@@ -5010,10 +4977,14 @@ body:is(.ui-hidden, .focus-mode)::after {
 
 /* Responsive positioning */
 @media (max-width: 768px) {
-    .bulk-fab-container {
+    .bulk-actions-panel {
         top: auto;
         bottom: 16px;
         right: 16px;
+    }
+
+    .selection-mode-btn .selection-icon {
+        font-size: 1em;
     }
 }
 
@@ -5283,176 +5254,219 @@ body:is(.ui-hidden, .focus-mode)::after {
 }
 
 /* ============================================================================
-   FAMILY BADGE - Floating Parent/Child Indicator
+   FAMILY FILMSTRIP - Compact filmstrip-style Parent/Child Indicator
    ============================================================================ */
 
-.family-badge {
-    position: absolute;
-    top: 16px;
-    left: 16px;
-    z-index: 20;
-}
-
-.family-badge-button {
+/* Main container - positioned beside action bar */
+.family-filmstrip {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-radius: 9999px;
-    backdrop-filter: var(--blur-md);
-    border: 1px solid var(--border-color);
-    background: rgba(30, 30, 45, 0.85);
-    cursor: pointer;
-    transition: all var(--transition-normal);
-    color: var(--text-secondary);
-    font-family: inherit;
-}
-
-.family-badge-button:hover {
-    border-color: var(--primary-blue);
-    background: rgba(40, 40, 60, 0.95);
-}
-
-.family-badge.expanded .family-badge-button {
-    border-color: var(--primary-blue);
-    background: rgba(40, 40, 60, 0.98);
-    box-shadow: 0 4px 20px rgba(135, 206, 235, 0.2);
-}
-
-.family-badge-icon {
-    font-size: 1.1em;
-}
-
-.family-badge-text {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-}
-
-.family-badge-arrow {
-    font-size: 10px;
-    transition: transform var(--transition-normal);
-    opacity: 0.7;
-}
-
-.family-badge.expanded .family-badge-arrow {
-    transform: rotate(180deg);
-}
-
-/* Expanded Panel */
-.family-badge-panel {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    width: fit-content;
-    max-width: min(500px, calc(100vw - 48px));
-    padding: 16px;
-    background: rgba(30, 30, 45, 0.98);
-    backdrop-filter: var(--blur-lg);
-    border-radius: var(--radius-xl);
-    border: 1px solid var(--border-color-hover);
-    box-shadow: var(--shadow-2xl);
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(-8px);
-    transition: all 0.2s ease-out;
-}
-
-.family-badge.expanded .family-badge-panel {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-}
-
-/* Family Groups */
-.family-group {
-    margin-bottom: 16px;
-}
-
-.family-group:last-child {
-    margin-bottom: 0;
-}
-
-.family-group-header {
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-bold);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 10px;
-}
-
-.family-group-header.parent {
-    color: #90ee90;
-}
-
-.family-group-header.child {
-    color: #dda0dd;
-}
-
-.family-group-thumbs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-/* Family Thumbnails */
-.family-thumb {
-    display: block;
-    width: 300px;
-    height: auto;
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    border: 3px solid rgba(100, 100, 120, 0.5);
-    transition: all var(--transition-normal);
+    gap: 0;
+    transition: all 0.25s ease-out;
     flex-shrink: 0;
+    margin-left: var(--spacing-md, 12px);
 }
 
-.family-thumb:hover {
-    transform: scale(1.05);
-    z-index: 5;
+/* Hidden state - shrinks to just the toggle button */
+.family-filmstrip.hidden .filmstrip-content {
+    max-width: 0;
+    opacity: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
-.family-thumb-parent {
-    border-color: rgba(144, 238, 144, 0.6);
+/* Filmstrip content container - matches action bar theming */
+.filmstrip-content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    background: var(--bg-secondary, rgba(20, 20, 30, 0.95));
+    backdrop-filter: var(--blur-md);
+    border-radius: var(--radius-lg, 12px) 0 0 var(--radius-lg, 12px);
+    border: none;
+    max-width: 600px;
+    transition: all 0.25s ease-out;
 }
 
-.family-thumb-parent:hover {
-    border-color: #90ee90;
-    box-shadow: 0 4px 16px rgba(144, 238, 144, 0.4);
+/* Toggle button - matches action bar theming */
+.filmstrip-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 100%;
+    min-height: 52px;
+    padding: 0 12px;
+    border: none;
+    background: var(--bg-secondary, rgba(20, 20, 30, 0.95));
+    backdrop-filter: var(--blur-md);
+    border-radius: 0 var(--radius-lg, 12px) var(--radius-lg, 12px) 0;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 18px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
 }
 
-.family-thumb-child {
-    border-color: rgba(221, 160, 221, 0.6);
+.family-filmstrip.hidden .filmstrip-toggle {
+    border-radius: var(--radius-lg, 12px);
+    padding: 0 14px;
+    font-size: 14px;
 }
 
-.family-thumb-child:hover {
-    border-color: #dda0dd;
-    box-shadow: 0 4px 16px rgba(221, 160, 221, 0.4);
+.filmstrip-toggle:hover {
+    background: rgba(60, 60, 90, 0.8);
+    color: var(--text-primary);
 }
 
-.family-thumb img {
-    width: 100%;
-    height: auto;
+/* Individual filmstrip thumbnail - larger size */
+.filmstrip-thumb {
+    position: relative;
     display: block;
+    height: 64px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm, 6px);
+    overflow: visible;
+}
+
+.filmstrip-thumb img {
+    height: 100%;
+    width: auto;
+    display: block;
+    border-radius: var(--radius-sm, 6px);
+    border: 2px solid rgba(60, 60, 90, 0.6);
+}
+
+.filmstrip-thumb:hover {
+    transform: scale(1.15) translateY(-4px);
+    z-index: 10;
+}
+
+/* Filmstrip perforations (decorative) */
+.filmstrip-perfs {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    height: 3px;
+    display: flex;
+    justify-content: space-around;
+    pointer-events: none;
+}
+
+.filmstrip-perfs.top {
+    top: -1px;
+}
+
+.filmstrip-perfs.bottom {
+    bottom: -1px;
+}
+
+.filmstrip-perfs::before,
+.filmstrip-perfs::after {
+    content: '';
+    width: 4px;
+    height: 3px;
+    background: rgba(80, 80, 100, 0.8);
+    border-radius: 1px;
+}
+
+/* Type badge (P for parent, C for child) */
+.filmstrip-type-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm, 4px);
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.filmstrip-thumb-parent .filmstrip-type-badge {
+    background: rgba(74, 222, 128, 0.9);
+    color: #0a2010;
+}
+
+.filmstrip-thumb-child .filmstrip-type-badge {
+    background: rgba(192, 132, 252, 0.9);
+    color: #1a0a2a;
+}
+
+/* Parent thumbnail border accent */
+.filmstrip-thumb-parent img {
+    border-color: rgba(74, 222, 128, 0.5);
+}
+
+.filmstrip-thumb-parent:hover img {
+    border-color: #4ade80;
+    box-shadow: 0 4px 12px rgba(74, 222, 128, 0.4);
+}
+
+/* Child thumbnail border accent */
+.filmstrip-thumb-child img {
+    border-color: rgba(192, 132, 252, 0.5);
+}
+
+.filmstrip-thumb-child:hover img {
+    border-color: #c084fc;
+    box-shadow: 0 4px 12px rgba(192, 132, 252, 0.4);
+}
+
+/* Current image marker */
+.filmstrip-current {
+    color: var(--primary-blue, #60a5fa);
+    font-size: 14px;
+    padding: 0 8px;
+    text-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
+    user-select: none;
+}
+
+/* Hover preview - enlarged thumbnail */
+.filmstrip-preview {
+    position: fixed;
+    z-index: 9999;
+    transform: translateX(-50%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.filmstrip-preview.visible {
+    opacity: 1;
+}
+
+.filmstrip-preview img {
+    max-height: 280px;
+    max-width: 400px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
-    .family-badge {
-        top: 8px;
-        left: 8px;
+    .filmstrip-content {
+        padding: 6px 10px;
+        gap: 4px;
     }
 
-    .family-badge-button {
-        padding: 8px 12px;
+    .filmstrip-thumb {
+        height: 48px;
     }
 
-    .family-badge-panel {
-        max-width: calc(100vw - 32px);
-        padding: 12px;
+    .filmstrip-type-badge {
+        font-size: 8px;
+        padding: 1px 4px;
     }
 
-    .family-thumb {
-        width: 200px;
-        height: auto;
+    .filmstrip-preview img {
+        max-height: 180px;
+        max-width: 260px;
     }
 }

@@ -90,6 +90,7 @@ async def clear_deltas():
     count = models.clear_deltas_for_image(filepath)
 
     return {
+        "status": "success",
         "message": f"Cleared {count} delta(s) for this image",
         "count": count
     }

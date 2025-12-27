@@ -7,7 +7,7 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=27' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=28' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') + '?v=1' }}">
 </head>
@@ -65,39 +65,26 @@
 
         <!-- Keyboard Hint -->
         <div class="keyboard-hint">
-            <kbd>J</kbd>/<kbd>K</kbd> navigate • <kbd>Enter</kbd> open • <kbd>Ctrl+F</kbd> search
+            <kbd>H</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> navigate • <kbd>Space</kbd> select • <kbd>Ctrl+A</kbd> all
+            • <kbd>S</kbd> sidebar • <kbd>Ctrl+F</kbd> search
         </div>
     </div>
 
-    <!-- Floating Action Button for Bulk Actions -->
+    <!-- Floating Bulk Actions Panel (appears when selection mode is active) -->
     {% if query and total_results is defined %}
-    <div class="bulk-fab-container" id="bulkFabContainer">
-        <div class="bulk-fab-menu" id="bulkFabMenu">
-            <div class="selection-toggle-container">
-                <div class="toggle-switch" id="selection-toggle">
-                    <div class="toggle-slider"></div>
-                </div>
-                <label class="toggle-label" for="selection-toggle">
-                    <span class="toggle-icon">☐</span>
-                    <span class="toggle-text">Select Mode</span>
-                </label>
-            </div>
-            <button id="select-all-btn" class="btn btn-secondary bulk-action-btn" style="display: none;">
-                <span class="btn-icon">☑</span>
-                <span class="btn-text">Select All</span>
-            </button>
-            <button id="download-selected-btn" class="btn btn-primary bulk-action-btn" style="display: none;">
-                <span class="btn-icon">📥</span>
-                <span class="btn-text">Download</span>
-            </button>
-            <button id="delete-selected-btn" class="btn btn-danger bulk-action-btn" style="display: none;">
-                <span class="btn-icon">🗑</span>
-                <span class="btn-text">Delete Selected</span>
-                <span class="selection-badge" id="selected-count">0</span>
-            </button>
-        </div>
-        <button class="bulk-fab-button" id="bulkFabButton">
-            <span class="fab-icon">☑</span>
+    <div class="bulk-actions-panel" id="bulkActionsPanel" style="display: none;">
+        <button id="select-all-btn" class="btn btn-secondary bulk-action-btn">
+            <span class="btn-icon">☑</span>
+            <span class="btn-text">Select All</span>
+        </button>
+        <button id="download-selected-btn" class="btn btn-primary bulk-action-btn">
+            <span class="btn-icon">📥</span>
+            <span class="btn-text">Download</span>
+        </button>
+        <button id="delete-selected-btn" class="btn btn-danger bulk-action-btn">
+            <span class="btn-icon">🗑</span>
+            <span class="btn-text">Delete</span>
+            <span class="selection-badge" id="selected-count">0</span>
         </button>
     </div>
     {% endif %}

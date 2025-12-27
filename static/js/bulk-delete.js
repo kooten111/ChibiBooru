@@ -8,10 +8,7 @@ import { showSuccess, showError, showInfo } from './utils/notifications.js';
     let selectedImages = new Set();
 
     const selectionToggle = document.getElementById('selection-toggle');
-    const toggleContainer = document.querySelector('.selection-toggle-container');
-    const toggleLabel = document.querySelector('.toggle-label');
-    const toggleIcon = document.querySelector('.toggle-icon');
-    const toggleText = document.querySelector('.toggle-text');
+    const bulkActionsPanel = document.getElementById('bulkActionsPanel');
     const selectAllBtn = document.getElementById('select-all-btn');
     const downloadSelectedBtn = document.getElementById('download-selected-btn');
     const deleteSelectedBtn = document.getElementById('delete-selected-btn');
@@ -30,52 +27,41 @@ import { showSuccess, showError, showInfo } from './utils/notifications.js';
     function toggleSelectionMode() {
         selectionMode = !selectionMode;
         const checkboxes = document.querySelectorAll('.image-select-checkbox');
+        const selectionIcon = selectionToggle.querySelector('.selection-icon');
 
         if (selectionMode) {
-            // Enable selection mode - show checkboxes and other buttons
+            // Enable selection mode - show checkboxes and action panel
             checkboxes.forEach(cb => {
                 cb.style.display = 'block';
             });
-            selectAllBtn.style.display = 'flex';
-            selectAllBtn.classList.add('visible');
-            downloadSelectedBtn.style.display = 'flex';
-            downloadSelectedBtn.classList.add('visible');
-            deleteSelectedBtn.style.display = 'flex';
-            deleteSelectedBtn.classList.add('visible');
+            if (bulkActionsPanel) {
+                bulkActionsPanel.style.display = 'flex';
+            }
             selectionToggle.classList.add('active');
-            toggleIcon.textContent = '☑';
-            toggleText.textContent = 'Selecting...';
+            if (selectionIcon) {
+                selectionIcon.textContent = '☑';
+            }
         } else {
             // Disable selection mode - hide checkboxes and reset
             checkboxes.forEach(cb => {
                 cb.style.display = 'none';
                 cb.checked = false;
             });
-            selectAllBtn.style.display = 'none';
-            selectAllBtn.classList.remove('visible');
-            downloadSelectedBtn.style.display = 'none';
-            downloadSelectedBtn.classList.remove('visible');
-            deleteSelectedBtn.style.display = 'none';
-            deleteSelectedBtn.classList.remove('visible');
+            if (bulkActionsPanel) {
+                bulkActionsPanel.style.display = 'none';
+            }
             selectionToggle.classList.remove('active');
-            toggleIcon.textContent = '☐';
-            toggleText.textContent = 'Select Mode';
+            if (selectionIcon) {
+                selectionIcon.textContent = '☐';
+            }
             selectedImages.clear();
             updateSelectedCount();
         }
     }
 
-    // Handle toggle switch clicks
+    // Handle toggle button clicks
     if (selectionToggle) {
         selectionToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleSelectionMode();
-        });
-    }
-
-    // Also handle clicks on the container for better UX
-    if (toggleContainer) {
-        toggleContainer.addEventListener('click', (e) => {
             e.stopPropagation();
             toggleSelectionMode();
         });
@@ -92,7 +78,10 @@ import { showSuccess, showError, showInfo } from './utils/notifications.js';
             const allCheckboxes = document.querySelectorAll('.image-select-checkbox');
             const allSelected = allCheckboxes.length > 0 &&
                 Array.from(allCheckboxes).every(cb => cb.checked);
-            selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
+            const btnText = selectAllBtn.querySelector('.btn-text');
+            if (btnText) {
+                btnText.textContent = allSelected ? 'Deselect All' : 'Select All';
+            }
         }
     }
 

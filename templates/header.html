@@ -26,6 +26,11 @@
                     <button class="grid-size-btn active" data-size="medium" title="Medium thumbnails">M</button>
                     <button class="grid-size-btn" data-size="large" title="Large thumbnails">L</button>
                 </div>
+                {% if query %}
+                <button class="header-btn selection-mode-btn" id="selection-toggle" title="Toggle selection mode">
+                    <span class="selection-icon">☐</span>
+                </button>
+                {% endif %}
                 <button class="header-btn" id="sidebarToggle" title="Toggle filters">◧</button>
             </div>
             {% else %}

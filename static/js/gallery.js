@@ -4,7 +4,7 @@
  * - Filter sidebar toggle
  * - Quick filter functionality  
  * - Recent searches
- * - Keyboard navigation (J/K, Ctrl+F, Enter, Escape)
+ * - Keyboard navigation (hjkl, arrows, space selection, Ctrl+A, Ctrl+F)
  * - Active filters bar with editable chips
  */
 
@@ -20,7 +20,9 @@
         sidebarOpen: localStorage.getItem('gallery-sidebar') !== 'false',
         recentSearches: JSON.parse(localStorage.getItem('recent-searches') || '[]'),
         focusedIndex: -1,
-        activeFilters: []
+        activeFilters: [],
+        spaceHeld: false,  // Track if space is being held for range selection
+        searchFocused: false  // Track search focus state for Ctrl+F toggle
     };
 
     // ========================================================================
@@ -319,6 +321,96 @@
     }
 
     // ========================================================================
+    // GRID UTILITIES
+    // ========================================================================
+
+    /**
+     * Get number of columns in the current grid layout
+     */
+    function getGridColumns() {
+        const gallery = document.querySelector('.gallery');
+        const thumbs = document.querySelectorAll('.thumbnail');
+        if (!gallery || thumbs.length < 2) return 4;
+
+        // Get the first row by finding how many thumbnails share the same top offset
+        const firstTop = thumbs[0].offsetTop;
+        let columnsInFirstRow = 0;
+        for (const thumb of thumbs) {
+            if (thumb.offsetTop === firstTop) {
+                columnsInFirstRow++;
+            } else {
+                break;
+            }
+        }
+        return columnsInFirstRow || 4;
+    }
+
+    /**
+     * Get row and column position for a given index
+     */
+    function getGridPosition(index) {
+        const cols = getGridColumns();
+        return {
+            row: Math.floor(index / cols),
+            col: index % cols
+        };
+    }
+
+    /**
+     * Get index from row and column
+     */
+    function getIndexFromPosition(row, col) {
+        const cols = getGridColumns();
+        return row * cols + col;
+    }
+
+    // ========================================================================
+    // SELECTION INTEGRATION
+    // ========================================================================
+
+    /**
+     * Toggle selection on a specific thumbnail
+     * Works with bulk-delete.js if selection mode is enabled
+     */
+    function toggleThumbnailSelection(thumb) {
+        if (!thumb) return;
+
+        const checkbox = thumb.querySelector('.image-select-checkbox');
+        if (!checkbox) return;
+
+        // Auto-enable selection mode if not already active
+        const selectionToggle = document.getElementById('selection-toggle');
+        if (selectionToggle && checkbox.style.display === 'none') {
+            // Trigger selection mode
+            selectionToggle.click();
+        }
+
+        // Toggle the checkbox
+        checkbox.checked = !checkbox.checked;
+
+        // Dispatch change event to notify bulk-delete.js
+        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    /**
+     * Select all visible thumbnails
+     */
+    function selectAllVisible() {
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const selectionToggle = document.getElementById('selection-toggle');
+
+        // Enable selection mode first if needed
+        if (selectionToggle && !selectionToggle.classList.contains('active')) {
+            selectionToggle.click();
+        }
+
+        // Click the select all button if it exists
+        if (selectAllBtn) {
+            selectAllBtn.click();
+        }
+    }
+
+    // ========================================================================
     // KEYBOARD NAVIGATION
     // ========================================================================
 
@@ -328,20 +420,34 @@
 
         const els = getElements();
 
-        // Ignore if typing in an input (except for Escape and Ctrl+F)
+        // Ignore if typing in an input (except for Escape and Ctrl shortcuts)
         const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
 
-        // Ctrl+F - focus search (prevent browser find)
+        // Ctrl+F - toggle search focus
         if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
             e.preventDefault();
-            els.searchInput?.focus();
+            if (state.searchFocused && els.searchInput) {
+                els.searchInput.blur();
+                state.searchFocused = false;
+            } else if (els.searchInput) {
+                els.searchInput.focus();
+                state.searchFocused = true;
+            }
             return;
         }
 
-        // Escape - blur search
+        // Ctrl+A - select all visible (only when not typing)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'a' && !isTyping) {
+            e.preventDefault();
+            selectAllVisible();
+            return;
+        }
+
+        // Escape - blur search / deselect
         if (e.key === 'Escape') {
             if (document.activeElement) {
                 document.activeElement.blur();
+                state.searchFocused = false;
             }
             return;
         }
@@ -350,39 +456,123 @@
         if (isTyping) return;
 
         const thumbnails = Array.from(document.querySelectorAll('.thumbnail'));
+        if (thumbnails.length === 0) return;
+
+        const cols = getGridColumns();
+        const currentPos = getGridPosition(state.focusedIndex);
+        const totalRows = Math.ceil(thumbnails.length / cols);
+
+        let newIndex = state.focusedIndex;
 
         switch (e.key) {
+            // Sidebar toggle
+            case 's':
+            case 'S':
+                e.preventDefault();
+                toggleSidebar();
+                return;
+
+            // Move down
             case 'j':
             case 'ArrowDown':
                 e.preventDefault();
-                state.focusedIndex = Math.min(state.focusedIndex + 1, thumbnails.length - 1);
-                focusThumbnail(thumbnails[state.focusedIndex]);
+                if (state.focusedIndex === -1) {
+                    // Start at first item
+                    newIndex = 0;
+                } else {
+                    // Move down one row
+                    const nextRowIndex = getIndexFromPosition(currentPos.row + 1, currentPos.col);
+                    if (nextRowIndex < thumbnails.length) {
+                        newIndex = nextRowIndex;
+                    }
+                }
                 break;
 
+            // Move up
             case 'k':
             case 'ArrowUp':
                 e.preventDefault();
-                state.focusedIndex = Math.max(state.focusedIndex - 1, 0);
-                focusThumbnail(thumbnails[state.focusedIndex]);
+                if (state.focusedIndex === -1) {
+                    newIndex = 0;
+                } else if (currentPos.row > 0) {
+                    newIndex = getIndexFromPosition(currentPos.row - 1, currentPos.col);
+                }
                 break;
 
-            case 'ArrowRight':
-                e.preventDefault();
-                state.focusedIndex = Math.min(state.focusedIndex + 1, thumbnails.length - 1);
-                focusThumbnail(thumbnails[state.focusedIndex]);
-                break;
-
+            // Move left
+            case 'h':
             case 'ArrowLeft':
                 e.preventDefault();
-                state.focusedIndex = Math.max(state.focusedIndex - 1, 0);
-                focusThumbnail(thumbnails[state.focusedIndex]);
+                if (state.focusedIndex === -1) {
+                    newIndex = 0;
+                } else if (currentPos.col > 0) {
+                    // Stay within same row
+                    newIndex = state.focusedIndex - 1;
+                }
                 break;
 
+            // Move right
+            case 'l':
+            case 'ArrowRight':
+                e.preventDefault();
+                if (state.focusedIndex === -1) {
+                    newIndex = 0;
+                } else {
+                    const nextIndex = state.focusedIndex + 1;
+                    const nextPos = getGridPosition(nextIndex);
+                    // Only move right if still on same row and valid
+                    if (nextIndex < thumbnails.length && nextPos.row === currentPos.row) {
+                        newIndex = nextIndex;
+                    }
+                }
+                break;
+
+            // Select focused image
+            case ' ':
+                e.preventDefault();
+                if (state.focusedIndex >= 0 && thumbnails[state.focusedIndex]) {
+                    toggleThumbnailSelection(thumbnails[state.focusedIndex]);
+                }
+                return;
+
+            // Open focused image
             case 'Enter':
                 if (state.focusedIndex >= 0 && thumbnails[state.focusedIndex]) {
                     thumbnails[state.focusedIndex].querySelector('a')?.click();
                 }
-                break;
+                return;
+
+            default:
+                return;
+        }
+
+        // Update focus if index changed
+        if (newIndex !== state.focusedIndex) {
+            state.focusedIndex = newIndex;
+            focusThumbnail(thumbnails[state.focusedIndex]);
+
+            // If space is held, also select the new thumbnail
+            if (state.spaceHeld && thumbnails[state.focusedIndex]) {
+                const checkbox = thumbnails[state.focusedIndex].querySelector('.image-select-checkbox');
+                if (checkbox && !checkbox.checked) {
+                    toggleThumbnailSelection(thumbnails[state.focusedIndex]);
+                }
+            }
+        }
+    }
+
+    function handleKeyUp(e) {
+        if (e.key === ' ') {
+            state.spaceHeld = false;
+        }
+    }
+
+    function handleKeyDownForSpace(e) {
+        if (e.key === ' ' && !e.repeat) {
+            const isTyping = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+            if (!isTyping) {
+                state.spaceHeld = true;
+            }
         }
     }
 
@@ -392,6 +582,15 @@
         document.querySelectorAll('.thumbnail.focused').forEach(t => t.classList.remove('focused'));
         thumb.classList.add('focused');
         thumb.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Track search focus state
+    function handleSearchFocus() {
+        state.searchFocused = true;
+    }
+
+    function handleSearchBlur() {
+        state.searchFocused = false;
     }
 
     // ========================================================================
@@ -432,6 +631,12 @@
 
         // Keyboard navigation
         document.addEventListener('keydown', handleKeyboard);
+        document.addEventListener('keydown', handleKeyDownForSpace);
+        document.addEventListener('keyup', handleKeyUp);
+
+        // Track search focus for Ctrl+F toggle
+        els.searchInput?.addEventListener('focus', handleSearchFocus);
+        els.searchInput?.addEventListener('blur', handleSearchBlur);
 
         // Save search on form submit
         const searchForm = document.querySelector('.search-bar form');
