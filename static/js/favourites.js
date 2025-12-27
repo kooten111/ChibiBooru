@@ -6,21 +6,38 @@
 (function () {
     'use strict';
 
-    const favouriteBtn = document.getElementById('favouriteBtn');
-    if (!favouriteBtn) return;
+    // Expose init function for client-side navigation
+    // Expose init function for client-side navigation
+    window.initFavourites = function () {
+        favouriteBtn = document.getElementById('favouriteBtn');
+        if (!favouriteBtn) return;
 
-    const filepath = favouriteBtn.dataset.filepath;
-    const iconSpan = favouriteBtn.querySelector('.favourite-icon');
-    const textSpan = favouriteBtn.querySelector('.favourite-text');
+        iconSpan = favouriteBtn.querySelector('.favourite-icon');
+        textSpan = favouriteBtn.querySelector('.favourite-text');
 
+        // Remove existing listener to prevent duplicates if called multiple times
+        favouriteBtn.removeEventListener('click', toggleFavourite);
+        favouriteBtn.addEventListener('click', toggleFavourite);
+
+        const filepath = favouriteBtn.dataset.filepath;
+
+        checkFavouriteStatus(filepath);
+    };
+
+    let favouriteBtn;
+    let iconSpan;
+    let textSpan;
     // Icons for favourite states
     const ICON_FAVOURITE = '❤️';
     const ICON_NOT_FAVOURITE = '🤍';
 
-    /**
-     * Update button appearance based on favourite state
-     */
     function updateButtonState(isFavourite) {
+        // Re-query if null (safety)
+        if (!favouriteBtn) favouriteBtn = document.getElementById('favouriteBtn');
+        if (!favouriteBtn) return;
+        iconSpan = favouriteBtn.querySelector('.favourite-icon');
+        textSpan = favouriteBtn.querySelector('.favourite-text');
+
         if (isFavourite) {
             favouriteBtn.classList.add('is-favourite');
             if (iconSpan) iconSpan.textContent = ICON_FAVOURITE;
@@ -32,10 +49,7 @@
         }
     }
 
-    /**
-     * Check initial favourite status on page load
-     */
-    async function checkFavouriteStatus() {
+    async function checkFavouriteStatus(filepath) {
         try {
             const response = await fetch(`/api/favourites/status?filepath=${encodeURIComponent(filepath)}`);
             if (response.ok) {
@@ -47,12 +61,13 @@
         }
     }
 
-    /**
-     * Toggle favourite status
-     */
-    async function toggleFavourite() {
+    async function toggleFavourite(e) {
+        // Get the button from the event to ensure we have the right one
+        const btn = e.currentTarget;
+        const filepath = btn.dataset.filepath;
+
         // Disable button during request
-        favouriteBtn.disabled = true;
+        btn.disabled = true;
 
         try {
             const response = await fetch('/api/favourites/toggle', {
@@ -67,7 +82,6 @@
                 const data = await response.json();
                 updateButtonState(data.is_favourite);
 
-                // Optional: Show toast notification
                 if (typeof showToast === 'function') {
                     showToast(data.message, 'success');
                 }
@@ -84,13 +98,11 @@
                 showToast('Failed to toggle favourite', 'error');
             }
         } finally {
-            favouriteBtn.disabled = false;
+            btn.disabled = false;
         }
     }
 
-    // Event listener for button click
-    favouriteBtn.addEventListener('click', toggleFavourite);
+    // Initialize on load
+    window.initFavourites();
 
-    // Check initial status on page load
-    checkFavouriteStatus();
 })();

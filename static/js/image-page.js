@@ -541,6 +541,10 @@ function initSwipeNavigation() {
             if (typeof loadPoolsForImage === 'function') {
                 loadPoolsForImage();
             }
+
+            if (typeof window.initFavourites === 'function') {
+                window.initFavourites();
+            }
         }, 50);
 
         isTransitioning = false;
