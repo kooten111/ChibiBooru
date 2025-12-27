@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Tag Manager - {{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tag-manager.css') + '?v=2' }}">
+</head>
+
+<body>
+    {% include 'header.html' %}
+
+    <div class="tag-manager-container">
+        <!-- Header with mode tabs -->
+        <div class="tag-manager-header">
+            <div class="header-left">
+                <h1 class="page-title">Tag Manager</h1>
+            </div>
+            <div class="mode-tabs">
+                <button class="mode-tab active" data-mode="tags">
+                    <span class="tab-icon">🏷️</span>
+                    <span class="tab-label">Tags</span>
+                </button>
+                <button class="mode-tab" data-mode="images">
+                    <span class="tab-icon">🖼️</span>
+                    <span class="tab-label">Images</span>
+                </button>
+                <button class="mode-tab" data-mode="stats">
+                    <span class="tab-icon">📊</span>
+                    <span class="tab-label">Statistics</span>
+                </button>
+            </div>
+            <div class="header-actions">
+                <button class="header-action-btn" id="settingsBtn" title="Settings">
+                    <span>⚙️</span>
+                </button>
+                <button class="header-action-btn" id="helpBtn" title="Keyboard shortcuts (?)">
+                    <span>?</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Working Set Bar -->
+        <div class="working-set-bar" id="workingSetBar">
+            <div class="working-set-info">
+                <span class="working-set-count" id="workingSetCount">0 images</span>
+            </div>
+            <div class="working-set-thumbnails" id="workingSetThumbnails">
+                <!-- Thumbnails populated by JS -->
+            </div>
+            <div class="working-set-actions">
+                <button class="ws-btn ws-btn-primary" id="addTagsBtn">+ Tags</button>
+                <button class="ws-btn ws-btn-danger" id="removeTagsBtn">− Tags</button>
+                <button class="ws-btn ws-btn-secondary" id="clearWorkingSetBtn">Clear</button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="tag-manager-layout">
+            <!-- Left Panel (Filters) -->
+            <div class="left-panel" id="leftPanel">
+                <!-- Tags Mode Filters -->
+                <div class="panel-content mode-content" data-mode="tags">
+                    <div class="panel-section">
+                        <h3 class="panel-section-title">Filters</h3>
+                        <input type="text" id="tagSearchInput" class="filter-input" placeholder="Search tags...">
+                    </div>
+
+                    <div class="panel-section">
+                        <h4 class="section-header">Status</h4>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="tagStatus" value="all" checked>
+                                <span>All</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="tagStatus" value="uncategorized">
+                                <span>Uncategorized</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="tagStatus" value="needs_extended">
+                                <span>Needs Extended</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="tagStatus" value="orphaned">
+                                <span>Orphaned</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="tagStatus" value="low_usage">
+                                <span>Low Usage (&lt;5)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h4 class="section-header">Base Category</h4>
+                        <div class="checkbox-group">
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="baseCategory" value="character">
+                                <span>Character</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="baseCategory" value="copyright">
+                                <span>Copyright</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="baseCategory" value="artist">
+                                <span>Artist</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="baseCategory" value="general">
+                                <span>General</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="baseCategory" value="meta">
+                                <span>Meta</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" name="baseCategory" value="species">
+                                <span>Species</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="panel-section">
+                        <h4 class="section-header">Sort By</h4>
+                        <select id="tagSortSelect" class="filter-select">
+                            <option value="count_desc">Count (High to Low)</option>
+                            <option value="count_asc">Count (Low to High)</option>
+                            <option value="alpha_asc">Name (A to Z)</option>
+                            <option value="alpha_desc">Name (Z to A)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Images Mode Filters -->
+                <div class="panel-content mode-content" data-mode="images" style="display: none;">
+                    <div class="panel-section">
+                        <h3 class="panel-section-title">Find Images</h3>
+                        <input type="text" id="imageSearchInput" class="filter-input" placeholder="Search images...">
+                        <button class="filter-btn" id="imageSearchBtn">Search</button>
+                    </div>
+
+                    <div class="panel-section">
+                        <h4 class="section-header">Search Behavior</h4>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="searchMode" value="replace" checked>
+                                <span>Replace Results</span>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="searchMode" value="add">
+                                <span>Add to Working Set</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Mode has no filters -->
+                <div class="panel-content mode-content" data-mode="stats" style="display: none;">
+                    <div class="panel-section">
+                        <h3 class="panel-section-title">Statistics</h3>
+                        <p class="panel-info">View comprehensive tag and image statistics.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Panel (Content) -->
+            <div class="center-panel" id="centerPanel">
+                <!-- Tags Mode Content -->
+                <div class="panel-content mode-content" data-mode="tags">
+                    <div class="content-header">
+                        <div class="content-title">Tags</div>
+                        <div class="content-actions">
+                            <span class="result-count" id="tagResultCount">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="tag-list-container">
+                        <div class="loading-state" id="tagLoadingState">Loading tags...</div>
+                        <table class="tag-table" id="tagTable" style="display: none;">
+                            <thead>
+                                <tr>
+                                    <th width="40"><input type="checkbox" id="selectAllTags"></th>
+                                    <th>Tag Name</th>
+                                    <th>Base Category</th>
+                                    <th>Extended Category</th>
+                                    <th width="80">Count</th>
+                                    <th width="80">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tagTableBody">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="pagination-controls" id="tagPagination" style="display: none;">
+                        <button class="pagination-btn" id="tagPrevBtn" disabled>Previous</button>
+                        <span class="pagination-info" id="tagPageInfo">Page 1</span>
+                        <button class="pagination-btn" id="tagNextBtn">Next</button>
+                        <select id="tagPerPageSelect" class="per-page-select">
+                            <option value="25">25 per page</option>
+                            <option value="50" selected>50 per page</option>
+                            <option value="100">100 per page</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Images Mode Content -->
+                <div class="panel-content mode-content" data-mode="images" style="display: none;">
+                    <div class="content-header">
+                        <div class="content-title">Image Search Results</div>
+                        <div class="content-actions">
+                            <button class="content-action-btn" id="selectAllImages">Select All</button>
+                            <button class="content-action-btn" id="addSelectedToWorkingSet">Add Selected</button>
+                        </div>
+                    </div>
+                    <div class="image-grid-container">
+                        <div class="info-state" id="imageInfoState">Search for images to begin</div>
+                        <div class="image-grid" id="imageGrid">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                    <div class="pagination-controls" id="imagePagination" style="display: none;">
+                        <button class="pagination-btn" id="imagePrevBtn" disabled>Previous</button>
+                        <span class="pagination-info" id="imagePageInfo">Page 1</span>
+                        <button class="pagination-btn" id="imageNextBtn">Next</button>
+                    </div>
+                </div>
+
+                <!-- Stats Mode Content -->
+                <div class="panel-content mode-content" data-mode="stats" style="display: none;">
+                    <div class="stats-container" id="statsContainer">
+                        <div class="loading-state">Loading statistics...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel (Detail) -->
+            <div class="right-panel" id="rightPanel">
+                <!-- Tags Mode Detail -->
+                <div class="panel-content mode-content" data-mode="tags">
+                    <div class="detail-section">
+                        <h3 class="detail-title">Tag Detail</h3>
+                        <div class="detail-empty" id="tagDetailEmpty">Select a tag to view details</div>
+                        <div class="detail-content" id="tagDetailContent" style="display: none;">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Images Mode Detail (Bulk Tag Editor) -->
+                <div class="panel-content mode-content" data-mode="images" style="display: none;">
+                    <div class="detail-section">
+                        <h3 class="detail-title">Bulk Tag Editor</h3>
+                        <div class="bulk-editor-content" id="bulkEditorContent">
+                            <div class="editor-section">
+                                <h4>Working Set</h4>
+                                <div class="working-set-summary" id="workingSetSummary">
+                                    <span class="ws-count">0 images</span>
+                                </div>
+                            </div>
+
+                            <div class="editor-section">
+                                <h4>Current Tags</h4>
+                                <div class="current-tags" id="currentTagsAll">
+                                    <div class="tag-group-label">On ALL images:</div>
+                                    <div class="tag-chips" id="allTagsChips">
+                                        <span class="empty-state">No common tags</span>
+                                    </div>
+                                </div>
+                                <div class="current-tags" id="currentTagsSome">
+                                    <div class="tag-group-label">On SOME images:</div>
+                                    <div class="tag-chips" id="someTagsChips">
+                                        <span class="empty-state">No tags</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="editor-section">
+                                <h4>Add Tags</h4>
+                                <input type="text" id="addTagInput" class="tag-input" placeholder="Enter tag name...">
+                                <div class="tag-queue" id="addTagQueue"></div>
+                                <button class="editor-btn editor-btn-primary" id="applyAddTagsBtn">Apply Add</button>
+                            </div>
+
+                            <div class="editor-section">
+                                <h4>Remove Tags</h4>
+                                <div class="tag-queue" id="removeTagQueue"></div>
+                                <button class="editor-btn editor-btn-danger" id="applyRemoveTagsBtn">Apply Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stats Mode has no right panel -->
+                <div class="panel-content mode-content" data-mode="stats" style="display: none;">
+                    <!-- Empty -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar" id="statusBar">
+            <span class="status-text" id="statusText">Ready</span>
+            <span class="status-hint">Press ? for keyboard shortcuts</span>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    
+    <!-- Bulk Operations Bar (appears when tags selected) -->
+    <div class="bulk-operations-bar" id="bulkOperationsBar" style="display: none;">
+        <span class="bulk-selection-count" id="bulkSelectionCount">0 selected</span>
+        <select class="bulk-select" id="bulkBaseCategorySelect">
+            <option value="">Set Base Category...</option>
+            <option value="general">General</option>
+            <option value="character">Character</option>
+            <option value="copyright">Copyright</option>
+            <option value="artist">Artist</option>
+            <option value="meta">Meta</option>
+            <option value="species">Species</option>
+        </select>
+        <input type="text" class="bulk-input" id="bulkExtendedCategoryInput" placeholder="Extended Category...">
+        <button class="bulk-btn bulk-btn-primary" id="bulkCategorizeBtn">Apply</button>
+        <button class="bulk-btn bulk-btn-secondary" id="bulkMergeBtn">Merge</button>
+        <button class="bulk-btn bulk-btn-danger" id="bulkDeleteBtn">Delete</button>
+        <button class="bulk-btn bulk-btn-cancel" id="bulkCancelBtn">Cancel</button>
+    </div>
+
+    <!-- Rename Tag Modal -->
+    <div class="modal" id="renameModal" style="display: none;">
+        <div class="modal-overlay" onclick="closeModal('renameModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Rename Tag</h2>
+                <button class="modal-close" onclick="closeModal('renameModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Current Name:</label>
+                    <div class="current-name" id="renameCurrentName"></div>
+                </div>
+                <div class="form-group">
+                    <label>New Name:</label>
+                    <input type="text" id="renameNewName" class="modal-input">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="renameCreateAlias">
+                        <span>Create alias from old name</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal('renameModal')">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="confirmRenameBtn">Rename</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Merge Tags Modal -->
+    <div class="modal" id="mergeModal" style="display: none;">
+        <div class="modal-overlay" onclick="closeModal('mergeModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Merge Tags</h2>
+                <button class="modal-close" onclick="closeModal('mergeModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Tags to merge:</label>
+                    <div id="mergeTagsList"></div>
+                </div>
+                <div class="form-group">
+                    <label>Target tag:</label>
+                    <select id="mergeTargetSelect" class="modal-select">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="mergeCreateAliases" checked>
+                        <span>Create aliases from merged names</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal('mergeModal')">Cancel</button>
+                <button class="modal-btn modal-btn-primary" id="confirmMergeBtn">Merge</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Tag Modal -->
+    <div class="modal" id="deleteModal" style="display: none;">
+        <div class="modal-overlay" onclick="closeModal('deleteModal')"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Delete Tag(s)</h2>
+                <button class="modal-close" onclick="closeModal('deleteModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="warning-message">
+                    <strong>⚠️ Warning:</strong> This action cannot be undone.
+                </div>
+                <div class="form-group">
+                    <label>Tags to delete:</label>
+                    <div id="deleteTagsList"></div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="deleteRemoveFromImages" checked>
+                        <span>Remove from all images</span>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+                <button class="modal-btn modal-btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div class="modal" id="helpModal" style="display: none;">
+        <div class="modal-overlay" onclick="closeModal('helpModal')"></div>
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Keyboard Shortcuts</h2>
+                <button class="modal-close" onclick="closeModal('helpModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="shortcuts-section">
+                    <h3>Global</h3>
+                    <div class="shortcut-item">
+                        <kbd>1</kbd> <span>Switch to Tags mode</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>2</kbd> <span>Switch to Images mode</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>3</kbd> <span>Switch to Stats mode</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>/</kbd> <span>Focus search</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Esc</kbd> <span>Close modal/panel, clear selection</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>?</kbd> <span>Show keyboard shortcuts</span>
+                    </div>
+                </div>
+                <div class="shortcuts-section">
+                    <h3>Tag Mode</h3>
+                    <div class="shortcut-item">
+                        <kbd>j</kbd> / <kbd>k</kbd> or <kbd>↓</kbd> / <kbd>↑</kbd> <span>Navigate tags</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Space</kbd> <span>Toggle tag selection</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Enter</kbd> <span>Open tag detail</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>e</kbd> <span>Edit selected tag</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>d</kbd> <span>Delete selected tag(s)</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>m</kbd> <span>Merge selected tags</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>c</kbd> <span>Set category for selected</span>
+                    </div>
+                </div>
+                <div class="shortcuts-section">
+                    <h3>Image Mode</h3>
+                    <div class="shortcut-item">
+                        <kbd>Space</kbd> <span>Toggle image selection</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Enter</kbd> <span>Add selected to working set</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Shift</kbd> + <kbd>Enter</kbd> <span>Add all results to working set</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Backspace</kbd> <span>Remove from working set</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>t</kbd> <span>Focus tag input</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <kbd>Shift</kbd> + <kbd>A</kbd> <span>Select all visible</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/tag-manager.js') }}"></script>
+    <script type="module">
+        import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
+        window.showNotification = showNotification;
+        window.closeModal = function(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        };
+    </script>
+</body>
+
+</html>

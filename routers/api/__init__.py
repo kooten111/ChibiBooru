@@ -14,5 +14,6 @@ from . import (
     tag_categorization,
     animation,
     favourites,
-    similarity
+    similarity,
+    tag_manager
 )
