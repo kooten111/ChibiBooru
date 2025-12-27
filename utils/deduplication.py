@@ -7,7 +7,7 @@ Prevents duplicate images from being processed or downloaded.
 import os
 import json
 from pathlib import Path
-from utils.file_utils import get_file_md5
+from utils.file_utils import get_file_md5, get_bucketed_thumbnail_path_on_disk
 
 METADATA_DIR = "./metadata"
 STATIC_IMAGES = "./static/images"
@@ -60,7 +60,6 @@ def remove_duplicate(filepath):
     Permanently remove a duplicate image file and its thumbnail.
     Returns: bool: True if successfully removed.
     """
-    from utils.file_utils import get_bucketed_thumbnail_path_on_disk
     full_path = os.path.join(STATIC_IMAGES, filepath) if not filepath.startswith(STATIC_IMAGES) else filepath
     try:
         if os.path.exists(full_path):

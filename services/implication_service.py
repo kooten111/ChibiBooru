@@ -5,6 +5,7 @@ Handles automatic pattern detection and suggestion generation for tag implicatio
 import re
 from database import get_db_connection
 from typing import List, Dict, Tuple, Set
+from repositories.tag_repository import apply_implications_for_image
 
 
 class ImplicationSuggestion:
@@ -445,8 +446,6 @@ def batch_apply_implications_to_all_images() -> int:
         for img_row in images:
             image_id = img_row['id']
 
-            # Import from repository to reuse existing function
-            from repositories.tag_repository import apply_implications_for_image
             if apply_implications_for_image(image_id):
                 count += 1
 
