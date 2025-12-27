@@ -70,6 +70,13 @@ async def tag_categorize():
     return await render_template('tag_categorize.html', app_name=config.APP_NAME)
 
 
+@main_blueprint.route('/tag_manager')
+@login_required
+async def tag_manager():
+    """Comprehensive tag and image management interface."""
+    return await render_template('tag_manager.html', app_name=config.APP_NAME)
+
+
 @main_blueprint.route('/')
 @login_required
 async def home():
