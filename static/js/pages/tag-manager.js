@@ -397,14 +397,16 @@ function updateTagTable() {
             </td>
         `;
         
-        // Checkbox toggle
+        // Checkbox toggle - use event delegation to avoid recursive calls
         tr.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
+            e.stopPropagation(); // Prevent row click from triggering
             if (e.target.checked) {
                 state.tags.selected.add(tag.name);
             } else {
                 state.tags.selected.delete(tag.name);
             }
-            updateTagTable();
+            tr.classList.toggle('selected', e.target.checked);
+            updateBulkOperationsBar(); // Update only the bulk bar, not the whole table
         });
         
         // View button
@@ -417,14 +419,18 @@ function updateTagTable() {
             if (e.target.type !== 'checkbox' && e.target.tagName !== 'BUTTON') {
                 const checkbox = tr.querySelector('input[type="checkbox"]');
                 checkbox.checked = !checkbox.checked;
-                checkbox.dispatchEvent(new Event('change'));
+                checkbox.dispatchEvent(new Event('change', { bubbles: false }));
             }
         });
         
         tbody.appendChild(tr);
     });
     
-    // Update bulk operations bar
+    updateBulkOperationsBar();
+}
+
+// Update Bulk Operations Bar (separated for efficiency)
+function updateBulkOperationsBar() {
     const bulkBar = document.getElementById('bulkOperationsBar');
     const bulkCount = document.getElementById('bulkSelectionCount');
     
@@ -512,6 +518,7 @@ async function searchImages() {
     }
     
     state.images.searchQuery = query;
+    state.images.offset = 0; // Reset pagination
     const infoState = document.getElementById('imageInfoState');
     const imageGrid = document.getElementById('imageGrid');
     
@@ -519,8 +526,9 @@ async function searchImages() {
     imageGrid.innerHTML = '';
     
     try {
-        // Use existing search API
-        const response = await fetch(`/api/images?query=${encodeURIComponent(query)}&offset=0&limit=50`);
+        // Use configurable limit from state
+        const limit = state.images.limit || 50;
+        const response = await fetch(`/api/images?query=${encodeURIComponent(query)}&offset=${state.images.offset}&limit=${limit}`);
         const data = await response.json();
         
         state.images.data = data.images || [];
@@ -538,40 +546,58 @@ async function searchImages() {
     }
 }
 
-// Update Image Grid
+// Update Image Grid (optimized to avoid excessive re-renders)
 function updateImageGrid() {
     const imageGrid = document.getElementById('imageGrid');
-    imageGrid.innerHTML = '';
     
+    // Only update if grid is empty or needs refresh
+    if (imageGrid.children.length !== state.images.data.length) {
+        imageGrid.innerHTML = '';
+        
+        state.images.data.forEach(image => {
+            const filepath = image.filepath || image;
+            const div = document.createElement('div');
+            div.className = 'image-grid-item';
+            div.dataset.filepath = filepath;
+            
+            div.innerHTML = `
+                <img src="/images/${filepath}" alt="">
+                <input type="checkbox" class="image-checkbox" data-filepath="${filepath}">
+            `;
+            
+            const checkbox = div.querySelector('.image-checkbox');
+            checkbox.addEventListener('change', (e) => {
+                e.stopPropagation();
+                const fp = e.target.dataset.filepath;
+                if (e.target.checked) {
+                    state.images.selected.add(fp);
+                } else {
+                    state.images.selected.delete(fp);
+                }
+                div.classList.toggle('selected', e.target.checked);
+            });
+            
+            div.addEventListener('click', (e) => {
+                if (e.target !== checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change', { bubbles: false }));
+                }
+            });
+            
+            imageGrid.appendChild(div);
+        });
+    }
+    
+    // Update checked states and selected class
     state.images.data.forEach(image => {
         const filepath = image.filepath || image;
-        const div = document.createElement('div');
-        div.className = 'image-grid-item';
-        div.classList.toggle('selected', state.images.selected.has(filepath));
-        
-        div.innerHTML = `
-            <img src="/images/${filepath}" alt="">
-            <input type="checkbox" class="image-checkbox" ${state.images.selected.has(filepath) ? 'checked' : ''}>
-        `;
-        
-        const checkbox = div.querySelector('.image-checkbox');
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                state.images.selected.add(filepath);
-            } else {
-                state.images.selected.delete(filepath);
-            }
-            updateImageGrid();
-        });
-        
-        div.addEventListener('click', (e) => {
-            if (e.target !== checkbox) {
-                checkbox.checked = !checkbox.checked;
-                checkbox.dispatchEvent(new Event('change'));
-            }
-        });
-        
-        imageGrid.appendChild(div);
+        const div = imageGrid.querySelector(`[data-filepath="${filepath}"]`);
+        if (div) {
+            const checkbox = div.querySelector('.image-checkbox');
+            const isSelected = state.images.selected.has(filepath);
+            checkbox.checked = isSelected;
+            div.classList.toggle('selected', isSelected);
+        }
     });
 }
 
@@ -669,6 +695,7 @@ function addTagToQueue(type, tag) {
     
     const chip = document.createElement('span');
     chip.className = 'tag-chip removable';
+    chip.dataset.tagName = tag; // Store tag name as data attribute
     chip.innerHTML = `${tag}<span class="tag-chip-remove" onclick="this.parentElement.remove()">×</span>`;
     queue.appendChild(chip);
 }
@@ -681,9 +708,8 @@ window.queueTagForRemoval = function(tag) {
 // Apply Bulk Add Tags
 async function applyBulkAddTags() {
     const queue = document.getElementById('addTagQueue');
-    const tags = Array.from(queue.querySelectorAll('.tag-chip')).map(chip => 
-        chip.textContent.replace('×', '').trim()
-    );
+    const chips = queue.querySelectorAll('.tag-chip');
+    const tags = Array.from(chips).map(chip => chip.dataset.tagName || chip.textContent.replace('×', '').trim());
     
     if (tags.length === 0) {
         showNotification('No tags to add', 'warning');
@@ -719,9 +745,8 @@ async function applyBulkAddTags() {
 // Apply Bulk Remove Tags
 async function applyBulkRemoveTags() {
     const queue = document.getElementById('removeTagQueue');
-    const tags = Array.from(queue.querySelectorAll('.tag-chip')).map(chip => 
-        chip.textContent.replace('×', '').trim()
-    );
+    const chips = queue.querySelectorAll('.tag-chip');
+    const tags = Array.from(chips).map(chip => chip.dataset.tagName || chip.textContent.replace('×', '').trim());
     
     if (tags.length === 0) {
         showNotification('No tags to remove', 'warning');

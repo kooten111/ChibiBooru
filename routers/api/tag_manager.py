@@ -4,6 +4,14 @@ from database import models, get_db_connection
 from utils import api_handler
 import json
 
+# Constants
+DEFAULT_TAG_CATEGORY = 'general'
+SAMPLE_IMAGE_LIMIT = 6
+
+def reload_cache():
+    """Reload data cache after modifications. Can be optimized in the future."""
+    reload_cache()
+
 @api_blueprint.route('/tags/browse')
 @api_handler()
 async def browse_tags():
@@ -103,15 +111,16 @@ async def tag_detail(tag_name):
         tag_dict = dict(tag)
         tag_id = tag_dict['id']
         
-        # Get sample images (up to 6)
+        # Get sample images (up to limit, using more efficient method than RANDOM)
+        # For better performance, we get the first N images ordered by ID
         cur.execute("""
             SELECT i.filepath, i.thumbnail_path
             FROM images i
             JOIN image_tags it ON i.id = it.image_id
             WHERE it.tag_id = ?
-            ORDER BY RANDOM()
-            LIMIT 6
-        """, (tag_id,))
+            ORDER BY i.id DESC
+            LIMIT ?
+        """, (tag_id, SAMPLE_IMAGE_LIMIT))
         samples = [dict(row) for row in cur.fetchall()]
         
         # Get implications
@@ -179,7 +188,7 @@ async def rename_tag():
         conn.commit()
         
         # Reload cache
-        models.load_data_from_db()
+        reload_cache()
     
     return {'success': True, 'message': f'Tag renamed from {old_name} to {new_name}'}
 
@@ -245,7 +254,7 @@ async def merge_tags():
         conn.commit()
         
         # Reload cache
-        models.load_data_from_db()
+        reload_cache()
     
     return {'success': True, 'message': f'Merged {len(source_tags)} tags into {target_tag}'}
 
@@ -284,7 +293,7 @@ async def delete_tags():
         conn.commit()
         
         # Reload cache
-        models.load_data_from_db()
+        reload_cache()
     
     return {'success': True, 'message': f'Deleted {len(tag_names)} tag(s)'}
 
@@ -323,7 +332,7 @@ async def bulk_categorize():
         conn.commit()
         
         # Reload cache
-        models.load_data_from_db()
+        reload_cache()
     
     return {'success': True, 'message': f'Updated categories for {len(tag_names)} tag(s)'}
 
@@ -442,8 +451,8 @@ async def bulk_add_tags():
             if tag_row:
                 tag_ids[tag_name] = tag_row['id']
             else:
-                # Create new tag
-                cur.execute("INSERT INTO tags (name, category, count) VALUES (?, 'general', 0)", (tag_name,))
+                # Create new tag with default category
+                cur.execute("INSERT INTO tags (name, category, count) VALUES (?, ?, 0)", (tag_name, DEFAULT_TAG_CATEGORY))
                 tag_ids[tag_name] = cur.lastrowid
         
         # Add tags to images
@@ -472,7 +481,7 @@ async def bulk_add_tags():
         conn.commit()
         
         # Reload cache
-        models.load_data_from_db()
+        reload_cache()
     
     return {'success': True, 'message': f'Added {len(tags_to_add)} tag(s) to {len(filepaths)} image(s)'}
 
@@ -524,7 +533,7 @@ async def bulk_remove_tags():
         conn.commit()
         
         # Reload cache
-        models.load_data_from_db()
+        reload_cache()
     
     return {'success': True, 'message': f'Removed {len(tags_to_remove)} tag(s) from {len(filepaths)} image(s)'}
 
