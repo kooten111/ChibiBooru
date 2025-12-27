@@ -50,6 +50,10 @@ def create_app():
 
     app.register_blueprint(main_blueprint)
     app.register_blueprint(api_blueprint, url_prefix='/api')
+    
+    # Register static file blueprint for proper handling of special characters
+    from routers import static_blueprint
+    app.register_blueprint(static_blueprint)
 
     # Register custom Jinja2 filters
     from utils import url_encode_path

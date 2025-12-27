@@ -69,10 +69,10 @@ function updateWorkingSetDisplay() {
     const countEl = document.getElementById('workingSetCount');
     const thumbnailsEl = document.getElementById('workingSetThumbnails');
     const summaryEl = document.getElementById('workingSetSummary');
-    
+
     const count = state.workingSet.images.length;
     countEl.textContent = `${count} image${count !== 1 ? 's' : ''}`;
-    
+
     // Update thumbnails
     thumbnailsEl.innerHTML = '';
     const displayCount = Math.min(count, 10);
@@ -84,19 +84,19 @@ function updateWorkingSetDisplay() {
         img.title = filepath;
         thumbnailsEl.appendChild(img);
     }
-    
+
     if (count > displayCount) {
         const more = document.createElement('div');
         more.textContent = `+${count - displayCount} more`;
         more.style.cssText = 'color: var(--text-muted); font-size: 0.85rem; align-self: center;';
         thumbnailsEl.appendChild(more);
     }
-    
+
     // Update summary in bulk editor
     if (summaryEl) {
         summaryEl.querySelector('.ws-count').textContent = `${count} image${count !== 1 ? 's' : ''}`;
     }
-    
+
     // Load common tags if in images mode and working set is not empty
     if (state.currentMode === 'images' && count > 0) {
         loadCommonTags();
@@ -111,12 +111,12 @@ function initializeEventListeners() {
             switchMode(tab.dataset.mode);
         });
     });
-    
+
     // Header actions
     document.getElementById('helpBtn').addEventListener('click', () => {
         document.getElementById('helpModal').style.display = 'flex';
     });
-    
+
     // Working Set actions
     document.getElementById('addTagsBtn').addEventListener('click', () => {
         if (state.workingSet.images.length === 0) {
@@ -125,7 +125,7 @@ function initializeEventListeners() {
         }
         switchMode('images');
     });
-    
+
     document.getElementById('removeTagsBtn').addEventListener('click', () => {
         if (state.workingSet.images.length === 0) {
             showNotification('No images in working set', 'warning');
@@ -133,16 +133,16 @@ function initializeEventListeners() {
         }
         switchMode('images');
     });
-    
+
     document.getElementById('clearWorkingSetBtn').addEventListener('click', clearWorkingSet);
-    
+
     // Tag mode filters
     document.getElementById('tagSearchInput').addEventListener('input', debounce(() => {
         state.tags.filters.search = document.getElementById('tagSearchInput').value;
         state.tags.offset = 0;
         loadTags();
     }, 300));
-    
+
     document.querySelectorAll('input[name="tagStatus"]').forEach(radio => {
         radio.addEventListener('change', () => {
             state.tags.filters.status = radio.value;
@@ -150,7 +150,7 @@ function initializeEventListeners() {
             loadTags();
         });
     });
-    
+
     document.querySelectorAll('input[name="baseCategory"]').forEach(checkbox => {
         checkbox.addEventListener('change', () => {
             state.tags.filters.baseCategories = Array.from(
@@ -160,13 +160,13 @@ function initializeEventListeners() {
             loadTags();
         });
     });
-    
+
     document.getElementById('tagSortSelect').addEventListener('change', (e) => {
         state.tags.filters.sort = e.target.value;
         state.tags.offset = 0;
         loadTags();
     });
-    
+
     // Tag pagination
     document.getElementById('tagPrevBtn').addEventListener('click', () => {
         if (state.tags.offset > 0) {
@@ -174,20 +174,20 @@ function initializeEventListeners() {
             loadTags();
         }
     });
-    
+
     document.getElementById('tagNextBtn').addEventListener('click', () => {
         if (state.tags.offset + state.tags.limit < state.tags.total) {
             state.tags.offset += state.tags.limit;
             loadTags();
         }
     });
-    
+
     document.getElementById('tagPerPageSelect').addEventListener('change', (e) => {
         state.tags.limit = parseInt(e.target.value);
         state.tags.offset = 0;
         loadTags();
     });
-    
+
     // Select all tags
     document.getElementById('selectAllTags').addEventListener('change', (e) => {
         if (e.target.checked) {
@@ -197,7 +197,7 @@ function initializeEventListeners() {
         }
         updateTagTable();
     });
-    
+
     // Image mode
     document.getElementById('imageSearchBtn').addEventListener('click', searchImages);
     document.getElementById('imageSearchInput').addEventListener('keypress', (e) => {
@@ -205,14 +205,14 @@ function initializeEventListeners() {
             searchImages();
         }
     });
-    
+
     document.getElementById('selectAllImages').addEventListener('click', () => {
         state.images.data.forEach(img => state.images.selected.add(img.filepath));
         updateImageGrid();
     });
-    
+
     document.getElementById('addSelectedToWorkingSet').addEventListener('click', addSelectedToWorkingSet);
-    
+
     // Bulk editor
     document.getElementById('addTagInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -223,10 +223,10 @@ function initializeEventListeners() {
             }
         }
     });
-    
+
     document.getElementById('applyAddTagsBtn').addEventListener('click', applyBulkAddTags);
     document.getElementById('applyRemoveTagsBtn').addEventListener('click', applyBulkRemoveTags);
-    
+
     // Bulk operations
     document.getElementById('bulkCategorizeBtn').addEventListener('click', bulkCategorize);
     document.getElementById('bulkMergeBtn').addEventListener('click', showMergeModal);
@@ -235,7 +235,7 @@ function initializeEventListeners() {
         state.tags.selected.clear();
         updateTagTable();
     });
-    
+
     // Modal confirmations
     document.getElementById('confirmRenameBtn').addEventListener('click', confirmRename);
     document.getElementById('confirmMergeBtn').addEventListener('click', confirmMerge);
@@ -252,7 +252,7 @@ function initializeKeyboardShortcuts() {
             }
             return;
         }
-        
+
         // Global shortcuts
         if (e.key === '1') {
             switchMode('tags');
@@ -280,7 +280,7 @@ function initializeKeyboardShortcuts() {
             updateTagTable();
             updateImageGrid();
         }
-        
+
         // Tag mode shortcuts
         if (state.currentMode === 'tags') {
             if (e.key === 'd' && state.tags.selected.size > 0) {
@@ -291,7 +291,7 @@ function initializeKeyboardShortcuts() {
                 document.getElementById('bulkBaseCategorySelect').focus();
             }
         }
-        
+
         // Image mode shortcuts
         if (state.currentMode === 'images') {
             if (e.key === 't') {
@@ -307,18 +307,18 @@ function initializeKeyboardShortcuts() {
 // Switch Mode
 function switchMode(mode) {
     state.currentMode = mode;
-    
+
     // Update tabs
     document.querySelectorAll('.mode-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.mode === mode);
     });
-    
+
     // Update content panels
     document.querySelectorAll('.mode-content').forEach(panel => {
         const panelMode = panel.dataset.mode;
         panel.style.display = panelMode === mode ? 'block' : 'none';
     });
-    
+
     // Load mode-specific data
     if (mode === 'tags') {
         loadTags();
@@ -335,17 +335,17 @@ async function loadTags() {
     const tagTable = document.getElementById('tagTable');
     const pagination = document.getElementById('tagPagination');
     const resultCount = document.getElementById('tagResultCount');
-    
+
     loadingState.style.display = 'block';
     tagTable.style.display = 'none';
-    
+
     try {
         const params = new URLSearchParams({
             offset: state.tags.offset,
             limit: state.tags.limit,
             sort: state.tags.filters.sort
         });
-        
+
         if (state.tags.filters.search) {
             params.append('search', state.tags.filters.search);
         }
@@ -355,19 +355,19 @@ async function loadTags() {
         if (state.tags.filters.baseCategories.length === 1) {
             params.append('base_category', state.tags.filters.baseCategories[0]);
         }
-        
+
         const response = await fetch(`/api/tags/browse?${params}`);
         const data = await response.json();
-        
+
         state.tags.data = data.tags;
         state.tags.total = data.total;
-        
+
         loadingState.style.display = 'none';
         tagTable.style.display = 'table';
         pagination.style.display = 'flex';
-        
+
         resultCount.textContent = `${data.total} tag${data.total !== 1 ? 's' : ''}`;
-        
+
         updateTagTable();
         updatePagination();
     } catch (error) {
@@ -381,11 +381,11 @@ async function loadTags() {
 function updateTagTable() {
     const tbody = document.getElementById('tagTableBody');
     tbody.innerHTML = '';
-    
+
     state.tags.data.forEach(tag => {
         const tr = document.createElement('tr');
         tr.classList.toggle('selected', state.tags.selected.has(tag.name));
-        
+
         tr.innerHTML = `
             <td><input type="checkbox" ${state.tags.selected.has(tag.name) ? 'checked' : ''} data-tag="${tag.name}"></td>
             <td class="tag-name">${tag.name}</td>
@@ -396,7 +396,7 @@ function updateTagTable() {
                 <button class="tag-action-btn" data-action="view" data-tag="${tag.name}">View</button>
             </td>
         `;
-        
+
         // Checkbox toggle - use event delegation to avoid recursive calls
         tr.querySelector('input[type="checkbox"]').addEventListener('change', (e) => {
             e.stopPropagation(); // Prevent row click from triggering
@@ -408,12 +408,12 @@ function updateTagTable() {
             tr.classList.toggle('selected', e.target.checked);
             updateBulkOperationsBar(); // Update only the bulk bar, not the whole table
         });
-        
+
         // View button
         tr.querySelector('[data-action="view"]').addEventListener('click', () => {
             loadTagDetail(tag.name);
         });
-        
+
         // Row click to select
         tr.addEventListener('click', (e) => {
             if (e.target.type !== 'checkbox' && e.target.tagName !== 'BUTTON') {
@@ -422,10 +422,10 @@ function updateTagTable() {
                 checkbox.dispatchEvent(new Event('change', { bubbles: false }));
             }
         });
-        
+
         tbody.appendChild(tr);
     });
-    
+
     updateBulkOperationsBar();
 }
 
@@ -433,7 +433,7 @@ function updateTagTable() {
 function updateBulkOperationsBar() {
     const bulkBar = document.getElementById('bulkOperationsBar');
     const bulkCount = document.getElementById('bulkSelectionCount');
-    
+
     if (state.tags.selected.size > 0) {
         bulkBar.style.display = 'flex';
         bulkCount.textContent = `${state.tags.selected.size} selected`;
@@ -447,10 +447,10 @@ function updatePagination() {
     const prevBtn = document.getElementById('tagPrevBtn');
     const nextBtn = document.getElementById('tagNextBtn');
     const pageInfo = document.getElementById('tagPageInfo');
-    
+
     prevBtn.disabled = state.tags.offset === 0;
     nextBtn.disabled = state.tags.offset + state.tags.limit >= state.tags.total;
-    
+
     const currentPage = Math.floor(state.tags.offset / state.tags.limit) + 1;
     const totalPages = Math.ceil(state.tags.total / state.tags.limit);
     pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
@@ -461,15 +461,15 @@ async function loadTagDetail(tagName) {
     state.currentTag = tagName;
     const detailEmpty = document.getElementById('tagDetailEmpty');
     const detailContent = document.getElementById('tagDetailContent');
-    
+
     detailEmpty.style.display = 'none';
     detailContent.innerHTML = '<div class="loading-state">Loading...</div>';
     detailContent.style.display = 'block';
-    
+
     try {
         const response = await fetch(`/api/tags/${encodeURIComponent(tagName)}/detail`);
         const data = await response.json();
-        
+
         detailContent.innerHTML = `
             <div class="detail-group">
                 <div class="detail-label">Tag Name</div>
@@ -516,23 +516,23 @@ async function searchImages() {
         showNotification('Please enter a search query', 'warning');
         return;
     }
-    
+
     state.images.searchQuery = query;
     state.images.offset = 0; // Reset pagination
     const infoState = document.getElementById('imageInfoState');
     const imageGrid = document.getElementById('imageGrid');
-    
+
     infoState.textContent = 'Searching...';
     imageGrid.innerHTML = '';
-    
+
     try {
         // Use configurable limit from state
         const limit = state.images.limit || 50;
         const response = await fetch(`/api/images?query=${encodeURIComponent(query)}&offset=${state.images.offset}&limit=${limit}`);
         const data = await response.json();
-        
+
         state.images.data = data.images || [];
-        
+
         if (state.images.data.length === 0) {
             infoState.textContent = 'No results found';
         } else {
@@ -549,22 +549,25 @@ async function searchImages() {
 // Update Image Grid (optimized to avoid excessive re-renders)
 function updateImageGrid() {
     const imageGrid = document.getElementById('imageGrid');
-    
+
     // Only update if grid is empty or needs refresh
     if (imageGrid.children.length !== state.images.data.length) {
         imageGrid.innerHTML = '';
-        
+
         state.images.data.forEach(image => {
-            const filepath = image.filepath || image;
+            // Handle both API response format (with 'path' and 'thumb') and simple filepath
+            const filepath = image.path || image.filepath || image;
+            const thumbnailPath = image.thumb || filepath;
+
             const div = document.createElement('div');
             div.className = 'image-grid-item';
             div.dataset.filepath = filepath;
-            
+
             div.innerHTML = `
-                <img src="/images/${filepath}" alt="">
+                <img src="/${thumbnailPath}" alt="">
                 <input type="checkbox" class="image-checkbox" data-filepath="${filepath}">
             `;
-            
+
             const checkbox = div.querySelector('.image-checkbox');
             checkbox.addEventListener('change', (e) => {
                 e.stopPropagation();
@@ -576,21 +579,21 @@ function updateImageGrid() {
                 }
                 div.classList.toggle('selected', e.target.checked);
             });
-            
+
             div.addEventListener('click', (e) => {
                 if (e.target !== checkbox) {
                     checkbox.checked = !checkbox.checked;
                     checkbox.dispatchEvent(new Event('change', { bubbles: false }));
                 }
             });
-            
+
             imageGrid.appendChild(div);
         });
     }
-    
+
     // Update checked states and selected class
     state.images.data.forEach(image => {
-        const filepath = image.filepath || image;
+        const filepath = image.path || image.filepath || image;
         const div = imageGrid.querySelector(`[data-filepath="${filepath}"]`);
         if (div) {
             const checkbox = div.querySelector('.image-checkbox');
@@ -608,22 +611,24 @@ function addSelectedToWorkingSet() {
         showNotification('No images selected', 'warning');
         return;
     }
-    
+
     // Add to working set, avoiding duplicates
+    // Normalize filepaths by removing 'images/' prefix if present
     selected.forEach(filepath => {
-        if (!state.workingSet.images.includes(filepath)) {
-            state.workingSet.images.push(filepath);
+        const normalizedPath = filepath.replace(/^images\//, '');
+        if (!state.workingSet.images.includes(normalizedPath)) {
+            state.workingSet.images.push(normalizedPath);
         }
     });
-    
+
     state.workingSet.source = `search:${state.images.searchQuery}`;
     state.workingSet.createdAt = Date.now();
-    
+
     saveWorkingSetToStorage();
     updateWorkingSetDisplay();
-    
+
     showNotification(`Added ${selected.length} image${selected.length !== 1 ? 's' : ''} to working set`, 'success');
-    
+
     // Clear selection
     state.images.selected.clear();
     updateImageGrid();
@@ -634,15 +639,15 @@ function clearWorkingSet() {
     if (state.workingSet.images.length === 0) {
         return;
     }
-    
+
     if (confirm('Clear all images from working set?')) {
         state.workingSet.images = [];
         state.workingSet.source = 'manual';
         state.workingSet.createdAt = Date.now();
-        
+
         saveWorkingSetToStorage();
         updateWorkingSetDisplay();
-        
+
         showNotification('Working set cleared', 'info');
     }
 }
@@ -654,12 +659,12 @@ async function loadCommonTags() {
         document.getElementById('someTagsChips').innerHTML = '<span class="empty-state">No tags</span>';
         return;
     }
-    
+
     try {
         const filepaths = state.workingSet.images.join(',');
         const response = await fetch(`/api/images/common_tags?filepaths=${encodeURIComponent(filepaths)}`);
         const data = await response.json();
-        
+
         // Display ALL tags
         const allTagsChips = document.getElementById('allTagsChips');
         if (data.all.length === 0) {
@@ -671,7 +676,7 @@ async function loadCommonTags() {
                 </span>
             `).join('');
         }
-        
+
         // Display SOME tags
         const someTagsChips = document.getElementById('someTagsChips');
         if (data.some.length === 0) {
@@ -692,7 +697,7 @@ async function loadCommonTags() {
 function addTagToQueue(type, tag) {
     const queueId = type === 'add' ? 'addTagQueue' : 'removeTagQueue';
     const queue = document.getElementById(queueId);
-    
+
     const chip = document.createElement('span');
     chip.className = 'tag-chip removable';
     chip.dataset.tagName = tag; // Store tag name as data attribute
@@ -701,7 +706,7 @@ function addTagToQueue(type, tag) {
 }
 
 // Queue Tag for Removal (called from template string)
-window.queueTagForRemoval = function(tag) {
+window.queueTagForRemoval = function (tag) {
     addTagToQueue('remove', tag);
 };
 
@@ -710,17 +715,17 @@ async function applyBulkAddTags() {
     const queue = document.getElementById('addTagQueue');
     const chips = queue.querySelectorAll('.tag-chip');
     const tags = Array.from(chips).map(chip => chip.dataset.tagName || chip.textContent.replace('×', '').trim());
-    
+
     if (tags.length === 0) {
         showNotification('No tags to add', 'warning');
         return;
     }
-    
+
     if (state.workingSet.images.length === 0) {
         showNotification('No images in working set', 'warning');
         return;
     }
-    
+
     try {
         const response = await fetch('/api/images/bulk_add_tags', {
             method: 'POST',
@@ -730,10 +735,10 @@ async function applyBulkAddTags() {
                 tags: tags
             })
         });
-        
+
         const data = await response.json();
         showNotification(data.message, 'success');
-        
+
         queue.innerHTML = '';
         loadCommonTags();
     } catch (error) {
@@ -747,17 +752,17 @@ async function applyBulkRemoveTags() {
     const queue = document.getElementById('removeTagQueue');
     const chips = queue.querySelectorAll('.tag-chip');
     const tags = Array.from(chips).map(chip => chip.dataset.tagName || chip.textContent.replace('×', '').trim());
-    
+
     if (tags.length === 0) {
         showNotification('No tags to remove', 'warning');
         return;
     }
-    
+
     if (state.workingSet.images.length === 0) {
         showNotification('No images in working set', 'warning');
         return;
     }
-    
+
     try {
         const response = await fetch('/api/images/bulk_remove_tags', {
             method: 'POST',
@@ -767,10 +772,10 @@ async function applyBulkRemoveTags() {
                 tags: tags
             })
         });
-        
+
         const data = await response.json();
         showNotification(data.message, 'success');
-        
+
         queue.innerHTML = '';
         loadCommonTags();
     } catch (error) {
@@ -783,17 +788,17 @@ async function applyBulkRemoveTags() {
 async function bulkCategorize() {
     const baseCategory = document.getElementById('bulkBaseCategorySelect').value;
     const extendedCategory = document.getElementById('bulkExtendedCategoryInput').value.trim();
-    
+
     if (!baseCategory && !extendedCategory) {
         showNotification('Please select a base category or enter an extended category', 'warning');
         return;
     }
-    
+
     if (state.tags.selected.size === 0) {
         showNotification('No tags selected', 'warning');
         return;
     }
-    
+
     try {
         const response = await fetch('/api/tags/bulk_categorize', {
             method: 'POST',
@@ -804,10 +809,10 @@ async function bulkCategorize() {
                 extended_category: extendedCategory
             })
         });
-        
+
         const data = await response.json();
         showNotification(data.message, 'success');
-        
+
         state.tags.selected.clear();
         loadTags();
     } catch (error) {
@@ -822,19 +827,19 @@ function showMergeModal() {
         showNotification('Select at least 2 tags to merge', 'warning');
         return;
     }
-    
+
     const modal = document.getElementById('mergeModal');
     const tagsList = document.getElementById('mergeTagsList');
     const targetSelect = document.getElementById('mergeTargetSelect');
-    
-    tagsList.innerHTML = Array.from(state.tags.selected).map(tag => 
+
+    tagsList.innerHTML = Array.from(state.tags.selected).map(tag =>
         `<div>• ${tag}</div>`
     ).join('');
-    
-    targetSelect.innerHTML = Array.from(state.tags.selected).map(tag => 
+
+    targetSelect.innerHTML = Array.from(state.tags.selected).map(tag =>
         `<option value="${tag}">${tag}</option>`
     ).join('');
-    
+
     modal.style.display = 'flex';
 }
 
@@ -842,7 +847,7 @@ function showMergeModal() {
 async function confirmMerge() {
     const targetTag = document.getElementById('mergeTargetSelect').value;
     const createAliases = document.getElementById('mergeCreateAliases').checked;
-    
+
     try {
         const response = await fetch('/api/tags/merge', {
             method: 'POST',
@@ -853,10 +858,10 @@ async function confirmMerge() {
                 create_aliases: createAliases
             })
         });
-        
+
         const data = await response.json();
         showNotification(data.message, 'success');
-        
+
         window.closeModal('mergeModal');
         state.tags.selected.clear();
         loadTags();
@@ -872,21 +877,21 @@ function showDeleteModal() {
         showNotification('No tags selected', 'warning');
         return;
     }
-    
+
     const modal = document.getElementById('deleteModal');
     const tagsList = document.getElementById('deleteTagsList');
-    
-    tagsList.innerHTML = Array.from(state.tags.selected).map(tag => 
+
+    tagsList.innerHTML = Array.from(state.tags.selected).map(tag =>
         `<div>• ${tag}</div>`
     ).join('');
-    
+
     modal.style.display = 'flex';
 }
 
 // Confirm Delete
 async function confirmDelete() {
     const removeFromImages = document.getElementById('deleteRemoveFromImages').checked;
-    
+
     try {
         const response = await fetch('/api/tags/delete', {
             method: 'POST',
@@ -896,10 +901,10 @@ async function confirmDelete() {
                 remove_from_images: removeFromImages
             })
         });
-        
+
         const data = await response.json();
         showNotification(data.message, 'success');
-        
+
         window.closeModal('deleteModal');
         state.tags.selected.clear();
         loadTags();
@@ -910,7 +915,7 @@ async function confirmDelete() {
 }
 
 // Rename Tag (exposed to window for template string)
-window.renameTag = function(tagName) {
+window.renameTag = function (tagName) {
     const modal = document.getElementById('renameModal');
     document.getElementById('renameCurrentName').textContent = tagName;
     document.getElementById('renameNewName').value = '';
@@ -922,12 +927,12 @@ async function confirmRename() {
     const oldName = document.getElementById('renameCurrentName').textContent;
     const newName = document.getElementById('renameNewName').value.trim();
     const createAlias = document.getElementById('renameCreateAlias').checked;
-    
+
     if (!newName) {
         showNotification('Please enter a new name', 'warning');
         return;
     }
-    
+
     try {
         const response = await fetch('/api/tags/rename', {
             method: 'POST',
@@ -938,10 +943,10 @@ async function confirmRename() {
                 create_alias: createAlias
             })
         });
-        
+
         const data = await response.json();
         showNotification(data.message, 'success');
-        
+
         window.closeModal('renameModal');
         loadTags();
         if (state.currentTag === oldName) {
@@ -957,11 +962,11 @@ async function confirmRename() {
 async function loadStats() {
     const statsContainer = document.getElementById('statsContainer');
     statsContainer.innerHTML = '<div class="loading-state">Loading statistics...</div>';
-    
+
     try {
         const response = await fetch('/api/tags/stats');
         const data = await response.json();
-        
+
         statsContainer.innerHTML = `
             <div class="stats-overview">
                 <div class="stat-card">

@@ -28,9 +28,12 @@ async def browse_tags():
         cur = conn.cursor()
         
         # Build query based on filters
+        # Note: tags table doesn't have a count column, we compute it from image_tags
         query = """
-            SELECT t.id, t.name, t.category as base_category, t.extended_category, t.count
+            SELECT t.id, t.name, t.category as base_category, t.extended_category, 
+                   COUNT(DISTINCT it.image_id) as count
             FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
             WHERE 1=1
         """
         params = []
@@ -46,9 +49,11 @@ async def browse_tags():
         elif status == 'needs_extended':
             query += " AND t.category != 'general' AND (t.extended_category IS NULL OR t.extended_category = '')"
         elif status == 'orphaned':
-            query += " AND t.count = 0"
+            # Will be filtered after GROUP BY using HAVING
+            pass
         elif status == 'low_usage':
-            query += " AND t.count > 0 AND t.count < 5"
+            # Will be filtered after GROUP BY using HAVING
+            pass
         
         # Base category filter
         if base_category:
@@ -60,20 +65,29 @@ async def browse_tags():
             query += " AND t.extended_category = ?"
             params.append(extended_category)
         
+        # Group by tag to compute counts
+        query += " GROUP BY t.id, t.name, t.category, t.extended_category"
+        
+        # HAVING clause for count-based filters
+        if status == 'orphaned':
+            query += " HAVING count = 0"
+        elif status == 'low_usage':
+            query += " HAVING count > 0 AND count < 5"
+        
         # Sorting
         if sort == 'count_desc':
-            query += " ORDER BY t.count DESC, t.name ASC"
+            query += " ORDER BY count DESC, t.name ASC"
         elif sort == 'count_asc':
-            query += " ORDER BY t.count ASC, t.name ASC"
+            query += " ORDER BY count ASC, t.name ASC"
         elif sort == 'alpha_asc':
             query += " ORDER BY t.name ASC"
         elif sort == 'alpha_desc':
             query += " ORDER BY t.name DESC"
         
         # Get total count first
-        count_query = f"SELECT COUNT(*) as total FROM ({query}) AS filtered"
+        count_query = f"SELECT COUNT(*) FROM ({query}) AS filtered"
         cur.execute(count_query, params)
-        total = cur.fetchone()['total']
+        total = cur.fetchone()[0]
         
         # Add pagination
         query += " LIMIT ? OFFSET ?"
@@ -97,11 +111,14 @@ async def tag_detail(tag_name):
     with get_db_connection() as conn:
         cur = conn.cursor()
         
-        # Get tag info
+        # Get tag info with computed count
         cur.execute("""
-            SELECT id, name, category as base_category, extended_category, count
-            FROM tags
-            WHERE name = ?
+            SELECT t.id, t.name, t.category as base_category, t.extended_category,
+                   COUNT(DISTINCT it.image_id) as count
+            FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
+            WHERE t.name = ?
+            GROUP BY t.id, t.name, t.category, t.extended_category
         """, (tag_name,))
         tag = cur.fetchone()
         
@@ -244,12 +261,7 @@ async def merge_tags():
             # Delete the source tag
             cur.execute("DELETE FROM tags WHERE id = ?", (source_id,))
         
-        # Update target tag count
-        cur.execute("""
-            UPDATE tags
-            SET count = (SELECT COUNT(DISTINCT image_id) FROM image_tags WHERE tag_id = ?)
-            WHERE id = ?
-        """, (target_id, target_id))
+        
         
         conn.commit()
         
@@ -350,16 +362,34 @@ async def tag_stats():
         cur.execute("SELECT COUNT(*) as count FROM tags WHERE extended_category IS NOT NULL AND extended_category != ''")
         categorized = cur.fetchone()['count']
         
-        cur.execute("SELECT COUNT(*) as count FROM tags WHERE count = 0")
-        orphaned = cur.fetchone()['count']
+        # Count orphaned tags (tags with no images)
+        cur.execute("""
+            SELECT COUNT(*) as count
+            FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
+            GROUP BY t.id
+            HAVING COUNT(it.image_id) = 0
+        """)
+        orphaned = len(cur.fetchall())  # Count the number of rows returned
         
-        cur.execute("SELECT COUNT(*) as count FROM tags WHERE count > 0 AND count < 5")
+        # Count low usage tags (1-4 images)
+        cur.execute("""
+            SELECT COUNT(*) as count
+            FROM (
+                SELECT t.id
+                FROM tags t
+                LEFT JOIN image_tags it ON t.id = it.tag_id
+                GROUP BY t.id
+                HAVING COUNT(it.image_id) > 0 AND COUNT(it.image_id) < 5
+            )
+        """)
         low_usage = cur.fetchone()['count']
         
         cur.execute("SELECT COUNT(DISTINCT i.id) as count FROM images i")
         total_images = cur.fetchone()['count']
         
-        cur.execute("SELECT SUM(count) as total FROM tags")
+        # Total tag uses (count all image_tags relationships)
+        cur.execute("SELECT COUNT(*) as total FROM image_tags")
         total_uses = cur.fetchone()['total'] or 0
         
         avg_tags = total_uses / total_images if total_images > 0 else 0
@@ -383,8 +413,10 @@ async def tag_stats():
         
         # Top tags
         cur.execute("""
-            SELECT name, count
-            FROM tags
+            SELECT t.name, COUNT(DISTINCT it.image_id) as count
+            FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
+            GROUP BY t.id, t.name
             ORDER BY count DESC
             LIMIT 10
         """)
@@ -392,18 +424,23 @@ async def tag_stats():
         
         # Problem tags
         cur.execute("""
-            SELECT name, count
-            FROM tags
-            WHERE (extended_category IS NULL OR extended_category = '') AND count > 100
+            SELECT t.name, COUNT(DISTINCT it.image_id) as count
+            FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
+            WHERE (t.extended_category IS NULL OR t.extended_category = '')
+            GROUP BY t.id, t.name
+            HAVING count > 100
             ORDER BY count DESC
             LIMIT 10
         """)
         uncategorized_high_usage = [dict(row) for row in cur.fetchall()]
         
         cur.execute("""
-            SELECT name
-            FROM tags
-            WHERE count = 0
+            SELECT t.name
+            FROM tags t
+            LEFT JOIN image_tags it ON t.id = it.tag_id
+            GROUP BY t.id, t.name
+            HAVING COUNT(DISTINCT it.image_id) = 0
             LIMIT 20
         """)
         orphaned_tags = [row['name'] for row in cur.fetchall()]
@@ -451,8 +488,8 @@ async def bulk_add_tags():
             if tag_row:
                 tag_ids[tag_name] = tag_row['id']
             else:
-                # Create new tag with default category
-                cur.execute("INSERT INTO tags (name, category, count) VALUES (?, ?, 0)", (tag_name, DEFAULT_TAG_CATEGORY))
+                # Create new tag with default category (no count column in schema)
+                cur.execute("INSERT INTO tags (name, category) VALUES (?, ?)", (tag_name, DEFAULT_TAG_CATEGORY))
                 tag_ids[tag_name] = cur.lastrowid
         
         # Add tags to images
@@ -470,13 +507,7 @@ async def bulk_add_tags():
                     VALUES (?, ?)
                 """, (image_id, tag_id))
         
-        # Update tag counts
-        for tag_id in tag_ids.values():
-            cur.execute("""
-                UPDATE tags
-                SET count = (SELECT COUNT(DISTINCT image_id) FROM image_tags WHERE tag_id = ?)
-                WHERE id = ?
-            """, (tag_id, tag_id))
+        # Tag counts are computed dynamically, no need to update
         
         conn.commit()
         
@@ -522,13 +553,7 @@ async def bulk_remove_tags():
                     WHERE image_id = ? AND tag_id = ?
                 """, (image_id, tag_id))
         
-        # Update tag counts
-        for tag_id in tag_ids:
-            cur.execute("""
-                UPDATE tags
-                SET count = (SELECT COUNT(DISTINCT image_id) FROM image_tags WHERE tag_id = ?)
-                WHERE id = ?
-            """, (tag_id, tag_id))
+        # Tag counts are computed dynamically, no need to update
         
         conn.commit()
         
