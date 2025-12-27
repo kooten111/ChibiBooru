@@ -248,10 +248,24 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
     """
     if filepath.lower().endswith(config.SUPPORTED_VIDEO_EXTENSIONS):
         return compute_colorhash_for_video(filepath)
-    # Zip animation colorhash? We could support it but maybe overkill for now.
-    # If we want consistency, we should. But let's skip for now or use thumb.
     elif filepath.lower().endswith(config.SUPPORTED_ZIP_EXTENSIONS):
-        return None # TODO: Implement zip colorhash
+        # Compute colorhash from first frame of zip animation
+        from services import zip_animation_service
+        from database import models
+        
+        # Get MD5 to find extracted frames
+        image_data = models.get_image_details(filepath)
+        if image_data and image_data.get('md5'):
+            md5 = image_data['md5']
+            first_frame_path = zip_animation_service.get_frame_path(md5, 0)
+            if first_frame_path and os.path.exists(first_frame_path):
+                try:
+                    img = Image.open(first_frame_path)
+                    return str(imagehash.colorhash(img))
+                except Exception as e:
+                    print(f"Error computing colorhash for zip animation {filepath}: {e}")
+                    return None
+        return None
     else:
         return compute_colorhash(filepath)
 

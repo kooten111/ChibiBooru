@@ -240,8 +240,8 @@ def release_processing_lock(lock_fd):
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
             lock_fd.close()
             os.remove(lock_file)
-        except:
-            pass
+        except Exception as e:
+            pass  # Lock cleanup failure is not critical
 
 
 def load_local_tagger():
@@ -839,8 +839,8 @@ def search_saucenao(filepath):
         if temp_file and os.path.exists(temp_file.name):
             try:
                 os.unlink(temp_file.name)
-            except:
-                pass
+            except (OSError, IOError) as e:
+                pass  # Temp file cleanup failure is not critical
 
 def fetch_by_post_id(source, post_id):
     try:

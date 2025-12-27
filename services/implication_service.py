@@ -413,13 +413,18 @@ def preview_implication_impact(source_tag: str, implied_tag: str) -> Dict:
         # Get chain implications
         chain = get_implication_chain(implied_tag)
         chain_tags = _flatten_chain(chain)
+        
+        # Detect circular implications
+        conflicts = []
+        if source_tag in chain_tags:
+            conflicts.append(f"Circular implication detected: {source_tag} -> {implied_tag} -> ... -> {source_tag}")
 
         return {
             'total_images': total_images,
             'already_has_tag': already_has,
             'will_gain_tag': will_gain,
             'chain_implications': chain_tags,
-            'conflicts': []  # TODO: Detect conflicts (e.g., circular implications)
+            'conflicts': conflicts
         }
 
 
