@@ -1,7 +1,6 @@
 # processing.py
 import config
 import os
-import hashlib
 import requests
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -10,6 +9,7 @@ import numpy as np
 from database import models
 from database import get_db_connection
 from utils.deduplication import remove_duplicate
+from utils.file_utils import get_file_md5
 from utils.tag_extraction import (
     extract_tags_from_source,
     extract_rating_from_source,
@@ -611,13 +611,6 @@ def extract_tag_data(data, source):
         "width": width, "height": height, "file_size": file_size
     }
 
-def get_md5(filepath):
-    hash_md5 = hashlib.md5()
-    with open(filepath, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
 def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
     """
     Create a thumbnail for an image, video, or zip animation.
@@ -1093,7 +1086,7 @@ def process_image_file(filepath, move_from_ingest=True):
     
     # Calculate MD5 immediately
     try:
-        md5 = get_md5(filepath)
+        md5 = get_file_md5(filepath)
     except Exception as e:
         print(f"[Processing] ERROR: Failed to calculate MD5 for {filename}: {e}")
         return False
@@ -1230,7 +1223,7 @@ def process_image_file(filepath, move_from_ingest=True):
             
             if os.path.exists(new_path):
                 # File already exists at destination
-                if get_md5(new_path) == md5:
+                if get_file_md5(new_path) == md5:
                     # Same file, remove ingest copy
                     os.remove(filepath)
                     file_dest = new_path

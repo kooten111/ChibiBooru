@@ -6,20 +6,11 @@ Prevents duplicate images from being processed or downloaded.
 
 import os
 import json
-import hashlib
 from pathlib import Path
+from utils.file_utils import get_file_md5
 
 METADATA_DIR = "./metadata"
 STATIC_IMAGES = "./static/images"
-
-
-def get_md5(filepath):
-    """Calculate MD5 hash of a file"""
-    hash_md5 = hashlib.md5()
-    with open(filepath, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
 
 
 def build_md5_index():
@@ -53,7 +44,7 @@ def is_duplicate(filepath, md5_index=None):
         md5_index = build_md5_index()
     full_path = os.path.join(STATIC_IMAGES, filepath) if not filepath.startswith(STATIC_IMAGES) else filepath
     try:
-        new_md5 = get_md5(full_path)
+        new_md5 = get_file_md5(full_path)
     except FileNotFoundError:
         return False, None, None
     except Exception as e:
