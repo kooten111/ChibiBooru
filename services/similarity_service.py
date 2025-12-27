@@ -10,9 +10,9 @@ from typing import Optional, List, Dict, Tuple
 from PIL import Image, UnidentifiedImageError
 import imagehash
 import config
-from database import get_db_connection
+from database import get_db_connection, models
 from utils.file_utils import get_thumbnail_path
-from services import similarity_db
+from services import similarity_db, zip_animation_service
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -250,9 +250,6 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
         return compute_colorhash_for_video(filepath)
     elif filepath.lower().endswith(config.SUPPORTED_ZIP_EXTENSIONS):
         # Compute colorhash from first frame of zip animation
-        from services import zip_animation_service
-        from database import models
-        
         # Get MD5 to find extracted frames
         image_data = models.get_image_details(filepath)
         if image_data and image_data.get('md5'):

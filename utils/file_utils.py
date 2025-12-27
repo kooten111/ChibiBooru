@@ -103,7 +103,8 @@ def get_bucketed_thumbnail_path_on_disk(filepath: str) -> str:
         filepath: The image filepath (e.g., "abc/image.jpg" or "images/abc/image.jpg")
     
     Returns:
-        Full disk path like "./static/thumbnails/abc/image.webp"
+        Full disk path like "./static/thumbnails/[bucket]/image.webp" where [bucket] 
+        is a 3-character hash based on the filename
     """
     # Remove "images/" prefix if present
     rel_path = filepath.replace("images/", "", 1)
