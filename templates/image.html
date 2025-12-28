@@ -444,7 +444,7 @@
                     %}data-animation-type="zip" data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="10" {% endif
                     %}>
                     {% if filepath.endswith('.mp4') %}
-                    <video controls loop preload="metadata"
+                    <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
                         onloadeddata="this.closest('.image-view').classList.add('has-image')">
                         <source
                             src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
@@ -452,7 +452,7 @@
                         Your browser does not support the video tag.
                     </video>
                     {% elif filepath.endswith('.webm') %}
-                    <video controls loop preload="metadata"
+                    <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
                         onloadeddata="this.closest('.image-view').classList.add('has-image')">
                         <source
                             src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"

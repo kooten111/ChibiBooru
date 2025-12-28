@@ -138,7 +138,16 @@ async def tag_detail(tag_name):
             ORDER BY i.id DESC
             LIMIT ?
         """, (tag_id, SAMPLE_IMAGE_LIMIT))
-        samples = [dict(row) for row in cur.fetchall()]
+        
+        # Build sample images with thumbnail paths
+        from utils import get_thumbnail_path
+        samples = []
+        for row in cur.fetchall():
+            filepath = row['filepath']
+            samples.append({
+                'filepath': filepath,
+                'thumb': get_thumbnail_path(f"images/{filepath}")
+            })
         
         # Get implications (tags that this tag implies - i.e., this tag is the source)
         cur.execute("""

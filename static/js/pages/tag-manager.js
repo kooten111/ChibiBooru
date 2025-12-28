@@ -484,7 +484,7 @@ async function loadTagDetail(tagName) {
                 <div class="sample-images-grid">
                     ${data.sample_images.map(img => `
                         <div class="sample-image">
-                            <img src="/images/${img.filepath}" alt="">
+                            <img src="/static/${img.thumb.startsWith('thumbnails/') || img.thumb.startsWith('images/') ? img.thumb : 'images/' + img.thumb}" alt="">
                         </div>
                     `).join('')}
                 </div>

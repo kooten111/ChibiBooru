@@ -291,7 +291,8 @@
                             <div class="editor-section">
                                 <h4>Remove Tags</h4>
                                 <div class="tag-queue" id="removeTagQueue"></div>
-                                <button class="editor-btn editor-btn-danger" id="applyRemoveTagsBtn">Apply Remove</button>
+                                <button class="editor-btn editor-btn-danger" id="applyRemoveTagsBtn">Apply
+                                    Remove</button>
                             </div>
                         </div>
                     </div>
@@ -312,7 +313,7 @@
     </div>
 
     <!-- Modals -->
-    
+
     <!-- Bulk Operations Bar (appears when tags selected) -->
     <div class="bulk-operations-bar" id="bulkOperationsBar" style="display: none;">
         <span class="bulk-selection-count" id="bulkSelectionCount">0 selected</span>
@@ -509,11 +510,11 @@
     <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
     <script src="{{ url_for('static', filename='js/header.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/pages/tag-manager.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/tag-manager.js') + '?v=2' }}"></script>
     <script type="module">
         import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
         window.showNotification = showNotification;
-        window.closeModal = function(modalId) {
+        window.closeModal = function (modalId) {
             document.getElementById(modalId).style.display = 'none';
         };
     </script>
