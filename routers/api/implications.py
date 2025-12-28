@@ -13,11 +13,35 @@ async def get_implication_suggestions():
     limit = request.args.get('limit', 50, type=int)
     pattern_type = request.args.get('type', None)
     
+    # Robustly get list filters (check both with and without brackets)
+    source_categories = request.args.getlist('source_categories[]')
+    if not source_categories:
+        source_categories = request.args.getlist('source_categories')
+        
+    implied_categories = request.args.getlist('implied_categories[]')
+    if not implied_categories:
+        implied_categories = request.args.getlist('implied_categories')
+    
+    # Also support comma-separated if passed as single string
+    if not source_categories and request.args.get('source_categories'):
+        val = request.args.get('source_categories')
+        source_categories = val.split(',') if val else []
+        
+    if not implied_categories and request.args.get('implied_categories'):
+        val = request.args.get('implied_categories')
+        implied_categories = val.split(',') if val else []
+    
+    # Clean up empty strings if any
+    source_categories = [c for c in source_categories if c]
+    implied_categories = [c for c in implied_categories if c]
+        
     # Clamp values to reasonable ranges
     page = max(1, page)
     limit = max(1, min(200, limit))
     
-    return implication_service.get_paginated_suggestions(page, limit, pattern_type)
+    return implication_service.get_paginated_suggestions(
+        page, limit, pattern_type, source_categories, implied_categories
+    )
 
 
 @api_blueprint.route('/implications/approve', methods=['POST'])

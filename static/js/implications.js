@@ -185,7 +185,8 @@ function initializeTypeFilters() {
                 }
             }
 
-            renderImplications();
+            // Reload data from server with new filters
+            loadAllSuggestions();
         });
     });
 }
@@ -236,7 +237,8 @@ function handleCategoryFilterChange(checkbox, filterSet, allCheckboxes, filterNa
         }
     }
 
-    renderImplications();
+    // Reload data from server with new filters
+    loadAllSuggestions();
 }
 
 // Collapsible Sections - Handled inline in HTML
@@ -385,6 +387,35 @@ function clearSelection() {
     updateBulkActionsBar();
 }
 
+// Helper to build filter query string
+function getFilterQueryString() {
+    const params = new URLSearchParams();
+
+    // Type filters
+    if (!typeFilters.has('all')) {
+        // Find which one is selected
+        for (const type of typeFilters) {
+            params.append('type', type);
+        }
+    }
+
+    // Source Category filters
+    if (!sourceCategoryFilters.has('all')) {
+        for (const cat of sourceCategoryFilters) {
+            params.append('source_categories[]', cat); // Use [] convention for arrays
+        }
+    }
+
+    // Implied Category filters
+    if (!impliedCategoryFilters.has('all')) {
+        for (const cat of impliedCategoryFilters) {
+            params.append('implied_categories[]', cat);
+        }
+    }
+
+    return params.toString();
+}
+
 // Load suggestions with pagination (first page)
 async function loadAllSuggestions() {
     try {
@@ -392,7 +423,12 @@ async function loadAllSuggestions() {
         paginationState.currentPage = 1;
         paginationState.isLoading = true;
 
-        const response = await fetch(`/api/implications/suggestions?page=1&limit=${paginationState.limit}`);
+        // Show loading state in UI
+        const listEl = document.getElementById('suggestionsList');
+        if (listEl) listEl.innerHTML = '<div class="loading-message">Loading suggestions...</div>';
+
+        const queryString = getFilterQueryString();
+        const response = await fetch(`/api/implications/suggestions?page=1&limit=${paginationState.limit}&${queryString}`);
         const data = await response.json();
 
         // Update pagination state from response
@@ -405,12 +441,17 @@ async function loadAllSuggestions() {
         // Store suggestions (already flat list from new API)
         allImplications.suggestions = data.suggestions;
 
-        // Also load all active implications
-        const activeResponse = await fetch('/api/implications/all');
-        const activeData = await activeResponse.json();
-        allImplications.active = activeData.implications;
+        // Also load all active implications (only if not already loaded or if we want to refresh them too)
+        // For active ones, we usually load once. But if we want to support filtering active ones server-side later we could.
+        // For now, active implications are small enough to keep client-side or we can leave as is.
+        // Let's assume active implications are still fetched all at once for now as per original code.
+        if (allImplications.active.length === 0) {
+            const activeResponse = await fetch('/api/implications/all');
+            const activeData = await activeResponse.json();
+            allImplications.active = activeData.implications;
+        }
 
-        renderImplications();
+        renderImplications(true); // Pass true to indicate suggestions are already filtered
     } catch (error) {
         console.error('Error loading suggestions:', error);
         showError('Failed to load suggestions');
@@ -429,7 +470,8 @@ async function loadMoreSuggestions() {
         updateLoadMoreButton();
 
         const nextPage = paginationState.currentPage + 1;
-        const response = await fetch(`/api/implications/suggestions?page=${nextPage}&limit=${paginationState.limit}`);
+        const queryString = getFilterQueryString();
+        const response = await fetch(`/api/implications/suggestions?page=${nextPage}&limit=${paginationState.limit}&${queryString}`);
         const data = await response.json();
 
         // Update pagination state
@@ -441,7 +483,7 @@ async function loadMoreSuggestions() {
         // Append new suggestions to existing list
         allImplications.suggestions = [...allImplications.suggestions, ...data.suggestions];
 
-        renderImplications();
+        renderImplications(true);
     } catch (error) {
         console.error('Error loading more suggestions:', error);
         showError('Failed to load more suggestions');
@@ -471,8 +513,15 @@ function updateLoadMoreButton() {
 window.loadMoreSuggestions = loadMoreSuggestions;
 
 // Render implications based on current filters
-function renderImplications() {
-    let suggestions = filterImplications(allImplications.suggestions, true);
+function renderImplications(skipSuggestionFiltering = false) {
+    // If suggestions come from server already filtered, use them as is (or filter defensively but careful not to double filter if logic differed)
+    // Since we reuse filterImplications logic on server which is 1:1, it's safe to re-filter, 
+    // BUT we want to avoid hiding things if the client state is slightly out of sync or if we just want to show what server gave.
+    // However, for pagination consistency, we should trust the server's return.
+    let suggestions = skipSuggestionFiltering ?
+        allImplications.suggestions :
+        filterImplications(allImplications.suggestions, true);
+
     let active = filterImplications(allImplications.active, false);
 
     // Apply view mode

@@ -263,7 +263,9 @@ def invalidate_suggestion_cache():
 
 
 def get_paginated_suggestions(page: int = 1, limit: int = 50, 
-                               pattern_type: str = None) -> Dict:
+                               pattern_type: str = None,
+                               source_categories: List[str] = None,
+                               implied_categories: List[str] = None) -> Dict:
     """
     Get paginated suggestions with optional filtering.
     
@@ -271,27 +273,35 @@ def get_paginated_suggestions(page: int = 1, limit: int = 50,
         page: Page number (1-indexed)
         limit: Items per page
         pattern_type: Optional filter ('naming_pattern' or 'correlation')
+        source_categories: List of categories to include/exclude
+        implied_categories: List of categories to include/exclude
     
     Returns:
         Dict with paginated results and metadata
     """
     all_suggestions = _get_cached_suggestions()
     
-    # Apply filter if specified
-    if pattern_type:
-        all_suggestions = [s for s in all_suggestions if s.get('pattern_type') == pattern_type]
+    # Apply filters
+    filtered_suggestions = _filter_suggestions(
+        all_suggestions, 
+        pattern_type, 
+        source_categories, 
+        implied_categories
+    )
     
-    total = len(all_suggestions)
-    total_pages = (total + limit - 1) // limit  # Ceiling division
+    total = len(filtered_suggestions)
+    total_pages = (total + limit - 1) // limit if limit > 0 else 1
     
     # Calculate slice indices
     start_idx = (page - 1) * limit
     end_idx = start_idx + limit
     
     # Get the slice
-    page_suggestions = all_suggestions[start_idx:end_idx]
+    page_suggestions = filtered_suggestions[start_idx:end_idx]
     
-    # Count by type for the full dataset
+    # Count by type for the full dataset (unfiltered counts usually desired for badges, 
+    # but here we might want filtered counts? Let's keep total available counts for now)
+    # actually, usually UI badges want "total available" not "current view"
     naming_count = sum(1 for s in _get_cached_suggestions() if s.get('pattern_type') == 'naming_pattern')
     correlation_count = sum(1 for s in _get_cached_suggestions() if s.get('pattern_type') == 'correlation')
     
@@ -308,6 +318,43 @@ def get_paginated_suggestions(page: int = 1, limit: int = 50,
             'correlation_count': correlation_count
         }
     }
+
+
+def _filter_suggestions(suggestions: List[Dict], pattern_type: str = None,
+                        source_categories: List[str] = None,
+                        implied_categories: List[str] = None) -> List[Dict]:
+    """Helper to filter detailed suggestions list."""
+    filtered = suggestions
+    
+    # Pattern type filter
+    if pattern_type and pattern_type != 'all':
+        filtered = [s for s in filtered if s.get('pattern_type') == pattern_type]
+        
+    # Source category filter
+    if source_categories and 'all' not in source_categories:
+        # Separate inclusions and exclusions
+        exclusions = [c[1:] for c in source_categories if c.startswith('!')]
+        inclusions = [c for c in source_categories if not c.startswith('!')]
+        
+        filtered = [
+            s for s in filtered
+            if (not inclusions or s.get('source_category', 'general') in inclusions)
+            and (not exclusions or s.get('source_category', 'general') not in exclusions)
+        ]
+        
+    # Implied category filter
+    if implied_categories and 'all' not in implied_categories:
+        # Separate inclusions and exclusions
+        exclusions = [c[1:] for c in implied_categories if c.startswith('!')]
+        inclusions = [c for c in implied_categories if not c.startswith('!')]
+        
+        filtered = [
+            s for s in filtered
+            if (not inclusions or s.get('implied_category', 'general') in inclusions)
+            and (not exclusions or s.get('implied_category', 'general') not in exclusions)
+        ]
+        
+    return filtered
 
 
 def approve_suggestion(source_tag: str, implied_tag: str, inference_type: str,
