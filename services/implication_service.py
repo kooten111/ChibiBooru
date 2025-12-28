@@ -11,13 +11,16 @@ from repositories.tag_repository import apply_implications_for_image
 class ImplicationSuggestion:
     """Represents a suggested tag implication."""
     def __init__(self, source_tag: str, implied_tag: str, confidence: float,
-                 pattern_type: str, reason: str, affected_images: int = 0):
+                 pattern_type: str, reason: str, affected_images: int = 0,
+                 source_category: str = 'general', implied_category: str = 'general'):
         self.source_tag = source_tag
         self.implied_tag = implied_tag
         self.confidence = confidence
         self.pattern_type = pattern_type
         self.reason = reason
         self.affected_images = affected_images
+        self.source_category = source_category
+        self.implied_category = implied_category
 
     def to_dict(self):
         return {
@@ -26,7 +29,9 @@ class ImplicationSuggestion:
             'confidence': self.confidence,
             'pattern_type': self.pattern_type,
             'reason': self.reason,
-            'affected_images': self.affected_images
+            'affected_images': self.affected_images,
+            'source_category': self.source_category,
+            'implied_category': self.implied_category
         }
 
 
@@ -75,7 +80,9 @@ def detect_substring_implications() -> List[ImplicationSuggestion]:
                             confidence=0.92,
                             pattern_type='naming_pattern',
                             reason=f'Naming pattern: extracted "{potential_implied}" from tag name',
-                            affected_images=affected
+                            affected_images=affected,
+                            source_category='character',
+                            implied_category='copyright'
                         ))
 
             # Pattern 2: Substring variations (costume, form, alt, etc.)
@@ -105,7 +112,9 @@ def detect_substring_implications() -> List[ImplicationSuggestion]:
                             confidence=0.95,
                             pattern_type='naming_pattern',
                             reason=f'Variant pattern: {middle_part} form implies base character',
-                            affected_images=affected
+                            affected_images=affected,
+                            source_category='character',
+                            implied_category='character'
                         ))
 
     return suggestions
@@ -186,7 +195,9 @@ def detect_tag_correlations(min_confidence: float = 0.85, min_co_occurrence: int
                             confidence=confidence,
                             pattern_type='correlation',
                             reason=reason,
-                            affected_images=char_count - co_occurrence  # Images that will gain the tag
+                            affected_images=char_count - co_occurrence,  # Images that will gain the tag
+                            source_category='character',
+                            implied_category=corr_category
                         ))
 
     return suggestions
@@ -658,6 +669,104 @@ def get_implications_for_tag(tag_name: str) -> Dict:
             'implied_by': implied_by,
             'suggestions': tag_suggestions
         }
+
+
+def auto_approve_naming_pattern_suggestions() -> Dict:
+    """
+    Auto-approve all naming pattern suggestions.
+    These are character_(copyright) → copyright patterns with high reliability.
+    
+    Returns:
+        Dict with success count and any errors
+    """
+    suggestions = _get_cached_suggestions()
+    
+    # Filter to only naming pattern suggestions
+    naming_suggestions = [s for s in suggestions if s.get('pattern_type') == 'naming_pattern']
+    
+    success_count = 0
+    errors = []
+    
+    for suggestion in naming_suggestions:
+        source_tag = suggestion.get('source_tag')
+        implied_tag = suggestion.get('implied_tag')
+        confidence = suggestion.get('confidence', 0.92)
+        
+        if not source_tag or not implied_tag:
+            continue
+        
+        try:
+            success = approve_suggestion(source_tag, implied_tag, 'naming_pattern', confidence)
+            if success:
+                success_count += 1
+        except Exception as e:
+            errors.append(f"Error approving {source_tag} → {implied_tag}: {str(e)}")
+    
+    # Invalidate cache after bulk operation
+    invalidate_suggestion_cache()
+    
+    return {
+        'success_count': success_count,
+        'total': len(naming_suggestions),
+        'errors': errors,
+        'pattern_type': 'naming_pattern'
+    }
+
+
+def auto_approve_high_confidence_suggestions(min_confidence: float = 0.95, 
+                                              min_sample_size: int = 10) -> Dict:
+    """
+    Auto-approve correlation suggestions that meet confidence and sample size thresholds.
+    This ensures statistical significance before auto-approving.
+    
+    Args:
+        min_confidence: Minimum confidence threshold (default 95%)
+        min_sample_size: Minimum number of affected images for statistical significance
+    
+    Returns:
+        Dict with success count and any errors
+    """
+    suggestions = _get_cached_suggestions()
+    
+    # Filter to correlation suggestions meeting thresholds
+    eligible_suggestions = [
+        s for s in suggestions 
+        if s.get('pattern_type') == 'correlation'
+        and s.get('confidence', 0) >= min_confidence
+        and s.get('affected_images', 0) >= min_sample_size
+    ]
+    
+    success_count = 0
+    errors = []
+    
+    for suggestion in eligible_suggestions:
+        source_tag = suggestion.get('source_tag')
+        implied_tag = suggestion.get('implied_tag')
+        confidence = suggestion.get('confidence', min_confidence)
+        
+        if not source_tag or not implied_tag:
+            continue
+        
+        try:
+            success = approve_suggestion(source_tag, implied_tag, 'correlation', confidence)
+            if success:
+                success_count += 1
+        except Exception as e:
+            errors.append(f"Error approving {source_tag} → {implied_tag}: {str(e)}")
+    
+    # Invalidate cache after bulk operation
+    invalidate_suggestion_cache()
+    
+    return {
+        'success_count': success_count,
+        'total': len(eligible_suggestions),
+        'errors': errors,
+        'pattern_type': 'correlation',
+        'thresholds': {
+            'min_confidence': min_confidence,
+            'min_sample_size': min_sample_size
+        }
+    }
 
 
 def bulk_approve_implications(suggestions: List[Dict]) -> Dict:

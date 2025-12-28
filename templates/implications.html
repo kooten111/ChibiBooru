@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>{{ app_name }} - Tag Implications</title>
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 </head>
+
 <body>
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
@@ -55,7 +57,7 @@
             </div>
 
             <div class="sidebar-section">
-                <button class="collapsible-header" data-target="typeFilters">
+                <button class="collapsible-header" onclick="toggleSection(this, 'typeFilters', event)">
                     <span>Type Filters</span>
                     <span class="collapse-arrow">▼</span>
                 </button>
@@ -79,12 +81,64 @@
                 </div>
             </div>
 
+            <div class="sidebar-section">
+                <button class="collapsible-header" onclick="toggleSection(this, 'categoryFilters', event)">
+                    <span>Category Filters</span>
+                    <span class="collapse-arrow">▼</span>
+                </button>
+                <div id="categoryFilters" class="collapsible-content">
+                    <div class="filter-subsection">
+                        <span class="filter-subsection-label">Source Category:</span>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="sourceCategoryFilter" value="all" checked>
+                            <span>All</span>
+                        </label>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="sourceCategoryFilter" value="character">
+                            <span>Character</span>
+                        </label>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="sourceCategoryFilter" value="copyright">
+                            <span>Copyright</span>
+                        </label>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="sourceCategoryFilter" value="general">
+                            <span>General</span>
+                        </label>
+                    </div>
+                    <div class="filter-subsection">
+                        <span class="filter-subsection-label">Implied Category:</span>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="impliedCategoryFilter" value="all" checked>
+                            <span>All</span>
+                        </label>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="impliedCategoryFilter" value="character">
+                            <span>Character</span>
+                        </label>
+                        <label class="filter-checkbox">
+                            <input type="checkbox" name="impliedCategoryFilter" value="copyright">
+                            <span>Copyright</span>
+                        </label>
+                        <label class="filter-checkbox exclude-filter">
+                            <input type="checkbox" name="impliedCategoryFilter" value="!general">
+                            <span>Exclude General</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
             <div class="sidebar-section quick-actions">
                 <button id="createManualBtn" class="action-btn primary-btn">
                     <span>➕</span> Create Manual Implication
                 </button>
-                <button id="runAutoDetectBtn" class="action-btn secondary-btn">
-                    <span>🔍</span> Run Auto-Detection
+                <button id="autoApprovePatternBtn" class="action-btn success-btn"
+                    title="Auto-approve all character_(copyright) → copyright patterns">
+                    <span>⚡</span> Auto-Approve Naming Patterns
+                </button>
+                <button id="autoApproveConfidentBtn" class="action-btn success-btn"
+                    title="Auto-approve high-confidence correlation suggestions (≥95%, ≥10 images)">
+                    <span>🎯</span> Auto-Approve High Confidence
                 </button>
             </div>
         </aside>
@@ -106,7 +160,7 @@
             <div class="implications-sections">
                 <!-- Suggestions Section -->
                 <div class="collapsible-section suggestions-section">
-                    <button class="section-header" data-target="suggestionsContent">
+                    <button class="section-header" onclick="toggleSection(this, 'suggestionsContent', event)">
                         <span class="section-icon">⚠️</span>
                         <span class="section-title">Pending Suggestions</span>
                         <span class="section-badge" id="suggestionsBadge">0</span>
@@ -127,7 +181,7 @@
 
                 <!-- Active Implications Section -->
                 <div class="collapsible-section active-section">
-                    <button class="section-header" data-target="activeContent">
+                    <button class="section-header" onclick="toggleSection(this, 'activeContent', event)">
                         <span class="section-icon">✓</span>
                         <span class="section-title">Active Implications</span>
                         <span class="section-badge" id="activeBadge">0</span>
@@ -167,7 +221,8 @@
                 <div class="flow-arrow">→</div>
                 <div class="form-group">
                     <label for="manualImpliedTag">Also add this tag:</label>
-                    <input type="text" id="manualImpliedTag" placeholder="e.g., vshojo" autocomplete="off">
+                    <input type="text" id="manualImpliedTag" placeholder="e.g., indie_virtual_youtuber"
+                        autocomplete="off">
                 </div>
             </div>
             <div class="modal-actions">
@@ -177,10 +232,28 @@
         </div>
     </div>
 
+    <div class="toast-container" id="toastContainer"></div>
+
     <script src="{{ url_for('static', filename='js/header.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/implications.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/implications.js') + '?v=2' }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
+    <script>
+        // Global toggle function for collapsible sections
+        function toggleSection(header, contentId, e) {
+            // Prevent event propagation if triggered from inside
+            if (e && (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL')) {
+                return;
+            }
+
+            const content = document.getElementById(contentId);
+            if (content) {
+                header.classList.toggle('collapsed');
+                content.classList.toggle('collapsed');
+            }
+        }
+    </script>
 </body>
+
 </html>

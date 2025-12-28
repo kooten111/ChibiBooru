@@ -7,6 +7,8 @@ let selectedImplication = null;
 let selectedSuggestions = new Set();
 let viewMode = 'all'; // 'all', 'suggestions', 'active'
 let typeFilters = new Set(['all']);
+let sourceCategoryFilters = new Set(['all']);
+let impliedCategoryFilters = new Set(['all']);
 let allImplications = { suggestions: [], active: [] };
 
 // Pagination state
@@ -24,7 +26,8 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeTagSearch();
     initializeViewModeToggle();
     initializeTypeFilters();
-    initializeCollapsibleSections();
+    initializeCategoryFilters();
+    // initializeCollapsibleSections(); // Using inline handlers now
     initializeBulkActions();
     initializeManualCreation();
     initializeKeyboardShortcuts();
@@ -187,19 +190,77 @@ function initializeTypeFilters() {
     });
 }
 
-// Collapsible Sections
+// Category Filters
+function initializeCategoryFilters() {
+    // Source category filters
+    const sourceCheckboxes = document.querySelectorAll('input[name="sourceCategoryFilter"]');
+    sourceCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            handleCategoryFilterChange(checkbox, sourceCategoryFilters, sourceCheckboxes, 'sourceCategoryFilter');
+        });
+    });
+
+    // Implied category filters
+    const impliedCheckboxes = document.querySelectorAll('input[name="impliedCategoryFilter"]');
+    impliedCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            handleCategoryFilterChange(checkbox, impliedCategoryFilters, impliedCheckboxes, 'impliedCategoryFilter');
+        });
+    });
+}
+
+function handleCategoryFilterChange(checkbox, filterSet, allCheckboxes, filterName) {
+    const value = checkbox.value;
+
+    if (value === 'all') {
+        if (checkbox.checked) {
+            filterSet.clear();
+            filterSet.add('all');
+            allCheckboxes.forEach(cb => {
+                if (cb.value !== 'all') cb.checked = false;
+            });
+        }
+    } else {
+        filterSet.delete('all');
+        document.querySelector(`input[name="${filterName}"][value="all"]`).checked = false;
+
+        if (checkbox.checked) {
+            filterSet.add(value);
+        } else {
+            filterSet.delete(value);
+        }
+
+        if (filterSet.size === 0) {
+            filterSet.add('all');
+            document.querySelector(`input[name="${filterName}"][value="all"]`).checked = true;
+        }
+    }
+
+    renderImplications();
+}
+
+// Collapsible Sections - Handled inline in HTML
+/*
 function initializeCollapsibleSections() {
     document.querySelectorAll('.collapsible-header, .section-header').forEach(header => {
-        header.addEventListener('click', () => {
+        header.addEventListener('click', (e) => {
+            // Prevent checkbox clicks from triggering collapse
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') {
+                return;
+            }
+            
             const target = header.dataset.target;
             if (target) {
                 const content = document.getElementById(target);
-                header.classList.toggle('collapsed');
-                content.classList.toggle('collapsed');
+                if (content) {
+                    header.classList.toggle('collapsed');
+                    content.classList.toggle('collapsed');
+                }
             }
         });
     });
 }
+*/
 
 // Bulk Actions
 function initializeBulkActions() {
@@ -446,6 +507,39 @@ function filterImplications(implications, isSuggestion) {
         if (!typeFilters.has('all') && !typeFilters.has(type)) {
             return false;
         }
+
+        // Source category filter
+        const sourceCategory = impl.source_category || 'general';
+        if (!sourceCategoryFilters.has('all')) {
+            // Check for exclusions (values starting with !)
+            for (const filter of sourceCategoryFilters) {
+                if (filter.startsWith('!') && sourceCategory === filter.slice(1)) {
+                    return false;
+                }
+            }
+            // Check for inclusions
+            const inclusions = [...sourceCategoryFilters].filter(f => !f.startsWith('!'));
+            if (inclusions.length > 0 && !inclusions.includes(sourceCategory)) {
+                return false;
+            }
+        }
+
+        // Implied category filter
+        const impliedCategory = impl.implied_category || 'general';
+        if (!impliedCategoryFilters.has('all')) {
+            // Check for exclusions (values starting with !)
+            for (const filter of impliedCategoryFilters) {
+                if (filter.startsWith('!') && impliedCategory === filter.slice(1)) {
+                    return false;
+                }
+            }
+            // Check for inclusions
+            const inclusions = [...impliedCategoryFilters].filter(f => !f.startsWith('!'));
+            if (inclusions.length > 0 && !inclusions.includes(impliedCategory)) {
+                return false;
+            }
+        }
+
         return true;
     });
 }
@@ -895,15 +989,88 @@ async function createManualImplication() {
     }
 }
 
-// Run Auto-Detection
-document.getElementById('runAutoDetectBtn')?.addEventListener('click', async () => {
-    showInfo('Auto-detection is running in the background...');
-    // In a real implementation, this would trigger a background job
-    // For now, just reload suggestions after a delay
-    setTimeout(() => {
+// Auto-Approve Naming Patterns
+document.getElementById('autoApprovePatternBtn')?.addEventListener('click', async () => {
+    const confirmMsg = `This will auto-approve ALL naming pattern suggestions.\n\nThese are character_(copyright) → copyright patterns with 92% confidence.\n\nContinue?`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    const btn = document.getElementById('autoApprovePatternBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>⏳</span> Processing...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/implications/auto-approve-pattern', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+
+        if (result.success_count > 0) {
+            showSuccess(`Auto-approved ${result.success_count} of ${result.total} naming pattern implications!`);
+        } else if (result.total === 0) {
+            showInfo('No naming pattern suggestions to approve');
+        } else {
+            showError(`Failed to approve suggestions. Errors: ${result.errors.length}`);
+        }
+
+        // Reload suggestions
         loadAllSuggestions();
-        showSuccess('Auto-detection complete!');
-    }, 2000);
+    } catch (error) {
+        console.error('Error auto-approving naming patterns:', error);
+        showError('Failed to auto-approve naming patterns');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+});
+
+// Auto-Approve High Confidence
+document.getElementById('autoApproveConfidentBtn')?.addEventListener('click', async () => {
+    const confirmMsg = `This will auto-approve correlation suggestions with:\n• ≥95% confidence\n• ≥10 images (statistical significance)\n\nContinue?`;
+
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+
+    const btn = document.getElementById('autoApproveConfidentBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>⏳</span> Processing...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/implications/auto-approve-confident', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                min_confidence: 0.95,
+                min_sample_size: 10
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success_count > 0) {
+            showSuccess(`Auto-approved ${result.success_count} of ${result.total} high-confidence implications!`);
+        } else if (result.total === 0) {
+            showInfo('No high-confidence suggestions meeting thresholds');
+        } else {
+            showError(`Failed to approve suggestions. Errors: ${result.errors.length}`);
+        }
+
+        // Reload suggestions
+        loadAllSuggestions();
+    } catch (error) {
+        console.error('Error auto-approving high confidence:', error);
+        showError('Failed to auto-approve high-confidence suggestions');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 });
 
 // Keyboard Shortcuts

@@ -156,3 +156,32 @@ async def bulk_approve_implications():
     implication_service.invalidate_suggestion_cache()
     
     return result
+
+
+@api_blueprint.route('/implications/auto-approve-pattern', methods=['POST'])
+@api_handler()
+async def auto_approve_naming_patterns():
+    """Auto-approve all naming pattern suggestions (character_(copyright) → copyright)."""
+    from services import implication_service
+    
+    result = implication_service.auto_approve_naming_pattern_suggestions()
+    
+    return result
+
+
+@api_blueprint.route('/implications/auto-approve-confident', methods=['POST'])
+@api_handler()
+async def auto_approve_high_confidence():
+    """Auto-approve high-confidence correlation suggestions with statistical significance."""
+    from services import implication_service
+    data = await request.json or {}
+    
+    min_confidence = data.get('min_confidence', 0.95)
+    min_sample_size = data.get('min_sample_size', 10)
+    
+    result = implication_service.auto_approve_high_confidence_suggestions(
+        min_confidence=min_confidence,
+        min_sample_size=min_sample_size
+    )
+    
+    return result
