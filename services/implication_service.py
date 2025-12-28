@@ -497,3 +497,114 @@ def _flatten_chain(chain: Dict) -> List[str]:
 
     traverse(chain)
     return tags
+
+
+def get_implications_for_tag(tag_name: str) -> Dict:
+    """
+    Get all implications related to a specific tag (tag-centric view).
+    Returns implications where this tag is the source OR target, plus suggestions.
+    """
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Get tag info
+        cursor.execute("SELECT id, name, category FROM tags WHERE name = ?", (tag_name,))
+        tag_result = cursor.fetchone()
+        
+        if not tag_result:
+            return {
+                'tag': None,
+                'implies': [],
+                'implied_by': [],
+                'suggestions': []
+            }
+        
+        tag_id = tag_result['id']
+        tag_info = dict(tag_result)
+        
+        # Get implications where this tag is the source (what it implies)
+        cursor.execute("""
+            SELECT
+                t_implied.name as implied_tag,
+                t_implied.category as implied_category,
+                ti.inference_type,
+                ti.confidence,
+                ti.created_at
+            FROM tag_implications ti
+            JOIN tags t_implied ON ti.implied_tag_id = t_implied.id
+            WHERE ti.source_tag_id = ? AND ti.status = 'active'
+            ORDER BY t_implied.name
+        """, (tag_id,))
+        
+        implies = [dict(row) for row in cursor.fetchall()]
+        
+        # Get implications where this tag is the target (what implies it)
+        cursor.execute("""
+            SELECT
+                t_source.name as source_tag,
+                t_source.category as source_category,
+                ti.inference_type,
+                ti.confidence,
+                ti.created_at
+            FROM tag_implications ti
+            JOIN tags t_source ON ti.source_tag_id = t_source.id
+            WHERE ti.implied_tag_id = ? AND ti.status = 'active'
+            ORDER BY t_source.name
+        """, (tag_id,))
+        
+        implied_by = [dict(row) for row in cursor.fetchall()]
+        
+        # Get suggestions involving this tag
+        all_suggestions = get_all_suggestions()
+        tag_suggestions = []
+        
+        for pattern_type in ['naming', 'correlation']:
+            for suggestion in all_suggestions.get(pattern_type, []):
+                if suggestion['source_tag'] == tag_name or suggestion['implied_tag'] == tag_name:
+                    tag_suggestions.append(suggestion)
+        
+        return {
+            'tag': tag_info,
+            'implies': implies,
+            'implied_by': implied_by,
+            'suggestions': tag_suggestions
+        }
+
+
+def bulk_approve_implications(suggestions: List[Dict]) -> Dict:
+    """
+    Approve multiple suggestions at once.
+    
+    Args:
+        suggestions: List of dicts with 'source_tag', 'implied_tag', 'inference_type', 'confidence'
+    
+    Returns:
+        Dict with success count and any errors
+    """
+    success_count = 0
+    errors = []
+    
+    for suggestion in suggestions:
+        source_tag = suggestion.get('source_tag')
+        implied_tag = suggestion.get('implied_tag')
+        inference_type = suggestion.get('inference_type', 'manual')
+        confidence = suggestion.get('confidence', 1.0)
+        
+        if not source_tag or not implied_tag:
+            errors.append(f"Missing source_tag or implied_tag in suggestion")
+            continue
+        
+        try:
+            success = approve_suggestion(source_tag, implied_tag, inference_type, confidence)
+            if success:
+                success_count += 1
+            else:
+                errors.append(f"Failed to approve {source_tag} → {implied_tag}")
+        except Exception as e:
+            errors.append(f"Error approving {source_tag} → {implied_tag}: {str(e)}")
+    
+    return {
+        'success_count': success_count,
+        'total': len(suggestions),
+        'errors': errors
+    }

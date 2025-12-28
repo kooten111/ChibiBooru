@@ -116,3 +116,27 @@ async def batch_apply_implications():
     from services import implication_service
     count = implication_service.batch_apply_implications_to_all_images()
     return {"message": f"Applied implications to {count} images"}
+
+
+@api_blueprint.route('/implications/for-tag/<tag_name>', methods=['GET'])
+@api_handler()
+async def get_implications_for_tag(tag_name):
+    """Get all implications where this tag is source OR target, plus suggestions."""
+    from services import implication_service
+    result = implication_service.get_implications_for_tag(tag_name)
+    return result
+
+
+@api_blueprint.route('/implications/bulk-approve', methods=['POST'])
+@api_handler()
+async def bulk_approve_implications():
+    """Approve multiple suggestions at once."""
+    from services import implication_service
+    data = await request.json
+    suggestions = data.get('suggestions', [])
+    
+    if not suggestions:
+        raise ValueError("No suggestions provided")
+    
+    result = implication_service.bulk_approve_implications(suggestions)
+    return result
