@@ -18,115 +18,162 @@
 
     {% include 'header.html' %}
 
-    <div class="container">
-        <div class="implications-header">
-            <h2>Tag Implications Manager</h2>
-            <p class="subtitle">Automatically detect and manage tag relationships</p>
-        </div>
-
-        <div class="tabs-container">
-            <div class="tabs-nav">
-                <button class="tab-button active" data-tab="suggestions">Suggestions</button>
-                <button class="tab-button" data-tab="manual">Manual Creation</button>
-                <button class="tab-button" data-tab="existing">Existing Implications</button>
-            </div>
-
-            <!-- Suggestions Tab -->
-            <div class="tab-content active" id="suggestions-tab">
-                <div class="suggestions-header">
-                    <h3>Auto-Detected Suggestions</h3>
-                    <button id="refreshSuggestionsBtn" class="btn-secondary">🔄 Refresh Suggestions</button>
-                </div>
-
-                <div class="suggestions-summary" id="suggestionsSummary">
-                    <div class="summary-loading">Loading suggestions...</div>
-                </div>
-
-                <div class="pattern-groups" id="patternGroups">
-                    <!-- Pattern groups will be loaded here -->
+    <div class="container implications-layout">
+        <!-- Left Sidebar -->
+        <aside class="implications-sidebar implications-sidebar-left">
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">Tag Search</h3>
+                <div class="tag-search-input-wrapper">
+                    <input type="text" id="tagSearchInput" placeholder="Search for a tag..." autocomplete="off">
+                    <div id="tagSearchDropdown" class="autocomplete-dropdown"></div>
                 </div>
             </div>
 
-            <!-- Manual Creation Tab -->
-            <div class="tab-content" id="manual-tab">
-                <div class="manual-creation-form">
-                    <h3>Create Manual Implication</h3>
-                    <p class="form-description">
-                        Define a relationship where adding one tag automatically adds another.
-                    </p>
+            <div class="sidebar-section selected-tag-info" id="selectedTagInfo" style="display: none;">
+                <div class="tag-info-header">
+                    <span class="tag-badge" id="selectedTagBadge"></span>
+                </div>
+                <div class="tag-stats">
+                    <div class="tag-stat">
+                        <span class="stat-value" id="impliesCount">0</span>
+                        <span class="stat-label">Implies</span>
+                    </div>
+                    <div class="tag-stat">
+                        <span class="stat-value" id="impliedByCount">0</span>
+                        <span class="stat-label">Implied By</span>
+                    </div>
+                </div>
+            </div>
 
-                    <div class="implication-flow">
-                        <div class="form-group">
-                            <label for="sourceTag">When this tag is added:</label>
-                            <input type="text" id="sourceTag" placeholder="e.g., mint_fantome" autocomplete="off">
-                            <div class="tag-suggestions" id="sourceSuggestions"></div>
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">View Mode</h3>
+                <div class="view-mode-toggle">
+                    <button class="toggle-btn active" data-mode="all">All</button>
+                    <button class="toggle-btn" data-mode="suggestions">Suggestions</button>
+                    <button class="toggle-btn" data-mode="active">Active</button>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <button class="collapsible-header" data-target="typeFilters">
+                    <span>Type Filters</span>
+                    <span class="collapse-arrow">▼</span>
+                </button>
+                <div id="typeFilters" class="collapsible-content">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="typeFilter" value="all" checked>
+                        <span>All Types</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="typeFilter" value="manual">
+                        <span>Manual</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="typeFilter" value="naming_pattern">
+                        <span>Naming Pattern</span>
+                    </label>
+                    <label class="filter-checkbox">
+                        <input type="checkbox" name="typeFilter" value="correlation">
+                        <span>Statistical</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="sidebar-section quick-actions">
+                <button id="createManualBtn" class="action-btn primary-btn">
+                    <span>➕</span> Create Manual Implication
+                </button>
+                <button id="runAutoDetectBtn" class="action-btn secondary-btn">
+                    <span>🔍</span> Run Auto-Detection
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="implications-main">
+            <div class="main-header">
+                <h2>Tag Implications Manager</h2>
+                <div class="header-count" id="headerCount">Showing 0 implications</div>
+            </div>
+
+            <div id="bulkActionsBar" class="bulk-actions-bar" style="display: none;">
+                <span class="selection-count" id="selectionCount">0 selected</span>
+                <button id="bulkApproveBtn" class="bulk-btn approve-btn">✓ Approve All</button>
+                <button id="bulkDismissBtn" class="bulk-btn dismiss-btn">✗ Dismiss All</button>
+                <button id="clearSelectionBtn" class="bulk-btn clear-btn">Clear Selection</button>
+            </div>
+
+            <div class="implications-sections">
+                <!-- Suggestions Section -->
+                <div class="collapsible-section suggestions-section">
+                    <button class="section-header" data-target="suggestionsContent">
+                        <span class="section-icon">⚠️</span>
+                        <span class="section-title">Pending Suggestions</span>
+                        <span class="section-badge" id="suggestionsBadge">0</span>
+                        <span class="collapse-arrow">▼</span>
+                    </button>
+                    <div id="suggestionsContent" class="section-content">
+                        <div class="select-all-row">
+                            <label class="filter-checkbox">
+                                <input type="checkbox" id="selectAllSuggestions">
+                                <span>Select all suggestions</span>
+                            </label>
                         </div>
-
-                        <div class="flow-arrow">→</div>
-
-                        <div class="form-group">
-                            <label>Also add these tags:</label>
-                            <div id="impliedTagsList" class="implied-tags-list">
-                                <!-- Implied tags will be added here -->
-                            </div>
-                            <div class="add-implied-container">
-                                <input type="text" id="impliedTag" placeholder="Add tag..." autocomplete="off">
-                                <button id="addImpliedBtn" class="btn-secondary">+ Add</button>
-                            </div>
-                            <div class="tag-suggestions" id="impliedSuggestions"></div>
+                        <div id="suggestionsList" class="implications-list">
+                            <div class="loading-message">Loading suggestions...</div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="preview-section hidden" id="previewSection">
-                        <h4>Impact Preview</h4>
-                        <div id="previewContent"></div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button id="previewImplicationBtn" class="btn-secondary">Preview Changes</button>
-                        <button id="createImplicationBtn" class="btn-primary" disabled>Create Implication</button>
+                <!-- Active Implications Section -->
+                <div class="collapsible-section active-section">
+                    <button class="section-header" data-target="activeContent">
+                        <span class="section-icon">✓</span>
+                        <span class="section-title">Active Implications</span>
+                        <span class="section-badge" id="activeBadge">0</span>
+                        <span class="collapse-arrow">▼</span>
+                    </button>
+                    <div id="activeContent" class="section-content">
+                        <div id="activeList" class="implications-list">
+                            <div class="loading-message">Loading active implications...</div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </main>
 
-            <!-- Existing Implications Tab -->
-            <div class="tab-content" id="existing-tab">
-                <div class="existing-header">
-                    <h3>All Implications</h3>
-                    <div class="filter-controls">
-                        <input type="text" id="implicationFilter" placeholder="Filter implications...">
-                        <select id="typeFilter">
-                            <option value="all">All Types</option>
-                            <option value="manual">Manual Only</option>
-                            <option value="naming_pattern">Naming Pattern</option>
-                            <option value="correlation">Statistical Correlation</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="implications-list" id="implicationsList">
-                    <div class="implications-loading">Loading implications...</div>
+        <!-- Right Sidebar - Detail Panel -->
+        <aside class="implications-sidebar implications-sidebar-right">
+            <div id="detailPanel" class="detail-panel">
+                <div class="detail-placeholder">
+                    <div class="placeholder-icon">📋</div>
+                    <p>No implication selected</p>
+                    <p class="placeholder-hint">Click on an implication to view details</p>
                 </div>
             </div>
-        </div>
+        </aside>
     </div>
 
-    <!-- Suggestion Review Modal -->
-    <div id="suggestionModal" class="modal">
-        <div class="modal-content modal-large">
-            <span class="close">&times;</span>
-            <div id="suggestionModalContent">
-                <!-- Content will be loaded dynamically -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Chain Visualizer Modal -->
-    <div id="chainModal" class="modal">
+    <!-- Manual Creation Modal -->
+    <div id="manualModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h3>Implication Chain</h3>
-            <div id="chainVisualization"></div>
+            <h3>Create Manual Implication</h3>
+            <div class="manual-creation-form">
+                <div class="form-group">
+                    <label for="manualSourceTag">When this tag is added:</label>
+                    <input type="text" id="manualSourceTag" placeholder="e.g., mint_fantome" autocomplete="off">
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="form-group">
+                    <label for="manualImpliedTag">Also add this tag:</label>
+                    <input type="text" id="manualImpliedTag" placeholder="e.g., vshojo" autocomplete="off">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button id="previewManualBtn" class="btn-secondary">Preview</button>
+                <button id="createManualSubmitBtn" class="btn-primary">Create</button>
+            </div>
         </div>
     </div>
 

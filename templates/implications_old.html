@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ app_name }} - Tag Implications</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
+</head>
+<body>
+    <div id="global-drop-zone" class="global-drop-zone">
+        <div class="drop-zone-content">
+            <div class="drop-zone-icon">📤</div>
+            <div class="drop-zone-text">Drop images to upload</div>
+        </div>
+    </div>
+
+    {% include 'header.html' %}
+
+    <div class="container">
+        <div class="implications-header">
+            <h2>Tag Implications Manager</h2>
+            <p class="subtitle">Automatically detect and manage tag relationships</p>
+        </div>
+
+        <div class="tabs-container">
+            <div class="tabs-nav">
+                <button class="tab-button active" data-tab="suggestions">Suggestions</button>
+                <button class="tab-button" data-tab="manual">Manual Creation</button>
+                <button class="tab-button" data-tab="existing">Existing Implications</button>
+            </div>
+
+            <!-- Suggestions Tab -->
+            <div class="tab-content active" id="suggestions-tab">
+                <div class="suggestions-header">
+                    <h3>Auto-Detected Suggestions</h3>
+                    <button id="refreshSuggestionsBtn" class="btn-secondary">🔄 Refresh Suggestions</button>
+                </div>
+
+                <div class="suggestions-summary" id="suggestionsSummary">
+                    <div class="summary-loading">Loading suggestions...</div>
+                </div>
+
+                <div class="pattern-groups" id="patternGroups">
+                    <!-- Pattern groups will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Manual Creation Tab -->
+            <div class="tab-content" id="manual-tab">
+                <div class="manual-creation-form">
+                    <h3>Create Manual Implication</h3>
+                    <p class="form-description">
+                        Define a relationship where adding one tag automatically adds another.
+                    </p>
+
+                    <div class="implication-flow">
+                        <div class="form-group">
+                            <label for="sourceTag">When this tag is added:</label>
+                            <input type="text" id="sourceTag" placeholder="e.g., mint_fantome" autocomplete="off">
+                            <div class="tag-suggestions" id="sourceSuggestions"></div>
+                        </div>
+
+                        <div class="flow-arrow">→</div>
+
+                        <div class="form-group">
+                            <label>Also add these tags:</label>
+                            <div id="impliedTagsList" class="implied-tags-list">
+                                <!-- Implied tags will be added here -->
+                            </div>
+                            <div class="add-implied-container">
+                                <input type="text" id="impliedTag" placeholder="Add tag..." autocomplete="off">
+                                <button id="addImpliedBtn" class="btn-secondary">+ Add</button>
+                            </div>
+                            <div class="tag-suggestions" id="impliedSuggestions"></div>
+                        </div>
+                    </div>
+
+                    <div class="preview-section hidden" id="previewSection">
+                        <h4>Impact Preview</h4>
+                        <div id="previewContent"></div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button id="previewImplicationBtn" class="btn-secondary">Preview Changes</button>
+                        <button id="createImplicationBtn" class="btn-primary" disabled>Create Implication</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Existing Implications Tab -->
+            <div class="tab-content" id="existing-tab">
+                <div class="existing-header">
+                    <h3>All Implications</h3>
+                    <div class="filter-controls">
+                        <input type="text" id="implicationFilter" placeholder="Filter implications...">
+                        <select id="typeFilter">
+                            <option value="all">All Types</option>
+                            <option value="manual">Manual Only</option>
+                            <option value="naming_pattern">Naming Pattern</option>
+                            <option value="correlation">Statistical Correlation</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="implications-list" id="implicationsList">
+                    <div class="implications-loading">Loading implications...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suggestion Review Modal -->
+    <div id="suggestionModal" class="modal">
+        <div class="modal-content modal-large">
+            <span class="close">&times;</span>
+            <div id="suggestionModalContent">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Chain Visualizer Modal -->
+    <div id="chainModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Implication Chain</h3>
+            <div id="chainVisualization"></div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/implications.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
+</body>
+</html>
