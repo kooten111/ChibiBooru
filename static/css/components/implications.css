@@ -17,6 +17,7 @@
     flex-direction: column;
     gap: var(--spacing-lg);
     overflow-y: auto;
+    overflow-x: hidden;
     padding: var(--spacing-md);
     background: var(--bg-panel);
     border-radius: var(--radius-lg);
@@ -274,7 +275,6 @@
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
     cursor: pointer;
-    transition: all var(--transition-normal);
     display: flex;
     align-items: center;
     justify-content: center;
