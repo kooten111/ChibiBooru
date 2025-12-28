@@ -209,9 +209,14 @@ async def show_image(filepath):
     
     # Use the merged tags function to include high-confidence local tagger predictions
     from repositories.data_access import get_image_details_with_merged_tags
+    from services import upscaler_service
+    
     data = get_image_details_with_merged_tags(lookup_path)
     if not data:
         return "Image not found", 404
+
+    # Check for upscaled version
+    upscaled_image_url = upscaler_service.get_upscale_url(lookup_path)
 
     tag_counts = models.get_tag_counts()
     stats = query_service.get_enhanced_stats()
@@ -399,7 +404,9 @@ async def show_image(filepath):
         data=data,
         app_name=config.APP_NAME,
         tag_deltas=tag_deltas,
-        merged_general_tags=merged_general  # Pass to template for potential styling
+
+        merged_general_tags=merged_general,  # Pass to template for potential styling
+        upscaled_image_url=upscaled_image_url
     )
 
 @main_blueprint.route('/similar/<path:filepath>')

@@ -101,6 +101,13 @@ async def delete_image_service():
             models.remove_image_from_cache(filepath)
             from core.cache_manager import invalidate_tag_cache
             invalidate_tag_cache()
+
+            # Remove upscaled version if it exists
+            try:
+                from services.upscaler_service import delete_upscaled_image
+                await delete_upscaled_image(filepath)
+            except Exception as e:
+                print(f"Failed to delete upscaled image for {filepath}: {e}")
         else:
             print("No database entry or files were found to delete.")
 
@@ -156,6 +163,10 @@ async def delete_images_bulk_service():
             # Update cache
             if db_success or image_deleted or thumb_deleted:
                 models.remove_image_from_cache(clean_filepath)
+                # Remove upscaled version if it exists
+                from services.upscaler_service import delete_upscaled_image
+                await delete_upscaled_image(clean_filepath)
+                
                 results["deleted"] += 1
             else:
                 results["failed"] += 1

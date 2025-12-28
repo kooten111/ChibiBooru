@@ -471,9 +471,16 @@
                         onload="this.closest('.image-view').classList.add('has-image')">
                     <span class="animation-badge">Animated</span>
                     {% else %}
+                    {% if upscaled_image_url %}
+                    <img src="{{ upscaled_image_url }}" alt="Upscaled Image" fetchpriority="high"
+                        onload="this.closest('.image-view').classList.add('has-image')"
+                        data-original-src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}">
+                    <span class="animation-badge" style="background: rgba(0, 255, 128, 0.8);">Upscaled</span>
+                    {% else %}
                     <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
                         alt="Image" fetchpriority="high"
                         onload="this.closest('.image-view').classList.add('has-image')">
+                    {% endif %}
                     {% endif %}
                 </div>
 
