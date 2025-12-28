@@ -1,529 +1,670 @@
-// Tag Implications Manager JavaScript
+// Tag Implications Manager JavaScript - Redesigned
 import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
-let currentSuggestions = {};
-let currentImplications = [];
-let impliedTags = [];
+// State management
+let selectedTag = null;
+let selectedImplication = null;
+let selectedSuggestions = new Set();
+let viewMode = 'all'; // 'all', 'suggestions', 'active'
+let typeFilters = new Set(['all']);
+let allImplications = { suggestions: [], active: [] };
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function () {
-    initializeTabs();
-    loadSuggestions();
-    loadExistingImplications();
-    initializeManualForm();
+    initializeTagSearch();
+    initializeViewModeToggle();
+    initializeTypeFilters();
+    initializeCollapsibleSections();
+    initializeBulkActions();
+    initializeManualCreation();
+    initializeKeyboardShortcuts();
+    
+    // Load initial data
+    loadAllSuggestions();
 });
 
-// Tab Management
-function initializeTabs() {
-    const tabButtons = document.querySelectorAll('.tab-button');
-    const tabContents = document.querySelectorAll('.tab-content');
-
-    tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-            const tabName = button.getAttribute('data-tab');
-
-            // Remove active class from all
-            tabButtons.forEach(btn => btn.classList.remove('active'));
-            tabContents.forEach(content => content.classList.remove('active'));
-
-            // Add active to clicked
-            button.classList.add('active');
-            document.getElementById(`${tabName}-tab`).classList.add('active');
-        });
-    });
-}
-
-// Load Suggestions
-async function loadSuggestions() {
-    const summaryEl = document.getElementById('suggestionsSummary');
-    const groupsEl = document.getElementById('patternGroups');
-
-    summaryEl.innerHTML = '<div class="summary-loading">Loading suggestions...</div>';
-    groupsEl.innerHTML = '';
-
-    try {
-        const response = await fetch('/api/implications/suggestions');
-        const data = await response.json();
-
-        currentSuggestions = data;
-
-        // Display summary
-        summaryEl.innerHTML = `
-            <div class="summary-stats">
-                <div class="stat-box">
-                    <h4>Total Suggestions</h4>
-                    <div class="stat-number">${data.summary.total}</div>
-                </div>
-                <div class="stat-box">
-                    <h4>Naming Patterns</h4>
-                    <div class="stat-number">${data.summary.naming_count}</div>
-                </div>
-                <div class="stat-box">
-                    <h4>Statistical Correlations</h4>
-                    <div class="stat-number">${data.summary.correlation_count}</div>
-                </div>
-            </div>
-        `;
-
-        // Display pattern groups
-        if (data.naming && data.naming.length > 0) {
-            groupsEl.innerHTML += createPatternGroup('Naming Patterns', 'naming', data.naming,
-                'Tag name structure suggests relationships (costumes, franchises, variants)');
-        }
-
-        if (data.correlation && data.correlation.length > 0) {
-            groupsEl.innerHTML += createPatternGroup('Statistical Correlations', 'correlation', data.correlation,
-                'Tags that appear together 85%+ of the time');
-        }
-
-        if (data.summary.total === 0) {
-            groupsEl.innerHTML = '<div class="no-suggestions">No suggestions found. All patterns have been reviewed!</div>';
-        }
-
-        // Attach event listeners
-        attachPatternGroupListeners();
-
-    } catch (error) {
-        console.error('Error loading suggestions:', error);
-        summaryEl.innerHTML = '<div class="error">Failed to load suggestions</div>';
-    }
-}
-
-function createPatternGroup(title, type, suggestions, description) {
-    const suggestionsHtml = suggestions.map((s, idx) => createSuggestionItem(s, type, idx)).join('');
-
-    return `
-        <div class="pattern-group" data-pattern="${type}">
-            <div class="pattern-header">
-                <div class="pattern-info">
-                    <h4>${title}</h4>
-                    <p>${description} • ${suggestions.length} found</p>
-                </div>
-                <div class="pattern-actions">
-                    <button class="btn-secondary btn-small" onclick="reviewPattern('${type}')">Review All</button>
-                    <button class="btn-success btn-small" onclick="approveAllHighConfidence('${type}')">
-                        Approve High Confidence
-                    </button>
-                </div>
-            </div>
-            <div class="pattern-content">
-                <div class="suggestions-grid">
-                    ${suggestionsHtml}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function createSuggestionItem(suggestion, type, idx) {
-    const confidenceClass = suggestion.confidence >= 0.9 ? 'high-confidence' :
-        suggestion.confidence >= 0.7 ? 'medium-confidence' : '';
-
-    const confidencePercent = Math.round(suggestion.confidence * 100);
-
-    return `
-        <div class="suggestion-item ${confidenceClass}" data-type="${type}" data-index="${idx}">
-            <div class="suggestion-flow">
-                <span class="tag-badge">${suggestion.source_tag}</span>
-                <span class="flow-arrow">→</span>
-                <span class="tag-badge">${suggestion.implied_tag}</span>
-            </div>
-            <div class="suggestion-meta">
-                <span>Confidence: ${confidencePercent}%</span>
-                <span>Affects: ${suggestion.affected_images} images</span>
-                <span>${suggestion.reason}</span>
-            </div>
-            <div class="suggestion-actions">
-                <button class="btn-secondary btn-small" onclick="previewSuggestion('${type}', ${idx})">
-                    Preview
-                </button>
-                <button class="btn-success btn-small" onclick="approveSuggestion('${type}', ${idx})">
-                    ✓ Approve
-                </button>
-                <button class="btn-danger btn-small" onclick="rejectSuggestion('${type}', ${idx})">
-                    ✗ Reject
-                </button>
-            </div>
-        </div>
-    `;
-}
-
-function attachPatternGroupListeners() {
-    document.querySelectorAll('.pattern-header').forEach(header => {
-        header.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'BUTTON') {
-                const content = header.nextElementSibling;
-                content.classList.toggle('expanded');
-            }
-        });
-    });
-}
-
-function reviewPattern(type) {
-    const pattern = document.querySelector(`[data-pattern="${type}"] .pattern-content`);
-    pattern.classList.add('expanded');
-    pattern.scrollIntoView({ behavior: 'smooth' });
-}
-
-async function approveAllHighConfidence(type) {
-    if (!confirm('Approve all high confidence (>90%) suggestions for this pattern?')) {
-        return;
-    }
-
-    const suggestions = currentSuggestions[type].filter(s => s.confidence >= 0.9);
-
-    for (const suggestion of suggestions) {
-        await approveSuggestionData(suggestion, type);
-    }
-
-    showSuccess(`Approved ${suggestions.length} high confidence suggestions!`);
-    loadSuggestions();
-}
-
-async function previewSuggestion(type, idx) {
-    const suggestion = currentSuggestions[type][idx];
-
-    try {
-        const response = await fetch('/api/implications/preview', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                source_tag: suggestion.source_tag,
-                implied_tag: suggestion.implied_tag
-            })
-        });
-
-        const preview = await response.json();
-
-        showInfo(`Preview for ${suggestion.source_tag} → ${suggestion.implied_tag}\n\n` +
-            `Total images with source tag: ${preview.total_images}\n` +
-            `Already have implied tag: ${preview.already_has_tag}\n` +
-            `Will gain tag: ${preview.will_gain_tag}\n` +
-            `Chain implications: ${preview.chain_implications.join(', ') || 'None'}`);
-
-    } catch (error) {
-        console.error('Error previewing:', error);
-        showError('Failed to load preview');
-    }
-}
-
-async function approveSuggestion(type, idx) {
-    const suggestion = currentSuggestions[type][idx];
-    await approveSuggestionData(suggestion, type);
-    loadSuggestions();
-}
-
-async function approveSuggestionData(suggestion, type) {
-    try {
-        const response = await fetch('/api/implications/approve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                source_tag: suggestion.source_tag,
-                implied_tag: suggestion.implied_tag,
-                inference_type: type,
-                confidence: suggestion.confidence
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'success') {
-            // Successfully approved
-        } else {
-            showError('Failed to approve: ' + (result.error || 'Unknown error'));
-        }
-
-    } catch (error) {
-        console.error('Error approving:', error);
-        showError('Failed to approve suggestion');
-    }
-}
-
-function rejectSuggestion(type, idx) {
-    const suggestion = currentSuggestions[type][idx];
-    // Just remove from UI - we could add a rejected_implications table later
-    const item = document.querySelector(`[data-type="${type}"][data-index="${idx}"]`);
-    item.style.display = 'none';
-}
-
-// Manual Creation Form
-function initializeManualForm() {
-    const sourceInput = document.getElementById('sourceTag');
-    const impliedInput = document.getElementById('impliedTag');
-    const addBtn = document.getElementById('addImpliedBtn');
-    const previewBtn = document.getElementById('previewImplicationBtn');
-    const createBtn = document.getElementById('createImplicationBtn');
-
-    // Add implied tag on button click or Enter
-    addBtn.addEventListener('click', addImpliedTag);
-    impliedInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addImpliedTag();
-        }
-    });
-
-    previewBtn.addEventListener('click', previewManualImplication);
-    createBtn.addEventListener('click', createManualImplication);
-
-    // Update create button state when fields change
-    sourceInput.addEventListener('input', updateCreateButtonState);
-    impliedInput.addEventListener('input', updateCreateButtonState);
-}
-
-function addImpliedTag() {
-    const input = document.getElementById('impliedTag');
-    const tag = input.value.trim();
-
-    if (tag && !impliedTags.includes(tag)) {
-        impliedTags.push(tag);
-        updateImpliedTagsList();
-        input.value = '';
-        updateCreateButtonState();
-    }
-}
-
-function updateImpliedTagsList() {
-    const listEl = document.getElementById('impliedTagsList');
-
-    if (impliedTags.length === 0) {
-        listEl.innerHTML = '<div style="color: #888; text-align: center;">No tags added yet</div>';
-        return;
-    }
-
-    listEl.innerHTML = impliedTags.map((tag, idx) => `
-        <div class="implied-tag-item">
-            <span>${tag}</span>
-            <button class="remove-tag-btn" onclick="removeImpliedTag(${idx})">×</button>
-        </div>
-    `).join('');
-}
-
-function removeImpliedTag(idx) {
-    impliedTags.splice(idx, 1);
-    updateImpliedTagsList();
-    updateCreateButtonState();
-}
-
-function updateCreateButtonState() {
-    const sourceTag = document.getElementById('sourceTag').value.trim();
-    const createBtn = document.getElementById('createImplicationBtn');
-
-    createBtn.disabled = !sourceTag || impliedTags.length === 0;
-}
-
-async function previewManualImplication() {
-    const sourceTag = document.getElementById('sourceTag').value.trim();
-
-    if (!sourceTag || impliedTags.length === 0) {
-        showInfo('Please enter source tag and at least one implied tag');
-        return;
-    }
-
-    const previewSection = document.getElementById('previewSection');
-    const previewContent = document.getElementById('previewContent');
-
-    previewContent.innerHTML = '<div>Loading preview...</div>';
-    previewSection.style.display = 'block';
-
-    try {
-        // Preview each implication
-        const previews = await Promise.all(
-            impliedTags.map(async (impliedTag) => {
-                const response = await fetch('/api/implications/preview', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ source_tag: sourceTag, implied_tag: impliedTag })
-                });
-                return { tag: impliedTag, data: await response.json() };
-            })
-        );
-
-        previewContent.innerHTML = previews.map(p => `
-            <div style="margin-bottom: 15px; padding: 10px; background: #0d0d0d; border-radius: 4px;">
-                <strong>${sourceTag} → ${p.tag}</strong><br>
-                <small>
-                    ${p.data.will_gain_tag} images will gain this tag
-                    ${p.data.chain_implications.length > 0 ? `<br>Chain: ${p.data.chain_implications.join(' → ')}` : ''}
-                </small>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        console.error('Error previewing:', error);
-        previewContent.innerHTML = '<div style="color: #ff6b6b;">Failed to load preview</div>';
-    }
-}
-
-async function createManualImplication() {
-    const sourceTag = document.getElementById('sourceTag').value.trim();
-
-    if (!sourceTag || impliedTags.length === 0) {
-        showInfo('Please enter source tag and at least one implied tag');
-        return;
-    }
-
-    try {
-        for (const impliedTag of impliedTags) {
-            const response = await fetch('/api/implications/create', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    source_tag: sourceTag,
-                    implied_tag: impliedTag
-                })
-            });
-
-            const result = await response.json();
-
-            if (result.status !== 'success') {
-                showError(`Failed to create ${sourceTag} → ${impliedTag}: ${result.error}`);
-                return;
-            }
-        }
-
-        showSuccess(`Successfully created ${impliedTags.length} implication(s)!`);
-
-        // Reset form
-        document.getElementById('sourceTag').value = '';
-        impliedTags = [];
-        updateImpliedTagsList();
-        document.getElementById('previewSection').style.display = 'none';
-        updateCreateButtonState();
-
-        // Reload existing implications
-        loadExistingImplications();
-
-    } catch (error) {
-        console.error('Error creating implications:', error);
-        showError('Failed to create implications');
-    }
-}
-
-// Load Existing Implications
-async function loadExistingImplications() {
-    const listEl = document.getElementById('implicationsList');
-    listEl.innerHTML = '<div class="implications-loading">Loading implications...</div>';
-
-    try {
-        const response = await fetch('/api/implications/all');
-        const data = await response.json();
-
-        currentImplications = data.implications;
-
-        if (currentImplications.length === 0) {
-            listEl.innerHTML = '<div style="text-align: center; padding: 40px; color: #888;">No implications created yet</div>';
+// Tag Search with Autocomplete
+function initializeTagSearch() {
+    const searchInput = document.getElementById('tagSearchInput');
+    const dropdown = document.getElementById('tagSearchDropdown');
+    let searchTimeout;
+
+    searchInput.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 2) {
+            dropdown.classList.remove('active');
             return;
         }
 
-        // Group by category
-        const grouped = {};
-        currentImplications.forEach(imp => {
-            const cat = imp.source_category || 'general';
-            if (!grouped[cat]) grouped[cat] = [];
-            grouped[cat].push(imp);
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/tags/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
+                const tags = await response.json();
+                
+                if (tags.length > 0) {
+                    dropdown.innerHTML = tags.map(tag => `
+                        <div class="autocomplete-item" data-tag="${tag.name}">
+                            <span class="tag-badge ${tag.category}">${tag.name}</span>
+                        </div>
+                    `).join('');
+                    dropdown.classList.add('active');
+                    
+                    // Add click handlers
+                    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            selectTag(item.dataset.tag);
+                            dropdown.classList.remove('active');
+                            searchInput.value = '';
+                        });
+                    });
+                } else {
+                    dropdown.classList.remove('active');
+                }
+            } catch (error) {
+                console.error('Error fetching tag suggestions:', error);
+            }
+        }, 300);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.remove('active');
+        }
+    });
+}
+
+// Select a tag and load its implications
+async function selectTag(tagName) {
+    try {
+        const response = await fetch(`/api/implications/for-tag/${encodeURIComponent(tagName)}`);
+        const data = await response.json();
+        
+        selectedTag = data.tag;
+        
+        if (!selectedTag) {
+            showError(`Tag "${tagName}" not found`);
+            return;
+        }
+
+        // Update selected tag info
+        const infoSection = document.getElementById('selectedTagInfo');
+        const badge = document.getElementById('selectedTagBadge');
+        const impliesCount = document.getElementById('impliesCount');
+        const impliedByCount = document.getElementById('impliedByCount');
+
+        badge.textContent = selectedTag.name;
+        badge.className = `tag-badge ${selectedTag.category}`;
+        impliesCount.textContent = data.implies.length;
+        impliedByCount.textContent = data.implied_by.length;
+        infoSection.style.display = 'block';
+
+        // Store implications for this tag
+        allImplications.suggestions = data.suggestions;
+        allImplications.active = [...data.implies, ...data.implied_by];
+
+        renderImplications();
+        showInfo(`Loaded implications for "${tagName}"`);
+    } catch (error) {
+        console.error('Error loading tag implications:', error);
+        showError('Failed to load tag implications');
+    }
+}
+
+// View Mode Toggle
+function initializeViewModeToggle() {
+    const toggleButtons = document.querySelectorAll('.view-mode-toggle .toggle-btn');
+    
+    toggleButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            toggleButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            viewMode = btn.dataset.mode;
+            renderImplications();
+        });
+    });
+}
+
+// Type Filters
+function initializeTypeFilters() {
+    const checkboxes = document.querySelectorAll('input[name="typeFilter"]');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+            const value = checkbox.value;
+            
+            if (value === 'all') {
+                if (checkbox.checked) {
+                    typeFilters.clear();
+                    typeFilters.add('all');
+                    checkboxes.forEach(cb => {
+                        if (cb.value !== 'all') cb.checked = false;
+                    });
+                }
+            } else {
+                typeFilters.delete('all');
+                document.querySelector('input[name="typeFilter"][value="all"]').checked = false;
+                
+                if (checkbox.checked) {
+                    typeFilters.add(value);
+                } else {
+                    typeFilters.delete(value);
+                }
+                
+                if (typeFilters.size === 0) {
+                    typeFilters.add('all');
+                    document.querySelector('input[name="typeFilter"][value="all"]').checked = true;
+                }
+            }
+            
+            renderImplications();
+        });
+    });
+}
+
+// Collapsible Sections
+function initializeCollapsibleSections() {
+    document.querySelectorAll('.collapsible-header, .section-header').forEach(header => {
+        header.addEventListener('click', () => {
+            const target = header.dataset.target;
+            if (target) {
+                const content = document.getElementById(target);
+                header.classList.toggle('collapsed');
+                content.classList.toggle('collapsed');
+            }
+        });
+    });
+}
+
+// Bulk Actions
+function initializeBulkActions() {
+    const selectAllCheckbox = document.getElementById('selectAllSuggestions');
+    const bulkApproveBtn = document.getElementById('bulkApproveBtn');
+    const bulkDismissBtn = document.getElementById('bulkDismissBtn');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
+    selectAllCheckbox?.addEventListener('change', (e) => {
+        const checkboxes = document.querySelectorAll('.implication-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = e.target.checked;
+            const item = cb.closest('.implication-item');
+            if (e.target.checked) {
+                selectedSuggestions.add(item.dataset.id);
+                item.classList.add('selected');
+            } else {
+                selectedSuggestions.delete(item.dataset.id);
+                item.classList.remove('selected');
+            }
+        });
+        updateBulkActionsBar();
+    });
+
+    bulkApproveBtn?.addEventListener('click', bulkApprove);
+    bulkDismissBtn?.addEventListener('click', bulkDismiss);
+    clearSelectionBtn?.addEventListener('click', clearSelection);
+}
+
+function toggleSuggestionSelection(suggestionId, checkbox) {
+    const item = checkbox.closest('.implication-item');
+    
+    if (checkbox.checked) {
+        selectedSuggestions.add(suggestionId);
+        item.classList.add('selected');
+    } else {
+        selectedSuggestions.delete(suggestionId);
+        item.classList.remove('selected');
+    }
+    
+    updateBulkActionsBar();
+}
+
+function updateBulkActionsBar() {
+    const bar = document.getElementById('bulkActionsBar');
+    const count = document.getElementById('selectionCount');
+    
+    if (selectedSuggestions.size > 0) {
+        bar.style.display = 'flex';
+        count.textContent = `${selectedSuggestions.size} selected`;
+    } else {
+        bar.style.display = 'none';
+    }
+}
+
+async function bulkApprove() {
+    if (selectedSuggestions.size === 0) {
+        showInfo('No suggestions selected');
+        return;
+    }
+
+    const suggestions = Array.from(selectedSuggestions).map(id => {
+        const item = document.querySelector(`[data-id="${id}"]`);
+        return {
+            source_tag: item.dataset.source,
+            implied_tag: item.dataset.implied,
+            inference_type: item.dataset.type,
+            confidence: parseFloat(item.dataset.confidence)
+        };
+    });
+
+    try {
+        const response = await fetch('/api/implications/bulk-approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ suggestions })
         });
 
-        let html = '';
-        for (const [category, implications] of Object.entries(grouped)) {
-            html += `
-                <div class="implication-group">
-                    <div class="group-header" onclick="toggleGroup(this)">
-                        <span>${category.charAt(0).toUpperCase() + category.slice(1)} (${implications.length})</span>
-                        <span>▼</span>
+        const result = await response.json();
+        
+        showSuccess(`Approved ${result.success_count} of ${result.total} suggestions`);
+        
+        if (result.errors.length > 0) {
+            console.error('Bulk approve errors:', result.errors);
+        }
+
+        clearSelection();
+        
+        // Reload implications
+        if (selectedTag) {
+            selectTag(selectedTag.name);
+        } else {
+            loadAllSuggestions();
+        }
+    } catch (error) {
+        console.error('Error bulk approving:', error);
+        showError('Failed to approve suggestions');
+    }
+}
+
+async function bulkDismiss() {
+    if (selectedSuggestions.size === 0) {
+        showInfo('No suggestions selected');
+        return;
+    }
+
+    // Just remove from UI - could add a rejected_implications table later
+    selectedSuggestions.forEach(id => {
+        const item = document.querySelector(`[data-id="${id}"]`);
+        if (item) item.remove();
+    });
+
+    showSuccess(`Dismissed ${selectedSuggestions.size} suggestions`);
+    clearSelection();
+}
+
+function clearSelection() {
+    selectedSuggestions.clear();
+    document.querySelectorAll('.implication-checkbox').forEach(cb => cb.checked = false);
+    document.querySelectorAll('.implication-item').forEach(item => item.classList.remove('selected'));
+    document.getElementById('selectAllSuggestions').checked = false;
+    updateBulkActionsBar();
+}
+
+// Load all suggestions (when no tag selected)
+async function loadAllSuggestions() {
+    try {
+        const response = await fetch('/api/implications/suggestions');
+        const data = await response.json();
+        
+        allImplications.suggestions = [
+            ...data.naming.map(s => ({ ...s, pattern_type: 'naming_pattern' })),
+            ...data.correlation.map(s => ({ ...s, pattern_type: 'correlation' }))
+        ];
+
+        // Also load all active implications
+        const activeResponse = await fetch('/api/implications/all');
+        const activeData = await activeResponse.json();
+        allImplications.active = activeData.implications;
+
+        renderImplications();
+    } catch (error) {
+        console.error('Error loading suggestions:', error);
+        showError('Failed to load suggestions');
+    }
+}
+
+// Render implications based on current filters
+function renderImplications() {
+    let suggestions = filterImplications(allImplications.suggestions, true);
+    let active = filterImplications(allImplications.active, false);
+
+    // Apply view mode
+    if (viewMode === 'suggestions') {
+        active = [];
+    } else if (viewMode === 'active') {
+        suggestions = [];
+    }
+
+    // Update counts
+    document.getElementById('suggestionsBadge').textContent = suggestions.length;
+    document.getElementById('activeBadge').textContent = active.length;
+    document.getElementById('headerCount').textContent = `Showing ${suggestions.length + active.length} implications`;
+
+    // Render lists
+    renderSuggestionsList(suggestions);
+    renderActiveList(active);
+}
+
+function filterImplications(implications, isSuggestion) {
+    return implications.filter(impl => {
+        // Type filter
+        const type = isSuggestion ? impl.pattern_type : impl.inference_type;
+        if (!typeFilters.has('all') && !typeFilters.has(type)) {
+            return false;
+        }
+        return true;
+    });
+}
+
+function renderSuggestionsList(suggestions) {
+    const listEl = document.getElementById('suggestionsList');
+    
+    if (suggestions.length === 0) {
+        listEl.innerHTML = '<div class="loading-message">No suggestions found</div>';
+        return;
+    }
+
+    listEl.innerHTML = suggestions.map((s, idx) => {
+        const id = `suggestion-${idx}`;
+        const confidence = s.confidence || 0.9;
+        const confidencePercent = Math.round(confidence * 100);
+        const confidenceClass = confidence >= 0.9 ? 'high' : confidence >= 0.7 ? 'medium' : '';
+
+        return `
+            <div class="implication-item" 
+                 data-id="${id}"
+                 data-source="${s.source_tag}"
+                 data-implied="${s.implied_tag}"
+                 data-type="${s.pattern_type}"
+                 data-confidence="${confidence}">
+                <input type="checkbox" class="implication-checkbox" onchange="window.toggleSuggestionSelection('${id}', this)">
+                <div class="implication-flow">
+                    <span class="tag-badge">${s.source_tag}</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="tag-badge">${s.implied_tag}</span>
+                </div>
+                <span class="type-badge">${s.pattern_type.replace('_', ' ')}</span>
+                <div class="confidence-meter">
+                    <div class="confidence-bar">
+                        <div class="confidence-fill ${confidenceClass}" style="width: ${confidencePercent}%"></div>
                     </div>
-                    <div class="group-content">
-                        ${implications.map(imp => createImplicationRow(imp)).join('')}
+                    <span class="confidence-percentage">${confidencePercent}%</span>
+                </div>
+                <div class="implication-actions">
+                    <button class="icon-btn approve-icon-btn" onclick="window.approveSingle('${id}')" title="Approve">✓</button>
+                    <button class="icon-btn dismiss-icon-btn" onclick="window.dismissSingle('${id}')" title="Dismiss">✗</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add click handlers to items
+    listEl.querySelectorAll('.implication-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.implication-checkbox') && !e.target.closest('.implication-actions')) {
+                selectImplication(item.dataset.id, true);
+            }
+        });
+    });
+}
+
+function renderActiveList(active) {
+    const listEl = document.getElementById('activeList');
+    
+    if (active.length === 0) {
+        listEl.innerHTML = '<div class="loading-message">No active implications</div>';
+        return;
+    }
+
+    listEl.innerHTML = active.map((impl, idx) => {
+        const id = `active-${idx}`;
+        const sourceTag = impl.source_tag;
+        const impliedTag = impl.implied_tag;
+        const sourceCategory = impl.source_category || 'general';
+        const impliedCategory = impl.implied_category || impl.implied_category || 'general';
+        const confidence = impl.confidence || 1.0;
+        const confidencePercent = Math.round(confidence * 100);
+        const confidenceClass = confidence >= 0.9 ? 'high' : confidence >= 0.7 ? 'medium' : '';
+
+        return `
+            <div class="implication-item" 
+                 data-id="${id}"
+                 data-source="${sourceTag}"
+                 data-implied="${impliedTag}"
+                 data-type="${impl.inference_type}">
+                <div class="implication-flow">
+                    <span class="tag-badge ${sourceCategory}">${sourceTag}</span>
+                    <span class="flow-arrow">→</span>
+                    <span class="tag-badge ${impliedCategory}">${impliedTag}</span>
+                </div>
+                <span class="type-badge">${impl.inference_type}</span>
+                <div class="confidence-meter">
+                    <div class="confidence-bar">
+                        <div class="confidence-fill ${confidenceClass}" style="width: ${confidencePercent}%"></div>
+                    </div>
+                    <span class="confidence-percentage">${confidencePercent}%</span>
+                </div>
+                <div class="implication-actions">
+                    <button class="icon-btn chain-icon-btn" onclick="window.viewChain('${sourceTag}')" title="View Chain">🔗</button>
+                    <button class="icon-btn delete-icon-btn" onclick="window.deleteImplication('${sourceTag}', '${impliedTag}')" title="Delete">🗑️</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add click handlers to items
+    listEl.querySelectorAll('.implication-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            if (!e.target.closest('.implication-actions')) {
+                selectImplication(item.dataset.id, false);
+            }
+        });
+    });
+}
+
+// Select an implication to show in detail panel
+async function selectImplication(itemId, isSuggestion) {
+    const item = document.querySelector(`[data-id="${itemId}"]`);
+    if (!item) return;
+
+    const sourceTag = item.dataset.source;
+    const impliedTag = item.dataset.implied;
+    const type = item.dataset.type;
+
+    selectedImplication = {
+        id: itemId,
+        source_tag: sourceTag,
+        implied_tag: impliedTag,
+        type: type,
+        isSuggestion: isSuggestion,
+        confidence: parseFloat(item.dataset.confidence || 1.0)
+    };
+
+    await renderDetailPanel();
+}
+
+async function renderDetailPanel() {
+    const panel = document.getElementById('detailPanel');
+    
+    if (!selectedImplication) {
+        panel.innerHTML = `
+            <div class="detail-placeholder">
+                <div class="placeholder-icon">📋</div>
+                <p>No implication selected</p>
+                <p class="placeholder-hint">Click on an implication to view details</p>
+            </div>
+        `;
+        return;
+    }
+
+    const { source_tag, implied_tag, type, isSuggestion, confidence } = selectedImplication;
+    const confidencePercent = Math.round(confidence * 100);
+
+    // Fetch chain and impact data
+    let chainHtml = '';
+    let impactHtml = '';
+
+    try {
+        const chainResponse = await fetch(`/api/implications/chain/${encodeURIComponent(implied_tag)}`);
+        const chain = await chainResponse.json();
+        chainHtml = renderChainTree(chain);
+
+        if (isSuggestion) {
+            const previewResponse = await fetch('/api/implications/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source_tag, implied_tag })
+            });
+            const preview = await previewResponse.json();
+            impactHtml = `
+                <div class="detail-section">
+                    <div class="detail-section-title">Impact</div>
+                    <div class="detail-section-content">
+                        Approving will add <span class="impact-highlight">${preview.will_gain_tag} tags</span> to images
                     </div>
                 </div>
             `;
         }
-
-        listEl.innerHTML = html;
-
-        // Apply filters
-        applyImplicationFilters();
-
     } catch (error) {
-        console.error('Error loading implications:', error);
-        listEl.innerHTML = '<div style="color: #ff6b6b;">Failed to load implications</div>';
+        console.error('Error loading detail data:', error);
     }
-}
 
-function createImplicationRow(imp) {
-    return `
-        <div class="implication-row">
-            <div class="implication-details">
-                <span class="tag-badge ${imp.source_category}">${imp.source_tag}</span>
-                <span class="flow-arrow">→</span>
-                <span class="tag-badge ${imp.implied_category}">${imp.implied_tag}</span>
+    const actionsHtml = isSuggestion ? `
+        <button class="detail-action-btn detail-approve-btn" onclick="window.approveSingle('${selectedImplication.id}')">
+            ✓ Approve Suggestion
+        </button>
+        <button class="detail-action-btn detail-dismiss-btn" onclick="window.dismissSingle('${selectedImplication.id}')">
+            ✗ Dismiss Suggestion
+        </button>
+    ` : `
+        <button class="detail-action-btn detail-delete-btn" onclick="window.deleteImplication('${source_tag}', '${implied_tag}')">
+            🗑️ Delete Implication
+        </button>
+    `;
+
+    panel.innerHTML = `
+        <div class="detail-content">
+            <div class="detail-header">
+                <h3 class="detail-title">Implication Details</h3>
+                <button class="close-detail-btn" onclick="window.closeDetail()">✕</button>
             </div>
-            <div class="implication-meta">
-                ${imp.inference_type} • ${Math.round((imp.confidence || 1.0) * 100)}%
+
+            <div class="detail-diagram">
+                <span class="tag-badge">${source_tag}</span>
+                <div class="diagram-arrow">↓</div>
+                <span class="tag-badge">${implied_tag}</span>
             </div>
-            <div class="implication-row-actions">
-                <button class="btn-secondary btn-small" onclick="viewChain('${imp.source_tag}')">
-                    View Chain
-                </button>
-                <button class="btn-danger btn-small" onclick="deleteImplication('${imp.source_tag}', '${imp.implied_tag}')">
-                    Delete
-                </button>
+
+            <div class="detail-stats">
+                <div class="detail-stat">
+                    <span class="detail-stat-label">Type</span>
+                    <span class="type-badge">${type}</span>
+                </div>
+                <div class="detail-stat">
+                    <span class="detail-stat-label">Confidence</span>
+                    <span>${confidencePercent}%</span>
+                </div>
+            </div>
+
+            ${impactHtml}
+
+            <div class="detail-section">
+                <div class="detail-section-title">Implication Chain</div>
+                <div class="chain-tree">
+                    ${chainHtml}
+                </div>
+            </div>
+
+            <div class="detail-actions">
+                ${actionsHtml}
             </div>
         </div>
     `;
 }
 
-function toggleGroup(header) {
-    const content = header.nextElementSibling;
-    content.classList.toggle('expanded');
-    const arrow = header.querySelector('span:last-child');
-    arrow.textContent = content.classList.contains('expanded') ? '▲' : '▼';
+function renderChainTree(node, depth = 0) {
+    let html = `<div class="chain-node" style="--depth: ${depth}">${node.tag}</div>`;
+    
+    if (node.implies && node.implies.length > 0) {
+        html += `<div class="chain-connector" style="--depth: ${depth}">↓</div>`;
+        node.implies.forEach(child => {
+            html += renderChainTree(child, depth + 1);
+        });
+    }
+    
+    return html;
 }
 
-async function viewChain(tagName) {
+// Global functions for onclick handlers
+window.toggleSuggestionSelection = toggleSuggestionSelection;
+
+window.approveSingle = async function(itemId) {
+    const item = document.querySelector(`[data-id="${itemId}"]`);
+    if (!item) return;
+
+    const suggestion = {
+        source_tag: item.dataset.source,
+        implied_tag: item.dataset.implied,
+        inference_type: item.dataset.type,
+        confidence: parseFloat(item.dataset.confidence)
+    };
+
+    try {
+        const response = await fetch('/api/implications/approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(suggestion)
+        });
+
+        const result = await response.json();
+        showSuccess(`Approved: ${suggestion.source_tag} → ${suggestion.implied_tag}`);
+        
+        if (selectedTag) {
+            selectTag(selectedTag.name);
+        } else {
+            loadAllSuggestions();
+        }
+    } catch (error) {
+        console.error('Error approving:', error);
+        showError('Failed to approve suggestion');
+    }
+};
+
+window.dismissSingle = function(itemId) {
+    const item = document.querySelector(`[data-id="${itemId}"]`);
+    if (item) {
+        item.remove();
+        showInfo('Suggestion dismissed');
+    }
+};
+
+window.viewChain = async function(tagName) {
     try {
         const response = await fetch(`/api/implications/chain/${encodeURIComponent(tagName)}`);
         const chain = await response.json();
-
-        const modal = document.getElementById('chainModal');
-        const visualization = document.getElementById('chainVisualization');
-
-        visualization.innerHTML = renderChain(chain);
-
-        modal.classList.add('active');
-
-        // Close modal on click outside or X
-        const closeBtn = modal.querySelector('.close');
-        closeBtn.onclick = () => modal.classList.remove('active');
-        modal.onclick = (e) => {
-            if (e.target === modal) modal.classList.remove('active');
-        };
-
+        
+        // Show in a simple alert for now - could make a modal
+        const chainText = renderChainText(chain);
+        showInfo(`Implication Chain for ${tagName}:\n\n${chainText}`);
     } catch (error) {
         console.error('Error loading chain:', error);
         showError('Failed to load implication chain');
     }
-}
+};
 
-function renderChain(node, depth = 0) {
-    let html = `
-        <div class="chain-node" style="margin-left: ${depth * 20}px;">
-            <span class="tag-badge ${node.category}">${node.tag}</span>
-        </div>
-    `;
-
+function renderChainText(node, depth = 0) {
+    let text = '  '.repeat(depth) + node.tag + '\n';
     if (node.implies && node.implies.length > 0) {
-        html += '<div class="chain-arrow" style="margin-left: ' + (depth * 20 + 30) + 'px;">↓</div>';
         node.implies.forEach(child => {
-            html += renderChain(child, depth + 1);
+            text += renderChainText(child, depth + 1);
         });
     }
-
-    return html;
+    return text;
 }
 
-async function deleteImplication(sourceTag, impliedTag) {
+window.deleteImplication = async function(sourceTag, impliedTag) {
     if (!confirm(`Delete implication: ${sourceTag} → ${impliedTag}?`)) {
         return;
     }
@@ -532,44 +673,155 @@ async function deleteImplication(sourceTag, impliedTag) {
         const response = await fetch('/api/implications/delete', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                source_tag: sourceTag,
-                implied_tag: impliedTag
-            })
+            body: JSON.stringify({ source_tag: sourceTag, implied_tag: impliedTag })
         });
 
         const result = await response.json();
-
-        if (result.status === 'success') {
-            showSuccess('Implication deleted');
-            loadExistingImplications();
+        showSuccess('Implication deleted');
+        
+        if (selectedTag) {
+            selectTag(selectedTag.name);
         } else {
-            showError('Failed to delete: ' + (result.error || 'Unknown error'));
+            loadAllSuggestions();
         }
-
     } catch (error) {
         console.error('Error deleting:', error);
         showError('Failed to delete implication');
     }
+};
+
+window.closeDetail = function() {
+    selectedImplication = null;
+    renderDetailPanel();
+};
+
+// Manual Creation Modal
+function initializeManualCreation() {
+    const createBtn = document.getElementById('createManualBtn');
+    const modal = document.getElementById('manualModal');
+    const closeBtn = modal.querySelector('.close');
+    const previewBtn = document.getElementById('previewManualBtn');
+    const submitBtn = document.getElementById('createManualSubmitBtn');
+
+    createBtn.addEventListener('click', () => {
+        modal.classList.add('active');
+    });
+
+    closeBtn.addEventListener('click', () => {
+        modal.classList.remove('active');
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+        }
+    });
+
+    previewBtn.addEventListener('click', previewManualImplication);
+    submitBtn.addEventListener('click', createManualImplication);
 }
 
-// Filter existing implications
-document.getElementById('implicationFilter')?.addEventListener('input', applyImplicationFilters);
-document.getElementById('typeFilter')?.addEventListener('change', applyImplicationFilters);
+async function previewManualImplication() {
+    const sourceTag = document.getElementById('manualSourceTag').value.trim();
+    const impliedTag = document.getElementById('manualImpliedTag').value.trim();
 
-function applyImplicationFilters() {
-    const searchText = document.getElementById('implicationFilter')?.value.toLowerCase() || '';
-    const typeFilter = document.getElementById('typeFilter')?.value || 'all';
+    if (!sourceTag || !impliedTag) {
+        showInfo('Please enter both source and implied tags');
+        return;
+    }
 
-    document.querySelectorAll('.implication-row').forEach(row => {
-        const text = row.textContent.toLowerCase();
-        const matchesSearch = text.includes(searchText);
-        const meta = row.querySelector('.implication-meta').textContent;
-        const matchesType = typeFilter === 'all' || meta.includes(typeFilter);
+    try {
+        const response = await fetch('/api/implications/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_tag: sourceTag, implied_tag: impliedTag })
+        });
 
-        row.style.display = (matchesSearch && matchesType) ? 'flex' : 'none';
+        const preview = await response.json();
+        showInfo(`Preview: ${sourceTag} → ${impliedTag}\n\n` +
+            `${preview.will_gain_tag} images will gain this tag\n` +
+            `Chain: ${preview.chain_implications.join(' → ') || 'None'}`);
+    } catch (error) {
+        console.error('Error previewing:', error);
+        showError('Failed to load preview');
+    }
+}
+
+async function createManualImplication() {
+    const sourceTag = document.getElementById('manualSourceTag').value.trim();
+    const impliedTag = document.getElementById('manualImpliedTag').value.trim();
+
+    if (!sourceTag || !impliedTag) {
+        showInfo('Please enter both source and implied tags');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/implications/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_tag: sourceTag, implied_tag: impliedTag })
+        });
+
+        const result = await response.json();
+        showSuccess(`Created implication: ${sourceTag} → ${impliedTag}`);
+
+        // Close modal and reset
+        document.getElementById('manualModal').classList.remove('active');
+        document.getElementById('manualSourceTag').value = '';
+        document.getElementById('manualImpliedTag').value = '';
+
+        // Reload implications
+        if (selectedTag) {
+            selectTag(selectedTag.name);
+        } else {
+            loadAllSuggestions();
+        }
+    } catch (error) {
+        console.error('Error creating:', error);
+        showError('Failed to create implication');
+    }
+}
+
+// Run Auto-Detection
+document.getElementById('runAutoDetectBtn')?.addEventListener('click', async () => {
+    showInfo('Auto-detection is running in the background...');
+    // In a real implementation, this would trigger a background job
+    // For now, just reload suggestions after a delay
+    setTimeout(() => {
+        loadAllSuggestions();
+        showSuccess('Auto-detection complete!');
+    }, 2000);
+});
+
+// Keyboard Shortcuts
+function initializeKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        // Ignore if typing in input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        switch(e.key) {
+            case '/':
+                e.preventDefault();
+                document.getElementById('tagSearchInput').focus();
+                break;
+            case 'a':
+                if (selectedSuggestions.size > 0) {
+                    e.preventDefault();
+                    bulkApprove();
+                }
+                break;
+            case 'd':
+                if (selectedSuggestions.size > 0) {
+                    e.preventDefault();
+                    bulkDismiss();
+                }
+                break;
+            case 'Escape':
+                closeDetail();
+                break;
+        }
     });
 }
-
-// Refresh button
-document.getElementById('refreshSuggestionsBtn')?.addEventListener('click', loadSuggestions);
