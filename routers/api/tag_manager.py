@@ -131,7 +131,7 @@ async def tag_detail(tag_name):
         # Get sample images (up to limit, using more efficient method than RANDOM)
         # For better performance, we get the first N images ordered by ID
         cur.execute("""
-            SELECT i.filepath, i.thumbnail_path
+            SELECT i.filepath
             FROM images i
             JOIN image_tags it ON i.id = it.image_id
             WHERE it.tag_id = ?
@@ -140,20 +140,23 @@ async def tag_detail(tag_name):
         """, (tag_id, SAMPLE_IMAGE_LIMIT))
         samples = [dict(row) for row in cur.fetchall()]
         
-        # Get implications
+        # Get implications (tags that this tag implies - i.e., this tag is the source)
         cur.execute("""
-            SELECT parent_tag
-            FROM tag_implications
-            WHERE child_tag = ?
-        """, (tag_name,))
-        parents = [row['parent_tag'] for row in cur.fetchall()]
+            SELECT t.name
+            FROM tag_implications ti
+            JOIN tags t ON ti.implied_tag_id = t.id
+            WHERE ti.source_tag_id = ?
+        """, (tag_id,))
+        children = [row['name'] for row in cur.fetchall()]
         
+        # Get implied by (tags that imply this tag - i.e., this tag is the implied)
         cur.execute("""
-            SELECT child_tag
-            FROM tag_implications
-            WHERE parent_tag = ?
-        """, (tag_name,))
-        children = [row['child_tag'] for row in cur.fetchall()]
+            SELECT t.name
+            FROM tag_implications ti
+            JOIN tags t ON ti.source_tag_id = t.id
+            WHERE ti.implied_tag_id = ?
+        """, (tag_id,))
+        parents = [row['name'] for row in cur.fetchall()]
         
         # Get aliases (if any exist in your schema)
         # For now, returning empty list
