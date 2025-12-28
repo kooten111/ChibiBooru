@@ -406,7 +406,8 @@ async def show_image(filepath):
         tag_deltas=tag_deltas,
 
         merged_general_tags=merged_general,  # Pass to template for potential styling
-        upscaled_image_url=upscaled_image_url
+        upscaled_image_url=upscaled_image_url,
+        image_pools=models.get_pools_for_image(data['id']) if data and data.get('id') else []
     )
 
 @main_blueprint.route('/similar/<path:filepath>')

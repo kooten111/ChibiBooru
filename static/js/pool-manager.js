@@ -11,7 +11,10 @@ async function loadPoolsForImage() {
     const poolsPanel = document.querySelector('.pool-management.panel');
     const poolsContent = document.getElementById('pools-content');
 
-    if (!filepath || !poolsList) return;
+    if (!filepath || !poolsList) {
+        // Safe check for server-side hidden section
+        return;
+    }
 
     try {
         const response = await fetch(`/api/pools/for_image?filepath=${encodeURIComponent(filepath)}`);

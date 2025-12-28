@@ -480,7 +480,6 @@
 .section-content {
     display: block !important;
     padding: var(--spacing-lg);
-    max-height: 600px;
     overflow-y: auto;
     transition: max-height var(--transition-smooth);
 }
