@@ -209,6 +209,23 @@ SUPPORTED_ZIP_EXTENSIONS = ('.zip',)
 SUPPORTED_ANIMATION_EXTENSIONS = ('.gif', '.webp', '.apng')
 SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS + SUPPORTED_VIDEO_EXTENSIONS + SUPPORTED_ZIP_EXTENSIONS
 
+# ==================== UPSCALER (AI IMAGE UPSCALING) ====================
+
+# Enable upscaling feature (disabled by default - set UPSCALER_ENABLED=true in .env)
+UPSCALER_ENABLED = os.environ.get('UPSCALER_ENABLED', 'false').lower() in ('true', '1', 'yes')
+
+# Model to use for upscaling
+UPSCALER_MODEL = os.environ.get('UPSCALER_MODEL', 'RealESRGAN_x4plus')
+
+# Upscale factor (the x4plus model is designed for 4x)
+UPSCALER_SCALE = int(os.environ.get('UPSCALER_SCALE', 4))
+
+# Tile size for processing large images without running out of VRAM
+UPSCALER_TILE_SIZE = int(os.environ.get('UPSCALER_TILE_SIZE', 512))
+
+# Directory to store upscaled images (separate from originals)
+UPSCALED_IMAGES_DIR = os.environ.get('UPSCALED_IMAGES_DIR', './static/upscaled')
+
 
 def is_supported_media(filepath: str) -> bool:
     """Check if a file is a supported media type."""

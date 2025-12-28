@@ -15,5 +15,6 @@ from . import (
     animation,
     favourites,
     similarity,
-    tag_manager
+    tag_manager,
+    upscaler
 )

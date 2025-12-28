@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/saucenao-modal.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/animation-player.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/upscaler.css') + '?v=1' }}">
 
     {# Preload main image with high priority - start loading ASAP #}
     {% if not (filepath.endswith('.mp4') or filepath.endswith('.webm')) %}
@@ -744,6 +745,7 @@
     <script src="{{ url_for('static', filename='js/animation-player.js', v='1.0') }}"></script>
     <script src="{{ url_for('static', filename='js/family-badge.js', v='3.0') }}"></script>
     <script src="{{ url_for('static', filename='js/favourites.js', v='1.0') }}"></script>
+    <script src="{{ url_for('static', filename='js/upscaler.js', v='1.0') }}"></script>
 </body>
 
 </html>

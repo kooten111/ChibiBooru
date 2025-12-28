@@ -42,10 +42,10 @@ database.db
 # Media & Static Assets
 # ===========================
 # User uploaded or generated content
+static/animations/
 static/images/
 static/thumbnails/
-static/animations/
-static/logo/
+static/upscaled/
 
 # ===========================
 # Project Specific & Temporary
