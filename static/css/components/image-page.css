@@ -1,4 +1,3 @@
-
 /* Override header animation for image page */
 .image-page .header {
     animation: none !important;
@@ -739,3 +738,11 @@ body:is(.ui-hidden, .focus-mode)::after {
 }
 
 /* Responsive */
+
+/* Expand sidebar content dynamically */
+#sidebar-right-content {
+    flex-grow: 1;
+    max-height: none;
+    display: flex;
+    flex-direction: column;
+}
