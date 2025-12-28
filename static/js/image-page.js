@@ -545,6 +545,10 @@ function initSwipeNavigation() {
             if (typeof window.initFavourites === 'function') {
                 window.initFavourites();
             }
+
+            // Dispatch event for modules that listen for client-side navigation
+            // (e.g., upscaler, family-badge, animation-player)
+            window.dispatchEvent(new CustomEvent('imagePageNavigated'));
         }, 50);
 
         isTransitioning = false;
