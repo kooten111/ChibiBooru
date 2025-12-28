@@ -5,10 +5,19 @@ from utils import api_handler
 @api_blueprint.route('/implications/suggestions', methods=['GET'])
 @api_handler()
 async def get_implication_suggestions():
-    """Get all auto-detected implication suggestions."""
+    """Get paginated auto-detected implication suggestions."""
     from services import implication_service
-    suggestions = implication_service.get_all_suggestions()
-    return suggestions
+    
+    # Get pagination parameters
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    pattern_type = request.args.get('type', None)
+    
+    # Clamp values to reasonable ranges
+    page = max(1, page)
+    limit = max(1, min(200, limit))
+    
+    return implication_service.get_paginated_suggestions(page, limit, pattern_type)
 
 
 @api_blueprint.route('/implications/approve', methods=['POST'])
@@ -32,6 +41,9 @@ async def approve_implication():
     if not success:
         raise ValueError("Failed to create implication")
 
+    # Invalidate cache so next fetch reflects the approval
+    implication_service.invalidate_suggestion_cache()
+    
     return {"message": f"Implication created: {source_tag} → {implied_tag}"}
 
 
@@ -139,4 +151,8 @@ async def bulk_approve_implications():
         raise ValueError("No suggestions provided")
     
     result = implication_service.bulk_approve_implications(suggestions)
+    
+    # Invalidate cache so next fetch reflects the approvals
+    implication_service.invalidate_suggestion_cache()
+    
     return result

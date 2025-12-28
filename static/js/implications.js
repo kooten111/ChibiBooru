@@ -9,6 +9,16 @@ let viewMode = 'all'; // 'all', 'suggestions', 'active'
 let typeFilters = new Set(['all']);
 let allImplications = { suggestions: [], active: [] };
 
+// Pagination state
+let paginationState = {
+    currentPage: 1,
+    totalPages: 1,
+    totalSuggestions: 0,
+    hasMore: false,
+    isLoading: false,
+    limit: 50
+};
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function () {
     initializeTagSearch();
@@ -18,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeBulkActions();
     initializeManualCreation();
     initializeKeyboardShortcuts();
-    
+
     // Load initial data
     loadAllSuggestions();
 });
@@ -31,9 +41,9 @@ function initializeTagSearch() {
 
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value.trim();
-        
+
         clearTimeout(searchTimeout);
-        
+
         if (query.length < 2) {
             dropdown.classList.remove('active');
             return;
@@ -43,11 +53,11 @@ function initializeTagSearch() {
             try {
                 const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
                 const data = await response.json();
-                
+
                 // Extract tags from groups
                 let tags = [];
                 if (data.groups && data.groups.length > 0) {
-                    const tagGroup = data.groups.find(g => g.title === 'Tags');
+                    const tagGroup = data.groups.find(g => g.name === 'Tags');
                     if (tagGroup && tagGroup.items) {
                         tags = tagGroup.items.map(item => ({
                             name: item.tag || item.label,
@@ -55,7 +65,7 @@ function initializeTagSearch() {
                         }));
                     }
                 }
-                
+
                 if (tags.length > 0) {
                     dropdown.innerHTML = tags.map(tag => `
                         <div class="autocomplete-item" data-tag="${tag.name}">
@@ -63,7 +73,7 @@ function initializeTagSearch() {
                         </div>
                     `).join('');
                     dropdown.classList.add('active');
-                    
+
                     // Add click handlers
                     dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
                         item.addEventListener('click', () => {
@@ -94,9 +104,9 @@ async function selectTag(tagName) {
     try {
         const response = await fetch(`/api/implications/for-tag/${encodeURIComponent(tagName)}`);
         const data = await response.json();
-        
+
         selectedTag = data.tag;
-        
+
         if (!selectedTag) {
             showError(`Tag "${tagName}" not found`);
             return;
@@ -129,7 +139,7 @@ async function selectTag(tagName) {
 // View Mode Toggle
 function initializeViewModeToggle() {
     const toggleButtons = document.querySelectorAll('.view-mode-toggle .toggle-btn');
-    
+
     toggleButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             toggleButtons.forEach(b => b.classList.remove('active'));
@@ -143,11 +153,11 @@ function initializeViewModeToggle() {
 // Type Filters
 function initializeTypeFilters() {
     const checkboxes = document.querySelectorAll('input[name="typeFilter"]');
-    
+
     checkboxes.forEach(checkbox => {
         checkbox.addEventListener('change', () => {
             const value = checkbox.value;
-            
+
             if (value === 'all') {
                 if (checkbox.checked) {
                     typeFilters.clear();
@@ -159,19 +169,19 @@ function initializeTypeFilters() {
             } else {
                 typeFilters.delete('all');
                 document.querySelector('input[name="typeFilter"][value="all"]').checked = false;
-                
+
                 if (checkbox.checked) {
                     typeFilters.add(value);
                 } else {
                     typeFilters.delete(value);
                 }
-                
+
                 if (typeFilters.size === 0) {
                     typeFilters.add('all');
                     document.querySelector('input[name="typeFilter"][value="all"]').checked = true;
                 }
             }
-            
+
             renderImplications();
         });
     });
@@ -221,7 +231,7 @@ function initializeBulkActions() {
 
 function toggleSuggestionSelection(suggestionId, checkbox) {
     const item = checkbox.closest('.implication-item');
-    
+
     if (checkbox.checked) {
         selectedSuggestions.add(suggestionId);
         item.classList.add('selected');
@@ -229,14 +239,14 @@ function toggleSuggestionSelection(suggestionId, checkbox) {
         selectedSuggestions.delete(suggestionId);
         item.classList.remove('selected');
     }
-    
+
     updateBulkActionsBar();
 }
 
 function updateBulkActionsBar() {
     const bar = document.getElementById('bulkActionsBar');
     const count = document.getElementById('selectionCount');
-    
+
     if (selectedSuggestions.size > 0) {
         bar.style.display = 'flex';
         count.textContent = `${selectedSuggestions.size} selected`;
@@ -269,15 +279,15 @@ async function bulkApprove() {
         });
 
         const result = await response.json();
-        
+
         showSuccess(`Approved ${result.success_count} of ${result.total} suggestions`);
-        
+
         if (result.errors.length > 0) {
             console.error('Bulk approve errors:', result.errors);
         }
 
         clearSelection();
-        
+
         // Reload implications
         if (selectedTag) {
             selectTag(selectedTag.name);
@@ -314,16 +324,25 @@ function clearSelection() {
     updateBulkActionsBar();
 }
 
-// Load all suggestions (when no tag selected)
+// Load suggestions with pagination (first page)
 async function loadAllSuggestions() {
     try {
-        const response = await fetch('/api/implications/suggestions');
+        // Reset pagination state
+        paginationState.currentPage = 1;
+        paginationState.isLoading = true;
+
+        const response = await fetch(`/api/implications/suggestions?page=1&limit=${paginationState.limit}`);
         const data = await response.json();
-        
-        allImplications.suggestions = [
-            ...data.naming.map(s => ({ ...s, pattern_type: 'naming_pattern' })),
-            ...data.correlation.map(s => ({ ...s, pattern_type: 'correlation' }))
-        ];
+
+        // Update pagination state from response
+        paginationState.currentPage = data.page;
+        paginationState.totalPages = data.total_pages;
+        paginationState.totalSuggestions = data.total;
+        paginationState.hasMore = data.has_more;
+        paginationState.isLoading = false;
+
+        // Store suggestions (already flat list from new API)
+        allImplications.suggestions = data.suggestions;
 
         // Also load all active implications
         const activeResponse = await fetch('/api/implications/all');
@@ -334,8 +353,61 @@ async function loadAllSuggestions() {
     } catch (error) {
         console.error('Error loading suggestions:', error);
         showError('Failed to load suggestions');
+        paginationState.isLoading = false;
     }
 }
+
+// Load more suggestions (next page)
+async function loadMoreSuggestions() {
+    if (paginationState.isLoading || !paginationState.hasMore) {
+        return;
+    }
+
+    try {
+        paginationState.isLoading = true;
+        updateLoadMoreButton();
+
+        const nextPage = paginationState.currentPage + 1;
+        const response = await fetch(`/api/implications/suggestions?page=${nextPage}&limit=${paginationState.limit}`);
+        const data = await response.json();
+
+        // Update pagination state
+        paginationState.currentPage = data.page;
+        paginationState.totalPages = data.total_pages;
+        paginationState.hasMore = data.has_more;
+        paginationState.isLoading = false;
+
+        // Append new suggestions to existing list
+        allImplications.suggestions = [...allImplications.suggestions, ...data.suggestions];
+
+        renderImplications();
+    } catch (error) {
+        console.error('Error loading more suggestions:', error);
+        showError('Failed to load more suggestions');
+        paginationState.isLoading = false;
+        updateLoadMoreButton();
+    }
+}
+
+// Update load more button state
+function updateLoadMoreButton() {
+    const btn = document.getElementById('loadMoreBtn');
+    if (!btn) return;
+
+    if (paginationState.isLoading) {
+        btn.textContent = 'Loading...';
+        btn.disabled = true;
+    } else if (paginationState.hasMore) {
+        btn.textContent = `Load More (${allImplications.suggestions.length} of ${paginationState.totalSuggestions})`;
+        btn.disabled = false;
+    } else {
+        btn.textContent = `All ${paginationState.totalSuggestions} suggestions loaded`;
+        btn.disabled = true;
+    }
+}
+
+// Expose loadMoreSuggestions globally
+window.loadMoreSuggestions = loadMoreSuggestions;
 
 // Render implications based on current filters
 function renderImplications() {
@@ -349,10 +421,18 @@ function renderImplications() {
         suggestions = [];
     }
 
-    // Update counts
-    document.getElementById('suggestionsBadge').textContent = suggestions.length;
+    // Update counts - show loaded vs total for suggestions
+    const suggestionsCountText = paginationState.totalSuggestions > 0
+        ? `${suggestions.length} of ${paginationState.totalSuggestions}`
+        : suggestions.length;
+    document.getElementById('suggestionsBadge').textContent = suggestionsCountText;
     document.getElementById('activeBadge').textContent = active.length;
-    document.getElementById('headerCount').textContent = `Showing ${suggestions.length + active.length} implications`;
+
+    const totalShown = suggestions.length + active.length;
+    const totalAvailable = paginationState.totalSuggestions + active.length;
+    document.getElementById('headerCount').textContent = paginationState.hasMore
+        ? `Showing ${totalShown} of ${totalAvailable} implications`
+        : `Showing ${totalShown} implications`;
 
     // Render lists
     renderSuggestionsList(suggestions);
@@ -372,7 +452,7 @@ function filterImplications(implications, isSuggestion) {
 
 function renderSuggestionsList(suggestions) {
     const listEl = document.getElementById('suggestionsList');
-    
+
     if (suggestions.length === 0) {
         listEl.innerHTML = '<div class="loading-message">No suggestions found</div>';
         return;
@@ -412,6 +492,26 @@ function renderSuggestionsList(suggestions) {
         `;
     }).join('');
 
+    // Add Load More button if there are more suggestions to load
+    if (paginationState.hasMore && !selectedTag) {
+        const loadMoreHtml = `
+            <div class="load-more-container">
+                <button id="loadMoreBtn" class="load-more-btn" onclick="window.loadMoreSuggestions()">
+                    Load More (${allImplications.suggestions.length} of ${paginationState.totalSuggestions})
+                </button>
+            </div>
+        `;
+        listEl.insertAdjacentHTML('beforeend', loadMoreHtml);
+    } else if (!paginationState.hasMore && paginationState.totalSuggestions > paginationState.limit) {
+        // Show "all loaded" message if we've loaded everything
+        const allLoadedHtml = `
+            <div class="load-more-container">
+                <span class="all-loaded-message">All ${paginationState.totalSuggestions} suggestions loaded</span>
+            </div>
+        `;
+        listEl.insertAdjacentHTML('beforeend', allLoadedHtml);
+    }
+
     // Add click handlers to items
     listEl.querySelectorAll('.implication-item').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -424,7 +524,7 @@ function renderSuggestionsList(suggestions) {
 
 function renderActiveList(active) {
     const listEl = document.getElementById('activeList');
-    
+
     if (active.length === 0) {
         listEl.innerHTML = '<div class="loading-message">No active implications</div>';
         return;
@@ -499,7 +599,7 @@ async function selectImplication(itemId, isSuggestion) {
 
 async function renderDetailPanel() {
     const panel = document.getElementById('detailPanel');
-    
+
     if (!selectedImplication) {
         panel.innerHTML = `
             <div class="detail-placeholder">
@@ -598,21 +698,21 @@ async function renderDetailPanel() {
 
 function renderChainTree(node, depth = 0) {
     let html = `<div class="chain-node" style="--depth: ${depth}">${node.tag}</div>`;
-    
+
     if (node.implies && node.implies.length > 0) {
         html += `<div class="chain-connector" style="--depth: ${depth}">↓</div>`;
         node.implies.forEach(child => {
             html += renderChainTree(child, depth + 1);
         });
     }
-    
+
     return html;
 }
 
 // Global functions for onclick handlers
 window.toggleSuggestionSelection = toggleSuggestionSelection;
 
-window.approveSingle = async function(itemId) {
+window.approveSingle = async function (itemId) {
     const item = document.querySelector(`[data-id="${itemId}"]`);
     if (!item) return;
 
@@ -632,7 +732,7 @@ window.approveSingle = async function(itemId) {
 
         const result = await response.json();
         showSuccess(`Approved: ${suggestion.source_tag} → ${suggestion.implied_tag}`);
-        
+
         if (selectedTag) {
             selectTag(selectedTag.name);
         } else {
@@ -644,7 +744,7 @@ window.approveSingle = async function(itemId) {
     }
 };
 
-window.dismissSingle = function(itemId) {
+window.dismissSingle = function (itemId) {
     const item = document.querySelector(`[data-id="${itemId}"]`);
     if (item) {
         item.remove();
@@ -652,11 +752,11 @@ window.dismissSingle = function(itemId) {
     }
 };
 
-window.viewChain = async function(tagName) {
+window.viewChain = async function (tagName) {
     try {
         const response = await fetch(`/api/implications/chain/${encodeURIComponent(tagName)}`);
         const chain = await response.json();
-        
+
         // Show in a simple alert for now - could make a modal
         const chainText = renderChainText(chain);
         showInfo(`Implication Chain for ${tagName}:\n\n${chainText}`);
@@ -676,7 +776,7 @@ function renderChainText(node, depth = 0) {
     return text;
 }
 
-window.deleteImplication = async function(sourceTag, impliedTag) {
+window.deleteImplication = async function (sourceTag, impliedTag) {
     if (!confirm(`Delete implication: ${sourceTag} → ${impliedTag}?`)) {
         return;
     }
@@ -690,7 +790,7 @@ window.deleteImplication = async function(sourceTag, impliedTag) {
 
         const result = await response.json();
         showSuccess('Implication deleted');
-        
+
         if (selectedTag) {
             selectTag(selectedTag.name);
         } else {
@@ -702,7 +802,7 @@ window.deleteImplication = async function(sourceTag, impliedTag) {
     }
 };
 
-window.closeDetail = function() {
+window.closeDetail = function () {
     selectedImplication = null;
     renderDetailPanel();
 };
@@ -814,7 +914,7 @@ function initializeKeyboardShortcuts() {
             return;
         }
 
-        switch(e.key) {
+        switch (e.key) {
             case '/':
                 e.preventDefault();
                 document.getElementById('tagSearchInput').focus();
