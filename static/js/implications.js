@@ -41,8 +41,20 @@ function initializeTagSearch() {
 
         searchTimeout = setTimeout(async () => {
             try {
-                const response = await fetch(`/api/tags/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
-                const tags = await response.json();
+                const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
+                const data = await response.json();
+                
+                // Extract tags from groups
+                let tags = [];
+                if (data.groups && data.groups.length > 0) {
+                    const tagGroup = data.groups.find(g => g.title === 'Tags');
+                    if (tagGroup && tagGroup.items) {
+                        tags = tagGroup.items.map(item => ({
+                            name: item.tag || item.label,
+                            category: item.category || 'general'
+                        }));
+                    }
+                }
                 
                 if (tags.length > 0) {
                     dropdown.innerHTML = tags.map(tag => `
