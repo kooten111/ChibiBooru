@@ -36,9 +36,6 @@
                 </button>
             </div>
             <div class="header-actions">
-                <button class="header-action-btn" id="settingsBtn" title="Settings">
-                    <span>⚙️</span>
-                </button>
                 <button class="header-action-btn" id="helpBtn" title="Keyboard shortcuts (?)">
                     <span>?</span>
                 </button>
@@ -326,7 +323,31 @@
             <option value="meta">Meta</option>
             <option value="species">Species</option>
         </select>
-        <input type="text" class="bulk-input" id="bulkExtendedCategoryInput" placeholder="Extended Category...">
+        <select class="bulk-select" id="bulkExtendedCategorySelect">
+            <option value="">Set Extended Category...</option>
+            <option value="00_Subject_Count">00 Subject Count</option>
+            <option value="01_Body_Physique">01 Body Physique</option>
+            <option value="02_Body_Hair">02 Body Hair</option>
+            <option value="03_Body_Face">03 Body Face</option>
+            <option value="04_Body_Genitalia">04 Body Genitalia</option>
+            <option value="05_Attire_Main">05 Attire Main</option>
+            <option value="06_Attire_Inner">06 Attire Inner</option>
+            <option value="07_Attire_Legwear">07 Attire Legwear</option>
+            <option value="08_Attire_Acc">08 Attire Accessories</option>
+            <option value="09_Action">09 Action</option>
+            <option value="10_Pose">10 Pose</option>
+            <option value="11_Expression">11 Expression</option>
+            <option value="12_Sexual_Act">12 Sexual Act</option>
+            <option value="13_Object">13 Object</option>
+            <option value="14_Setting">14 Setting</option>
+            <option value="15_Framing">15 Framing</option>
+            <option value="16_Focus">16 Focus</option>
+            <option value="17_Style_Art">17 Style Art</option>
+            <option value="18_Style_Tech">18 Style Tech</option>
+            <option value="19_Meta_Attributes">19 Meta Attributes</option>
+            <option value="20_Meta_Text">20 Meta Text</option>
+            <option value="21_Status">21 Status</option>
+        </select>
         <button class="bulk-btn bulk-btn-primary" id="bulkCategorizeBtn">Apply</button>
         <button class="bulk-btn bulk-btn-secondary" id="bulkMergeBtn">Merge</button>
         <button class="bulk-btn bulk-btn-danger" id="bulkDeleteBtn">Delete</button>

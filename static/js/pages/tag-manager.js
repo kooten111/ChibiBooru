@@ -787,7 +787,7 @@ async function applyBulkRemoveTags() {
 // Bulk Categorize
 async function bulkCategorize() {
     const baseCategory = document.getElementById('bulkBaseCategorySelect').value;
-    const extendedCategory = document.getElementById('bulkExtendedCategoryInput').value.trim();
+    const extendedCategory = document.getElementById('bulkExtendedCategorySelect').value;
 
     if (!baseCategory && !extendedCategory) {
         showNotification('Please select a base category or enter an extended category', 'warning');
