@@ -10,7 +10,7 @@ document.addEventListener('keydown', (e) => {
     // Don't trigger if user is typing in an input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-    switch(e.key) {
+    switch (e.key) {
         case '1':
             setRating('rating:general');
             break;
@@ -50,7 +50,10 @@ document.querySelectorAll('input[name="filter"]').forEach(radio => {
 });
 
 async function loadImages() {
-    document.getElementById('loadingState').style.display = 'block';
+    const loadingState = document.getElementById('loadingState');
+    if (loadingState) {
+        loadingState.style.display = 'block';
+    }
     document.getElementById('imageDisplay').innerHTML = '<div class="loading-state">Loading images...</div>';
 
     try {
@@ -63,6 +66,7 @@ async function loadImages() {
         if (currentImages.length === 0) {
             document.getElementById('imageDisplay').innerHTML =
                 '<div class="no-images-state">No images to rate! 🎉</div>';
+            document.getElementById('rateProgress').textContent = 'All done!';
         } else {
             displayCurrentImage();
         }
@@ -70,6 +74,7 @@ async function loadImages() {
         console.error('Error loading images:', error);
         document.getElementById('imageDisplay').innerHTML =
             '<div class="no-images-state">Error loading images: ' + error.message + '</div>';
+        document.getElementById('rateProgress').textContent = 'Error';
     }
 }
 
