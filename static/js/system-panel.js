@@ -565,6 +565,84 @@ function toggleDebugOptions() {
     toggleButton.classList.toggle('expanded');
 }
 
+function systemClearImpliedTags(event) {
+    if (event) event.preventDefault();
+
+    const template = document.getElementById('clear-implied-tags-modal-template');
+    const clone = template.content.cloneNode(true);
+    const overlay = clone.querySelector('.custom-confirm-overlay');
+
+    const modal = overlay.querySelector('.custom-confirm-modal');
+    const btnConfirm = modal.querySelector('.btn-confirm');
+    const btnCancel = modal.querySelector('.btn-cancel');
+    const reapplyCheckbox = modal.querySelector('#clearImpliedReapply');
+
+    btnConfirm.onclick = () => {
+        const reapply = reapplyCheckbox.checked;
+        document.body.removeChild(overlay);
+
+        // Call the appropriate implications API endpoint
+        const buttonElement = event ? event.target.closest('button') : null;
+        const originalText = buttonElement ? buttonElement.innerHTML : '';
+
+        if (buttonElement) {
+            buttonElement.innerHTML = reapply
+                ? '<span class="processing-spinner">⚙️</span> Clearing & Reapplying...'
+                : '<span class="processing-spinner">⚙️</span> Clearing...';
+            buttonElement.disabled = true;
+        }
+
+        loadLogs?.();
+
+        const endpoint = reapply ? '/api/implications/clear-and-reapply' : '/api/implications/clear-tags';
+
+        fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.message) {
+                    if (typeof showNotification === 'function') {
+                        showNotification(data.message, 'success');
+                    } else {
+                        alert(data.message);
+                    }
+                    loadLogs?.();
+                } else if (data.error) {
+                    const msg = `Error: ${data.error}`;
+                    if (typeof showNotification === 'function') {
+                        showNotification(msg, 'error');
+                    } else {
+                        alert(msg);
+                    }
+                }
+            })
+            .catch(err => {
+                const msg = `Error: ${err.message}`;
+                if (typeof showNotification === 'function') {
+                    showNotification(msg, 'error');
+                } else {
+                    alert(msg);
+                }
+            })
+            .finally(() => {
+                if (buttonElement) {
+                    buttonElement.innerHTML = originalText;
+                    buttonElement.disabled = false;
+                }
+                loadLogs?.();
+            });
+    };
+
+    btnCancel.onclick = () => document.body.removeChild(overlay);
+    overlay.onclick = (e) => {
+        if (e.target === overlay) document.body.removeChild(overlay);
+    };
+
+    document.body.appendChild(overlay);
+}
+
 // Export functions to global scope for onclick handlers
 window.toggleDebugOptions = toggleDebugOptions;
 window.systemScanImages = systemScanImages;
@@ -584,5 +662,7 @@ window.systemBulkRetryTagging = systemBulkRetryTagging;
 window.systemDatabaseHealthCheck = systemDatabaseHealthCheck;
 window.systemStartMonitor = systemStartMonitor;
 window.systemStopMonitor = systemStopMonitor;
+window.systemClearImpliedTags = systemClearImpliedTags;
 window.saveSystemSecret = saveSystemSecret;
 window.clearSystemSecret = clearSystemSecret;
+

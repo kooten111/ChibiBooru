@@ -863,7 +863,8 @@ window.approveSingle = async function (itemId) {
         source_tag: item.dataset.source,
         implied_tag: item.dataset.implied,
         inference_type: item.dataset.type,
-        confidence: parseFloat(item.dataset.confidence)
+        confidence: parseFloat(item.dataset.confidence),
+        apply_now: document.getElementById('applyOnApproval')?.checked || false
     };
 
     try {
@@ -874,7 +875,11 @@ window.approveSingle = async function (itemId) {
         });
 
         const result = await response.json();
-        showSuccess(`Approved: ${suggestion.source_tag} → ${suggestion.implied_tag}`);
+        let message = `Approved: ${suggestion.source_tag} → ${suggestion.implied_tag}`;
+        if (result.applied_count > 0) {
+            message += ` (applied to ${result.applied_count} images)`;
+        }
+        showSuccess(message);
 
         if (selectedTag) {
             selectTag(selectedTag.name);
@@ -1078,48 +1083,212 @@ document.getElementById('autoApprovePatternBtn')?.addEventListener('click', asyn
     }
 });
 
-// Auto-Approve High Confidence
-document.getElementById('autoApproveConfidentBtn')?.addEventListener('click', async () => {
-    const confirmMsg = `This will auto-approve correlation suggestions with:\n• ≥95% confidence\n• ≥10 images (statistical significance)\n\nContinue?`;
+// Clear Implied Tags Modal
+function initializeClearImpliedModal() {
+    const modal = document.getElementById('clearImpliedModal');
+    const openBtn = document.getElementById('clearImpliedTagsBtn');
+    const closeBtn = modal?.querySelector('.close');
+    const cancelBtn = document.getElementById('clearImpliedCancelBtn');
+    const submitBtn = document.getElementById('clearImpliedSubmitBtn');
+    const reapplyCheckbox = document.getElementById('clearImpliedReapplyCheckbox');
 
-    if (!confirm(confirmMsg)) {
-        return;
+    if (!modal || !openBtn) return;
+
+    openBtn.addEventListener('click', () => {
+        modal.classList.add('active');
+    });
+
+    closeBtn?.addEventListener('click', () => {
+        modal.classList.remove('active');
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+        modal.classList.remove('active');
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+        }
+    });
+
+    submitBtn?.addEventListener('click', async () => {
+        const reapply = reapplyCheckbox?.checked || false;
+
+        submitBtn.textContent = reapply ? 'Clearing & Reapplying...' : 'Clearing...';
+        submitBtn.disabled = true;
+
+        try {
+            const endpoint = reapply ? '/api/implications/clear-and-reapply' : '/api/implications/clear-tags';
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+            showSuccess(result.message);
+            modal.classList.remove('active');
+        } catch (error) {
+            console.error('Error clearing tags:', error);
+            showError('Failed to clear implied tags');
+        } finally {
+            submitBtn.textContent = 'Clear Tags';
+            submitBtn.disabled = false;
+        }
+    });
+}
+
+// Initialize when DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    initializeClearImpliedModal();
+});
+
+// Auto-Approve Settings Modal
+function initializeAutoApproveModal() {
+    const modal = document.getElementById('autoApproveModal');
+    const openBtn = document.getElementById('autoApproveConfidentBtn');
+    const closeBtn = modal?.querySelector('.close');
+    const refreshBtn = document.getElementById('autoApproveRefreshBtn');
+    const submitBtn = document.getElementById('autoApproveSubmitBtn');
+    const confidenceSlider = document.getElementById('minConfidenceSlider');
+    const confidenceValue = document.getElementById('minConfidenceValue');
+    const samplesSlider = document.getElementById('minSamplesSlider');
+    const samplesValue = document.getElementById('minSamplesValue');
+
+    if (!modal || !openBtn) return;
+
+    // Open modal
+    openBtn.addEventListener('click', () => {
+        modal.classList.add('active');
+        updateAutoApprovePreview();
+    });
+
+    // Close modal
+    closeBtn?.addEventListener('click', () => {
+        modal.classList.remove('active');
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.remove('active');
+        }
+    });
+
+    // Update slider displays
+    confidenceSlider?.addEventListener('input', () => {
+        confidenceValue.textContent = `${confidenceSlider.value}%`;
+    });
+
+    confidenceSlider?.addEventListener('change', updateAutoApprovePreview);
+
+    samplesSlider?.addEventListener('input', () => {
+        samplesValue.textContent = samplesSlider.value;
+    });
+
+    samplesSlider?.addEventListener('change', updateAutoApprovePreview);
+
+    // Refresh button
+    refreshBtn?.addEventListener('click', updateAutoApprovePreview);
+
+    // Submit button
+    submitBtn?.addEventListener('click', executeAutoApprove);
+}
+
+async function updateAutoApprovePreview() {
+    const preview = document.getElementById('autoApprovePreview');
+    const minConfidence = parseInt(document.getElementById('minConfidenceSlider')?.value || 85) / 100;
+    const minSamples = parseInt(document.getElementById('minSamplesSlider')?.value || 5);
+
+    preview.innerHTML = '<div class="preview-count">Calculating...</div>';
+
+    try {
+        // Count matching suggestions from already loaded data
+        const matching = allImplications.suggestions.filter(s => {
+            const confidence = s.confidence || 0;
+            const samples = s.sample_size || s.affected_images || 0;
+            return s.pattern_type === 'correlation' &&
+                confidence >= minConfidence &&
+                samples >= minSamples;
+        });
+
+        preview.innerHTML = `
+            <div class="preview-count">
+                <strong>${matching.length}</strong> suggestions match these criteria
+            </div>
+            ${matching.length > 0 ? `
+                <div class="preview-examples">
+                    <small>Examples:</small>
+                    <ul>
+                        ${matching.slice(0, 5).map(s => `
+                            <li>${s.source_tag} → ${s.implied_tag} (${Math.round(s.confidence * 100)}%, ${s.sample_size || s.affected_images || '?'} samples)</li>
+                        `).join('')}
+                        ${matching.length > 5 ? `<li>...and ${matching.length - 5} more</li>` : ''}
+                    </ul>
+                </div>
+            ` : ''}
+        `;
+    } catch (error) {
+        preview.innerHTML = '<div class="preview-count">Error loading preview</div>';
     }
+}
 
-    const btn = document.getElementById('autoApproveConfidentBtn');
+async function executeAutoApprove() {
+    const minConfidence = parseInt(document.getElementById('minConfidenceSlider')?.value || 85) / 100;
+    const minSamples = parseInt(document.getElementById('minSamplesSlider')?.value || 5);
+    const applyNow = document.getElementById('autoApproveApplyNow')?.checked || false;
+
+    const btn = document.getElementById('autoApproveSubmitBtn');
     const originalText = btn.innerHTML;
-    btn.innerHTML = '<span>⏳</span> Processing...';
+    btn.innerHTML = '⏳ Processing...';
     btn.disabled = true;
 
     try {
+        const requestBody = {
+            min_confidence: minConfidence,
+            min_sample_size: minSamples,
+            apply_now: applyNow
+        };
+
+        // Add category filters if active
+        if (!sourceCategoryFilters.has('all')) {
+            requestBody.source_categories = [...sourceCategoryFilters];
+        }
+        if (!impliedCategoryFilters.has('all')) {
+            requestBody.implied_categories = [...impliedCategoryFilters];
+        }
+
         const response = await fetch('/api/implications/auto-approve-confident', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                min_confidence: 0.95,
-                min_sample_size: 10
-            })
+            body: JSON.stringify(requestBody)
         });
 
         const result = await response.json();
 
         if (result.success_count > 0) {
-            showSuccess(`Auto-approved ${result.success_count} of ${result.total} high-confidence implications!`);
+            let msg = `Auto-approved ${result.success_count} of ${result.total} implications!`;
+            if (result.tags_applied) {
+                msg += ` Applied ${result.tags_applied} tags.`;
+            }
+            showSuccess(msg);
+            document.getElementById('autoApproveModal').classList.remove('active');
+            loadAllSuggestions();
         } else if (result.total === 0) {
-            showInfo('No high-confidence suggestions meeting thresholds');
+            showInfo('No suggestions matching criteria');
         } else {
-            showError(`Failed to approve suggestions. Errors: ${result.errors.length}`);
+            showError(`Failed: ${result.errors?.length || 0} errors`);
         }
-
-        // Reload suggestions
-        loadAllSuggestions();
     } catch (error) {
-        console.error('Error auto-approving high confidence:', error);
-        showError('Failed to auto-approve high-confidence suggestions');
+        console.error('Error auto-approving:', error);
+        showError('Failed to auto-approve');
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+}
+
+// Initialize when DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    initializeAutoApproveModal();
 });
 
 // Keyboard Shortcuts

@@ -129,6 +129,13 @@
             </div>
 
             <div class="sidebar-section quick-actions">
+                <div class="settings-option">
+                    <label class="filter-checkbox"
+                        title="When enabled, approving a rule will immediately add the implied tag to all images that have the source tag">
+                        <input type="checkbox" id="applyOnApproval" checked>
+                        <span>Apply to existing images on approval</span>
+                    </label>
+                </div>
                 <button id="createManualBtn" class="action-btn primary-btn">
                     <span>➕</span> Create Manual Implication
                 </button>
@@ -137,8 +144,12 @@
                     <span>⚡</span> Auto-Approve Naming Patterns
                 </button>
                 <button id="autoApproveConfidentBtn" class="action-btn success-btn"
-                    title="Auto-approve high-confidence correlation suggestions (≥95%, ≥10 images)">
-                    <span>🎯</span> Auto-Approve High Confidence
+                    title="Configure and auto-approve correlation suggestions">
+                    <span>🎯</span> Auto-Approve Settings
+                </button>
+                <button id="clearImpliedTagsBtn" class="action-btn danger-btn"
+                    title="Clear all tags added by implications (source='implication')">
+                    <span>🗑️</span> Clear Implied Tags
                 </button>
             </div>
         </aside>
@@ -228,6 +239,69 @@
             <div class="modal-actions">
                 <button id="previewManualBtn" class="btn-secondary">Preview</button>
                 <button id="createManualSubmitBtn" class="btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto-Approve Settings Modal -->
+    <div id="autoApproveModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>Auto-Approve Settings</h3>
+
+            <div class="auto-approve-form">
+                <div class="form-group">
+                    <label for="minConfidenceSlider">
+                        Minimum Confidence: <span id="minConfidenceValue">85%</span>
+                    </label>
+                    <input type="range" id="minConfidenceSlider" min="50" max="100" value="85" class="slider">
+                    <p class="form-hint">How often must the implied tag appear with the source tag?</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="minSamplesSlider">
+                        Minimum Samples: <span id="minSamplesValue">5</span>
+                    </label>
+                    <input type="range" id="minSamplesSlider" min="2" max="50" value="5" class="slider">
+                    <p class="form-hint">How many images must have both tags? Higher = more reliable.</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="filter-checkbox">
+                        <input type="checkbox" id="autoApproveApplyNow" checked>
+                        <span>Apply to existing images immediately</span>
+                    </label>
+                </div>
+
+                <div class="auto-approve-preview" id="autoApprovePreview">
+                    <div class="preview-count">
+                        Loading preview...
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button id="autoApproveRefreshBtn" class="btn-secondary">Refresh Preview</button>
+                <button id="autoApproveSubmitBtn" class="btn-primary">Approve Matching</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Implied Tags Modal -->
+    <div id="clearImpliedModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>🗑️ Clear Implied Tags</h3>
+            <p>This will remove all tags that were added via implications (source='implication').</p>
+            <div class="form-group">
+                <label class="filter-checkbox">
+                    <input type="checkbox" id="clearImpliedReapplyCheckbox">
+                    <span>Reapply all active implication rules after clearing</span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button id="clearImpliedCancelBtn" class="btn-secondary">Cancel</button>
+                <button id="clearImpliedSubmitBtn" class="btn-danger">Clear Tags</button>
             </div>
         </div>
     </div>

@@ -54,6 +54,7 @@ async def approve_implication():
     implied_tag = data.get('implied_tag')
     inference_type = data.get('inference_type', 'manual')
     confidence = data.get('confidence', 1.0)
+    apply_now = data.get('apply_now', False)  # Option to apply to existing images
 
     if not source_tag or not implied_tag:
         raise ValueError("Missing source_tag or implied_tag")
@@ -68,7 +69,16 @@ async def approve_implication():
     # Invalidate cache so next fetch reflects the approval
     implication_service.invalidate_suggestion_cache()
     
-    return {"message": f"Implication created: {source_tag} → {implied_tag}"}
+    # Apply to existing images if requested
+    applied_count = 0
+    if apply_now:
+        applied_count = implication_service.apply_single_implication_to_images(source_tag, implied_tag)
+    
+    message = f"Implication created: {source_tag} → {implied_tag}"
+    if apply_now:
+        message += f" (applied to {applied_count} images)"
+    
+    return {"message": message, "applied_count": applied_count}
 
 
 @api_blueprint.route('/implications/create', methods=['POST'])
@@ -202,10 +212,34 @@ async def auto_approve_high_confidence():
     
     min_confidence = data.get('min_confidence', 0.95)
     min_sample_size = data.get('min_sample_size', 10)
+    source_categories = data.get('source_categories')
+    implied_categories = data.get('implied_categories')
+    apply_now = data.get('apply_now', False)
     
     result = implication_service.auto_approve_high_confidence_suggestions(
         min_confidence=min_confidence,
-        min_sample_size=min_sample_size
+        min_sample_size=min_sample_size,
+        source_categories=source_categories,
+        implied_categories=implied_categories,
+        apply_now=apply_now
     )
     
     return result
+
+
+@api_blueprint.route('/implications/clear-and-reapply', methods=['POST'])
+@api_handler()
+async def clear_and_reapply_implications():
+    """Clear all implied tags and reapply all implications. Debug/maintenance operation."""
+    from services import implication_service
+    result = implication_service.clear_and_reapply_all_implications()
+    return result
+
+
+@api_blueprint.route('/implications/clear-tags', methods=['POST'])
+@api_handler()
+async def clear_implied_tags_only():
+    """Just clear all implied tags without reapplying. Debug operation."""
+    from services import implication_service
+    count = implication_service.clear_implied_tags()
+    return {"message": f"Cleared {count} implied tags", "count": count}
