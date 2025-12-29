@@ -163,6 +163,24 @@ LOCAL_TAGGER_ALWAYS_RUN = os.environ.get('LOCAL_TAGGER_ALWAYS_RUN', 'false').low
 # Pixiv tags are often incomplete, so this helps add missing tags
 LOCAL_TAGGER_COMPLEMENT_PIXIV = os.environ.get('LOCAL_TAGGER_COMPLEMENT_PIXIV', 'true').lower() in ('true', '1', 'yes')
 
+# Tag Implications behavior
+# If True, automatically applies tag implications when images are ingested
+# (e.g., if 'hatsune_miku' implies 'vocaloid', adds 'vocaloid' automatically)
+APPLY_IMPLICATIONS_ON_INGEST = os.environ.get('APPLY_IMPLICATIONS_ON_INGEST', 'true').lower() in ('true', '1', 'yes')
+
+# Extended categories allowed for implication detection
+# Only tags in these categories will be considered as implied tags
+# This prevents contextual tags (pose, action, expression) from being suggested as implications
+# Categories are from the Platinum Schema - Group 1 (Identity) contains permanent traits
+IMPLICATION_ALLOWED_EXTENDED_CATEGORIES = [
+    #'00_Subject_Count',    # 1girl, solo, 1boy
+    '01_Body_Physique',    # breasts, tail, animal_ears
+    '02_Body_Hair',        # long_hair, twintails, blonde_hair
+    '03_Body_Face',        # blue_eyes, sharp_teeth
+    #'04_Body_Genitalia',   # nipples, penis, pussy
+    #'21_Status',           # nude, wet (often consistent for characters)
+]
+
 # ==================== SIMILARITY CALCULATION ====================
 
 # Similarity calculation method

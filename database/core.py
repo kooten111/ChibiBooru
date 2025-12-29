@@ -130,8 +130,34 @@ def initialize_database():
             cur.execute("""
                 ALTER TABLE image_tags
                 ADD COLUMN source TEXT DEFAULT 'original'
-                CHECK(source IN ('original', 'user', 'ai_inference'))
+                CHECK(source IN ('original', 'user', 'ai_inference', 'implication'))
             """)
+        else:
+            # Migration: Update CHECK constraint to include 'implication' source
+            # Check if current constraint allows 'implication' by checking table schema
+            cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='image_tags'")
+            schema = cur.fetchone()
+            if schema and 'implication' not in schema['sql']:
+                print("Migrating image_tags table to allow 'implication' source...")
+                # Recreate table with updated constraint
+                cur.execute("""
+                    CREATE TABLE image_tags_new (
+                        image_id INTEGER,
+                        tag_id INTEGER,
+                        source TEXT DEFAULT 'original' CHECK(source IN ('original', 'user', 'ai_inference', 'implication')),
+                        FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
+                        FOREIGN KEY (tag_id) REFERENCES tags (id) ON DELETE CASCADE,
+                        PRIMARY KEY (image_id, tag_id)
+                    )
+                """)
+                cur.execute("INSERT INTO image_tags_new SELECT * FROM image_tags")
+                cur.execute("DROP TABLE image_tags")
+                cur.execute("ALTER TABLE image_tags_new RENAME TO image_tags")
+                # Recreate indexes
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag_id ON image_tags(tag_id)")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_source ON image_tags(source)")
+                print("Migration complete.")
 
         # Sources table
         cur.execute("""

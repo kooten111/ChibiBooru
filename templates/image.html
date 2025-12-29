@@ -50,8 +50,11 @@
                         <div class="tag-category artist">
                             <div class="tag-category-title">Artist</div>
                             {% for tag, count in categorized_tags.artist %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query='artist:' + tag) }}">{{ tag }}</a>
+                            <div class="tag-item{% if implied_tag_names and tag in implied_tag_names %} implied{% endif %}"
+                                {% if implied_tag_names and tag in implied_tag_names
+                                %}title="Implied by implication rule" {% endif %}>
+                                <a href="{{ url_for('main.home', query='artist:' + tag) }}">{% if implied_tag_names and
+                                    tag in implied_tag_names %}→ {% endif %}{{ tag }}</a>
                                 <span class="tag-count">
                                     {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >=
                                     1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
@@ -65,8 +68,11 @@
                         <div class="tag-category copyright">
                             <div class="tag-category-title">Copyright</div>
                             {% for tag, count in categorized_tags.copyright %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query='copyright:' + tag) }}">{{ tag }}</a>
+                            <div class="tag-item{% if implied_tag_names and tag in implied_tag_names %} implied{% endif %}"
+                                {% if implied_tag_names and tag in implied_tag_names
+                                %}title="Implied by implication rule" {% endif %}>
+                                <a href="{{ url_for('main.home', query='copyright:' + tag) }}">{% if implied_tag_names
+                                    and tag in implied_tag_names %}→ {% endif %}{{ tag }}</a>
                                 <span class="tag-count">
                                     {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >=
                                     1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
@@ -80,8 +86,11 @@
                         <div class="tag-category character">
                             <div class="tag-category-title">Character</div>
                             {% for tag, count in categorized_tags.character %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query='character:' + tag) }}">{{ tag }}</a>
+                            <div class="tag-item{% if implied_tag_names and tag in implied_tag_names %} implied{% endif %}"
+                                {% if implied_tag_names and tag in implied_tag_names
+                                %}title="Implied by implication rule" {% endif %}>
+                                <a href="{{ url_for('main.home', query='character:' + tag) }}">{% if implied_tag_names
+                                    and tag in implied_tag_names %}→ {% endif %}{{ tag }}</a>
                                 <span class="tag-count">
                                     {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >=
                                     1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
@@ -95,8 +104,11 @@
                         <div class="tag-category species">
                             <div class="tag-category-title">Species</div>
                             {% for tag, count in categorized_tags.species %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query='species:' + tag) }}">{{ tag }}</a>
+                            <div class="tag-item{% if implied_tag_names and tag in implied_tag_names %} implied{% endif %}"
+                                {% if implied_tag_names and tag in implied_tag_names
+                                %}title="Implied by implication rule" {% endif %}>
+                                <a href="{{ url_for('main.home', query='species:' + tag) }}">{% if implied_tag_names and
+                                    tag in implied_tag_names %}→ {% endif %}{{ tag }}</a>
                                 <span class="tag-count">
                                     {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >=
                                     1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
@@ -145,8 +157,11 @@
                                 class="extended-sub-category {{ cat_key|replace('_', '-')|lower if cat_key else 'uncategorized' }}">
                                 <div class="extended-category-title">{{ cat_display_name }}</div>
                                 {% for tag, count in extended_grouped_tags[cat_key] %}
-                                <div class="tag-item">
-                                    <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
+                                <div class="tag-item{% if implied_tag_names and tag in implied_tag_names %} implied{% endif %}"
+                                    {% if implied_tag_names and tag in implied_tag_names
+                                    %}title="Implied by implication rule" {% endif %}>
+                                    <a href="{{ url_for('main.home', query=tag) }}">{% if implied_tag_names and tag in
+                                        implied_tag_names %}→ {% endif %}{{ tag }}</a>
                                     <span class="tag-count">
                                         {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >=
                                         1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}
@@ -161,8 +176,11 @@
                         <div class="tag-category general">
                             <div class="tag-category-title">General</div>
                             {% for tag, count in tags %}
-                            <div class="tag-item">
-                                <a href="{{ url_for('main.home', query=tag) }}">{{ tag }}</a>
+                            <div class="tag-item{% if implied_tag_names and tag in implied_tag_names %} implied{% endif %}"
+                                {% if implied_tag_names and tag in implied_tag_names
+                                %}title="Implied by implication rule" {% endif %}>
+                                <a href="{{ url_for('main.home', query=tag) }}">{% if implied_tag_names and tag in
+                                    implied_tag_names %}→ {% endif %}{{ tag }}</a>
                                 <span class="tag-count">
                                     {% if count >= 1000000 %}{{ "%.1f"|format(count / 1000000.0) }}M{% elif count >=
                                     1000 %}{{ "%.1f"|format(count / 1000.0) }}k{% else %}{{ count }}{% endif %}

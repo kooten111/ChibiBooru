@@ -413,6 +413,46 @@ body.image-page {
     border-radius: var(--radius-lg);
 }
 
+/* Implied Tags - Tags added via implication rules */
+.image-page .tag-item.implied {
+    background: rgba(255, 193, 7, 0.15) !important;
+    border: 1px solid rgba(255, 193, 7, 0.4) !important;
+    border-radius: var(--radius-sm);
+    padding: 2px 8px !important;
+    margin: 2px 0;
+}
+
+.image-page .tag-item.implied a {
+    color: #f59f00 !important;
+    /* Hardcoded warning orange */
+    font-weight: var(--font-weight-medium);
+}
+
+/* Add visible icon before implied tags */
+.image-page .tag-item.implied a::before {
+    content: "⚡ ";
+    font-size: 0.9em;
+    opacity: 1 !important;
+    color: #f59f00 !important;
+}
+
+.image-page .tag-item.implied:hover {
+    background: rgba(255, 193, 7, 0.25) !important;
+    padding-left: 8px !important;
+    /* Override standard hover padding shift */
+}
+
+.image-page .tag-item.implied:hover a {
+    color: #ffb300 !important;
+    /* Lighter amber */
+}
+
+.image-page .tag-item.implied .tag-count {
+    background: rgba(255, 193, 7, 0.25) !important;
+    color: #d97706 !important;
+    /* Darker amber for contrast */
+}
+
 /* Image Display Area */
 .image-page .image-display-area {
     flex: 1;

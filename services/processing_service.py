@@ -1393,6 +1393,20 @@ def process_image_file(filepath, move_from_ingest=True):
         # Generate thumbnail
         ensure_thumbnail(file_dest, md5=md5)
         
+        # Apply tag implications if enabled
+        if config.APPLY_IMPLICATIONS_ON_INGEST:
+            try:
+                from repositories.tag_repository import apply_implications_for_image
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
+                    row = cursor.fetchone()
+                    if row:
+                        if apply_implications_for_image(row['id']):
+                            print(f"[Processing] Applied tag implications for: {filename}")
+            except Exception as e:
+                print(f"[Processing] WARNING: Failed to apply implications for {filename}: {e}")
+        
         print(f"[Processing] Successfully processed: {filename}")
         return True
         

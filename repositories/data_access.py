@@ -679,3 +679,40 @@ def get_tags_with_extended_categories(tag_names):
             result.append((tag_name, count, extended_cat))
 
         return result
+
+
+def get_implied_tags_for_image(image_id: int) -> dict:
+    """
+    Get tags on an image that were added via implication rules.
+    
+    These are tags with source='implication' in the image_tags table,
+    meaning they were not originally on the image but were added
+    automatically when implications were applied.
+    
+    Args:
+        image_id: The image ID to check
+        
+    Returns:
+        Dict of {tag_name: {'category': str, 'extended_category': str}}
+    """
+    if not image_id:
+        return {}
+    
+    implied_tags = {}
+    
+    with get_db_connection() as conn:
+        query = """
+            SELECT t.name, t.category, t.extended_category
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            WHERE it.image_id = ?
+              AND it.source = 'implication'
+        """
+        
+        for row in conn.execute(query, (image_id,)).fetchall():
+            implied_tags[row['name']] = {
+                'category': row['category'],
+                'extended_category': row['extended_category']
+            }
+    
+    return implied_tags

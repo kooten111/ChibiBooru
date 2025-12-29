@@ -267,6 +267,40 @@ async def show_image(filepath):
         "meta": [(t, tag_counts.get(t, 0)) for t in meta_with_rating if t],
     }
 
+    # Get tags that were added via implication rules (source='implication')
+    # Get tags that were added via implication rules (source='implication')
+    from repositories.data_access import get_implied_tags_for_image
+    implied_tags_map = get_implied_tags_for_image(data.get('id'))
+    implied_tag_names = set(implied_tags_map.keys())
+    
+    # Merge implied tags into display lists ensuring they appear
+    for tag_name, info in implied_tags_map.items():
+        category = info.get('category')
+        extended_cat = info.get('extended_category')
+        
+        # 1. Update categorized_tags / tags_with_counts (Legacy/Sidebar)
+        if category == 'general' or category not in categorized_tags:
+            if not any(t[0] == tag_name for t in tags_with_counts):
+                tags_with_counts.append((tag_name, tag_counts.get(tag_name, 0)))
+                tags_with_counts.sort(key=lambda x: x[0])
+        else:
+            # Handle standard categories
+            current_list = categorized_tags[category]
+            if not any(t[0] == tag_name for t in current_list):
+                current_list.append((tag_name, tag_counts.get(tag_name, 0)))
+                current_list.sort(key=lambda x: x[0])
+
+        # 2. Update extended_grouped_tags (Main Display)
+        # Only relevant for general tags, as extended categorization usually applies to them
+        if category == 'general':
+            if extended_cat not in extended_grouped_tags:
+                extended_grouped_tags[extended_cat] = []
+            
+            target_list = extended_grouped_tags[extended_cat]
+            if not any(t[0] == tag_name for t in target_list):
+                 target_list.append((tag_name, tag_counts.get(tag_name, 0)))
+                 target_list.sort(key=lambda x: x[0])
+
     # Fetch family images first to exclude them from similarity results
     parent_child_images = models.get_related_images(data.get('post_id'), data.get('parent_id'))
     parent_child_paths = set()
@@ -407,7 +441,8 @@ async def show_image(filepath):
 
         merged_general_tags=merged_general,  # Pass to template for potential styling
         upscaled_image_url=upscaled_image_url,
-        image_pools=models.get_pools_for_image(data['id']) if data and data.get('id') else []
+        image_pools=models.get_pools_for_image(data['id']) if data and data.get('id') else [],
+        implied_tag_names=implied_tag_names  # Tags implied by implication rules
     )
 
 @main_blueprint.route('/similar/<path:filepath>')

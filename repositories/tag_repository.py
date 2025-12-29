@@ -427,12 +427,13 @@ def apply_implications_for_image(image_id):
                         tags_to_add.add(implied_tag)
                         newly_added_tags_this_iteration.add(implied_tag)
 
-        # Add the new tags to the database
+        # Add the new tags to the database with source='implication'
         for tag_name in tags_to_add:
             cursor.execute("INSERT OR IGNORE INTO tags (name, category) VALUES (?, ?)", (tag_name, 'general'))
             cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
             tag_id = cursor.fetchone()['id']
-            cursor.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id) VALUES (?, ?)", (image_id, tag_id))
+            # Mark with source='implication' to identify implied tags
+            cursor.execute("INSERT OR IGNORE INTO image_tags (image_id, tag_id, source) VALUES (?, ?, 'implication')", (image_id, tag_id))
 
         conn.commit()
         return len(tags_to_add) > 0
