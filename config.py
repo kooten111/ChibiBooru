@@ -100,7 +100,7 @@ DB_WAL_AUTOCHECKPOINT = int(os.environ.get('DB_WAL_AUTOCHECKPOINT', 1000))
 # ==================== PROCESSING ====================
 
 # Parallel processing
-MAX_WORKERS = 4  # Number of parallel threads for tag fetching
+MAX_WORKERS = 2  # Reduced for memory efficiency - each worker adds ~200-400MB due to SQLite memory mapping
 
 # Request timeouts
 REQUEST_TIMEOUT = 10  # seconds
