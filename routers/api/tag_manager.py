@@ -3,14 +3,22 @@ from . import api_blueprint
 from database import models, get_db_connection
 from utils import api_handler
 import json
+import config
 
 # Constants
 DEFAULT_TAG_CATEGORY = 'general'
 SAMPLE_IMAGE_LIMIT = 6
 
 def reload_cache():
-    """Reload data cache after modifications. Can be optimized in the future."""
-    reload_cache()
+    """Reload data cache after modifications."""
+    # Reload tag ID cache if enabled (new tags were added)
+    if config.TAG_ID_CACHE_ENABLED:
+        from core.tag_id_cache import reload_tag_id_cache
+        reload_tag_id_cache()
+
+    # Reload main cache (tag_counts, image_data, etc.)
+    from core.cache_manager import reload_tag_counts
+    reload_tag_counts()
 
 @api_blueprint.route('/tags/browse')
 @api_handler()

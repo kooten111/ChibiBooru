@@ -37,6 +37,11 @@ def _load_data_from_db_impl():
 
     print("Loading data from database...")
 
+    # Reload tag ID cache if enabled (ensure fresh mappings before loading IDs)
+    if config.TAG_ID_CACHE_ENABLED:
+        from core.tag_id_cache import reload_tag_id_cache
+        reload_tag_id_cache()
+
     # Invalidate similarity caches when reloading data
     from events.cache_events import trigger_cache_invalidation
     trigger_cache_invalidation()
@@ -375,6 +380,10 @@ def invalidate_image_cache(filepath: str = None):
 
 def invalidate_tag_cache():
     """Invalidate tag-related caches."""
+    # Reload tag ID cache if enabled (new tags may have been added)
+    if config.TAG_ID_CACHE_ENABLED:
+        from core.tag_id_cache import reload_tag_id_cache
+        reload_tag_id_cache()
     reload_tag_counts()
 
 
