@@ -284,6 +284,9 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     if _upscaler_device != 'cpu':
         img_tensor = img_tensor.half()
 
+    logger.info(f"Upscaler input tensor device: {img_tensor.device}")
+
+
     # Upscale
     with torch.no_grad():
         output = _upscaler_model(img_tensor)
@@ -454,12 +457,13 @@ def handle_client(client_socket: socket.socket):
 
 def idle_monitor():
     """Background thread that monitors idle time and triggers shutdown"""
+    global _shutdown_requested
+    
     while not _shutdown_requested:
         time.sleep(30)  # Check every 30 seconds
 
         if should_shutdown():
             logger.info(f"Idle timeout reached ({_idle_timeout}s). Shutting down.")
-            global _shutdown_requested
             _shutdown_requested = True
             break
 
@@ -503,9 +507,19 @@ def run_server():
 
     # Ensure backend is ready (sets environment variables)
     try:
-        if backend != 'auto':
-            setup_backend_environment(backend)
-            logger.info(f"Backend environment configured: {backend}")
+        if backend == 'auto':
+            # Resolve auto to specific backend
+            from ml_worker.backends import detect_available_backends
+            available = detect_available_backends()
+            if available:
+                backend = available[0]
+                logger.info(f"Auto-detected best backend: {backend}")
+            else:
+                backend = 'cpu'
+                logger.warning("No backends detected, falling back to CPU")
+
+        setup_backend_environment(backend)
+        logger.info(f"Backend environment configured: {backend}")
     except Exception as e:
         logger.error(f"Failed to set up backend: {e}")
         return 1
