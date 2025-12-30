@@ -17,14 +17,29 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Optional dependencies for Semantic Similarity
-try:
-    import onnxruntime as ort
-    import numpy as np
-    import faiss
-    SEMANTIC_AVAILABLE = True
-except ImportError:
-    SEMANTIC_AVAILABLE = False
-    print("[Similarity] Warning: semantic similarity dependencies missing (onnxruntime, numpy, faiss)")
+# Check if ML worker is enabled first
+if config.ENABLE_SEMANTIC_SIMILARITY and config.ML_WORKER_ENABLED:
+    try:
+        from ml_worker.client import get_ml_worker_client
+        ML_WORKER_AVAILABLE = True
+        SEMANTIC_AVAILABLE = True  # Assume available through worker
+        # Still need numpy and faiss for local operations
+        import numpy as np
+        import faiss
+    except ImportError:
+        ML_WORKER_AVAILABLE = False
+        SEMANTIC_AVAILABLE = False
+        print("[Similarity] Warning: ML Worker not available for semantic similarity")
+else:
+    ML_WORKER_AVAILABLE = False
+    try:
+        import onnxruntime as ort
+        import numpy as np
+        import faiss
+        SEMANTIC_AVAILABLE = True
+    except ImportError:
+        SEMANTIC_AVAILABLE = False
+        print("[Similarity] Warning: semantic similarity dependencies missing (onnxruntime, numpy, faiss)")
 
 # Global state for semantic search
 _semantic_engine = None
@@ -302,27 +317,43 @@ class SemanticSearchEngine:
             return False
 
     def get_embedding(self, image_path: str) -> Optional[np.ndarray]:
+        # Use ML worker if enabled and available
+        if config.ML_WORKER_ENABLED and ML_WORKER_AVAILABLE:
+            try:
+                client = get_ml_worker_client()
+                result = client.compute_similarity(
+                    image_path=image_path,
+                    model_path=self.model_path
+                )
+                embedding = result['embedding']
+                return np.array(embedding, dtype=np.float32)
+            except Exception as e:
+                print(f"[Similarity] ML Worker error for {image_path}: {e}")
+                print(f"[Similarity] Falling back to direct loading...")
+                # Fall through to direct loading
+
+        # Direct loading (fallback or when ML worker disabled)
         if not self.load_model(): return None
-        
+
         try:
             # Preprocess
             img_tensor = self._preprocess(image_path)
             if img_tensor is None: return None
-            
+
             # Run inference
             # We want the normalized embedding (usually the last added output)
             # In our modified model, it is 'StatefulPartitionedCall/ConvNextBV1/predictions_norm/add:0'
             # We can request all outputs and pick the one with shape (1, 1024)
             outputs = self.session.run(None, {self.input_name: img_tensor})
-            
+
             for out in outputs:
                 if out.shape == (1, 1024):
                     return out[0] # Return 1D array
-            
+
             # Fallback: if we can't find exact shape, maybe it's the 3rd output
             if len(outputs) >= 3:
                  return outputs[2][0]
-                 
+
             return None
         except Exception as e:
             print(f"[Similarity] Inference error for {image_path}: {e}")

@@ -22,20 +22,35 @@ from threading import Lock
 import fcntl
 import shutil
 
-# Dependencies
-try:
-    import onnxruntime as ort
-    ONNX_AVAILABLE = True
-except ImportError:
-    ONNX_AVAILABLE = False
-    print("Warning: onnxruntime not installed. Local Tagger will not be available.")
+# Dependencies - conditional imports based on ML_WORKER_ENABLED
+if config.ML_WORKER_ENABLED:
+    # When ML worker is enabled, import only the client
+    try:
+        from ml_worker.client import get_ml_worker_client
+        ML_WORKER_AVAILABLE = True
+        ONNX_AVAILABLE = True  # Assume available through worker
+        TORCHVISION_AVAILABLE = True  # Assume available through worker
+    except ImportError:
+        ML_WORKER_AVAILABLE = False
+        ONNX_AVAILABLE = False
+        TORCHVISION_AVAILABLE = False
+        print("Warning: ML Worker not available. Falling back to direct loading.")
+else:
+    # When ML worker is disabled, import frameworks directly
+    ML_WORKER_AVAILABLE = False
+    try:
+        import onnxruntime as ort
+        ONNX_AVAILABLE = True
+    except ImportError:
+        ONNX_AVAILABLE = False
+        print("Warning: onnxruntime not installed. Local Tagger will not be available.")
 
-try:
-    import torchvision.transforms as transforms
-    TORCHVISION_AVAILABLE = True
-except ImportError:
-    TORCHVISION_AVAILABLE = False
-    print("Warning: torchvision not installed. Local Tagger's image preprocessing will fail.")
+    try:
+        import torchvision.transforms as transforms
+        TORCHVISION_AVAILABLE = True
+    except ImportError:
+        TORCHVISION_AVAILABLE = False
+        print("Warning: torchvision not installed. Local Tagger's image preprocessing will fail.")
 
 # Load from config
 SAUCENAO_API_KEY = config.SAUCENAO_API_KEY
@@ -324,19 +339,46 @@ def preprocess_image_for_local_tagger(image_path):
 def tag_with_local_tagger(filepath):
     """
     Tag an image using the local tagger.
-    
+
     Returns dict with:
       - source: 'local_tagger'
       - data: {tags, tagger_name, all_predictions}
         - tags: categorized tags above display threshold (for active_source use)
         - all_predictions: list of {tag_name, category, confidence} above storage threshold
     """
+    # Use ML worker if enabled and available
+    if config.ML_WORKER_ENABLED and ML_WORKER_AVAILABLE:
+        print(f"[Local Tagger] Analyzing (via ML Worker): {os.path.basename(filepath)}")
+        try:
+            client = get_ml_worker_client()
+            result = client.tag_image(
+                image_path=filepath,
+                model_path=tagger_config['model_path'],
+                threshold=tagger_config.get('threshold', 0.50),
+                character_threshold=0.85,
+                metadata_path=tagger_config.get('metadata_path')
+            )
+
+            return {
+                "source": "local_tagger",
+                "data": {
+                    "tags": result['tags'],
+                    "tagger_name": result['tagger_name'],
+                    "all_predictions": result['all_predictions']
+                }
+            }
+        except Exception as e:
+            print(f"[Local Tagger] ML Worker error for {filepath}: {e}")
+            print(f"[Local Tagger] Falling back to direct loading...")
+            # Fall through to direct loading
+
+    # Direct loading (fallback or when ML worker disabled)
     load_local_tagger()
     if not local_tagger_session:
         print("[Local Tagger] Tagger not available, cannot process file.")
         return None
 
-    print(f"[Local Tagger] Analyzing: {os.path.basename(filepath)}")
+    print(f"[Local Tagger] Analyzing (direct): {os.path.basename(filepath)}")
     try:
         img_numpy = preprocess_image_for_local_tagger(filepath)
         if img_numpy is None:
@@ -355,33 +397,33 @@ def tag_with_local_tagger(filepath):
 
         # Collect ALL predictions above storage threshold (for database storage)
         all_predictions = []
-        
+
         # Also collect tags above display threshold (for immediate use as active_source)
         tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": [], "species": []}
 
         # Get all indices above storage threshold
         indices = np.where(probs[0] >= storage_threshold)[0]
-        
+
         for idx in indices:
             idx_str = str(idx)
             tag_name = idx_to_tag_map.get(idx_str)
             if not tag_name:
                 continue
-                
+
             # Skip rating tags - these should only come from the rating inference system
             if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
                 continue
 
             category = tag_to_category_map.get(tag_name, "general")
             confidence = float(probs[0][idx])
-            
+
             # Store all predictions above storage threshold
             all_predictions.append({
                 'tag_name': tag_name,
                 'category': category,
                 'confidence': confidence
             })
-            
+
             # Only add to display tags if above display threshold
             if confidence >= display_threshold:
                 if category in tags_by_category:

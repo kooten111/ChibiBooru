@@ -245,6 +245,26 @@ UPSCALER_TILE_SIZE = int(os.environ.get('UPSCALER_TILE_SIZE', 512))
 UPSCALED_IMAGES_DIR = os.environ.get('UPSCALED_IMAGES_DIR', './static/upscaled')
 
 
+# ==================== ML WORKER (MEMORY OPTIMIZATION) ====================
+
+# Enable ML worker subprocess (recommended for memory efficiency)
+# When enabled, ML frameworks (PyTorch, ONNXRuntime) run in a separate process
+# that auto-terminates when idle, saving ~2 GB of RAM
+ML_WORKER_ENABLED = os.environ.get('ML_WORKER_ENABLED', 'true').lower() in ('true', '1', 'yes')
+
+# Idle timeout for ML worker (auto-terminate after N seconds of inactivity)
+# Default: 300 seconds (5 minutes)
+ML_WORKER_IDLE_TIMEOUT = int(os.environ.get('ML_WORKER_IDLE_TIMEOUT', 300))
+
+# ML worker backend (cuda/xpu/mps/cpu/auto)
+# 'auto' will prompt for selection on first run
+# Set by migration script or manually in .env file
+ML_WORKER_BACKEND = os.environ.get('ML_WORKER_BACKEND', 'auto')
+
+# ML worker socket path (Unix domain socket for IPC)
+ML_WORKER_SOCKET = os.environ.get('ML_WORKER_SOCKET', '/tmp/chibibooru_ml_worker.sock')
+
+
 def is_supported_media(filepath: str) -> bool:
     """Check if a file is a supported media type."""
     return filepath.lower().endswith(SUPPORTED_MEDIA_EXTENSIONS)
