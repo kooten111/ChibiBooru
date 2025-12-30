@@ -476,7 +476,7 @@ Track progress on implementing the full optimization plan.
 - [ ] Implement package installation in `backends.py`
 - [ ] Implement environment variable setup in `backends.py`
 - [ ] Modify `services/processing_service.py` to use ML worker client
-- [ ] Modify `services/upscaler_service.py` to use ML worker client
+- [x] Modify `services/upscaler_service.py` to use ML worker client
 - [ ] Modify `services/similarity_service.py` to use ML worker client
 - [ ] Add error handling for worker unavailability
 - [ ] Add backward compatibility flag for direct loading

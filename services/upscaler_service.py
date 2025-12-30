@@ -1,41 +1,19 @@
 """
 Upscaler Service for ChibiBooru
-Uses RealESRGAN for AI-powered image upscaling with lazy model loading
-Standalone implementation - no basicsr/realesrgan dependency
+Uses RealESRGAN for AI-powered image upscaling via ML Worker subprocess
+The ML Worker handles model loading/unloading for memory efficiency
 """
 
 import os
 import asyncio
 import logging
-import urllib.request
 from pathlib import Path
 from typing import Dict, Optional
-from PIL import Image
-import numpy as np
+import time
 
 import config
-from utils.gpu_detection import check_upscaler_dependencies, get_pytorch_device
 
 logger = logging.getLogger(__name__)
-
-# Lazy-loaded upscaler instance
-_model = None
-_device = None
-
-# Model download URLs
-MODEL_URLS = {
-    'RealESRGAN_x4plus': 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth',
-    'RealESRGAN_x4plus_anime': 'https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth'
-}
-
-# Model configurations (num_block varies by model)
-MODEL_CONFIGS = {
-    'RealESRGAN_x4plus': {'num_block': 23, 'num_feat': 64, 'num_grow_ch': 32},
-    'RealESRGAN_x4plus_anime': {'num_block': 6, 'num_feat': 64, 'num_grow_ch': 32}
-}
-
-# Model storage directory
-MODELS_DIR = './models/Upscaler'
 
 
 def get_upscaled_path(filepath: str) -> str:
@@ -77,153 +55,15 @@ def get_upscale_url(filepath: str) -> Optional[str]:
     return upscaled_path
 
 
-def _download_model(model_name: str) -> str:
-    """Download the model weights if not present."""
-    os.makedirs(MODELS_DIR, exist_ok=True)
-    
-    model_path = os.path.join(MODELS_DIR, f"{model_name}.pth")
-    
-    if os.path.exists(model_path):
-        logger.info(f"Model already exists: {model_path}")
-        return model_path
-    
-    url = MODEL_URLS.get(model_name)
-    if not url:
-        raise ValueError(f"Unknown model: {model_name}")
-    
-    logger.info(f"Downloading {model_name} from {url}...")
-    
-    # Download with progress
-    def progress_hook(count, block_size, total_size):
-        percent = int(count * block_size * 100 / total_size)
-        if count % 100 == 0:
-            logger.info(f"Download progress: {percent}%")
-    
-    urllib.request.urlretrieve(url, model_path, progress_hook)
-    
-    logger.info(f"Model downloaded to: {model_path}")
-    return model_path
-
-
-def _load_model():
-    """Load the RRDBNet model (lazy loading)."""
-    global _model, _device
-    
-    if _model is not None:
-        return _model
-    
-    import torch
-    from utils.rrdbnet_arch import RRDBNet
-    
-    device = get_pytorch_device()
-    _device = device
-    
-    model_name = config.UPSCALER_MODEL
-    model_config = MODEL_CONFIGS.get(model_name, MODEL_CONFIGS['RealESRGAN_x4plus'])
-    
-    logger.info(f"Loading {model_name} on {device}...")
-    
-    # Download model if needed
-    model_path = _download_model(model_name)
-    
-    # Create model
-    _model = RRDBNet(
-        num_in_ch=3,
-        num_out_ch=3,
-        num_feat=model_config['num_feat'],
-        num_block=model_config['num_block'],
-        num_grow_ch=model_config['num_grow_ch'],
-        scale=4
-    )
-    
-    # Load weights
-    loadnet = torch.load(model_path, map_location=torch.device('cpu'), weights_only=True)
-    
-    # Handle different checkpoint formats
-    if 'params_ema' in loadnet:
-        keyname = 'params_ema'
-    elif 'params' in loadnet:
-        keyname = 'params'
-    else:
-        keyname = None
-    
-    if keyname:
-        _model.load_state_dict(loadnet[keyname], strict=True)
-    else:
-        _model.load_state_dict(loadnet, strict=True)
-    
-    _model.eval()
-    _model = _model.to(device)
-    
-    # Use half precision on GPU
-    if device != 'cpu':
-        _model = _model.half()
-    
-    logger.info(f"Model loaded successfully on {device}")
-    return _model
-
-
-def _tile_process(img_tensor, model, tile_size=512, tile_pad=10, scale=4):
-    """Process image in tiles to avoid VRAM issues."""
-    import torch
-    
-    batch, channel, height, width = img_tensor.shape
-    output_height = height * scale
-    output_width = width * scale
-    output_shape = (batch, channel, output_height, output_width)
-    
-    # Create output tensor
-    output = img_tensor.new_zeros(output_shape)
-    
-    # Calculate number of tiles
-    tiles_x = (width + tile_size - 1) // tile_size
-    tiles_y = (height + tile_size - 1) // tile_size
-    
-    for y in range(tiles_y):
-        for x in range(tiles_x):
-            # Calculate tile boundaries
-            x_start = x * tile_size
-            y_start = y * tile_size
-            x_end = min(x_start + tile_size, width)
-            y_end = min(y_start + tile_size, height)
-            
-            # Add padding
-            x_start_pad = max(x_start - tile_pad, 0)
-            y_start_pad = max(y_start - tile_pad, 0)
-            x_end_pad = min(x_end + tile_pad, width)
-            y_end_pad = min(y_end + tile_pad, height)
-            
-            # Extract tile with padding
-            tile = img_tensor[:, :, y_start_pad:y_end_pad, x_start_pad:x_end_pad]
-            
-            # Process tile
-            with torch.no_grad():
-                tile_output = model(tile)
-            
-            # Calculate output boundaries
-            out_x_start = x_start * scale
-            out_y_start = y_start * scale
-            out_x_end = x_end * scale
-            out_y_end = y_end * scale
-            
-            # Calculate tile output boundaries (remove padding)
-            tile_out_x_start = (x_start - x_start_pad) * scale
-            tile_out_y_start = (y_start - y_start_pad) * scale
-            tile_out_x_end = tile_out_x_start + (x_end - x_start) * scale
-            tile_out_y_end = tile_out_y_start + (y_end - y_start) * scale
-            
-            # Place tile in output
-            output[:, :, out_y_start:out_y_end, out_x_start:out_x_end] = \
-                tile_output[:, :, tile_out_y_start:tile_out_y_end, tile_out_x_start:tile_out_x_end]
-    
-    return output
-
-
 async def upscale_image(filepath: str, force: bool = False) -> Dict:
-    """Upscale an image using RealESRGAN."""
-    import time
-    import torch
+    """
+    Upscale an image using RealESRGAN via ML Worker.
     
+    The ML Worker subprocess handles the actual upscaling, ensuring:
+    - Memory isolation from main process
+    - Model is loaded/unloaded as needed
+    - Auto-terminates after idle timeout
+    """
     result = {
         'success': False,
         'filepath': filepath,
@@ -262,53 +102,31 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
     start_time = time.time()
     
     try:
-        # Load the model (lazy loading)
-        model = _load_model()
-        device = _device
-        
-        # Load image
-        img = Image.open(source_path).convert('RGB')
-        result['original_size'] = img.size
-        
-        # Convert to tensor
-        img_np = np.array(img).astype(np.float32) / 255.0
-        img_tensor = torch.from_numpy(np.transpose(img_np, (2, 0, 1))).float()
-        img_tensor = img_tensor.unsqueeze(0).to(device)
-        
-        # Use half precision on GPU
-        if device != 'cpu':
-            img_tensor = img_tensor.half()
-        
-        # Run upscaling in thread pool
-        loop = asyncio.get_event_loop()
-        
-        def do_upscale():
-            # Use tiling for large images
-            if img.size[0] > config.UPSCALER_TILE_SIZE or img.size[1] > config.UPSCALER_TILE_SIZE:
-                return _tile_process(img_tensor, model, config.UPSCALER_TILE_SIZE, 10, config.UPSCALER_SCALE)
-            else:
-                with torch.no_grad():
-                    return model(img_tensor)
-        
-        output_tensor = await loop.run_in_executor(None, do_upscale)
-        
-        # Convert back to image
-        output = output_tensor.squeeze().float().cpu().clamp_(0, 1).numpy()
-        output = np.transpose(output, (1, 2, 0))
-        output = (output * 255.0).round().astype(np.uint8)
-        
-        upscaled_img = Image.fromarray(output)
-        result['upscaled_size'] = upscaled_img.size
+        # Use ML Worker for upscaling
+        from ml_worker.client import get_ml_worker_client
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(upscaled_path), exist_ok=True)
         
-        # Save with high quality
-        upscaled_img.save(upscaled_path, quality=95)
+        # Send upscale request to ML Worker
+        loop = asyncio.get_event_loop()
         
-        result['success'] = True
+        def do_upscale():
+            client = get_ml_worker_client()
+            return client.upscale_image(
+                image_path=os.path.abspath(source_path),
+                output_path=os.path.abspath(upscaled_path),
+                model_name=config.UPSCALER_MODEL,
+                device='auto'
+            )
+        
+        worker_result = await loop.run_in_executor(None, do_upscale)
+        
+        result['success'] = worker_result.get('success', False)
         result['upscaled_path'] = upscaled_path
         result['upscaled_url'] = get_upscale_url(filepath)
+        result['original_size'] = worker_result.get('original_size')
+        result['upscaled_size'] = worker_result.get('upscaled_size')
         result['processing_time'] = time.time() - start_time
         
         logger.info(f"Upscaled {filepath}: {result['original_size']} -> {result['upscaled_size']} in {result['processing_time']:.2f}s")
@@ -364,30 +182,35 @@ async def delete_upscaled_image(filepath: str) -> Dict:
 
 def get_upscaler_status() -> Dict:
     """Get current upscaler status."""
-    ready = False
-    pytorch_ok = False
     model_exists = False
+    worker_status = None
     
+    # Check if model file exists
+    model_name = config.UPSCALER_MODEL
+    model_path = os.path.join('./models/Upscaler', f"{model_name}.pth")
+    model_exists = os.path.exists(model_path)
+    
+    # Try to get ML Worker status
     try:
-        import torch
-        pytorch_ok = True
-    except ImportError:
-        pass
+        from ml_worker.client import get_ml_worker_client
+        client = get_ml_worker_client()
+        if client._is_worker_running():
+            worker_status = client.health_check()
+    except Exception as e:
+        logger.debug(f"Could not get ML worker status: {e}")
     
-    if pytorch_ok:
-        model_name = config.UPSCALER_MODEL
-        model_path = os.path.join(MODELS_DIR, f"{model_name}.pth")
-        model_exists = os.path.exists(model_path)
-        ready = True  # PyTorch is enough, model will auto-download
+    models_loaded = {}
+    if worker_status:
+        models_loaded = worker_status.get('models_loaded', {})
     
     return {
         'enabled': config.UPSCALER_ENABLED,
-        'ready': ready if config.UPSCALER_ENABLED else False,
+        'ready': config.UPSCALER_ENABLED and model_exists,
         'model': config.UPSCALER_MODEL,
         'model_downloaded': model_exists,
         'scale': config.UPSCALER_SCALE,
         'tile_size': config.UPSCALER_TILE_SIZE,
-        'pytorch_installed': pytorch_ok,
-        'model_loaded': _model is not None,
-        'device': _device or 'unknown'
+        'using_ml_worker': True,
+        'worker_running': worker_status is not None,
+        'model_loaded': models_loaded.get('upscaler', False)
     }
