@@ -18,7 +18,10 @@ import json
 import sys
 import threading
 import concurrent.futures
+from array import array
+from typing import Optional
 from database import get_db_connection
+import config
 
 tag_counts = {}
 image_data = []
@@ -61,21 +64,42 @@ def _load_data_from_db_impl():
             interned_name = sys.intern(row['name'])  # Reuse string objects for memory efficiency
             temp_tag_counts[interned_name] = row['count']
 
-        # Load image data
-        image_data_query = """
-        SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
-        FROM images i
-        LEFT JOIN image_tags it ON i.id = it.image_id
-        LEFT JOIN tags t ON it.tag_id = t.id
-        GROUP BY i.id
-        """
-        for row in conn.execute(image_data_query).fetchall():
-            row_dict = dict(row)
-            # Intern tag names to reduce memory usage
-            if row_dict['tags']:
-                interned_tags = ' '.join(sys.intern(tag) for tag in row_dict['tags'].split())
-                row_dict['tags'] = interned_tags
-            temp_image_data.append(row_dict)
+        # Load image data (with tag ID optimization if enabled)
+        if config.TAG_ID_CACHE_ENABLED:
+            # Tag ID optimization: Load integer IDs instead of string names
+            image_data_query = """
+            SELECT i.filepath,
+                   COALESCE(GROUP_CONCAT(t.id, ','), '') as tag_ids
+            FROM images i
+            LEFT JOIN image_tags it ON i.id = it.image_id
+            LEFT JOIN tags t ON it.tag_id = t.id
+            GROUP BY i.id
+            """
+            for row in conn.execute(image_data_query).fetchall():
+                row_dict = dict(row)
+                # Parse comma-separated IDs into compact int32 array
+                if row_dict['tag_ids']:
+                    ids = [int(id_str) for id_str in row_dict['tag_ids'].split(',')]
+                    row_dict['tag_ids'] = array('i', ids)  # 4 bytes per ID
+                else:
+                    row_dict['tag_ids'] = array('i')  # Empty array
+                temp_image_data.append(row_dict)
+        else:
+            # Original string-based format with interning
+            image_data_query = """
+            SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
+            FROM images i
+            LEFT JOIN image_tags it ON i.id = it.image_id
+            LEFT JOIN tags t ON it.tag_id = t.id
+            GROUP BY i.id
+            """
+            for row in conn.execute(image_data_query).fetchall():
+                row_dict = dict(row)
+                # Intern tag names to reduce memory usage
+                if row_dict['tags']:
+                    interned_tags = ' '.join(sys.intern(tag) for tag in row_dict['tags'].split())
+                    row_dict['tags'] = interned_tags
+                temp_image_data.append(row_dict)
 
         # Build cross-source post_id index with batched JSON parsing
         print("Building cross-source post_id index...")
@@ -181,22 +205,49 @@ def reload_single_image(filepath):
     global image_data
     with data_lock:
         with get_db_connection() as conn:
-            query = """
-            SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
-            FROM images i
-            LEFT JOIN image_tags it ON i.id = it.image_id
-            LEFT JOIN tags t ON it.tag_id = t.id
-            WHERE i.filepath = ?
-            GROUP BY i.id
-            """
-            result = conn.execute(query, (filepath,)).fetchone()
+            if config.TAG_ID_CACHE_ENABLED:
+                # Tag ID optimization: Load integer IDs
+                query = """
+                SELECT i.filepath,
+                       COALESCE(GROUP_CONCAT(t.id, ','), '') as tag_ids
+                FROM images i
+                LEFT JOIN image_tags it ON i.id = it.image_id
+                LEFT JOIN tags t ON it.tag_id = t.id
+                WHERE i.filepath = ?
+                GROUP BY i.id
+                """
+                result = conn.execute(query, (filepath,)).fetchone()
 
-            if result:
-                new_entry = dict(result)
-                # Remove old entry if exists
-                image_data[:] = [img for img in image_data if img['filepath'] != filepath]
-                # Add new entry
-                image_data.append(new_entry)
+                if result:
+                    new_entry = dict(result)
+                    # Parse comma-separated IDs into array
+                    if new_entry['tag_ids']:
+                        ids = [int(id_str) for id_str in new_entry['tag_ids'].split(',')]
+                        new_entry['tag_ids'] = array('i', ids)
+                    else:
+                        new_entry['tag_ids'] = array('i')
+                    # Remove old entry if exists
+                    image_data[:] = [img for img in image_data if img['filepath'] != filepath]
+                    # Add new entry
+                    image_data.append(new_entry)
+            else:
+                # Original string-based format
+                query = """
+                SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
+                FROM images i
+                LEFT JOIN image_tags it ON i.id = it.image_id
+                LEFT JOIN tags t ON it.tag_id = t.id
+                WHERE i.filepath = ?
+                GROUP BY i.id
+                """
+                result = conn.execute(query, (filepath,)).fetchone()
+
+                if result:
+                    new_entry = dict(result)
+                    # Remove old entry if exists
+                    image_data[:] = [img for img in image_data if img['filepath'] != filepath]
+                    # Add new entry
+                    image_data.append(new_entry)
 
 
 def remove_image_from_cache(filepath):
@@ -226,6 +277,80 @@ def reload_tag_counts():
             tag_counts_query = "SELECT name, COUNT(DISTINCT image_id) FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
             tag_counts.clear()
             tag_counts.update({row['name']: row['COUNT(DISTINCT image_id)'] for row in conn.execute(tag_counts_query).fetchall()})
+
+
+# ============================================================================
+# Tag ID Cache Helper Functions (Memory Optimization - Phase 3)
+# ============================================================================
+
+def get_image_tags_as_string(image_data_entry: dict) -> str:
+    """
+    Get tags as space-separated string from image_data entry.
+
+    Handles both old (tags) and new (tag_ids) formats for backward compatibility.
+
+    Args:
+        image_data_entry: Dict from image_data cache
+
+    Returns:
+        Space-separated tag names string
+    """
+    if config.TAG_ID_CACHE_ENABLED:
+        from core.tag_id_cache import get_tag_id_cache
+        tag_ids = image_data_entry.get('tag_ids', array('i'))
+        cache = get_tag_id_cache()
+        return cache.get_string_from_ids(tag_ids)
+    else:
+        return image_data_entry.get('tags', '')
+
+
+def get_image_tags_as_set(image_data_entry: dict) -> set:
+    """
+    Get tags as set for fast set operations.
+
+    Returns:
+        Set of tag names (for compatibility with existing code)
+    """
+    tags_string = get_image_tags_as_string(image_data_entry)
+    return set(tags_string.split()) if tags_string else set()
+
+
+def get_image_tags_as_ids(image_data_entry: dict) -> array:
+    """
+    Get tags as array of IDs.
+
+    Args:
+        image_data_entry: Dict from image_data cache
+
+    Returns:
+        array of int32 tag IDs
+    """
+    if config.TAG_ID_CACHE_ENABLED:
+        return image_data_entry.get('tag_ids', array('i'))
+    else:
+        # Convert from string format to IDs
+        from core.tag_id_cache import get_tag_id_cache
+        tags_string = image_data_entry.get('tags', '')
+        cache = get_tag_id_cache()
+        return cache.get_ids_from_string(tags_string)
+
+
+def get_image_tag_count(image_data_entry: dict) -> int:
+    """
+    Get number of tags for an image.
+
+    Args:
+        image_data_entry: Dict from image_data cache
+
+    Returns:
+        Number of tags
+    """
+    if config.TAG_ID_CACHE_ENABLED:
+        tag_ids = image_data_entry.get('tag_ids', array('i'))
+        return len(tag_ids)
+    else:
+        tags_string = image_data_entry.get('tags', '')
+        return len(tags_string.split()) if tags_string else 0
 
 
 # ============================================================================
