@@ -11,9 +11,11 @@ Optimized with:
 - Async loading support to prevent UI blocking
 - Batched JSON parsing
 - Progress tracking
+- String interning to reduce memory usage for duplicate strings
 """
 
 import json
+import sys
 import threading
 import concurrent.futures
 from database import get_db_connection
@@ -56,7 +58,8 @@ def _load_data_from_db_impl():
         # Load tag counts
         tag_counts_query = "SELECT name, COUNT(DISTINCT image_id) as count FROM tags JOIN image_tags ON tags.id = image_tags.tag_id GROUP BY name"
         for row in conn.execute(tag_counts_query).fetchall():
-            temp_tag_counts[row['name']] = row['count']
+            interned_name = sys.intern(row['name'])  # Reuse string objects for memory efficiency
+            temp_tag_counts[interned_name] = row['count']
 
         # Load image data
         image_data_query = """
@@ -66,7 +69,13 @@ def _load_data_from_db_impl():
         LEFT JOIN tags t ON it.tag_id = t.id
         GROUP BY i.id
         """
-        temp_image_data = [dict(row) for row in conn.execute(image_data_query).fetchall()]
+        for row in conn.execute(image_data_query).fetchall():
+            row_dict = dict(row)
+            # Intern tag names to reduce memory usage
+            if row_dict['tags']:
+                interned_tags = ' '.join(sys.intern(tag) for tag in row_dict['tags'].split())
+                row_dict['tags'] = interned_tags
+            temp_image_data.append(row_dict)
 
         # Build cross-source post_id index with batched JSON parsing
         print("Building cross-source post_id index...")
@@ -87,7 +96,7 @@ def _load_data_from_db_impl():
             for row in batch:
                 try:
                     metadata = json.loads(row['data'])
-                    md5 = row['md5']
+                    md5 = sys.intern(row['md5'])  # Intern MD5 strings for memory efficiency
                     for source, data in metadata.get('sources', {}).items():
                         if source in ['danbooru', 'e621', 'gelbooru', 'yandere']:
                             post_id = data.get('id')
