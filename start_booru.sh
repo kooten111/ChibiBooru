@@ -3,8 +3,23 @@
 
 cd "$(dirname "$0")"
 
+# Check and create venv if missing
+if [ ! -d "venv" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv venv
+fi
+
 # Activate virtual environment
 source venv/bin/activate
+
+# Upgrade pip
+pip install --upgrade pip
+
+# Install base requirements (excludes torch)
+pip install -r requirements.txt
+
+# Run ML setup (backend selection + torch install)
+python setup_ml.py
 
 # Load environment variables from .env
 if [ -f .env ]; then

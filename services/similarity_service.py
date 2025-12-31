@@ -304,7 +304,9 @@ class SemanticSearchEngine:
             
         try:
             # Load ONNX model
-            self.session = ort.InferenceSession(self.model_path, providers=['CPUExecutionProvider'])
+            # Load ONNX model with GPU support if available (fallback to CPU)
+            providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'CPUExecutionProvider']
+            self.session = ort.InferenceSession(self.model_path, providers=providers)
             # Verify inputs/outputs
             self.input_name = self.session.get_inputs()[0].name
             # We expect the embedding output to be available (added via modification script)

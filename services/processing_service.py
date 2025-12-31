@@ -286,7 +286,10 @@ def load_local_tagger():
         idx_to_tag_map = tag_mapping['idx_to_tag']
         tag_to_category_map = tag_mapping['tag_to_category']
         
-        providers = ['CPUExecutionProvider']
+        # Determine providers based on config, but default to CPU for safety in main process
+        # unless user explicitly wants GPU here too.
+        # Ideally, we rely on ML Worker. But for fallback:
+        providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'CPUExecutionProvider']
         local_tagger_session = ort.InferenceSession(tagger_config['model_path'], providers=providers)
         
         print(f"[Local Tagger] SUCCESS: Model loaded. Provider: {local_tagger_session.get_providers()[0]}")

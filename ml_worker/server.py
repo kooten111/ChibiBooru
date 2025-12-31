@@ -65,6 +65,24 @@ def should_shutdown() -> bool:
     return get_idle_time() > _idle_timeout
 
 
+def get_onnx_providers() -> list:
+    """Get the list of ONNX Runtime providers based on configured backend"""
+    backend = os.environ.get('ML_WORKER_BACKEND', 'cpu')
+    providers = []
+    
+    if backend == 'cuda':
+        providers.append('CUDAExecutionProvider')
+    elif backend == 'xpu':
+        # OpenVINO is often used for XPU with ONNX
+        providers.append('OpenVINOExecutionProvider')
+    elif backend == 'mps':
+        providers.append('CoreMLExecutionProvider')
+    elif backend == 'cpu':
+        providers.append('CPUExecutionProvider')
+        
+    return providers
+
+
 def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle tag_image request.
@@ -97,8 +115,9 @@ def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
 
         with open(metadata_path, 'r') as f:
             _tagger_metadata = json.load(f)
-
-        providers = ['CPUExecutionProvider']
+            
+        # Dynamic providers based on backend
+        providers = get_onnx_providers()
         _tagger_session = ort.InferenceSession(model_path, providers=providers)
 
         dataset_info = _tagger_metadata['dataset_info']
@@ -191,6 +210,80 @@ def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def tiled_inference(model, img, tile_size=512, tile_pad=32, scale=4, device='cpu'):
+    """
+    Run inference using seamless tiling.
+    img: Tensor (1, C, H, W)
+    """
+    import math
+    import torch
+    
+    batch, channel, height, width = img.shape
+    output_height = height * scale
+    output_width = width * scale
+    output_shape = (batch, channel, output_height, output_width)
+
+    # Initialize output tensor
+    output = torch.zeros(output_shape, device=device)
+
+    # Number of tiles
+    tiles_x = math.ceil(width / tile_size)
+    tiles_y = math.ceil(height / tile_size)
+
+    logger.info(f"Tiling: {tiles_x}x{tiles_y} tiles (Input tile: {tile_size}px, Pad: {tile_pad}px)")
+
+    for y in range(tiles_y):
+        for x in range(tiles_x):
+            # 1. Determine Input Crop Coordinates (Input Space)
+            # Core crop (without padding)
+            ofs_x = x * tile_size
+            ofs_y = y * tile_size
+            
+            # Input Pad limits (don't go out of bounds)
+            input_start_x = max(ofs_x - tile_pad, 0)
+            input_end_x = min(ofs_x + tile_size + tile_pad, width)
+            input_start_y = max(ofs_y - tile_pad, 0)
+            input_end_y = min(ofs_y + tile_size + tile_pad, height)
+
+            # Input padding offsets (how much we actually padded relative to the core crop)
+            pad_left = ofs_x - input_start_x
+            pad_top = ofs_y - input_start_y
+            
+            # Crop Input
+            input_tile = img[:, :, input_start_y:input_end_y, input_start_x:input_end_x]
+
+            # 2. Run Inference
+            with torch.no_grad():
+                try:
+                    output_tile = model(input_tile)
+                except RuntimeError as e:
+                    logger.error(f"Error processing tile ({x},{y}): {e}")
+                    raise e
+
+            # 3. Determine Output Crop Coordinates (Output Space)
+            # The output tensor includes the padding, so we need to crop the VALID center area.
+            
+            # Corresponding valid output area in the final image
+            output_start_x = ofs_x * scale
+            output_end_x = min(ofs_x + tile_size, width) * scale
+            output_start_y = ofs_y * scale
+            output_end_y = min(ofs_y + tile_size, height) * scale
+
+            # Crop offsets within the output_tile
+            # We skip the 'pad_left * scale' pixels that correspond to the left padding
+            tile_crop_start_x = pad_left * scale
+            tile_crop_end_x = tile_crop_start_x + (output_end_x - output_start_x)
+            
+            tile_crop_start_y = pad_top * scale
+            tile_crop_end_y = tile_crop_start_y + (output_end_y - output_start_y)
+
+            # Place into final output
+            output[:, :, output_start_y:output_end_y, output_start_x:output_end_x] = \
+                output_tile[:, :, tile_crop_start_y:tile_crop_end_y, tile_crop_start_x:tile_crop_end_x]
+
+    return output
+
+
 def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle upscale_image request.
@@ -225,11 +318,28 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
         'RealESRGAN_x4plus_anime': {'num_block': 6, 'num_feat': 64, 'num_grow_ch': 32}
     }
 
-    # Determine device
-    if device == 'auto':
-        backend = os.environ.get('ML_WORKER_BACKEND', 'cpu')
-        device = get_torch_device(backend)
-
+    # Determine device strict mode
+    # Backend environment is already setup by startup
+    backend = os.environ.get('ML_WORKER_BACKEND')
+    if not backend:
+        logger.error("ML_WORKER_BACKEND not set")
+        raise RuntimeError("ML_WORKER_BACKEND not set")
+        
+    # Import IPEX if XPU - Critical for Intel GPU
+    if backend == 'xpu':
+        try:
+            import intel_extension_for_pytorch as ipex
+            logger.info("Intel Extension for PyTorch imported for Upscaler")
+        except ImportError:
+            logger.error("Failed to import intel_extension_for_pytorch despite XPU backend!")
+            
+    device = get_torch_device(backend)
+    
+    # CRITICAL: Strict Check - Fail immediately if device is CPU but backend is not
+    if backend != 'cpu' and device == 'cpu':
+        logger.error(f"CRITICAL FAILURE: Backend is configured as '{backend}' but torch detected device as '{device}'.")
+        raise RuntimeError(f"Strict Mode Violation: Refusing to run on CPU when {backend} is requested.")
+        
     _upscaler_device = device
 
     # Load model if not already loaded
@@ -241,7 +351,19 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
         model_path = model_dir / f"{model_name}.pth"
 
         if not model_path.exists():
-            raise FileNotFoundError(f"Upscaler model not found: {model_path}")
+            # Try fallback to non-anime if anime requested but missing, or vice versa?
+            # User likely has 4plus but requested anime.
+            if 'anime' in model_name:
+                alt_model = 'RealESRGAN_x4plus'
+                alt_path = model_dir / f"{alt_model}.pth"
+                if alt_path.exists():
+                    logger.warning(f"Model {model_name} not found. Falling back to {alt_model}")
+                    model_path = alt_path
+                    model_config = MODEL_CONFIGS[alt_model]
+                else:
+                    raise FileNotFoundError(f"Upscaler model not found: {model_path}")
+            else:
+                 raise FileNotFoundError(f"Upscaler model not found: {model_path}")
 
         _upscaler_model = RRDBNet(
             num_in_ch=3, num_out_ch=3,
@@ -268,9 +390,6 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
         _upscaler_model.eval()
         _upscaler_model = _upscaler_model.to(device)
 
-        if device != 'cpu':
-            _upscaler_model = _upscaler_model.half()
-
         logger.info(f"Upscaler model loaded on {device}")
 
     # Load and preprocess image
@@ -281,15 +400,30 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     img_tensor = torch.from_numpy(np.transpose(img_np, (2, 0, 1))).float().unsqueeze(0)
     img_tensor = img_tensor.to(_upscaler_device)
 
-    if _upscaler_device != 'cpu':
-        img_tensor = img_tensor.half()
-
     logger.info(f"Upscaler input tensor device: {img_tensor.device}")
 
-
     # Upscale
-    with torch.no_grad():
-        output = _upscaler_model(img_tensor)
+    # FINAL SAFETY CHECK
+    if _upscaler_device != 'cpu' and img_tensor.device.type == 'cpu':
+         raise RuntimeError(f"FATAL: Input tensor is on CPU despite requested device {_upscaler_device}! Aborting to prevent CPU fallback.")
+
+    # Attempt to clear memory before upscaling - REMOVED to match standalone speed
+    # import gc
+    # gc.collect()
+    # if backend == 'xpu' and hasattr(torch, 'xpu'):
+    #    torch.xpu.empty_cache()
+    # elif backend == 'cuda' and torch.cuda.is_available():
+    #    torch.cuda.empty_cache()
+    # elif backend == 'mps':
+    #    if hasattr(torch.mps, 'empty_cache'):
+    #        torch.mps.empty_cache()
+
+    # Use tiled inference matching reference implementation
+    try:
+        output = tiled_inference(_upscaler_model, img_tensor, tile_size=400, tile_pad=32, device=_upscaler_device)
+    except RuntimeError as e:
+        logger.error(f"Inference failed: {e}")
+        raise e
 
     output = output.squeeze(0).cpu().float().numpy()
     output = np.transpose(output, (1, 2, 0))
@@ -337,7 +471,7 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
     # Load model if not already loaded
     if _similarity_model is None:
         logger.info(f"Loading similarity model from {model_path}")
-        providers = ['CPUExecutionProvider']
+        providers = get_onnx_providers()
         _similarity_model = ort.InferenceSession(model_path, providers=providers)
         logger.info("Similarity model loaded")
 
@@ -492,36 +626,13 @@ def run_server():
     # Get config from environment
     _idle_timeout = int(os.environ.get('ML_WORKER_IDLE_TIMEOUT', 300))
     _socket_path = os.environ.get('ML_WORKER_SOCKET', '/tmp/chibibooru_ml_worker.sock')
-    backend = os.environ.get('ML_WORKER_BACKEND', 'auto')
-
-    logger.info("="*60)
-    logger.info("ML Worker Server Starting")
-    logger.info("="*60)
-    logger.info(f"Socket path: {_socket_path}")
-    logger.info(f"Idle timeout: {_idle_timeout}s")
-    logger.info(f"Backend: {backend}")
-
-    # Set up signal handlers
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-
-    # Ensure backend is ready (sets environment variables)
+    # Ensure backend is ready (strict mode)
     try:
-        if backend == 'auto':
-            # Resolve auto to specific backend
-            from ml_worker.backends import detect_available_backends
-            available = detect_available_backends()
-            if available:
-                backend = available[0]
-                logger.info(f"Auto-detected best backend: {backend}")
-            else:
-                backend = 'cpu'
-                logger.warning("No backends detected, falling back to CPU")
-
-        setup_backend_environment(backend)
-        logger.info(f"Backend environment configured: {backend}")
+        backend = ensure_backend_ready()
+        logger.info(f"Backend strictly configured: {backend}")
     except Exception as e:
         logger.error(f"Failed to set up backend: {e}")
+        # Build might fail if ensure_backend_ready crashes process directly
         return 1
 
     # Clean up old socket
