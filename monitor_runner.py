@@ -44,6 +44,19 @@ def signal_handler(signum, frame):
         logger.info(f"Received signal {signum}, initiating graceful shutdown...")
     else:
         print(f"Received signal {signum}, initiating graceful shutdown...")
+    
+    # Kill ML worker if running
+    try:
+        from ml_worker.client import get_ml_worker_client
+        client = get_ml_worker_client()
+        if client._worker_process:
+            if logger:
+                logger.info("Terminating ML worker...")
+            client._cleanup_worker()
+    except Exception as e:
+        if logger:
+            logger.debug(f"ML worker cleanup: {e}")
+        pass
 
 def is_main_app_running():
     """

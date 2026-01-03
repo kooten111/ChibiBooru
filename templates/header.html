@@ -216,6 +216,14 @@
                                 </div>
                                 <button class="btn btn-warning" onclick="systemClearImpliedTags(event)">Clear</button>
                             </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Find Broken Images</span>
+                                    <span class="settings-desc">Find and cleanup images with missing tags, hashes, or
+                                        embeddings.</span>
+                                </div>
+                                <button class="btn btn-warning" onclick="systemFindBrokenImages(event)">Scan</button>
+                            </div>
                         </div>
 
                         <div class="settings-group danger-zone">
@@ -360,6 +368,37 @@
                 </div>
                 <div class="button-group">
                     <button class="btn-confirm">Clear Tags</button>
+                    <button class="btn-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="broken-images-modal-template">
+        <div class="custom-confirm-overlay">
+            <div class="custom-confirm-modal" style="max-width: 600px;">
+                <h3>🔍 Broken Images</h3>
+                <div id="brokenImagesLoading">Loading...</div>
+                <div id="brokenImagesContent" style="display:none;">
+                    <p id="brokenImagesSummary"></p>
+                    <div id="brokenImagesList"
+                        style="max-height: 200px; overflow-y: auto; margin: 10px 0; font-size: 0.9em;"></div>
+                    <div class="health-check-info">
+                        <strong>Actions:</strong>
+                        <ul>
+                            <li><strong>Move to Ingest:</strong> Remove from database and move files back to ingest
+                                folder for reprocessing</li>
+                            <li><strong>Retry:</strong> Regenerate missing hashes/embeddings in place</li>
+                            <li><strong>Delete Permanently:</strong> Remove from database and delete files</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="button-group" style="flex-wrap: wrap; gap: 8px;">
+                    <button class="btn-confirm" id="brokenMoveToIngest" style="background: #e67e22;">Move to
+                        Ingest</button>
+                    <button class="btn-confirm" id="brokenRetry" style="background: #3498db;">Retry</button>
+                    <button class="btn-confirm" id="brokenDelete" style="background: #e74c3c;">Delete
+                        Permanently</button>
                     <button class="btn-cancel">Cancel</button>
                 </div>
             </div>

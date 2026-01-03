@@ -79,6 +79,8 @@ def get_all_embeddings() -> Tuple[List[int], np.ndarray]:
         ids: List of image_ids corresponding to rows
         embeddings_matrix: numpy array of shape (N, 1024)
     """
+    EXPECTED_DIM = 1024
+    
     with get_db_connection() as conn:
         # Fetch all
         cursor = conn.execute("SELECT image_id, embedding FROM embeddings")
@@ -87,14 +89,28 @@ def get_all_embeddings() -> Tuple[List[int], np.ndarray]:
     if not rows:
         return [], np.array([], dtype=np.float32)
     
-    ids = [row['image_id'] for row in rows]
-    # Allocate matrix
-    count = len(rows)
-    # Assume 1024 dims
-    matrix = np.empty((count, 1024), dtype=np.float32)
+    # Filter out embeddings with wrong dimensions
+    valid_rows = []
+    invalid_count = 0
     
-    for i, row in enumerate(rows):
+    for row in rows:
         vec = np.frombuffer(row['embedding'], dtype=np.float32)
+        if len(vec) == EXPECTED_DIM:
+            valid_rows.append((row['image_id'], vec))
+        else:
+            invalid_count += 1
+    
+    if invalid_count > 0:
+        print(f"[Similarity DB] WARNING: Skipped {invalid_count} embeddings with invalid dimensions")
+        print(f"[Similarity DB] Use 'Find Broken Images' in debug menu to clean these up")
+    
+    if not valid_rows:
+        return [], np.array([], dtype=np.float32)
+    
+    ids = [r[0] for r in valid_rows]
+    matrix = np.empty((len(valid_rows), EXPECTED_DIM), dtype=np.float32)
+    
+    for i, (_, vec) in enumerate(valid_rows):
         matrix[i] = vec
         
     return ids, matrix

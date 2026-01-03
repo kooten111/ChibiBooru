@@ -13,6 +13,8 @@ import time
 import uuid
 import logging
 import threading
+import atexit
+import signal
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 
@@ -64,8 +66,37 @@ class MLWorkerClient:
         self._worker_process: Optional[subprocess.Popen] = None
         self._socket: Optional[socket.socket] = None
         self._lock = threading.Lock()
+        
+        # Register cleanup handlers
+        atexit.register(self._cleanup_worker)
+        
+        # Signal handlers can only be registered from main thread
+        if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
 
         logger.info(f"ML Worker Client initialized (socket: {self.socket_path})")
+    
+    def _signal_handler(self, signum, frame):
+        """Handle termination signals by cleaning up worker"""
+        logger.info(f"Received signal {signum}, cleaning up ML worker...")
+        self._cleanup_worker()
+        sys.exit(0)
+    
+    def _cleanup_worker(self):
+        """Terminate the ML worker process"""
+        if self._worker_process:
+            try:
+                self._worker_process.terminate()
+                self._worker_process.wait(timeout=5)
+                logger.info("ML worker terminated cleanly")
+            except subprocess.TimeoutExpired:
+                self._worker_process.kill()
+                logger.warning("ML worker killed (didn't respond to terminate)")
+            except Exception as e:
+                logger.error(f"Error cleaning up ML worker: {e}")
+            finally:
+                self._worker_process = None
 
     def _is_worker_running(self) -> bool:
         """Check if worker process is running"""

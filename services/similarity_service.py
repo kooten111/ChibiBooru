@@ -17,28 +17,31 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Optional dependencies for Semantic Similarity
-# Check if ML worker is enabled first
+# Always try to import onnxruntime for fallback when ML worker fails
+try:
+    import onnxruntime as ort
+    import numpy as np
+    import faiss
+    ONNX_AVAILABLE = True
+except ImportError:
+    ONNX_AVAILABLE = False
+    ort = None  # Define as None to avoid NameError
+
+# Check if ML worker is enabled
 if config.ENABLE_SEMANTIC_SIMILARITY and config.ML_WORKER_ENABLED:
     try:
         from ml_worker.client import get_ml_worker_client
         ML_WORKER_AVAILABLE = True
-        SEMANTIC_AVAILABLE = True  # Assume available through worker
-        # Still need numpy and faiss for local operations
-        import numpy as np
-        import faiss
+        SEMANTIC_AVAILABLE = True  # Available through worker (with local fallback if ONNX_AVAILABLE)
     except ImportError:
         ML_WORKER_AVAILABLE = False
-        SEMANTIC_AVAILABLE = False
-        print("[Similarity] Warning: ML Worker not available for semantic similarity")
+        SEMANTIC_AVAILABLE = ONNX_AVAILABLE  # Fall back to local if available
+        if not SEMANTIC_AVAILABLE:
+            print("[Similarity] Warning: ML Worker not available and onnxruntime not installed")
 else:
     ML_WORKER_AVAILABLE = False
-    try:
-        import onnxruntime as ort
-        import numpy as np
-        import faiss
-        SEMANTIC_AVAILABLE = True
-    except ImportError:
-        SEMANTIC_AVAILABLE = False
+    SEMANTIC_AVAILABLE = ONNX_AVAILABLE
+    if not SEMANTIC_AVAILABLE:
         print("[Similarity] Warning: semantic similarity dependencies missing (onnxruntime, numpy, faiss)")
 
 # Global state for semantic search
@@ -331,8 +334,8 @@ class SemanticSearchEngine:
                 return np.array(embedding, dtype=np.float32)
             except Exception as e:
                 print(f"[Similarity] ML Worker error for {image_path}: {e}")
-                print(f"[Similarity] Falling back to direct loading...")
-                # Fall through to direct loading
+                print(f"[Similarity] ERROR: ML Worker is enabled but failed. Skipping file.")
+                return None  # Hard error - don't fall back when ML worker is enabled
 
         # Direct loading (fallback or when ML worker disabled)
         if not self.load_model(): return None

@@ -627,3 +627,333 @@ def bulk_retag_local_service():
         traceback.print_exc()
         monitor_service.add_log(f"Bulk retag failed: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500
+
+
+async def find_broken_images_service():
+    """
+    Service to find images with missing tags, hashes, or embeddings.
+    Returns a list of broken images and their issues.
+    """
+    try:
+        from database import get_db_connection
+        from services import similarity_service
+        
+        broken_images = []
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Find images with missing phash
+            cursor.execute("""
+                SELECT id, filepath, phash, colorhash, md5
+                FROM images 
+                WHERE phash IS NULL OR phash = ''
+            """)
+            missing_phash = cursor.fetchall()
+            
+            for row in missing_phash:
+                broken_images.append({
+                    'id': row['id'],
+                    'filepath': row['filepath'],
+                    'md5': row['md5'],
+                    'issues': ['missing_phash']
+                })
+            
+            # Find images with no tags at all
+            cursor.execute("""
+                SELECT i.id, i.filepath, i.md5, COUNT(it.tag_id) as tag_count
+                FROM images i
+                LEFT JOIN image_tags it ON i.id = it.image_id
+                GROUP BY i.id
+                HAVING tag_count = 0
+            """)
+            no_tags = cursor.fetchall()
+            
+            for row in no_tags:
+                # Check if already in list
+                existing = next((b for b in broken_images if b['id'] == row['id']), None)
+                if existing:
+                    existing['issues'].append('no_tags')
+                else:
+                    broken_images.append({
+                        'id': row['id'],
+                        'filepath': row['filepath'],
+                        'md5': row['md5'],
+                        'issues': ['no_tags']
+                    })
+            
+            # Find images with missing embeddings (if semantic similarity is enabled)
+            if similarity_service.SEMANTIC_AVAILABLE:
+                from services import similarity_db
+                
+                # Get all image IDs that have embeddings from the separate similarity DB
+                embedding_ids = set(similarity_db.get_all_embedding_ids())
+                
+                # Find images without embeddings
+                cursor.execute("SELECT id, filepath, md5 FROM images")
+                all_images = cursor.fetchall()
+                
+                for row in all_images:
+                    if row['id'] not in embedding_ids:
+                        existing = next((b for b in broken_images if b['id'] == row['id']), None)
+                        if existing:
+                            existing['issues'].append('missing_embedding')
+                        else:
+                            broken_images.append({
+                                'id': row['id'],
+                                'filepath': row['filepath'],
+                                'md5': row['md5'],
+                                'issues': ['missing_embedding']
+                            })
+            
+            # Find images with invalid embedding dimensions (corrupted data)
+            if similarity_service.SEMANTIC_AVAILABLE:
+                from services import similarity_db
+                import numpy as np
+                
+                with similarity_db.get_db_connection() as emb_conn:
+                    emb_cursor = emb_conn.execute("SELECT image_id, embedding FROM embeddings")
+                    for emb_row in emb_cursor:
+                        vec = np.frombuffer(emb_row['embedding'], dtype=np.float32)
+                        if len(vec) != 1024:  # Expected dimension
+                            # Look up the image filepath 
+                            cursor.execute("SELECT id, filepath, md5 FROM images WHERE id = ?", (emb_row['image_id'],))
+                            img_row = cursor.fetchone()
+                            if img_row:
+                                existing = next((b for b in broken_images if b['id'] == img_row['id']), None)
+                                if existing:
+                                    existing['issues'].append('invalid_embedding_dim')
+                                else:
+                                    broken_images.append({
+                                        'id': img_row['id'],
+                                        'filepath': img_row['filepath'],
+                                        'md5': img_row['md5'],
+                                        'issues': ['invalid_embedding_dim']
+                                    })
+        
+        # Sort by number of issues (most broken first)
+        broken_images.sort(key=lambda x: len(x['issues']), reverse=True)
+        
+        return jsonify({
+            "status": "success",
+            "total_broken": len(broken_images),
+            "images": broken_images[:100],  # Limit to first 100
+            "has_more": len(broken_images) > 100
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+async def cleanup_broken_images_service():
+    """
+    Service to cleanup or retry broken images.
+    Actions:
+    - 'delete': Remove broken images from database and move files back to ingest
+    - 'retry': Re-process broken images (regenerate hashes/embeddings)
+    - 'delete_permanent': Remove from database and delete files permanently
+    """
+    data = await request.json or {}
+    action = data.get('action', 'scan')  # scan, delete, retry, delete_permanent
+    image_ids = data.get('image_ids', [])  # Specific IDs, or empty for all broken
+    
+    secret = request.args.get('secret', '') or request.form.get('secret', '')
+    if secret != RELOAD_SECRET:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        from database import get_db_connection
+        from services import similarity_service
+        import shutil
+        import config
+        
+        # If no specific IDs provided, find all broken images
+        if not image_ids:
+            from services import similarity_db
+            
+            # Get embedding IDs from the separate similarity DB
+            embedding_ids = set(similarity_db.get_all_embedding_ids()) if similarity_service.SEMANTIC_AVAILABLE else set()
+            
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                # Get all images with phash or tag issues
+                cursor.execute("""
+                    SELECT DISTINCT i.id
+                    FROM images i
+                    LEFT JOIN image_tags it ON i.id = it.image_id
+                    WHERE i.phash IS NULL 
+                       OR i.phash = ''
+                       OR it.tag_id IS NULL
+                    GROUP BY i.id
+                """)
+                
+                broken_ids = set(row['id'] for row in cursor.fetchall())
+                
+                # Also add images missing embeddings
+                if similarity_service.SEMANTIC_AVAILABLE:
+                    cursor.execute("SELECT id FROM images")
+                    all_ids = set(row['id'] for row in cursor.fetchall())
+                    missing_embeddings = all_ids - embedding_ids
+                    broken_ids.update(missing_embeddings)
+                
+                image_ids = list(broken_ids)
+        
+        if action == 'scan':
+            return jsonify({
+                "status": "success",
+                "message": f"Found {len(image_ids)} broken images",
+                "count": len(image_ids)
+            })
+        
+        if not image_ids:
+            return jsonify({
+                "status": "success",
+                "message": "No broken images found",
+                "processed": 0
+            })
+        
+        processed = 0
+        errors = 0
+        
+        if action == 'delete':
+            # Move files back to ingest folder and remove from database
+            monitor_service.add_log(f"Moving {len(image_ids)} broken images back to ingest...", "info")
+            
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                for image_id in image_ids:
+                    cursor.execute("SELECT filepath FROM images WHERE id = ?", (image_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        filepath = row['filepath']
+                        full_path = f"static/images/{filepath}"
+                        
+                        if os.path.exists(full_path):
+                            # Move back to ingest
+                            filename = os.path.basename(filepath)
+                            ingest_path = os.path.join(config.INGEST_DIRECTORY, filename)
+                            
+                            try:
+                                shutil.move(full_path, ingest_path)
+                                models.delete_image(filepath)
+                                processed += 1
+                            except Exception as e:
+                                errors += 1
+                                monitor_service.add_log(f"Error moving {filename}: {e}", "error")
+                        else:
+                            # File doesn't exist, just remove from DB
+                            models.delete_image(filepath)
+                            processed += 1
+            
+            models.load_data_from_db()
+            message = f"Moved {processed} broken images back to ingest folder"
+            
+        elif action == 'delete_permanent':
+            # Delete files and remove from database permanently
+            monitor_service.add_log(f"Permanently deleting {len(image_ids)} broken images...", "info")
+            
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                for image_id in image_ids:
+                    cursor.execute("SELECT filepath FROM images WHERE id = ?", (image_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        filepath = row['filepath']
+                        full_path = f"static/images/{filepath}"
+                        
+                        # Delete file if exists
+                        if os.path.exists(full_path):
+                            try:
+                                os.remove(full_path)
+                            except Exception as e:
+                                monitor_service.add_log(f"Error deleting {filepath}: {e}", "error")
+                        
+                        # Remove thumbnail if exists
+                        thumb_path = f"static/thumbnails/{filepath.rsplit('.', 1)[0]}.webp"
+                        if os.path.exists(thumb_path):
+                            try:
+                                os.remove(thumb_path)
+                            except:
+                                pass
+                        
+                        models.delete_image(filepath)
+                        processed += 1
+            
+            models.load_data_from_db()
+            message = f"Permanently deleted {processed} broken images"
+            
+        elif action == 'retry':
+            # Re-process broken images (regenerate hashes/tags/embeddings)
+            monitor_service.add_log(f"Retrying {len(image_ids)} broken images...", "info")
+            
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                for idx, image_id in enumerate(image_ids, 1):
+                    if idx % 10 == 0:
+                        monitor_service.add_log(f"Progress: {idx}/{len(image_ids)}", "info")
+                    
+                    cursor.execute("SELECT filepath, md5 FROM images WHERE id = ?", (image_id,))
+                    row = cursor.fetchone()
+                    if row:
+                        filepath = row['filepath']
+                        md5 = row['md5']
+                        full_path = f"static/images/{filepath}"
+                        
+                        if not os.path.exists(full_path):
+                            continue
+                        
+                        try:
+                            # Regenerate phash if missing
+                            cursor.execute("SELECT phash FROM images WHERE id = ?", (image_id,))
+                            if not cursor.fetchone()['phash']:
+                                phash = similarity_service.compute_phash_for_file(full_path, md5)
+                                if phash:
+                                    cursor.execute("UPDATE images SET phash = ? WHERE id = ?", (phash, image_id))
+                            
+                            # Regenerate colorhash if missing
+                            cursor.execute("SELECT colorhash FROM images WHERE id = ?", (image_id,))
+                            if not cursor.fetchone()['colorhash']:
+                                colorhash = similarity_service.compute_colorhash_for_file(full_path)
+                                if colorhash:
+                                    cursor.execute("UPDATE images SET colorhash = ? WHERE id = ?", (colorhash, image_id))
+                            
+                            # Regenerate embedding if missing and available
+                            if similarity_service.SEMANTIC_AVAILABLE:
+                                cursor.execute("SELECT image_id FROM image_embeddings WHERE image_id = ?", (image_id,))
+                                if not cursor.fetchone():
+                                    engine = similarity_service.get_semantic_engine()
+                                    if engine.load_model():
+                                        embedding = engine.get_embedding(full_path)
+                                        if embedding is not None:
+                                            similarity_service.store_embedding(image_id, embedding)
+                            
+                            conn.commit()
+                            processed += 1
+                        except Exception as e:
+                            errors += 1
+                            if errors <= 5:
+                                monitor_service.add_log(f"Error retrying {filepath}: {e}", "error")
+            
+            message = f"Retried {processed} images"
+            if errors > 0:
+                message += f", {errors} errors"
+        else:
+            return jsonify({"error": f"Unknown action: {action}"}), 400
+        
+        monitor_service.add_log(f"✓ {message}", "success")
+        
+        return jsonify({
+            "status": "success",
+            "message": message,
+            "processed": processed,
+            "errors": errors
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500

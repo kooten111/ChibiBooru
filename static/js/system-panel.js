@@ -666,3 +666,107 @@ window.systemClearImpliedTags = systemClearImpliedTags;
 window.saveSystemSecret = saveSystemSecret;
 window.clearSystemSecret = clearSystemSecret;
 
+async function systemFindBrokenImages(event) {
+    if (event) event.preventDefault();
+
+    const template = document.getElementById('broken-images-modal-template');
+    const clone = template.content.cloneNode(true);
+    const overlay = clone.querySelector('.custom-confirm-overlay');
+
+    const modal = overlay.querySelector('.custom-confirm-modal');
+    const loadingDiv = modal.querySelector('#brokenImagesLoading');
+    const contentDiv = modal.querySelector('#brokenImagesContent');
+    const summaryP = modal.querySelector('#brokenImagesSummary');
+    const listDiv = modal.querySelector('#brokenImagesList');
+    const btnMoveToIngest = modal.querySelector('#brokenMoveToIngest');
+    const btnRetry = modal.querySelector('#brokenRetry');
+    const btnDelete = modal.querySelector('#brokenDelete');
+    const btnCancel = modal.querySelector('.btn-cancel');
+
+    document.body.appendChild(overlay);
+
+    // Fetch broken images
+    try {
+        const response = await fetch('/api/system/broken_images');
+        const data = await response.json();
+
+        loadingDiv.style.display = 'none';
+        contentDiv.style.display = 'block';
+
+        if (data.total_broken === 0) {
+            summaryP.textContent = '✓ No broken images found! All images have proper tags, hashes, and embeddings.';
+            btnMoveToIngest.style.display = 'none';
+            btnRetry.style.display = 'none';
+            btnDelete.style.display = 'none';
+        } else {
+            summaryP.innerHTML = `Found <strong>${data.total_broken}</strong> broken images${data.has_more ? ' (showing first 100 below)' : ''}.<br/><small>Actions will apply to all ${data.total_broken} images.</small>`;
+            // Show list of broken images
+            listDiv.innerHTML = data.images.map(img => {
+                const issues = img.issues.map(i => {
+                    switch (i) {
+                        case 'missing_phash': return '⚠️ No hash';
+                        case 'no_tags': return '⚠️ No tags';
+                        case 'missing_embedding': return '⚠️ No embedding';
+                        case 'invalid_embedding_dim': return '⚠️ Corrupted embedding';
+                        default: return i;
+                    }
+                }).join(', ');
+                return `<div style="padding: 4px 0; border-bottom: 1px solid #333;">
+                    <code>${img.filepath}</code><br/>
+                    <small style="color: #e67e22;">${issues}</small>
+                </div>`;
+            }).join('');
+
+            // Actions will process ALL broken images (not just displayed ones)
+            const totalCount = data.total_broken;
+
+            const performAction = async (action) => {
+                const actionNames = {
+                    'delete': 'Moving to ingest',
+                    'retry': 'Retrying',
+                    'delete_permanent': 'Deleting permanently'
+                };
+
+                showNotification(`${actionNames[action]} ${totalCount} images...`, 'info');
+                document.body.removeChild(overlay);
+
+                try {
+                    // Send empty image_ids to process ALL broken images
+                    const res = await fetch(`/api/system/broken_images/cleanup?secret=${encodeURIComponent(SYSTEM_SECRET)}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action, image_ids: [] })
+                    });
+                    const result = await res.json();
+
+                    if (result.status === 'success') {
+                        showNotification(result.message, 'success');
+                        loadSystemStatus?.();
+                        loadLogs?.();
+                    } else {
+                        showNotification(`Error: ${result.error}`, 'error');
+                    }
+                } catch (err) {
+                    showNotification(`Error: ${err.message}`, 'error');
+                }
+            };
+
+            btnMoveToIngest.onclick = () => performAction('delete');
+            btnRetry.onclick = () => performAction('retry');
+            btnDelete.onclick = () => {
+                if (confirm('This will PERMANENTLY DELETE the files. Are you sure?')) {
+                    performAction('delete_permanent');
+                }
+            };
+        }
+    } catch (err) {
+        loadingDiv.textContent = `Error: ${err.message}`;
+    }
+
+    btnCancel.onclick = () => document.body.removeChild(overlay);
+    overlay.onclick = (e) => {
+        if (e.target === overlay) document.body.removeChild(overlay);
+    };
+}
+
+window.systemFindBrokenImages = systemFindBrokenImages;

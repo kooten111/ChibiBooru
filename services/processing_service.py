@@ -22,34 +22,37 @@ from threading import Lock
 import fcntl
 import shutil
 
-# Dependencies - conditional imports based on ML_WORKER_ENABLED
+# Dependencies - always try to import for fallback support when ML worker fails
+# Import onnxruntime (for fallback when ML worker fails)
+try:
+    import onnxruntime as ort
+    ONNX_AVAILABLE = True
+except ImportError:
+    ONNX_AVAILABLE = False
+    ort = None  # Define as None to avoid NameError
+
+# Import torchvision (for fallback when ML worker fails)
+try:
+    import torchvision.transforms as transforms
+    TORCHVISION_AVAILABLE = True
+except ImportError:
+    TORCHVISION_AVAILABLE = False
+    transforms = None  # Define as None to avoid NameError
+
+# Check if ML worker is enabled
 if config.ML_WORKER_ENABLED:
-    # When ML worker is enabled, import only the client
     try:
         from ml_worker.client import get_ml_worker_client
         ML_WORKER_AVAILABLE = True
-        ONNX_AVAILABLE = True  # Assume available through worker
-        TORCHVISION_AVAILABLE = True  # Assume available through worker
     except ImportError:
         ML_WORKER_AVAILABLE = False
-        ONNX_AVAILABLE = False
-        TORCHVISION_AVAILABLE = False
-        print("Warning: ML Worker not available. Falling back to direct loading.")
+        if not ONNX_AVAILABLE or not TORCHVISION_AVAILABLE:
+            print("Warning: ML Worker not available and fallback libraries missing.")
 else:
-    # When ML worker is disabled, import frameworks directly
     ML_WORKER_AVAILABLE = False
-    try:
-        import onnxruntime as ort
-        ONNX_AVAILABLE = True
-    except ImportError:
-        ONNX_AVAILABLE = False
+    if not ONNX_AVAILABLE:
         print("Warning: onnxruntime not installed. Local Tagger will not be available.")
-
-    try:
-        import torchvision.transforms as transforms
-        TORCHVISION_AVAILABLE = True
-    except ImportError:
-        TORCHVISION_AVAILABLE = False
+    if not TORCHVISION_AVAILABLE:
         print("Warning: torchvision not installed. Local Tagger's image preprocessing will fail.")
 
 # Load from config
@@ -372,8 +375,8 @@ def tag_with_local_tagger(filepath):
             }
         except Exception as e:
             print(f"[Local Tagger] ML Worker error for {filepath}: {e}")
-            print(f"[Local Tagger] Falling back to direct loading...")
-            # Fall through to direct loading
+            print(f"[Local Tagger] ERROR: ML Worker is enabled but failed. Skipping file.")
+            return None  # Hard error - don't fall back when ML worker is enabled
 
     # Direct loading (fallback or when ML worker disabled)
     load_local_tagger()
@@ -1181,6 +1184,10 @@ def process_image_file(filepath, move_from_ingest=True):
             if local_tagger_result:
                 all_results[local_tagger_result['source']] = local_tagger_result['data']
                 local_tagger_used = True
+            else:
+                # FAIL-FAST: Video tagging failed
+                print(f"[Processing] ERROR: Video tagging failed for {filename}. File NOT ingested.")
+                return False
         else:
             # Standard image processing
             if not all_results:
@@ -1233,32 +1240,45 @@ def process_image_file(filepath, move_from_ingest=True):
                 if lt_res:
                     all_results[lt_res['source']] = lt_res['data']
                     local_tagger_used = True
+                else:
+                    # FAIL-FAST: Local tagger was required but failed
+                    print(f"[Processing] ERROR: Local tagger failed for {filename}. File NOT ingested.")
+                    return False
         
         # ========== STAGE 3: HASH COMPUTATION (ALL IN ONE PASS) ==========
         hashes = {}
-        try:
-            from services import similarity_service
+        from services import similarity_service
+        
+        # Compute perceptual hash
+        phash = similarity_service.compute_phash_for_file(filepath, md5)
+        if phash:
+            hashes['phash'] = phash
+        else:
+            # FAIL-FAST: Hash computation is required
+            print(f"[Processing] ERROR: Failed to compute perceptual hash for {filename}. File NOT ingested.")
+            return False
+        
+        # Compute color hash
+        colorhash = similarity_service.compute_colorhash_for_file(filepath)
+        if colorhash:
+            hashes['colorhash'] = colorhash
+        # Note: colorhash failure is not fatal, phash is sufficient
+        
+        # Compute semantic embedding if available
+        if similarity_service.SEMANTIC_AVAILABLE:
+            engine = similarity_service.get_semantic_engine()
+            if not engine.load_model():
+                # FAIL-FAST: Similarity is enabled but model failed to load
+                print(f"[Processing] ERROR: Failed to load similarity model for {filename}. File NOT ingested.")
+                return False
             
-            # Compute perceptual hash
-            phash = similarity_service.compute_phash_for_file(filepath, md5)
-            if phash:
-                hashes['phash'] = phash
-            
-            # Compute color hash
-            colorhash = similarity_service.compute_colorhash_for_file(filepath)
-            if colorhash:
-                hashes['colorhash'] = colorhash
-            
-            # Compute semantic embedding if available
-            if similarity_service.SEMANTIC_AVAILABLE:
-                engine = similarity_service.get_semantic_engine()
-                if engine.load_model():
-                    embedding = engine.get_embedding(filepath)
-                    if embedding is not None:
-                        hashes['embedding'] = embedding
-        except Exception as e:
-            print(f"[Processing] WARNING: Hash computation error for {filename}: {e}")
-            # Continue processing even if hashes fail
+            embedding = engine.get_embedding(filepath)
+            if embedding is not None:
+                hashes['embedding'] = embedding
+            else:
+                # FAIL-FAST: Similarity is enabled but embedding failed
+                print(f"[Processing] ERROR: Failed to compute similarity embedding for {filename}. File NOT ingested.")
+                return False
         
         # ========== STAGE 4: FILE OPERATIONS ==========
         file_dest = filepath

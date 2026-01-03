@@ -35,6 +35,66 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def check_dependencies() -> bool:
+    """
+    Check that all required ML dependencies are installed.
+    Returns True if all dependencies are available, False otherwise.
+    """
+    missing = []
+    
+    # Check onnxruntime
+    try:
+        import onnxruntime
+        logger.info(f"onnxruntime: OK (version {onnxruntime.__version__})")
+    except ImportError:
+        missing.append("onnxruntime")
+        logger.error("onnxruntime: MISSING")
+    
+    # Check torchvision
+    try:
+        import torchvision
+        logger.info(f"torchvision: OK (version {torchvision.__version__})")
+    except ImportError:
+        missing.append("torchvision")
+        logger.error("torchvision: MISSING")
+    
+    # Check torch (comes with torchvision but check explicitly)
+    try:
+        import torch
+        logger.info(f"torch: OK (version {torch.__version__})")
+    except ImportError:
+        missing.append("torch")
+        logger.error("torch: MISSING")
+    
+    # Check PIL
+    try:
+        from PIL import Image
+        import PIL
+        logger.info(f"Pillow: OK (version {PIL.__version__})")
+    except ImportError:
+        missing.append("Pillow")
+        logger.error("Pillow: MISSING")
+    
+    # Check numpy
+    try:
+        import numpy
+        logger.info(f"numpy: OK (version {numpy.__version__})")
+    except ImportError:
+        missing.append("numpy")
+        logger.error("numpy: MISSING")
+    
+    if missing:
+        logger.error("=" * 60)
+        logger.error("FATAL: Missing required dependencies!")
+        logger.error(f"Please install: {', '.join(missing)}")
+        logger.error("Run: source ./venv/bin/activate && pip install -r requirements.txt")
+        logger.error("=" * 60)
+        return False
+    
+    logger.info("All ML dependencies verified.")
+    return True
+
 # Global state
 _last_request_time = time.time()
 _shutdown_requested = False
@@ -97,7 +157,17 @@ def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
 
     image_path = request_data['image_path']
     model_path = request_data['model_path']
-    metadata_path = request_data.get('metadata_path', model_path.replace('.onnx', '_metadata.json'))
+    metadata_path = request_data.get('metadata_path')
+    if not metadata_path:
+        # Try common metadata file naming conventions
+        model_dir = os.path.dirname(model_path)
+        for name in ['metadata.json', 'model_metadata.json', os.path.basename(model_path).replace('.onnx', '_metadata.json')]:
+            candidate = os.path.join(model_dir, name)
+            if os.path.exists(candidate):
+                metadata_path = candidate
+                break
+        if not metadata_path:
+            metadata_path = model_path.replace('.onnx', '_metadata.json')  # Fallback
     threshold = request_data.get('threshold', 0.35)
     character_threshold = request_data.get('character_threshold', 0.85)
 
@@ -475,21 +545,61 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
         _similarity_model = ort.InferenceSession(model_path, providers=providers)
         logger.info("Similarity model loaded")
 
-    # Preprocess image (standard 224x224 for most models)
-    img = Image.open(image_path).convert('RGB')
-    img = img.resize((224, 224), Image.Resampling.LANCZOS)
+    # Preprocess image - model expects 448x448 in NHWC format (TensorFlow-style)
+    # Handle videos by extracting a frame
+    if image_path.lower().endswith(('.mp4', '.webm', '.gif', '.mov', '.avi')):
+        import cv2
+        cap = cv2.VideoCapture(image_path)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        # Get middle frame
+        cap.set(cv2.CAP_PROP_POS_FRAMES, total_frames // 2)
+        ret, frame = cap.read()
+        cap.release()
+        if not ret:
+            raise ValueError(f"Could not extract frame from video: {image_path}")
+        # Convert BGR to RGB
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = Image.fromarray(frame)
+    else:
+        img = Image.open(image_path).convert('RGB')
+    
+    # Resize with aspect ratio preservation and padding (matching similarity_service.py)
+    target_size = 448
+    w, h = img.size
+    ratio = min(target_size/w, target_size/h)
+    new_w, new_h = int(w*ratio), int(h*ratio)
+    img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+    
+    # Paste on gray background
+    new_img = Image.new('RGB', (target_size, target_size), (124, 116, 104))
+    new_img.paste(img, ((target_size-new_w)//2, (target_size-new_h)//2))
 
-    img_np = np.array(img).astype(np.float32) / 255.0
-    mean = np.array([0.485, 0.456, 0.406])
-    std = np.array([0.229, 0.224, 0.225])
+    # Convert to numpy - NHWC format (no transpose needed)
+    img_np = np.array(new_img).astype(np.float32) / 255.0
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
     img_np = (img_np - mean) / std
-    img_np = np.transpose(img_np, (2, 0, 1))
-    img_np = np.expand_dims(img_np, axis=0)
+    # Model expects NHWC: (1, 448, 448, 3) - no transpose needed
+    img_np = np.expand_dims(img_np, axis=0).astype(np.float32)
 
     # Run inference
     input_name = _similarity_model.get_inputs()[0].name
     outputs = _similarity_model.run(None, {input_name: img_np})
-    embedding = outputs[0][0]
+    
+    # Find the 1024-d embedding output (not the 9083-d classification)
+    # Model outputs: predictions_sigmoid (9083), globalavgpooling (1024,1,1), predictions_norm (1024)
+    embedding = None
+    for out in outputs:
+        # Look for exactly 1024 dimensions (the embedding vector)
+        flat = out.flatten() if len(out.shape) > 2 else out[0] if len(out.shape) == 2 else out
+        if hasattr(flat, '__len__') and len(flat) == 1024:
+            embedding = flat.astype(np.float32)
+            break
+    
+    if embedding is None:
+        # Log output shapes for debugging
+        logger.error(f"Could not find 1024-d embedding. Output shapes: {[o.shape for o in outputs]}")
+        raise ValueError(f"Model did not produce valid 1024-d embedding")
 
     return {
         "embedding": embedding.tolist()
@@ -622,6 +732,12 @@ def signal_handler(signum, frame):
 def run_server():
     """Main server loop"""
     global _idle_timeout, _socket_path
+
+    # Check all dependencies are installed FIRST
+    logger.info("Checking ML dependencies...")
+    if not check_dependencies():
+        logger.error("ML Worker cannot start due to missing dependencies.")
+        return 1
 
     # Get config from environment
     _idle_timeout = int(os.environ.get('ML_WORKER_IDLE_TIMEOUT', 300))

@@ -119,3 +119,15 @@ async def database_health_check():
 async def bulk_retag_local():
     """Wipe all local tagger predictions and re-run local tagger for all images."""
     return await asyncio.to_thread(system_service.bulk_retag_local_service)
+
+@api_blueprint.route('/system/broken_images', methods=['GET'])
+@api_handler()
+async def find_broken_images():
+    """Find images with missing tags, hashes, or embeddings."""
+    return await system_service.find_broken_images_service()
+
+@api_blueprint.route('/system/broken_images/cleanup', methods=['POST'])
+@api_handler()
+async def cleanup_broken_images():
+    """Cleanup or retry broken images."""
+    return await system_service.cleanup_broken_images_service()
