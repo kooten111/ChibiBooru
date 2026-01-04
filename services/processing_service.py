@@ -675,8 +675,13 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
     filename = os.path.basename(filepath)
     base_name = os.path.splitext(filename)[0]
 
-    # Use bucketed structure for thumbnails (based on filename, not MD5)
-    bucket = get_hash_bucket(filename)
+    # Use bucketed structure for thumbnails
+    # Try to extract bucket from input filepath first to support collision buckets
+    from utils.file_utils import extract_bucket_from_path, get_hash_bucket
+    
+    path_bucket = extract_bucket_from_path(filepath)
+    bucket = path_bucket if path_bucket else get_hash_bucket(filename)
+    
     thumb_path = os.path.join(THUMB_DIR, bucket, base_name + '.webp')
 
     if not os.path.exists(thumb_path):
@@ -1118,7 +1123,7 @@ def process_image_file(filepath, move_from_ingest=True):
         move_from_ingest: If True, move file from ingest folder to bucketed structure
         
     Returns:
-        Boolean indicating success
+        Tuple (success, message)
     """
     from utils.file_utils import ensure_bucket_dir
     import shutil
@@ -1126,24 +1131,34 @@ def process_image_file(filepath, move_from_ingest=True):
     # ========== STAGE 1: PRE-FLIGHT CHECKS ==========
     # Check if file exists (race condition check for concurrent processing)
     if not os.path.exists(filepath):
-        print(f"[Processing] File not found (likely processed by another thread): {filepath}")
-        return False
+        msg = f"[Processing] File not found (likely processed by another thread): {filepath}"
+        print(msg)
+        return False, msg
     
     filename = os.path.basename(filepath)
     print(f"[Processing] Starting: {filename}")
     
+    # Debug logging for investigation - REMOVED
+
+    
     # Calculate MD5 immediately
     try:
         md5 = get_file_md5(filepath)
+        if md5 is None:
+            msg = f"[Processing] ERROR: Failed to calculate MD5 for {filename} (File not found or unreadable)"
+            print(msg)
+            return False, msg
     except Exception as e:
-        print(f"[Processing] ERROR: Failed to calculate MD5 for {filename}: {e}")
-        return False
+        msg = f"[Processing] ERROR: Failed to calculate MD5 for {filename}: {e}"
+        print(msg)
+        return False, msg
     
     # Check for duplicate in database (with lock)
     lock_fd, acquired = acquire_processing_lock(md5)
     if not acquired:
-        print(f"[Processing] Skipped: {filename} (already being processed by another thread)")
-        return False
+        msg = f"[Processing] Skipped: {filename} (already being processed by another thread)"
+        print(msg)
+        return False, msg
     
     try:
         # Re-check duplicate inside lock
@@ -1154,7 +1169,8 @@ def process_image_file(filepath, move_from_ingest=True):
                 if row:
                     existing_filepath = row['filepath']
             
-            print(f"[Processing] Duplicate detected: {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})")
+            msg = f"[Processing] Duplicate detected: {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
+            print(msg)
             
             # Remove duplicate file if it exists
             if os.path.exists(filepath):
@@ -1164,7 +1180,7 @@ def process_image_file(filepath, move_from_ingest=True):
                 except Exception as e:
                     print(f"[Processing] WARNING: Could not remove duplicate file {filename}: {e}")
             
-            return False
+            return False, msg
         
         # ========== STAGE 2: METADATA FETCHING ==========
         is_video = filepath.lower().endswith(('.mp4', '.webm'))
@@ -1186,8 +1202,9 @@ def process_image_file(filepath, move_from_ingest=True):
                 local_tagger_used = True
             else:
                 # FAIL-FAST: Video tagging failed
-                print(f"[Processing] ERROR: Video tagging failed for {filename}. File NOT ingested.")
-                return False
+                msg = f"[Processing] ERROR: Video tagging failed for {filename}. File NOT ingested."
+                print(msg)
+                return False, msg
         else:
             # Standard image processing
             if not all_results:
@@ -1242,8 +1259,9 @@ def process_image_file(filepath, move_from_ingest=True):
                     local_tagger_used = True
                 else:
                     # FAIL-FAST: Local tagger was required but failed
-                    print(f"[Processing] ERROR: Local tagger failed for {filename}. File NOT ingested.")
-                    return False
+                    msg = f"[Processing] ERROR: Local tagger failed for {filename}. File NOT ingested."
+                    print(msg)
+                    return False, msg
         
         # ========== STAGE 3: HASH COMPUTATION (ALL IN ONE PASS) ==========
         hashes = {}
@@ -1255,8 +1273,9 @@ def process_image_file(filepath, move_from_ingest=True):
             hashes['phash'] = phash
         else:
             # FAIL-FAST: Hash computation is required
-            print(f"[Processing] ERROR: Failed to compute perceptual hash for {filename}. File NOT ingested.")
-            return False
+            msg = f"[Processing] ERROR: Failed to compute perceptual hash for {filename}. File NOT ingested."
+            print(msg)
+            return False, msg
         
         # Compute color hash
         colorhash = similarity_service.compute_colorhash_for_file(filepath)
@@ -1277,31 +1296,124 @@ def process_image_file(filepath, move_from_ingest=True):
                 hashes['embedding'] = embedding
             else:
                 # FAIL-FAST: Similarity is enabled but embedding failed
-                print(f"[Processing] ERROR: Failed to compute similarity embedding for {filename}. File NOT ingested.")
-                return False
+                msg = f"[Processing] ERROR: Failed to compute similarity embedding for {filename}. File NOT ingested."
+                print(msg)
+                return False, msg
         
         # ========== STAGE 4: FILE OPERATIONS ==========
+        # ========== STAGE 4: FILE OPERATIONS ==========
+        
+        # Determine strict filename (renaming if necessary)
+        # Strategy:
+        # 1. If in subdirectory of ingest: ParentFolder_-_Filename.ext
+        # 2. If in root of ingest: Filename_MD5.ext
+        # 3. If not from ingest (e.g. upload): keep original name
+        
+        final_filename = filename
+        if move_from_ingest:
+            try:
+                abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+                abs_filepath = os.path.abspath(filepath)
+                
+                # Check if file is inside ingest directory
+                if abs_filepath.startswith(abs_ingest):
+                    rel_path = os.path.relpath(abs_filepath, abs_ingest)
+                    parent_dir = os.path.dirname(rel_path)
+                    
+                    name_base, name_ext = os.path.splitext(filename)
+                    
+                    if parent_dir and parent_dir != '.':
+                        # Case 1: Subdirectory -> Use immediate parent folder
+                        # Handle multiple levels if needed, but user asked for immediate parent
+                        # e.g. "Pack/Char/Image.png" -> "Char"
+                        immediate_parent = os.path.basename(parent_dir)
+                        final_filename = f"{immediate_parent}_-_{filename}"
+                    else:
+                        # Case 2: Root of ingest -> Append MD5
+                        final_filename = f"{name_base}_{md5}{name_ext}"
+                        
+                    print(f"[Processing] Renaming {filename} -> {final_filename}")
+
+                    
+            except Exception as e:
+                print(f"[Processing] WARNING: Error calculating new filename: {e}")
+                # Fallback to original filename
+                pass
+
         file_dest = filepath
         if move_from_ingest:
-            bucket_dir = ensure_bucket_dir(filename, config.IMAGE_DIRECTORY)
-            new_path = os.path.join(bucket_dir, filename)
+            from utils.file_utils import get_hash_bucket
             
-            if os.path.exists(new_path):
-                # File already exists at destination
-                if get_file_md5(new_path) == md5:
-                    # Same file, remove ingest copy
-                    os.remove(filepath)
-                    file_dest = new_path
-                    print(f"[Processing] File already at destination: {filename}")
+            # Canonical bucket attempt with NEW filename
+            bucket_chars = 3
+            canonical_bucket = get_hash_bucket(final_filename, bucket_chars)
+            
+            # Find a free filename/bucket
+            attempt = 0
+            target_filename = final_filename
+            bucket_chars = 3
+            canonical_bucket = get_hash_bucket(target_filename, bucket_chars)
+            final_bucket = canonical_bucket
+            
+            while True:
+                bucket_dir = os.path.join(config.IMAGE_DIRECTORY, final_bucket)
+                os.makedirs(bucket_dir, exist_ok=True)
+                new_path = os.path.join(bucket_dir, target_filename)
+                
+                if os.path.exists(new_path):
+                    # File exists at this path
+                    if get_file_md5(new_path) == md5:
+                        # Same file, remove ingest copy
+                        try:
+                            os.remove(filepath)
+                        except Exception as e:
+                             print(f"[Processing] WARNING: Failed to remove source file {filepath}: {e}")
+                             
+                        file_dest = new_path
+                        print(f"[Processing] File already at destination: {new_path}")
+                        break
+                    else:
+                        # Different file! Collision!
+                        print(f"[Processing] Collision for {target_filename} at bucket {final_bucket}.", 'warning')
+                        
+                        # Strategy: Append MD5 to filename if not already there
+                        name_base, name_ext = os.path.splitext(target_filename)
+                        
+                        # check if md5 is already in the name to avoid infinite appending
+                        if md5 in name_base:
+                             # Fallback to bucket iteration if MD5 is already there
+                             print(f"[Processing] MD5 already in filename, trying alternate bucket...")
+                             attempt += 1
+                             salt = f"_collision_{attempt}"
+                             import hashlib
+                             alt_hash = hashlib.md5((target_filename + salt).encode()).hexdigest()
+                             final_bucket = alt_hash[:bucket_chars]
+                        else:
+                             # Append MD5 to filename and try again (this changes the canonical bucket)
+                             print(f"[Processing] Appending MD5 to resolve collision...")
+                             target_filename = f"{name_base}_{md5}{name_ext}"
+                             # Recalculate bucket for the new filename
+                             final_bucket = get_hash_bucket(target_filename, bucket_chars)
+                        
+                        if attempt > 50:
+                            msg = f"[Processing] ERROR: Too many filename collisions for {filename} (gave up after 50 attempts)"
+                            print(msg)
+                            return False, msg
                 else:
-                    # Different file with same name - this shouldn't happen often
-                    print(f"[Processing] ERROR: Filename collision at {new_path}")
-                    return False
-            else:
-                # Move file to destination
-                shutil.move(filepath, new_path)
-                file_dest = new_path
-                print(f"[Processing] Moved to: {new_path}")
+                    # Found a free slot!
+                    try:
+                        shutil.move(filepath, new_path)
+                        file_dest = new_path
+                        print(f"[Processing] Moved to: {new_path}")
+
+                        break
+                    except Exception as e:
+                        return False, msg
+                    except Exception as e:
+                        msg = f"[Processing] ERROR: Failed to move file to {new_path}: {e}"
+                        print(msg)
+
+                        return False, msg
         
         db_path = os.path.relpath(file_dest, "static/images").replace('\\', '/')
         
@@ -1417,8 +1529,12 @@ def process_image_file(filepath, move_from_ingest=True):
         )
         
         if not success:
-            print(f"[Processing] ERROR: Database insert failed for {filename}")
-            return False
+            msg = f"[Processing] ERROR: Database insert failed for {filename}"
+            print(msg)
+
+            return False, msg
+
+
         
         # ========== STAGE 6: POST-PROCESSING ==========
         # Save semantic embedding if computed
@@ -1456,6 +1572,7 @@ def process_image_file(filepath, move_from_ingest=True):
                     print(f"[Processing] WARNING: Failed to save predictions for {filename}: {e}")
         
         # Generate thumbnail
+        # Ensure thumbnail respects the final destination bucket
         ensure_thumbnail(file_dest, md5=md5)
         
         # Apply tag implications if enabled
@@ -1473,13 +1590,14 @@ def process_image_file(filepath, move_from_ingest=True):
                 print(f"[Processing] WARNING: Failed to apply implications for {filename}: {e}")
         
         print(f"[Processing] Successfully processed: {filename}")
-        return True
+        return True, "Successfully processed"
         
     except Exception as e:
-        print(f"[Processing] ERROR processing {filename}: {e}")
+        msg = f"[Processing] ERROR processing {filename}: {e}"
+        print(msg)
         import traceback
         traceback.print_exc()
-        return False
+        return False, msg
     finally:
         release_processing_lock(lock_fd)
 

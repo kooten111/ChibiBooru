@@ -231,7 +231,7 @@ class MLWorkerClient:
                 if attempt == self.max_retries - 1:
                     raise MLWorkerTimeoutError(f"Request timed out after {self.timeout}s")
 
-            except (ConnectionError, BrokenPipeError) as e:
+            except (ConnectionError, BrokenPipeError, MLWorkerConnectionError) as e:
                 logger.warning(f"Connection error (attempt {attempt + 1}/{self.max_retries}): {e}")
                 # Worker might have crashed, try to respawn
                 if attempt < self.max_retries - 1:

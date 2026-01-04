@@ -531,12 +531,15 @@ async def upload_image():
                 await file.save(filepath)
 
                 # Process the file (already in bucketed location, so don't move)
-                if processing.process_image_file(filepath, move_from_ingest=False):
+                success, msg = processing.process_image_file(filepath, move_from_ingest=False)
+                if success:
                     processed_count += 1
                     # Keep track of the last successfully processed image's path
                     # Use bucketed path for URL
                     bucketed_path = get_bucketed_path(filename, "images")
                     last_processed_path = bucketed_path
+                else:
+                    print(f"Failed to process {filename}: {msg}")
 
         if processed_count > 0:
             models.load_data_from_db()

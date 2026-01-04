@@ -146,7 +146,8 @@ async def saucenao_apply_service():
             redirect_url = url_for('main.show_image', filepath=os.path.join("images", original_filepath))
 
         # Step 3: Process the image file (either the new one or the old one)
-        if processing.process_image_file(path_to_process):
+        success, msg = processing.process_image_file(path_to_process)
+        if success:
             # Selective reload: only update this image and tag counts
             rel_path = os.path.relpath(path_to_process, "static/images").replace('\\', '/')
             from core.cache_manager import invalidate_image_cache
@@ -156,7 +157,7 @@ async def saucenao_apply_service():
                 "redirect_url": redirect_url
             })
         else:
-            raise Exception("Failed to process and save the new image to the database.")
+            raise Exception(f"Failed to process and save the new image: {msg}")
 
     except Exception as e:
         traceback.print_exc()

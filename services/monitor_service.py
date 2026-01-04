@@ -75,38 +75,61 @@ def get_status():
             
     return monitor_status
 
+# Global lock for log file access
+# Global lock for thread safety within this process
+log_lock = threading.Lock()
+
 def add_log(message, type='info'):
     """Adds a log entry to the monitor status and persistent file."""
     import json
+    import fcntl
     
     log_entry = {'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"), 'message': message, 'type': type}
     
-    # Load existing logs from file first to ensure we have the latest state
-    current_logs = []
-    try:
-        if os.path.exists(LOG_FILE):
-             with open(LOG_FILE, 'r') as f:
-                content = f.read().strip()
-                if content:
-                    current_logs = json.loads(content)
-    except Exception as e:
-        print(f"Error reading log file: {e}")
-        
-    # Insert new log at start
-    current_logs.insert(0, log_entry)
-    
-    # Keep size manageable
-    if len(current_logs) > 100:
-        current_logs = current_logs[:100]
-        
-    # Write back to file
-    try:
-        with open(LOG_FILE, 'w') as f:
-            json.dump(current_logs, f)
-    except Exception as e:
-        print(f"Error writing log file: {e}")
+    # Use thread lock for intra-process safety
+    with log_lock:
+        try:
+            # Use file lock for inter-process safety
+            # Open the file in Append mode first to ensure it exists, but we need Read/Write
+            if not os.path.exists(LOG_FILE):
+                with open(LOG_FILE, 'w') as f:
+                    json.dump([], f)
 
-    # Update memory
+            with open(LOG_FILE, 'r+') as f:
+                # Acquire exclusive lock - blocks if another process has it
+                fcntl.flock(f, fcntl.LOCK_EX)
+                try:
+                    # Read existing
+                    try:
+                        f.seek(0)
+                        content = f.read().strip()
+                        current_logs = json.loads(content) if content else []
+                    except Exception:
+                        current_logs = []
+                    
+                    # Insert new log
+                    current_logs.insert(0, log_entry)
+                    if len(current_logs) > 100:
+                        current_logs = current_logs[:100]
+                    
+                    # Write back
+                    f.seek(0)
+                    f.truncate()
+                    json.dump(current_logs, f)
+                    f.flush()
+                    os.fsync(f.fileno()) # Force write to disk
+                    
+                    # Update memory for this process
+                    monitor_status['logs'] = current_logs
+                    
+                finally:
+                    # Release lock
+                    fcntl.flock(f, fcntl.LOCK_UN)
+                    
+        except Exception as e:
+            print(f"Error writing log file: {e}")
+
+    # Update memory (this is thread-safe enough for assignment)
     monitor_status['logs'] = current_logs
 
 # --- Watchdog Event Handler ---
@@ -281,8 +304,11 @@ def run_scan():
     futures = {}
     
     if not ingest_executor:
-        add_log("Executor died? Restarting...", 'error')
-        return 0
+        add_log("Executor died? Restarting...", 'warning')
+        start_monitor()
+        if not ingest_executor:
+            add_log("Failed to restart executor.", 'error')
+            return 0
 
     # Submit all files for processing
     for filepath in unprocessed_files:
@@ -300,13 +326,14 @@ def run_scan():
     for future in as_completed(futures):
         filepath = futures[future]
         try:
-            success = future.result()
+            success, msg = future.result()
             
             if success:
                 processed_count += 1
                 add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
-            # If not success, the processing function already logged the reason (duplicate, error, etc.)
-                  
+            else:
+                add_log(f"Failed to process {os.path.basename(filepath)}: {msg}", 'error')
+                
         except Exception as e:
             add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
 
