@@ -2,8 +2,11 @@
 Database health check and auto-repair system.
 Ensures database integrity and fixes common issues automatically.
 """
+import logging
 import config
 from database import get_db_connection
+
+logger = logging.getLogger('chibibooru.HealthService')
 
 
 class HealthCheckResult:
@@ -433,7 +436,7 @@ def run_all_health_checks(auto_fix=True, include_thumbnails=False, include_tag_d
     Returns:
         dict: Summary of all health check results
     """
-    print("[Database Health] Running health checks...")
+    logger.debug("Running health checks...")
 
     checks = [
         check_and_fix_null_active_source(auto_fix),
@@ -458,12 +461,12 @@ def run_all_health_checks(auto_fix=True, include_thumbnails=False, include_tag_d
     }
 
     # Print summary
-    print(f"[Database Health] Completed {results['total_checks']} checks")
-    print(f"[Database Health] Found {results['total_issues_found']} issues, fixed {results['total_issues_fixed']}")
+    logger.debug(f"Completed {results['total_checks']} checks")
+    logger.debug(f"Found {results['total_issues_found']} issues, fixed {results['total_issues_fixed']}")
 
     for check in checks:
         if check.issues_found > 0:
-            print(f"[Database Health] - {check.check_name}: {check.issues_found} issues, {check.issues_fixed} fixed")
+            logger.debug(f"- {check.check_name}: {check.issues_found} issues, {check.issues_fixed} fixed")
 
     return results
 
@@ -473,7 +476,7 @@ def startup_health_check():
     Run critical health checks on application startup.
     Only runs checks that are fast and safe to auto-fix.
     """
-    print("[Database Health] Running startup health checks...")
+    logger.debug("Running startup health checks...")
 
     # Only run critical, fast checks on startup
     checks = [
@@ -486,9 +489,9 @@ def startup_health_check():
     total_fixed = sum(c.issues_fixed for c in checks)
 
     if total_issues > 0:
-        print(f"[Database Health] Startup: Found {total_issues} issues, fixed {total_fixed}")
+        logger.info(f"Startup: Found {total_issues} issues, fixed {total_fixed}")
     else:
-        print("[Database Health] Startup: Database is healthy")
+        logger.info("Startup: Database is healthy")
 
     return {
         "issues_found": total_issues,

@@ -129,7 +129,7 @@ def main():
         
         # Load data from DB
         logger.info("Loading data from database...")
-        models.load_data_from_db()
+        models.load_data_from_db(verbose=True)
         
         # Start monitor service
         logger.info("Starting monitor service...")

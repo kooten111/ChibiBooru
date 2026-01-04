@@ -18,10 +18,14 @@ import json
 import sys
 import threading
 import concurrent.futures
+import logging
 from array import array
 from typing import Optional
+from tqdm import tqdm
 from database import get_db_connection
 import config
+
+logger = logging.getLogger('chibibooru.CacheManager')
 
 tag_counts = {}
 image_data = []
@@ -31,11 +35,11 @@ _loading_in_progress = False
 _load_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="cache_loader")
 
 
-def _load_data_from_db_impl():
+def _load_data_from_db_impl(verbose=True):
     """Internal implementation of database loading with optimizations."""
     global tag_counts, image_data, post_id_to_md5, _loading_in_progress
 
-    print("Loading data from database...")
+    logger.debug("Loading data from database...")
 
     # Reload tag ID cache if enabled (ensure fresh mappings before loading IDs)
     if config.TAG_ID_CACHE_ENABLED:
@@ -55,7 +59,7 @@ def _load_data_from_db_impl():
         cursor = conn.cursor()
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='images';")
         if cursor.fetchone() is None:
-            print("Warning: Database tables not found. Skipping data load.")
+            logger.warning("Database tables not found. Skipping data load.")
             with data_lock:
                 tag_counts.clear()
                 image_data.clear()
@@ -106,8 +110,7 @@ def _load_data_from_db_impl():
                     row_dict['tags'] = interned_tags
                 temp_image_data.append(row_dict)
 
-        # Build cross-source post_id index with batched JSON parsing
-        print("Building cross-source post_id index...")
+        # Build cross-source post_id index with tqdm progress
         cursor.execute("""
             SELECT i.md5, rm.data
             FROM images i
@@ -115,27 +118,29 @@ def _load_data_from_db_impl():
             WHERE rm.data IS NOT NULL
         """)
 
-        # Batch process JSON parsing to show progress and reduce memory pressure
-        BATCH_SIZE = 1000
         rows = cursor.fetchall()
-        total_rows = len(rows)
-
-        for i in range(0, total_rows, BATCH_SIZE):
-            batch = rows[i:i + BATCH_SIZE]
-            for row in batch:
-                try:
-                    metadata = json.loads(row['data'])
-                    md5 = sys.intern(row['md5'])  # Intern MD5 strings for memory efficiency
-                    for source, data in metadata.get('sources', {}).items():
-                        if source in ['danbooru', 'e621', 'gelbooru', 'yandere']:
-                            post_id = data.get('id')
-                            if post_id:
-                                temp_post_id_to_md5[post_id] = md5
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    continue
-
-            if i + BATCH_SIZE < total_rows:
-                print(f"  Processed {i + BATCH_SIZE}/{total_rows} metadata entries...")
+        parse_errors = 0
+        
+        # Only show progress bar if verbose=True
+        disable_tqdm = not verbose
+        
+        for row in tqdm(rows, desc="Building post_id index", unit="entries", leave=False, disable=disable_tqdm):
+            try:
+                metadata = json.loads(row['data'])
+                md5 = sys.intern(row['md5'])  # Intern MD5 strings for memory efficiency
+                for source, data in metadata.get('sources', {}).items():
+                    if source in ['danbooru', 'e621', 'gelbooru', 'yandere']:
+                        post_id = data.get('id')
+                        if post_id:
+                            temp_post_id_to_md5[post_id] = md5
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                parse_errors += 1
+                if parse_errors <= 5:  # Log first 5 errors in detail
+                    logger.error(f"Error parsing metadata for md5={row['md5']}: {e}")
+                continue
+        
+        if parse_errors > 5:
+            logger.warning(f"Suppressed {parse_errors - 5} additional metadata parse errors")
 
     # Update global caches atomically with minimal lock time
     with data_lock:
@@ -147,30 +152,30 @@ def _load_data_from_db_impl():
         post_id_to_md5.update(temp_post_id_to_md5)
         _loading_in_progress = False
 
-    print(f"Loaded {len(image_data)} images, {len(tag_counts)} unique tags, {len(post_id_to_md5)} cross-source post_ids.")
+    logger.info(f"Loaded {len(image_data)} images, {len(tag_counts)} unique tags, {len(post_id_to_md5)} cross-source post_ids.")
     return True
 
 
-def load_data_from_db():
+def load_data_from_db(verbose=True):
     """Load or reload data from the database into the in-memory caches (synchronous)."""
     global _loading_in_progress
 
     with data_lock:
         if _loading_in_progress:
-            print("Cache load already in progress, skipping...")
+            logger.debug("Cache load already in progress, skipping...")
             return False
         _loading_in_progress = True
 
     try:
-        return _load_data_from_db_impl()
+        return _load_data_from_db_impl(verbose=verbose)
     except Exception as e:
-        print(f"Error loading cache: {e}")
+        logger.error(f"Error loading cache: {e}")
         with data_lock:
             _loading_in_progress = False
         return False
 
 
-def load_data_from_db_async():
+def load_data_from_db_async(verbose=False):
     """Load data asynchronously in background thread to avoid blocking the main thread.
 
     Returns a Future object that can be waited on if needed.
@@ -179,18 +184,18 @@ def load_data_from_db_async():
 
     with data_lock:
         if _loading_in_progress:
-            print("Cache load already in progress, skipping async request...")
+            logger.debug("Cache load already in progress, skipping async request...")
             return None
         _loading_in_progress = True
 
     # Submit to executor
-    future = _load_executor.submit(_load_data_from_db_impl)
+    future = _load_executor.submit(_load_data_from_db_impl, verbose=verbose)
 
     def on_error(fut):
         try:
             fut.result()
         except Exception as e:
-            print(f"Async cache load failed: {e}")
+            logger.error(f"Async cache load failed: {e}")
             with data_lock:
                 global _loading_in_progress
                 _loading_in_progress = False

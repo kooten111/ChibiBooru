@@ -42,7 +42,7 @@ def create_app():
     check_and_apply_priority_changes()
 
     # Load data from DB on startup (no app context needed in Quart)
-    models.load_data_from_db()
+    models.load_data_from_db(verbose=False)
 
     # Note: Monitor service is now run as a standalone process (monitor_runner.py)
     # and is started by start_booru.sh. This prevents duplicate monitors when

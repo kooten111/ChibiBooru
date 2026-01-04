@@ -1,6 +1,9 @@
 # database.py
+import logging
 import sqlite3
 import config
+
+logger = logging.getLogger('chibibooru.Database')
 
 DB_FILE = "booru.db"
 
@@ -80,18 +83,18 @@ def initialize_database():
 
         for col, col_type in columns_to_add.items():
             if col not in existing_columns:
-                print(f"Adding column '{col}' to 'images' table...")
+                logger.debug(f"Adding column '{col}' to 'images' table...")
                 cur.execute(f"ALTER TABLE images ADD COLUMN {col} {col_type}")
 
         # Handle ingested_at column separately (requires special handling for CURRENT_TIMESTAMP)
         if 'ingested_at' not in existing_columns:
-            print("Adding 'ingested_at' column to 'images' table...")
+            logger.debug("Adding 'ingested_at' column to 'images' table...")
             # SQLite doesn't support DEFAULT CURRENT_TIMESTAMP in ALTER TABLE
             # Add without default, then update existing rows
             cur.execute("ALTER TABLE images ADD COLUMN ingested_at TIMESTAMP")
             # Set a default timestamp for existing rows (use current time)
             cur.execute("UPDATE images SET ingested_at = CURRENT_TIMESTAMP WHERE ingested_at IS NULL")
-            print("Updated existing images with current timestamp")
+            logger.debug("Updated existing images with current timestamp")
 
         # Tags table
         cur.execute("""
@@ -107,7 +110,7 @@ def initialize_database():
         tag_columns = [row['name'] for row in cur.fetchall()]
 
         if 'extended_category' not in tag_columns:
-            print("Adding 'extended_category' column to 'tags' table...")
+            logger.debug("Adding 'extended_category' column to 'tags' table...")
             cur.execute("ALTER TABLE tags ADD COLUMN extended_category TEXT")
 
         # Image-to-Tag mapping table
@@ -126,7 +129,7 @@ def initialize_database():
         image_tags_columns = [row['name'] for row in cur.fetchall()]
 
         if 'source' not in image_tags_columns:
-            print("Adding 'source' column to 'image_tags' table...")
+            logger.debug("Adding 'source' column to 'image_tags' table...")
             cur.execute("""
                 ALTER TABLE image_tags
                 ADD COLUMN source TEXT DEFAULT 'original'
@@ -138,7 +141,7 @@ def initialize_database():
             cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='image_tags'")
             schema = cur.fetchone()
             if schema and 'implication' not in schema['sql']:
-                print("Migrating image_tags table to allow 'implication' source...")
+                logger.debug("Migrating image_tags table to allow 'implication' source...")
                 # Recreate table with updated constraint
                 cur.execute("""
                     CREATE TABLE image_tags_new (
@@ -157,7 +160,7 @@ def initialize_database():
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_image_id ON image_tags(image_id)")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_tag_id ON image_tags(tag_id)")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_image_tags_source ON image_tags(source)")
-                print("Migration complete.")
+                logger.debug("Migration complete.")
 
         # Sources table
         cur.execute("""
@@ -317,7 +320,7 @@ def initialize_database():
         # Initialize default config if empty
         cur.execute("SELECT COUNT(*) as cnt FROM rating_inference_config")
         if cur.fetchone()['cnt'] == 0:
-            print("Initializing rating inference config with defaults...")
+            logger.debug("Initializing rating inference config with defaults...")
             default_config = [
                 ('threshold_general', 0.5),
                 ('threshold_sensitive', 0.6),
@@ -453,7 +456,7 @@ def initialize_database():
         """)
 
         conn.commit()
-        print("Database initialized successfully.")
+        logger.info("Database initialized successfully.")
 
 
 def repair_orphaned_image_tags():
@@ -493,7 +496,7 @@ def repair_orphaned_image_tags():
         if not orphaned_images:
             return 0
 
-        print(f"Found {len(orphaned_images)} images with orphaned tags. Rebuilding relationships...")
+        logger.info(f"Found {len(orphaned_images)} images with orphaned tags. Rebuilding relationships...")
 
         total_tags_added = 0
 
@@ -542,7 +545,7 @@ def repair_orphaned_image_tags():
                     total_tags_added += 1
 
         conn.commit()
-        print(f"✅ Repaired {len(orphaned_images)} images, added {total_tags_added} tag relationships")
+        logger.info(f"✅ Repaired {len(orphaned_images)} images, added {total_tags_added} tag relationships")
 
         return len(orphaned_images)
 
@@ -560,7 +563,7 @@ def populate_fts_table():
         images_count = cur.fetchone()['cnt']
 
         if fts_count == 0 and images_count > 0:
-            print(f"Populating FTS table with {images_count} images...")
+            logger.debug(f"Populating FTS table with {images_count} images...")
             cur.execute("""
                 INSERT INTO images_fts(filepath, tags_all, tags_character, tags_copyright, tags_artist, tags_species, tags_meta, tags_general)
                 SELECT
@@ -580,11 +583,11 @@ def populate_fts_table():
                 FROM images
             """)
             conn.commit()
-            print(f"FTS table populated with {images_count} entries.")
+            logger.debug(f"FTS table populated with {images_count} entries.")
         elif fts_count != images_count:
-            print(f"Warning: FTS table has {fts_count} entries but images table has {images_count}. Consider rebuilding FTS.")
+            logger.warning(f"FTS table has {fts_count} entries but images table has {images_count}. Consider rebuilding FTS.")
         else:
-            print(f"FTS table already populated ({fts_count} entries).")
+            logger.debug(f"FTS table already populated ({fts_count} entries).")
 
 if __name__ == "__main__":
     initialize_database()
