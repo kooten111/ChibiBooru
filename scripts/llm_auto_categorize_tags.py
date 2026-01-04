@@ -16,7 +16,7 @@ from time import sleep
 
 # API configuration (can be overridden via environment variables)
 CHIBIBOORU_API_URL = os.environ.get('CHIBIBOORU_API_URL', 'http://localhost:5000/api')
-LM_STUDIO_URL = os.environ.get('LM_STUDIO_URL', 'http://localhost:1234/v1/chat/completions')
+LM_STUDIO_URL = os.environ.get('LM_STUDIO_URL', 'http://192.168.1.2:1234/v1/chat/completions')
 MODEL_NAME = os.environ.get('LM_STUDIO_MODEL', 'mistralai/ministral-3-14b-reasoning')
 
 # Load category definitions from API
