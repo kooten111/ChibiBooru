@@ -50,15 +50,8 @@ def get_torch_device(backend: str) -> str:
         return "cuda"
         
     elif backend == Backend.XPU:
+        # PyTorch nightly has XPU built-in, IPEX not required
         if not hasattr(torch, 'xpu') or not torch.xpu.is_available():
-             # Try explicit import if not already done, though server.py should handle this
-            try:
-                import intel_extension_for_pytorch as ipex
-                if torch.xpu.is_available():
-                    return "xpu"
-            except ImportError:
-                pass
-                
             logger.error("Backend is XPU but torch.xpu.is_available() is False!")
             sys.exit(1)
         return "xpu"

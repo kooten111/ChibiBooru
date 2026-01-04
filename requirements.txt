@@ -52,12 +52,11 @@ numpy>=2.2.0,<3.0.0
 imagehash>=4.3.1,<5.0.0
 
 # ----------------------------------------------------------------------------
-# AI/ML - Optional for Local Tagging
+# AI/ML - ONNX Runtime for Tagger and Similarity models
 # ----------------------------------------------------------------------------
-# Uncomment these if you want to use local AI tagging with ONNX models
+# Note: PyTorch and torchvision are installed separately by setup_ml.py
+# based on your hardware backend (XPU, CUDA, or CPU)
 onnxruntime>=1.23.2,<2.0.0
-torchvision>=0.20.0,<1.0.0
-
 
 # ----------------------------------------------------------------------------
 # File System & Monitoring

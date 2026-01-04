@@ -46,7 +46,7 @@ class MLWorkerClient:
     """
 
     def __init__(self, socket_path: Optional[str] = None,
-                 timeout: float = 30.0,
+                 timeout: float = 300.0,
                  max_retries: int = 3):
         """
         Initialize ML worker client.

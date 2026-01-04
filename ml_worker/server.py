@@ -395,13 +395,14 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
         logger.error("ML_WORKER_BACKEND not set")
         raise RuntimeError("ML_WORKER_BACKEND not set")
         
-    # Import IPEX if XPU - Critical for Intel GPU
+    # Import IPEX if available (not required with PyTorch nightly XPU)
     if backend == 'xpu':
         try:
             import intel_extension_for_pytorch as ipex
             logger.info("Intel Extension for PyTorch imported for Upscaler")
         except ImportError:
-            logger.error("Failed to import intel_extension_for_pytorch despite XPU backend!")
+            # IPEX not required with PyTorch nightly - XPU support is built-in
+            logger.info("IPEX not installed, using built-in XPU support")
             
     device = get_torch_device(backend)
     
