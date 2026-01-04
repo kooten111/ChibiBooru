@@ -49,7 +49,7 @@ body.image-page {
     flex-direction: column;
     flex: 1;
     min-height: 0;
-    align-items: center;
+
 }
 
 .image-page .sidebar-right {

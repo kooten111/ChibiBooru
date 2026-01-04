@@ -47,12 +47,21 @@ def get_upscale_url(filepath: str) -> Optional[str]:
     if not check_upscale_exists(filepath):
         return None
     
+    from urllib.parse import quote
+    
     upscaled_path = get_upscaled_path(filepath)
-    if upscaled_path.startswith('./static/'):
-        return upscaled_path.replace('./static/', '/static/')
-    elif upscaled_path.startswith('static/'):
-        return '/' + upscaled_path
-    return upscaled_path
+    
+    # We need to preserve the slashes but encode the path components
+    # Especially for files with spaces, parentheses, etc.
+    parts = upscaled_path.split('/')
+    encoded_parts = [quote(part) for part in parts]
+    encoded_path = '/'.join(encoded_parts)
+    
+    if encoded_path.startswith('./static/'):
+        return encoded_path.replace('./static/', '/static/')
+    elif encoded_path.startswith('static/'):
+        return '/' + encoded_path
+    return encoded_path
 
 
 async def upscale_image(filepath: str, force: bool = False) -> Dict:

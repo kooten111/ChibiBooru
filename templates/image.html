@@ -23,6 +23,20 @@
 
     {# Related images are now preloaded via JavaScript AFTER main image loads #}
     {# This prevents bandwidth competition on initial page load #}
+
+    <style>
+        /* 
+           Enforce "fit to container" behavior where the image scales to fill the available space
+           while maintaining aspect ratio. This ensures both original (small) and upscaled (large)
+           images occupy the exact same screen real estate, preventing layout shifts during comparison.
+        */
+        .image-view img,
+        .image-view video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain !important;
+        }
+    </style>
 </head>
 
 <body class="image-page">

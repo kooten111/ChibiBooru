@@ -12,7 +12,11 @@ function initImageViewer() {
 
     const imageView = document.querySelector('.image-view');
     const body = document.body;
-    const img = imageView?.querySelector('img');
+    // Target the stack wrapper if it exists (created by upscaler), otherwise the image itself
+    let transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
+
+    // We also need access to the image for dimensions/cursor, prefer the visible one or any
+    let imgElement = imageView?.querySelector('img');
 
     if (!body.classList.contains('image-page')) return;
 
@@ -130,8 +134,8 @@ function initImageViewer() {
     // ============================================================================
 
     function updateTransform() {
-        if (img) {
-            img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+        if (transformTarget) {
+            transformTarget.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
         }
     }
 
@@ -143,11 +147,11 @@ function initImageViewer() {
     }
 
     function updateCursor() {
-        if (!img) return;
+        if (!transformTarget) return;
         if (scale > 1) {
-            img.style.cursor = isDragging ? 'grabbing' : 'grab';
+            transformTarget.style.cursor = isDragging ? 'grabbing' : 'grab';
         } else {
-            img.style.cursor = 'zoom-in';
+            transformTarget.style.cursor = 'zoom-in';
         }
     }
 
@@ -169,7 +173,11 @@ function initImageViewer() {
 
     // Mouse wheel to zoom (only in focus mode)
     const wheelHandler = function (event) {
-        if (!body.classList.contains('focus-mode') || !img) return;
+        // Refresh target reference in case it changed (e.g. upscaler init)
+        transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
+        imgElement = imageView?.querySelector('img');
+
+        if (!body.classList.contains('focus-mode') || !transformTarget) return;
 
         event.preventDefault();
 
@@ -178,7 +186,8 @@ function initImageViewer() {
         const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * (1 + delta * zoomIntensity)));
 
         if (newScale !== scale) {
-            const rect = img.getBoundingClientRect();
+            // Use imgElement for rect calculation to pivot around the image center
+            const rect = (imgElement || transformTarget).getBoundingClientRect();
             const pointX = event.clientX;
             const pointY = event.clientY;
             const imgCenterX = rect.left + rect.width / 2;
@@ -196,7 +205,7 @@ function initImageViewer() {
 
     // Mouse drag to pan when zoomed in
     const mouseDownHandler = function (event) {
-        if (scale > 1 && img) {
+        if (scale > 1 && transformTarget) {
             event.preventDefault();
             isDragging = true;
             startX = event.clientX - translateX;
@@ -329,7 +338,7 @@ function initImageViewer() {
             floatingFavBtn.classList.toggle('active', isFav);
         });
         observer.observe(mainFavBtn, { attributes: true, attributeFilter: ['class'] });
-        
+
         // Initial state
         const isFav = mainFavBtn.classList.contains('is-favourite');
         floatingFavBtn.textContent = isFav ? '❤️' : '🤍';
@@ -337,10 +346,39 @@ function initImageViewer() {
     }
 
     // Image zoom/pan events
-    if (img) {
-        img.addEventListener('click', imgClickHandler);
-        img.addEventListener('mousedown', mouseDownHandler);
-        img.addEventListener('contextmenu', contextMenuHandler);
+    // Attach to container to catch events on any image inside
+    if (imageView) {
+        // We delegate click/mousedown to the container or specific images
+        // But for drag start, we want to listen on the image(s)
+        const bindImageEvents = (element) => {
+            if (!element) return;
+            element.addEventListener('click', imgClickHandler);
+            element.addEventListener('mousedown', mouseDownHandler);
+            element.addEventListener('contextmenu', contextMenuHandler);
+        };
+
+        // Bind to existing image
+        bindImageEvents(imgElement);
+
+        // Observer to bind to new images (e.g. upscaled one added later)
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                for (const node of mutation.addedNodes) {
+                    if (node.tagName === 'IMG' || node.classList?.contains('image-stack')) {
+                        // Re-fetch targets
+                        transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
+                        imgElement = imageView?.querySelector('img');
+
+                        // Bind events if it's an image
+                        if (node.tagName === 'IMG') bindImageEvents(node);
+                        if (node.classList?.contains('image-stack')) {
+                            node.querySelectorAll('img').forEach(bindImageEvents);
+                        }
+                    }
+                }
+            }
+        });
+        observer.observe(imageView, { childList: true, subtree: true });
     }
 
     if (imageView) {
@@ -368,10 +406,10 @@ function initImageViewer() {
         prevBtn?.removeEventListener('click', () => navigate('prev'));
         nextBtn?.removeEventListener('click', () => navigate('next'));
 
-        if (img) {
-            img.removeEventListener('click', imgClickHandler);
-            img.removeEventListener('mousedown', mouseDownHandler);
-            img.removeEventListener('contextmenu', contextMenuHandler);
+        if (imgElement) {
+            imgElement.removeEventListener('click', imgClickHandler);
+            imgElement.removeEventListener('mousedown', mouseDownHandler);
+            imgElement.removeEventListener('contextmenu', contextMenuHandler);
         }
 
         if (imageView) {
