@@ -280,7 +280,10 @@ function initImageViewer() {
 
     // Click outside image to exit focus mode
     const imageViewClickHandler = function (event) {
-        if (event.target === imageView && body.classList.contains('focus-mode')) {
+        // Allow exit if clicking on container OR the stack wrapper (which covers container)
+        // But NOT if clicking on the actual image inside
+        if ((event.target === imageView || event.target.classList.contains('image-stack')) &&
+            body.classList.contains('focus-mode')) {
             exitFocusMode();
         }
     };

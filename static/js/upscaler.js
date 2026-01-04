@@ -329,33 +329,35 @@
             stack.className = 'image-stack';
 
             // Layout: Absolute overlay to prevent flow impact
+            // Stack container - just a positioning context
             stack.style.position = 'absolute';
             stack.style.top = '0';
             stack.style.left = '0';
-            stack.style.width = '100%';
-            stack.style.height = '100%';
+            stack.style.right = '0';
+            stack.style.bottom = '0';
             stack.style.boxSizing = 'border-box';
+            stack.style.padding = '24px';
 
             // Match the padding of the parent container to keep visual consistency
             // Using a safe approximation for var(--spacing-lg)
-            stack.style.padding = '24px';
 
-            stack.style.display = 'grid';
-            stack.style.alignItems = 'center';
-            stack.style.justifyItems = 'center';
-
+            // Remove display: flex/grid entirely
             // Insert stack and move original image into it
             originalImg.parentNode.insertBefore(stack, originalImg);
             stack.appendChild(originalImg);
 
             // Original Image Constraints
-            originalImg.style.gridArea = '1 / 1';
-            originalImg.style.zIndex = '1';
-            originalImg.style.width = '100%';
-            originalImg.style.height = '100%';
-            originalImg.style.maxWidth = 'none';
-            originalImg.style.maxHeight = 'none';
+            // Original image - absolutely positioned and centered
+            originalImg.style.position = 'absolute';
+            originalImg.style.top = '50%';
+            originalImg.style.left = '50%';
+            originalImg.style.transform = 'translate(-50%, -50%)';
+            originalImg.style.maxWidth = '100%';
+            originalImg.style.maxHeight = '100%';
+            originalImg.style.width = 'auto';
+            originalImg.style.height = 'auto';
             originalImg.style.objectFit = 'contain';
+            originalImg.style.zIndex = '1';
         }
 
         if (!stack) return; // Should not happen if originalImg exists
@@ -368,14 +370,17 @@
             upscaledImg.alt = 'Upscaled Image';
 
             // Upscaled Image Constraints
-            upscaledImg.style.gridArea = '1 / 1';
-            upscaledImg.style.zIndex = '2'; // Top layer
-
-            upscaledImg.style.width = '100%';
-            upscaledImg.style.height = '100%';
-            upscaledImg.style.maxWidth = 'none';
-            upscaledImg.style.maxHeight = 'none';
+            // Upscaled image - identical positioning, just higher z-index
+            upscaledImg.style.position = 'absolute';
+            upscaledImg.style.top = '50%';
+            upscaledImg.style.left = '50%';
+            upscaledImg.style.transform = 'translate(-50%, -50%)';
+            upscaledImg.style.maxWidth = '100%';
+            upscaledImg.style.maxHeight = '100%';
+            upscaledImg.style.width = 'auto';
+            upscaledImg.style.height = 'auto';
             upscaledImg.style.objectFit = 'contain';
+            upscaledImg.style.zIndex = '2';
 
             stack.appendChild(upscaledImg);
         }
