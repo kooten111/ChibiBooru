@@ -11,6 +11,7 @@
     let hasUpscaled = false;
     let isUpscaling = false;
     let showingUpscaled = false;
+    let isComparing = false;
     let upscalerEnabled = false;
     let upscalerReady = false;
 
@@ -63,7 +64,34 @@
 
         // Attach event listeners
         upscaleBtn.addEventListener('click', handleUpscaleClick);
+
+        // Key listeners for comparison
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
     }
+
+    /**
+     * Handle key down event
+     */
+    function handleKeyDown(e) {
+        // 'c' key for compare
+        if (e.key.toLowerCase() === 'c' && !e.repeat) {
+            // Ignore if typing in an input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            startComparison();
+        }
+    }
+
+    /**
+     * Handle key up event
+     */
+    function handleKeyUp(e) {
+        if (e.key.toLowerCase() === 'c') {
+            stopComparison();
+        }
+    }
+
+
 
     /**
      * Check upscaler feature status
@@ -127,7 +155,7 @@
 
         if (hasUpscaled) {
             upscaleBtn.classList.add('upscale-done');
-            upscaleBtn.title = 'Upscale options (hover for menu)';
+            upscaleBtn.title = 'Upscale options (hover for menu) | Hold "C" to compare';
             iconSpan.innerHTML = '✨';
             return;
         }
@@ -481,18 +509,71 @@
     }
 
     /**
+     * Start comparing (show original with locked dims)
+     */
+    function startComparison() {
+        if (!hasUpscaled || !imageContainer) return;
+
+        isComparing = true;
+
+        const img = imageContainer.querySelector('img');
+        if (!img) return;
+
+        // Lock dimensions to current rendered size (layout size, ignoring transforms)
+        const width = img.offsetWidth;
+        const height = img.offsetHeight;
+
+        // Store original inline styles to restore later if needed, but for now we just clear them on stop
+        img.style.width = width + 'px';
+        img.style.height = height + 'px';
+        // We might need to override max-width/height ensuring it stays fixed
+        img.style.maxWidth = 'none';
+        img.style.maxHeight = 'none';
+
+        // Swap to original
+        if (img.dataset.originalSrc) {
+            img.src = img.dataset.originalSrc;
+        }
+    }
+
+    /**
+     * Stop comparing (show upscaled, unlock dims)
+     */
+    function stopComparison() {
+        if (!isComparing || !imageContainer) return;
+
+        isComparing = false;
+
+        const img = imageContainer.querySelector('img');
+        if (!img) return;
+
+        // Swap back to upscaled
+        if (img.dataset.upscaledSrc) {
+            img.src = img.dataset.upscaledSrc;
+        }
+
+        // Unlock dimensions
+        img.style.width = '';
+        img.style.height = '';
+        img.style.maxWidth = '';
+        img.style.maxHeight = '';
+    }
+
+    /**
      * Re-initialize for client-side navigation
      */
     function reinit() {
         hasUpscaled = false;
         isUpscaling = false;
         showingUpscaled = false;
+        isComparing = false; // Reset comparison state
 
         if (hoverMenu) hoverMenu.remove();
         hoverMenu = null;
 
         init();
     }
+
 
     // Initialize on DOM ready
     if (document.readyState === 'loading') {
