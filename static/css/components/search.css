@@ -150,7 +150,18 @@
     background: transparent;
     outline: none;
     box-shadow: none;
-    padding: 6px 4px;
+
+    /* FIX: Override generic header input styles */
+    padding: 0 !important;
+
+    /* FIX: Strict vertical centering matching container content height (48px - 16px padding = 32px) */
+    min-height: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+
+    align-self: center;
+    margin: 0;
+
     font-size: var(--font-size-base);
     color: var(--text-primary);
     font-family: inherit;
@@ -514,4 +525,3 @@
     background: var(--primary-blue-medium);
     border-left: 3px solid var(--primary-blue);
 }
-
