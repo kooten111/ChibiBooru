@@ -290,7 +290,7 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
 class SemanticSearchEngine:
     def __init__(self):
         self.model_path = config.SEMANTIC_MODEL_PATH
-        self.session = None
+        self.ml_worker_ready = False  # Flag to indicate ML Worker is available
         self.index = None
         self.image_ids = [] # map index ID to image ID
         self.index_dirty = True
@@ -311,8 +311,8 @@ class SemanticSearchEngine:
             print(f"[Similarity] Model not found at {self.model_path}")
             return False
         
-        # Mark as loaded if ML Worker is available
-        self.session = True  # Use as a flag to indicate model is "ready" via ML Worker
+        # Mark as ready if ML Worker is available
+        self.ml_worker_ready = True
         return True
 
     def get_embedding(self, image_path: str) -> Optional[np.ndarray]:
@@ -766,7 +766,7 @@ def _process_semantic_single(row: dict) -> dict:
         # but ORT is generally thread safe for independent runs)
         engine = get_semantic_engine()
         # Ensure loaded
-        if not engine.session:
+        if not engine.ml_worker_ready:
             # Load explicitly if not loaded (main thread should have loaded it, but self-repair is good)
             print(f"[Semantic Worker {row['id']}] Loading model (latency expected)...")
             engine.load_model()

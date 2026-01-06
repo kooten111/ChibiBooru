@@ -270,7 +270,7 @@ def tag_with_local_tagger(filepath):
     except Exception as e:
         print(f"[Local Tagger] ML Worker error for {filepath}: {e}")
         print(f"[Local Tagger] ERROR: ML Worker failed. Skipping file.")
-        return None  # Hard error - don't fall back to local loading
+        return None  # ML Worker is required - no fallback available
 
 
 def check_ffmpeg_available():
