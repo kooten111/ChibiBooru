@@ -684,9 +684,6 @@ body.image-page {
     height: auto;
     display: block;
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-2xl);
-    border: var(--border-width) solid var(--border-color);
-    transition: box-shadow var(--transition-smooth), border-color var(--transition-smooth);
     cursor: zoom-in;
     object-fit: contain;
     user-select: none;
