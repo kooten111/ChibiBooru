@@ -17,32 +17,30 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Optional dependencies for Semantic Similarity
-# Always try to import onnxruntime for fallback when ML worker fails
+# Keep numpy and faiss for FAISS index operations (these are lightweight)
+# Remove onnxruntime - all ML inference goes through ML Worker
 try:
-    import onnxruntime as ort
     import numpy as np
     import faiss
-    ONNX_AVAILABLE = True
+    NUMPY_FAISS_AVAILABLE = True
 except ImportError:
-    ONNX_AVAILABLE = False
-    ort = None  # Define as None to avoid NameError
+    NUMPY_FAISS_AVAILABLE = False
+    np = None
+    faiss = None
 
-# Check if ML worker is enabled
-if config.ENABLE_SEMANTIC_SIMILARITY and config.ML_WORKER_ENABLED:
+# ML Worker client - always import for semantic similarity
+if config.ENABLE_SEMANTIC_SIMILARITY:
     try:
         from ml_worker.client import get_ml_worker_client
         ML_WORKER_AVAILABLE = True
-        SEMANTIC_AVAILABLE = True  # Available through worker (with local fallback if ONNX_AVAILABLE)
+        SEMANTIC_AVAILABLE = NUMPY_FAISS_AVAILABLE  # Need numpy/faiss for FAISS index
     except ImportError:
         ML_WORKER_AVAILABLE = False
-        SEMANTIC_AVAILABLE = ONNX_AVAILABLE  # Fall back to local if available
-        if not SEMANTIC_AVAILABLE:
-            print("[Similarity] Warning: ML Worker not available and onnxruntime not installed")
+        SEMANTIC_AVAILABLE = False
+        print("[Similarity] Warning: ML Worker not available. Semantic similarity disabled.")
 else:
     ML_WORKER_AVAILABLE = False
-    SEMANTIC_AVAILABLE = ONNX_AVAILABLE
-    if not SEMANTIC_AVAILABLE:
-        print("[Similarity] Warning: semantic similarity dependencies missing (onnxruntime, numpy, faiss)")
+    SEMANTIC_AVAILABLE = False
 
 # Global state for semantic search
 _semantic_engine = None
@@ -298,166 +296,45 @@ class SemanticSearchEngine:
         self.index_dirty = True
         
     def load_model(self):
-        if not SEMANTIC_AVAILABLE: return False
-        if self.session: return True
+        """
+        Check if semantic similarity is available via ML Worker.
+        No longer loads ONNX models directly - all inference via ML Worker.
+        """
+        if not SEMANTIC_AVAILABLE:
+            return False
         
+        if not ML_WORKER_AVAILABLE:
+            print("[Similarity] ERROR: ML Worker not available for semantic similarity")
+            return False
+            
         if not os.path.exists(self.model_path):
             print(f"[Similarity] Model not found at {self.model_path}")
             return False
-            
-        try:
-            # Load ONNX model
-            # Load ONNX model with GPU support if available (fallback to CPU)
-            providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'CPUExecutionProvider']
-            self.session = ort.InferenceSession(self.model_path, providers=providers)
-            # Verify inputs/outputs
-            self.input_name = self.session.get_inputs()[0].name
-            # We expect the embedding output to be available (added via modification script)
-            # It's usually the second or third output now
-            self.output_names = [o.name for o in self.session.get_outputs()]
-            print(f"[Similarity] Loaded semantic model. Outputs: {self.output_names}")
-            return True
-        except Exception as e:
-            print(f"[Similarity] Error loading model: {e}")
-            return False
+        
+        # Mark as loaded if ML Worker is available
+        self.session = True  # Use as a flag to indicate model is "ready" via ML Worker
+        return True
 
     def get_embedding(self, image_path: str) -> Optional[np.ndarray]:
-        # Use ML worker if enabled and available
-        if config.ML_WORKER_ENABLED and ML_WORKER_AVAILABLE:
-            try:
-                client = get_ml_worker_client()
-                result = client.compute_similarity(
-                    image_path=image_path,
-                    model_path=self.model_path
-                )
-                embedding = result['embedding']
-                return np.array(embedding, dtype=np.float32)
-            except Exception as e:
-                print(f"[Similarity] ML Worker error for {image_path}: {e}")
-                print(f"[Similarity] ERROR: ML Worker is enabled but failed. Skipping file.")
-                return None  # Hard error - don't fall back when ML worker is enabled
-
-        # Direct loading (fallback or when ML worker disabled)
-        if not self.load_model(): return None
-
-        try:
-            # Preprocess
-            img_tensor = self._preprocess(image_path)
-            if img_tensor is None: return None
-
-            # Run inference
-            # We want the normalized embedding (usually the last added output)
-            # In our modified model, it is 'StatefulPartitionedCall/ConvNextBV1/predictions_norm/add:0'
-            # We can request all outputs and pick the one with shape (1, 1024)
-            outputs = self.session.run(None, {self.input_name: img_tensor})
-
-            for out in outputs:
-                if out.shape == (1, 1024):
-                    return out[0] # Return 1D array
-
-            # Fallback: if we can't find exact shape, maybe it's the 3rd output
-            if len(outputs) >= 3:
-                 return outputs[2][0]
-
+        """
+        Get embedding for an image via ML Worker.
+        No fallback to local loading - ML Worker is the only way.
+        """
+        if not ML_WORKER_AVAILABLE:
+            print(f"[Similarity] ERROR: ML Worker not available. Cannot compute embedding for {image_path}")
             return None
-        except Exception as e:
-            print(f"[Similarity] Inference error for {image_path}: {e}")
-            return None
-
-    def _get_image_for_embedding(self, image_path: str) -> Optional[Image.Image]:
-        """Load image or extract frame from video for embedding."""
+            
         try:
-            # Check extension
-            if image_path.lower().endswith(config.SUPPORTED_VIDEO_EXTENSIONS):
-                # Use existing helper to compute pHash which extracts a frame? 
-                # No, we need the PIL Image object.
-                # Reuse the logic from compute_phash_for_video but return Image not hash?
-                # Actually, duplicate logic or factor it out?
-                # Let's verify if a thumbnail exists first, as it's faster.
-                rel_path = os.path.relpath(image_path, "static/images").replace('\\', '/')
-                thumb_path = get_thumbnail_path(f"images/{rel_path}")
-                # thumb_path is /thumbnails/uuid.jpg relative to static usually? 
-                # get_thumbnail_path returns URL path e.g. /thumbnails/...
-                # We need filesystem path.
-                # standard: static/thumbnails/UUID.jpg
-                
-                # We can't easily guess UUID from here without DB lookup usually.
-                # But wait, compute_phash_for_video extracts a temp frame. 
-                
-                import subprocess
-                import tempfile
-                
-                with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                    tmp_path = tmp.name
-                
-                cmd = [
-                    'ffmpeg', '-y', '-i', image_path,
-                    '-vframes', '1', '-f', 'image2',
-                    tmp_path
-                ]
-                # Suppress output
-                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
-                
-                if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-                    img = Image.open(tmp_path).convert('RGB')
-                    # We have to load it into memory before deleting file, or keep file until closed
-                    img.load() 
-                    os.unlink(tmp_path)
-                    return img
-                return None
-            
-            # Use logic to open file
-            img = Image.open(image_path)
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            return img
+            client = get_ml_worker_client()
+            result = client.compute_similarity(
+                image_path=image_path,
+                model_path=self.model_path
+            )
+            embedding = result['embedding']
+            return np.array(embedding, dtype=np.float32)
         except Exception as e:
-            print(f"[Similarity] Error loading image for embedding {image_path}: {e}")
-            return None
-
-    def _preprocess(self, image_path: str):
-        try:
-            # Get PIL Image (handles videos now)
-            img = self._get_image_for_embedding(image_path)
-            if img is None: return None
-            
-            # Setup transforms (manual to avoid torchvision dependency if possible, 
-            # but we likely have torchvision from requirements if using local tagger.
-            # If avoiding torchvision, we do numpy math)
-            # Resize to 448x448 (standard for v2? or 384? Model input says 448 in inspect output)
-            # Inspect output said: [1, 448, 448, 3] -> wait, inspect output said 448x448?
-            # Let's check my inspect output: "Shape: [1, 448, 448, 3]"
-            target_size = 448
-            
-            # Resize with aspect ratio preservation + padding
-            w, h = img.size
-            ratio = min(target_size/w, target_size/h)
-            new_w, new_h = int(w*ratio), int(h*ratio)
-            img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-            
-            # Paste on gray background (128, 128, 128) or specific mean? 
-            # WD14 usually uses (255, 255, 255) for padding? check processing_service
-            # processing_service used (124, 116, 104)
-            new_img = Image.new('RGB', (target_size, target_size), (124, 116, 104))
-            new_img.paste(img, ((target_size-new_w)//2, (target_size-new_h)//2))
-            
-            # Convert to numpy float32, normalize
-            # mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            data = np.array(new_img).astype(np.float32) / 255.0
-            mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-            std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-            data = (data - mean) / std
-            
-            # Transpose to BCHW? Inspect output said [1, 448, 448, 3] which is BHWC?
-            # Wait. Inspect output: "Name: input_1:0, Shape: [1, 448, 448, 3], Type: tensor(float)"
-            # This suggests TF-style NHWC! WD14 models are often Keras/TF exported to ONNX.
-            # processed `data` is (448, 448, 3).
-            # Expand dims to (1, 448, 448, 3)
-            data = np.expand_dims(data, axis=0)
-            
-            return data
-        except Exception as e:
-            print(f"[Similarity] Preprocessing error: {e}")
+            print(f"[Similarity] ML Worker error for {image_path}: {e}")
+            print(f"[Similarity] ERROR: ML Worker failed. Skipping file.")
             return None
 
     def build_index(self):
