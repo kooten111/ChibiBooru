@@ -247,10 +247,10 @@ UPSCALED_IMAGES_DIR = os.environ.get('UPSCALED_IMAGES_DIR', './static/upscaled')
 
 # ==================== ML WORKER (MEMORY OPTIMIZATION) ====================
 
-# Enable ML worker subprocess (recommended for memory efficiency)
-# When enabled, ML frameworks (PyTorch, ONNXRuntime) run in a separate process
-# that auto-terminates when idle, saving ~2 GB of RAM
-ML_WORKER_ENABLED = os.environ.get('ML_WORKER_ENABLED', 'true').lower() in ('true', '1', 'yes')
+# ML Worker is REQUIRED for all ML operations (tagging, similarity, upscaling)
+# ML frameworks (PyTorch, ONNXRuntime) run in a separate process that auto-terminates
+# when idle, saving ~2-3 GB of RAM in the main process.
+# The main process NEVER loads ML frameworks directly - all inference via ML Worker.
 
 # Idle timeout for ML worker (auto-terminate after N seconds of inactivity)
 # Default: 300 seconds (5 minutes)

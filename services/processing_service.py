@@ -22,38 +22,14 @@ from threading import Lock
 import fcntl
 import shutil
 
-# Dependencies - always try to import for fallback support when ML worker fails
-# Import onnxruntime (for fallback when ML worker fails)
+# ML Worker client - always import (no fallback to local loading)
 try:
-    import onnxruntime as ort
-    ONNX_AVAILABLE = True
+    from ml_worker.client import get_ml_worker_client
+    ML_WORKER_AVAILABLE = True
 except ImportError:
-    ONNX_AVAILABLE = False
-    ort = None  # Define as None to avoid NameError
-
-# Import torchvision (for fallback when ML worker fails)
-try:
-    import torchvision.transforms as transforms
-    TORCHVISION_AVAILABLE = True
-except ImportError:
-    TORCHVISION_AVAILABLE = False
-    transforms = None  # Define as None to avoid NameError
-
-# Check if ML worker is enabled
-if config.ML_WORKER_ENABLED:
-    try:
-        from ml_worker.client import get_ml_worker_client
-        ML_WORKER_AVAILABLE = True
-    except ImportError:
-        ML_WORKER_AVAILABLE = False
-        if not ONNX_AVAILABLE or not TORCHVISION_AVAILABLE:
-            print("Warning: ML Worker not available and fallback libraries missing.")
-else:
     ML_WORKER_AVAILABLE = False
-    if not ONNX_AVAILABLE:
-        print("Warning: onnxruntime not installed. Local Tagger will not be available.")
-    if not TORCHVISION_AVAILABLE:
-        print("Warning: torchvision not installed. Local Tagger's image preprocessing will fail.")
+    print("ERROR: ML Worker client not available. ML operations will fail.")
+    print("Ensure ml_worker module is installed and accessible.")
 
 # Load from config
 SAUCENAO_API_KEY = config.SAUCENAO_API_KEY
@@ -62,12 +38,8 @@ GELBOORU_USER_ID = config.GELBOORU_USER_ID
 THUMB_DIR = config.THUMB_DIR
 THUMB_SIZE = config.THUMB_SIZE
 
-# Local tagger
+# Local tagger configuration
 tagger_config = config.get_local_tagger_config()
-local_tagger_session = None
-local_tagger_metadata = None
-idx_to_tag_map = {}
-tag_to_category_map = {}
 
 
 class AdaptiveSauceNAORateLimiter:
@@ -262,89 +234,9 @@ def release_processing_lock(lock_fd):
             pass  # Lock cleanup failure is not critical
 
 
-def load_local_tagger():
-    """Load the local tagger model and metadata if not already loaded."""
-    global local_tagger_session, local_tagger_metadata, idx_to_tag_map, tag_to_category_map
-    if not ONNX_AVAILABLE or not TORCHVISION_AVAILABLE:
-        print("[Local Tagger] Missing required libraries (onnxruntime or torchvision). Tagger cannot be used.")
-        return
-
-    if local_tagger_session: # Already loaded
-        return
-
-    print("[Local Tagger] Attempting to load model...")
-    if not os.path.exists(tagger_config['model_path']) or not os.path.exists(tagger_config['metadata_path']):
-        print(f"[Local Tagger] ERROR: Model files not found.")
-        print(f"    - Searched for model at: {os.path.abspath(tagger_config['model_path'])}")
-        print(f"    - Searched for metadata at: {os.path.abspath(tagger_config['metadata_path'])}")
-        return
-
-    try:
-        # Load and parse the complex metadata structure
-        with open(tagger_config['metadata_path'], 'r') as f:
-            local_tagger_metadata = json.load(f)
-        
-        dataset_info = local_tagger_metadata['dataset_info']
-        tag_mapping = dataset_info['tag_mapping']
-        idx_to_tag_map = tag_mapping['idx_to_tag']
-        tag_to_category_map = tag_mapping['tag_to_category']
-        
-        # Determine providers based on config, but default to CPU for safety in main process
-        # unless user explicitly wants GPU here too.
-        # Ideally, we rely on ML Worker. But for fallback:
-        providers = ['CUDAExecutionProvider', 'OpenVINOExecutionProvider', 'CPUExecutionProvider']
-        local_tagger_session = ort.InferenceSession(tagger_config['model_path'], providers=providers)
-        
-        print(f"[Local Tagger] SUCCESS: Model loaded. Provider: {local_tagger_session.get_providers()[0]}")
-        print(f"    - Found {dataset_info['total_tags']} total tags.")
-
-    except Exception as e:
-        print(f"[Local Tagger] ERROR: Failed to load model files: {e}")
-        local_tagger_session = None
-        local_tagger_metadata = None
-        idx_to_tag_map = {}
-        tag_to_category_map = {}
-
-
-def preprocess_image_for_local_tagger(image_path):
-    """Process an image for the tagger with proper ImageNet normalization."""
-    image_size = local_tagger_metadata.get('model_info', {}).get('img_size', 512)
-    
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    
-    try:
-        with Image.open(image_path) as img:
-            if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
-            
-            width, height = img.size
-            aspect_ratio = width / height
-            
-            if aspect_ratio > 1:
-                new_width = image_size
-                new_height = int(new_width / aspect_ratio)
-            else:
-                new_height = image_size
-                new_width = int(new_height * aspect_ratio)
-                
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            
-            pad_color = (124, 116, 104) # Corresponds to ImageNet mean
-            new_image = Image.new('RGB', (image_size, image_size), pad_color)
-            new_image.paste(img, ((image_size - new_width) // 2, (image_size - new_height) // 2))
-            
-            return transform(new_image).unsqueeze(0).numpy()
-    except UnidentifiedImageError:
-        print(f"[Local Tagger] ERROR: Cannot identify image file {image_path}")
-        return None
-
-
 def tag_with_local_tagger(filepath):
     """
-    Tag an image using the local tagger.
+    Tag an image using the local tagger via ML Worker.
 
     Returns dict with:
       - source: 'local_tagger'
@@ -352,102 +244,33 @@ def tag_with_local_tagger(filepath):
         - tags: categorized tags above display threshold (for active_source use)
         - all_predictions: list of {tag_name, category, confidence} above storage threshold
     """
-    # Use ML worker if enabled and available
-    if config.ML_WORKER_ENABLED and ML_WORKER_AVAILABLE:
-        print(f"[Local Tagger] Analyzing (via ML Worker): {os.path.basename(filepath)}")
-        try:
-            client = get_ml_worker_client()
-            result = client.tag_image(
-                image_path=filepath,
-                model_path=tagger_config['model_path'],
-                threshold=tagger_config.get('threshold', 0.50),
-                character_threshold=0.85,
-                metadata_path=tagger_config.get('metadata_path')
-            )
-
-            return {
-                "source": "local_tagger",
-                "data": {
-                    "tags": result['tags'],
-                    "tagger_name": result['tagger_name'],
-                    "all_predictions": result['all_predictions']
-                }
-            }
-        except Exception as e:
-            print(f"[Local Tagger] ML Worker error for {filepath}: {e}")
-            print(f"[Local Tagger] ERROR: ML Worker is enabled but failed. Skipping file.")
-            return None  # Hard error - don't fall back when ML worker is enabled
-
-    # Direct loading (fallback or when ML worker disabled)
-    load_local_tagger()
-    if not local_tagger_session:
-        print("[Local Tagger] Tagger not available, cannot process file.")
+    if not ML_WORKER_AVAILABLE:
+        print(f"[Local Tagger] ERROR: ML Worker not available. Cannot process {os.path.basename(filepath)}")
         return None
-
-    print(f"[Local Tagger] Analyzing (direct): {os.path.basename(filepath)}")
+    
+    print(f"[Local Tagger] Analyzing (via ML Worker): {os.path.basename(filepath)}")
     try:
-        img_numpy = preprocess_image_for_local_tagger(filepath)
-        if img_numpy is None:
-            return None
-        input_name = local_tagger_session.get_inputs()[0].name
-
-        raw_outputs = local_tagger_session.run(None, {input_name: img_numpy})
-
-        # Use refined predictions if available (output index 1)
-        logits = raw_outputs[1] if len(raw_outputs) > 1 else raw_outputs[0]
-        probs = 1.0 / (1.0 + np.exp(-logits))
-
-        # Get thresholds from config
-        storage_threshold = tagger_config.get('storage_threshold', 0.10)
-        display_threshold = tagger_config.get('threshold', 0.50)
-
-        # Collect ALL predictions above storage threshold (for database storage)
-        all_predictions = []
-
-        # Also collect tags above display threshold (for immediate use as active_source)
-        tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": [], "species": []}
-
-        # Get all indices above storage threshold
-        indices = np.where(probs[0] >= storage_threshold)[0]
-
-        for idx in indices:
-            idx_str = str(idx)
-            tag_name = idx_to_tag_map.get(idx_str)
-            if not tag_name:
-                continue
-
-            # Skip rating tags - these should only come from the rating inference system
-            if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
-                continue
-
-            category = tag_to_category_map.get(tag_name, "general")
-            confidence = float(probs[0][idx])
-
-            # Store all predictions above storage threshold
-            all_predictions.append({
-                'tag_name': tag_name,
-                'category': category,
-                'confidence': confidence
-            })
-
-            # Only add to display tags if above display threshold
-            if confidence >= display_threshold:
-                if category in tags_by_category:
-                    tags_by_category[category].append(tag_name)
-                else:
-                    tags_by_category["general"].append(tag_name)
+        client = get_ml_worker_client()
+        result = client.tag_image(
+            image_path=filepath,
+            model_path=tagger_config['model_path'],
+            threshold=tagger_config.get('threshold', 0.50),
+            character_threshold=0.85,
+            metadata_path=tagger_config.get('metadata_path')
+        )
 
         return {
             "source": "local_tagger",
             "data": {
-                "tags": tags_by_category,
-                "tagger_name": tagger_config.get('name', 'Unknown'),
-                "all_predictions": all_predictions
+                "tags": result['tags'],
+                "tagger_name": result['tagger_name'],
+                "all_predictions": result['all_predictions']
             }
         }
     except Exception as e:
-        print(f"[Local Tagger] ERROR during analysis for {filepath}: {e}")
-        return None
+        print(f"[Local Tagger] ML Worker error for {filepath}: {e}")
+        print(f"[Local Tagger] ERROR: ML Worker failed. Skipping file.")
+        return None  # ML Worker is required - no fallback available
 
 
 def check_ffmpeg_available():
@@ -480,7 +303,7 @@ def check_ffmpeg_available():
 
 def tag_video_with_frames(video_filepath, num_frames=5):
     """
-    Tag a video by extracting multiple frames and merging the tags.
+    Tag a video by extracting multiple frames and merging the tags using ML Worker.
 
     Args:
         video_filepath: Path to the video file
@@ -489,9 +312,8 @@ def tag_video_with_frames(video_filepath, num_frames=5):
     Returns:
         Dictionary with source and merged tag data, or None on failure
     """
-    load_local_tagger()
-    if not local_tagger_session:
-        print("[Video Tagger] Local tagger not available, cannot process video.")
+    if not ML_WORKER_AVAILABLE:
+        print("[Video Tagger] ERROR: ML Worker not available. Cannot process video.")
         return None
 
     import subprocess
@@ -518,6 +340,8 @@ def tag_video_with_frames(video_filepath, num_frames=5):
 
         # Store all tags from all frames with their confidence scores
         all_tags_with_scores = {}
+        
+        client = get_ml_worker_client()
 
         for i, timestamp in enumerate(frame_times):
             with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
@@ -530,34 +354,38 @@ def tag_video_with_frames(video_filepath, num_frames=5):
                     '-vframes', '1', '-strict', 'unofficial', '-y', temp_frame_path
                 ], check=True, capture_output=True)
 
-                # Process frame with tagger
-                img_numpy = preprocess_image_for_local_tagger(temp_frame_path)
-                if img_numpy is None:
-                    continue
-
-                input_name = local_tagger_session.get_inputs()[0].name
-                raw_outputs = local_tagger_session.run(None, {input_name: img_numpy})
-
-                # Use refined predictions if available
-                logits = raw_outputs[1] if len(raw_outputs) > 1 else raw_outputs[0]
-                probs = 1.0 / (1.0 + np.exp(-logits))
-
-                # Collect tags with their probabilities
-                indices = np.where(probs[0] >= tagger_config['threshold'])[0]
-                for idx in indices:
-                    idx_str = str(idx)
-                    tag_name = idx_to_tag_map.get(idx_str)
-                    if tag_name and not (tag_name.startswith('rating:') or tag_name.startswith('rating_')):
-                        category = tag_to_category_map.get(tag_name, "general")
+                # Tag frame using ML Worker
+                try:
+                    result = client.tag_image(
+                        image_path=temp_frame_path,
+                        model_path=tagger_config['model_path'],
+                        threshold=tagger_config.get('threshold', 0.50),
+                        character_threshold=0.85,
+                        metadata_path=tagger_config.get('metadata_path')
+                    )
+                    
+                    # Process predictions from ML Worker
+                    all_predictions = result.get('all_predictions', [])
+                    for pred in all_predictions:
+                        tag_name = pred['tag_name']
+                        category = pred['category']
+                        confidence = pred['confidence']
+                        
+                        if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
+                            continue
+                        
                         key = (tag_name, category)
-                        prob = float(probs[0][idx])
-
+                        
                         # Keep track of max probability and count
                         if key in all_tags_with_scores:
                             all_tags_with_scores[key]['count'] += 1
-                            all_tags_with_scores[key]['max_prob'] = max(all_tags_with_scores[key]['max_prob'], prob)
+                            all_tags_with_scores[key]['max_prob'] = max(all_tags_with_scores[key]['max_prob'], confidence)
                         else:
-                            all_tags_with_scores[key] = {'count': 1, 'max_prob': prob}
+                            all_tags_with_scores[key] = {'count': 1, 'max_prob': confidence}
+                            
+                except Exception as e:
+                    print(f"[Video Tagger] Error tagging frame {i+1}: {e}")
+                    continue
 
             finally:
                 if os.path.exists(temp_frame_path):
