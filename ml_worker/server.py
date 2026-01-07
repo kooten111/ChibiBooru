@@ -98,7 +98,7 @@ def check_dependencies() -> bool:
 # Global state
 _last_request_time = time.time()
 _shutdown_requested = False
-_idle_timeout = 300  # 5 minutes default
+_idle_timeout = 60  # 1 minute default
 _socket_path = '/tmp/chibibooru_ml_worker.sock'
 
 # ML models (lazy loaded)
