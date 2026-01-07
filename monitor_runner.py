@@ -23,7 +23,6 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 from database import initialize_database, repair_orphaned_image_tags
-from database import models
 from services.priority_service import check_and_apply_priority_changes
 from services.health_service import startup_health_check
 from utils.logging_config import setup_logging, get_logger
@@ -127,9 +126,10 @@ def main():
         logger.info("Checking for priority changes...")
         check_and_apply_priority_changes()
         
-        # Load data from DB
-        logger.info("Loading data from database...")
-        models.load_data_from_db(verbose=True)
+        # Note: We intentionally do NOT load the full image/tag cache here.
+        # The monitor only needs get_all_filepaths() which queries the DB directly.
+        # Loading the cache would waste ~1.5GB+ of RAM for no benefit since
+        # the web server maintains its own separate cache.
         
         # Start monitor service
         logger.info("Starting monitor service...")

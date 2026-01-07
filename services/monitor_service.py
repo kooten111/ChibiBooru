@@ -20,8 +20,6 @@ monitor_status = {
     "interval_seconds": 300, # 5 minutes (fallback, not used with watchdog)
     "logs": [],
     "mode": "watchdog",  # "watchdog" for real-time or "polling" for legacy
-    "pending_reload": False,
-    "last_activity": 0
 }
 
 LOG_FILE = "monitor.logs"
@@ -170,8 +168,6 @@ class ImageFileHandler(FileSystemEventHandler):
             if success:
                 monitor_status["last_scan_found"] = 1
                 monitor_status["total_processed"] += 1
-                monitor_status["pending_reload"] = True
-                monitor_status["last_activity"] = time.time()
                 add_log(f"Successfully processed: {filename}", 'success')
             else:
                 # Success = False could mean duplicate or error
@@ -337,10 +333,9 @@ def run_scan():
         except Exception as e:
             add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
 
-    # For bulk operations, full reload is acceptable
-    if processed_count > 0:
-        from core.cache_manager import load_data_from_db_async
-        load_data_from_db_async()
+    # Note: We don't reload the cache here because the monitor runs in a
+    # separate process from the web server. The web server handles its own
+    # cache invalidation when images are added via API.
 
     return processed_count
 
@@ -434,19 +429,9 @@ def initial_scan_then_idle():
     except Exception as e:
         add_log(f"Error during initial scan: {e}", 'error')
 
-    # Now just idle
+    # Now just idle - the monitor doesn't need to maintain a cache
+    # The web server handles its own cache in a separate process
     while monitor_status["running"]:
-        if monitor_status["pending_reload"]:
-            if time.time() - monitor_status["last_activity"] > 2.0:
-                try:
-                    add_log("Reloading data after batch ingest...")
-                    from core.cache_manager import load_data_from_db_async
-                    load_data_from_db_async()
-                    monitor_status["pending_reload"] = False
-                    add_log("Data reload complete.", 'success')
-                except Exception as e:
-                    add_log(f"Error reloading data: {e}", 'error')
-        
         time.sleep(1)
 
 def stop_monitor():
