@@ -20,7 +20,7 @@ async def validate_secret():
 @api_handler()
 async def system_status():
     """Get system status information."""
-    return system_service.get_system_status()
+    return await asyncio.to_thread(system_service.get_system_status)
 
 @api_blueprint.route('/system/logs')
 @api_handler()

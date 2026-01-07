@@ -1,6 +1,7 @@
 from quart import Blueprint, render_template, request, jsonify, session, redirect, url_for, flash
 from services.switch_source_db import switch_metadata_source_db, merge_all_sources
 import random
+import asyncio
 from functools import wraps
 import os
 from werkzeug.utils import secure_filename
@@ -82,25 +83,31 @@ async def tag_manager():
 @login_required
 async def home():
     search_query = request.args.get('query', '').strip().lower()
-    stats = query_service.get_enhanced_stats()
     seed = random.randint(1, 1_000_000)
 
-    search_results, should_shuffle = query_service.perform_search(search_query)
+    # Run the heavy sync operations in a thread pool to avoid blocking the event loop
+    def prepare_home_data():
+        stats = query_service.get_enhanced_stats()
+        search_results, should_shuffle = query_service.perform_search(search_query)
 
-    if should_shuffle:
-        random.Random(seed).shuffle(search_results)
+        if should_shuffle:
+            random.Random(seed).shuffle(search_results)
 
-    total_results = len(search_results)
-    images_to_show = [
-        {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": img.get('tags', '')}
-        for img in search_results[:50]
-    ]
+        total_results = len(search_results)
+        images_to_show = [
+            {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": img.get('tags', '')}
+            for img in search_results[:50]
+        ]
 
-    random_tags = []
-    tag_counts = models.get_tag_counts()
-    if not search_query and tag_counts:
-        available_tags = list(tag_counts.items())
-        random_tags = random.sample(available_tags, min(len(available_tags), 30))
+        random_tags = []
+        tag_counts = models.get_tag_counts()
+        if not search_query and tag_counts:
+            available_tags = list(tag_counts.items())
+            random_tags = random.sample(available_tags, min(len(available_tags), 30))
+
+        return stats, images_to_show, random_tags, total_results
+
+    stats, images_to_show, random_tags, total_results = await asyncio.to_thread(prepare_home_data)
 
     return await render_template(
         'index.html',

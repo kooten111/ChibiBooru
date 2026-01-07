@@ -3,6 +3,7 @@ from . import api_blueprint
 from services import tag_service
 from database import models
 from utils import api_handler
+import asyncio
 
 @api_blueprint.route('/tags/fetch')
 @api_handler()
@@ -28,4 +29,4 @@ async def fetch_tags():
 @api_handler()
 async def autocomplete():
     """Get autocomplete suggestions for tags."""
-    return tag_service.autocomplete()
+    return await asyncio.to_thread(tag_service.autocomplete)

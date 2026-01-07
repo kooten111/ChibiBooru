@@ -11,7 +11,7 @@ import asyncio
 @api_handler()
 async def get_images():
     """Get paginated images for infinite scroll."""
-    return image_service.get_images_for_api()
+    return await asyncio.to_thread(image_service.get_images_for_api)
 
 @api_blueprint.route('/edit_tags', methods=['POST'])
 @api_handler()
