@@ -673,6 +673,8 @@ body.image-page {
     min-height: 0;
     overflow: hidden;
     padding: var(--spacing-lg);
+    padding-bottom: calc(var(--spacing-lg) + 24px);
+    /* Extra space for drop shadow */
     position: relative;
 }
 
@@ -688,6 +690,7 @@ body.image-page {
     object-fit: contain;
     user-select: none;
     -webkit-user-drag: none;
+    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
 }
 
 .image-page .image-view video {
@@ -732,7 +735,7 @@ body:is(.ui-hidden, .focus-mode) .image-view img {
     cursor: grab;
     max-height: 100vh;
     max-width: 100vw;
-    box-shadow: 0 0 80px rgba(0, 0, 0, 0.9);
+    filter: drop-shadow(0 0 60px rgba(0, 0, 0, 0.8));
     border-radius: 0;
     transform-origin: center center;
     will-change: transform;
