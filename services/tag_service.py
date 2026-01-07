@@ -118,12 +118,14 @@ def autocomplete():
                 })
 
     # Get tag categories from database
+    # Exclude dead rating tags that use underscore format (rating_*) instead of colon format (rating:*)
     with get_db_connection() as conn:
         cursor = conn.execute("""
             SELECT t.name, t.category, COUNT(DISTINCT it.image_id) as count
             FROM tags t
             LEFT JOIN image_tags it ON t.id = it.tag_id
             WHERE LOWER(t.name) LIKE ?
+              AND t.name NOT LIKE 'rating\_%' ESCAPE '\\'
             GROUP BY t.name, t.category
             ORDER BY count DESC
             LIMIT 20
