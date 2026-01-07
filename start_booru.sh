@@ -42,7 +42,7 @@ fi
 # Get host and port from environment or use defaults
 HOST=${FLASK_HOST:-0.0.0.0}
 PORT=${FLASK_PORT:-5000}
-WORKERS=${UVICORN_WORKERS:-4}
+WORKERS=${UVICORN_WORKERS:-1}
 
 echo "=========================================="
 echo "Starting ChibiBooru"
