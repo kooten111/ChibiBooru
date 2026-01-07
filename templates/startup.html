@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ app_name }} - Starting Up...</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/startup.css') }}">
+</head>
+
+<body>
+    <div class="startup-container">
+        <div class="startup-content">
+            <!-- Animated Logo/Mascot -->
+            <div class="startup-mascot">
+                <img src="{{ url_for('static', filename='mascot/mascot.webp') }}" alt="Mascot" class="mascot-image">
+                <div class="loading-ring"></div>
+            </div>
+
+            <!-- App Name -->
+            <h1 class="startup-title">{{ app_name }}</h1>
+
+            <!-- Loading Status -->
+            <div class="startup-status">
+                <span id="status-text">Initializing...</span>
+                <div class="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="startup-progress">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+
+            <!-- Status Messages -->
+            <div class="startup-messages" id="startup-messages">
+                <div class="message">Starting server...</div>
+            </div>
+        </div>
+
+        <!-- Background Animation -->
+        <div class="startup-background">
+            <div class="particle" style="--delay: 0s; --x: 10%;"></div>
+            <div class="particle" style="--delay: 1s; --x: 20%;"></div>
+            <div class="particle" style="--delay: 2s; --x: 35%;"></div>
+            <div class="particle" style="--delay: 0.5s; --x: 50%;"></div>
+            <div class="particle" style="--delay: 1.5s; --x: 65%;"></div>
+            <div class="particle" style="--delay: 2.5s; --x: 80%;"></div>
+            <div class="particle" style="--delay: 0.8s; --x: 90%;"></div>
+        </div>
+    </div>
+
+    <script>
+        let checkAttempts = 0;
+        const maxAttempts = 120; // 2 minutes max wait
+
+        const statusText = document.getElementById('status-text');
+        const progressBar = document.getElementById('progress-bar');
+        const messagesContainer = document.getElementById('startup-messages');
+
+        function updateStatus(message) {
+            statusText.textContent = message;
+
+            // Add to message log if it's a new message
+            const lastMsg = messagesContainer.lastElementChild;
+            if (!lastMsg || lastMsg.textContent !== message) {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = 'message fade-in';
+                msgDiv.textContent = message;
+                messagesContainer.appendChild(msgDiv);
+
+                // Keep only last 4 messages
+                while (messagesContainer.children.length > 4) {
+                    messagesContainer.removeChild(messagesContainer.firstChild);
+                }
+            }
+        }
+
+        function updateProgress(value) {
+            const progress = Math.min(value, 100);
+            progressBar.style.width = progress + '%';
+        }
+
+        async function checkReady() {
+            checkAttempts++;
+
+            try {
+                const response = await fetch('/api/ready', {
+                    method: 'GET',
+                    cache: 'no-store'
+                });
+
+                const data = await response.json();
+
+                // Update status and progress from server
+                if (data.status) {
+                    updateStatus(data.status);
+                }
+                if (data.progress !== undefined) {
+                    updateProgress(data.progress);
+                }
+
+                if (data.ready) {
+                    updateStatus('Ready! Redirecting...');
+                    updateProgress(100);
+
+                    // Add success animation
+                    document.querySelector('.startup-content').classList.add('success');
+
+                    // Redirect after short delay for visual feedback
+                    setTimeout(() => {
+                        window.location.href = data.redirect || '/';
+                    }, 500);
+                    return;
+                }
+            } catch (e) {
+                // Server not ready yet, continue polling
+                console.log('Waiting for server...', e.message);
+                updateStatus('Connecting to server...');
+            }
+
+            // Check if we've exceeded max attempts
+            if (checkAttempts >= maxAttempts) {
+                updateStatus('Server is taking longer than expected...');
+                // Continue checking but less frequently
+                setTimeout(checkReady, 5000);
+            } else {
+                // Poll every second
+                setTimeout(checkReady, 1000);
+            }
+        }
+
+        // Start checking after a brief delay
+        setTimeout(checkReady, 500);
+    </script>
+</body>
+
+</html>

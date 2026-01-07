@@ -22,6 +22,48 @@ async def system_status():
     """Get system status information."""
     return await asyncio.to_thread(system_service.get_system_status)
 
+
+@api_blueprint.route('/ready')
+async def check_ready():
+    """Check if the application is ready to serve requests.
+    
+    This endpoint is used by the startup page to determine when
+    the application has fully initialized.
+    """
+    from quart import session
+    from app import is_app_ready, get_init_status, get_init_progress
+    
+    try:
+        status = get_init_status()
+        progress = get_init_progress()
+        
+        # Check if app has completed initialization
+        if not is_app_ready():
+            return jsonify({
+                'ready': False,
+                'status': status,
+                'progress': progress
+            })
+        
+        # Determine redirect based on session
+        if 'logged_in' in session:
+            redirect_url = '/'
+        else:
+            redirect_url = '/login'
+        
+        return jsonify({
+            'ready': True,
+            'status': status,
+            'progress': 100,
+            'redirect': redirect_url
+        })
+    except Exception as e:
+        return jsonify({
+            'ready': False,
+            'status': f'Error: {e}',
+            'progress': 0
+        }), 503
+
 @api_blueprint.route('/system/logs')
 @api_handler()
 async def system_logs():

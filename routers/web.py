@@ -43,6 +43,13 @@ async def logout():
     return redirect(url_for('main.login'))
 
 
+@main_blueprint.route('/startup')
+async def startup():
+    """Display startup/loading screen while app initializes."""
+    # No authentication required - this is shown during startup
+    return await render_template('startup.html', app_name=config.APP_NAME)
+
+
 # ============================================================================
 # Rating Inference UI Routes
 # ============================================================================
