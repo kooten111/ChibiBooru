@@ -6,6 +6,7 @@ Similar to Czkawka's duplicate detection approach.
 """
 import os
 import time
+import threading
 from typing import Optional, List, Dict, Tuple
 from PIL import Image, UnidentifiedImageError
 import imagehash
@@ -287,9 +288,6 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
 # ============================================================================
 # Semantic Embedding & Search
 # ============================================================================
-
-# Import threading at module level for singleton
-import threading
 
 class SemanticIndex:
     """
