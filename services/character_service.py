@@ -19,6 +19,45 @@ from repositories.character_repository import get_or_create_tag_id, get_or_creat
 # Model database configuration
 USE_SEPARATE_MODEL_DB = True
 
+# Extended category weights for character inference
+# Categories most useful for character identification get higher weights
+EXTENDED_CATEGORY_WEIGHTS = {
+    # Highly character-specific (permanent physical traits)
+    '02_Body_Hair': 1.5,        # Hair color, style - very distinctive
+    '03_Body_Face': 1.4,        # Eye color - very distinctive
+    '01_Body_Physique': 1.3,    # Animal ears, tail, horns - distinctive features
+    
+    # Character-specific attire (outfit-based identification)
+    '05_Attire_Main': 1.2,      # Signature outfits
+    '06_Attire_Inner': 1.1,     # Specific underwear/swimwear
+    '07_Attire_Legwear': 1.1,   # Distinctive legwear
+    '08_Attire_Acc': 1.1,       # Signature accessories
+    
+    # Moderately useful
+    '00_Subject_Count': 0.8,    # Less specific for individual characters
+    '04_Body_Genitalia': 0.7,   # NSFW features - less distinctive
+    
+    # Less useful for character ID (more situational)
+    '09_Action': 0.5,           # Actions are character-agnostic
+    '10_Pose': 0.5,             # Poses are situational
+    '11_Expression': 0.5,       # Expressions vary
+    '21_Status': 0.5,           # State of being is situational
+    
+    # Not useful for character ID (environmental/technical)
+    '12_Sexual_Act': 0.3,       # Situational
+    '13_Object': 0.4,           # Objects held vary
+    '14_Setting': 0.2,          # Background irrelevant
+    '15_Framing': 0.1,          # Camera angle irrelevant
+    '16_Focus': 0.2,            # Focus irrelevant
+    '17_Style_Art': 0.1,        # Art style irrelevant
+    '18_Style_Tech': 0.1,       # Visual effects irrelevant
+    '19_Meta_Attributes': 0.1,  # Metadata irrelevant
+    '20_Meta_Text': 0.1,        # Text irrelevant
+}
+
+# Default weight for tags without extended category
+DEFAULT_TAG_WEIGHT = 1.0
+
 
 def get_model_connection():
     """Get connection to model database (separate or main DB)."""
@@ -83,7 +122,7 @@ def reset_config_to_defaults() -> None:
 # Data Retrieval
 # ============================================================================
 
-def get_character_tagged_images(sources: List[str] = None) -> List[Tuple[int, List[str], List[str]]]:
+def get_character_tagged_images(sources: List[str] = None) -> List[Tuple[int, List[str], List[Tuple[str, Optional[str]]]]]:
     """
     Get all images with character tags from trusted sources (boorus).
 
@@ -91,7 +130,8 @@ def get_character_tagged_images(sources: List[str] = None) -> List[Tuple[int, Li
         sources: Which sources to trust (default: ['danbooru', 'e621', 'gelbooru', 'yandere'])
 
     Returns:
-        List of (image_id, characters, tags) tuples
+        List of (image_id, characters, tags_with_extended) tuples
+        where tags_with_extended is List[(tag_name, extended_category)]
     """
     if sources is None:
         sources = ['danbooru', 'e621', 'gelbooru', 'yandere']
@@ -135,19 +175,34 @@ def get_character_tagged_images(sources: List[str] = None) -> List[Tuple[int, Li
                 tags_dict.get('tags_copyright', ''),
                 tags_dict.get('tags_species', ''),
             ])
-            tags = [t for t in all_tags_str.split() if t]
+            tag_names = [t for t in all_tags_str.split() if t]
+            
+            # Get extended categories for these tags from database
+            if tag_names:
+                placeholders = ','.join('?' * len(tag_names))
+                cur.execute(f"""
+                    SELECT name, extended_category
+                    FROM tags
+                    WHERE name IN ({placeholders})
+                """, tag_names)
+                
+                tag_extended_map = {row['name']: row['extended_category'] for row in cur.fetchall()}
+                tags_with_extended = [(tag, tag_extended_map.get(tag)) for tag in tag_names]
+            else:
+                tags_with_extended = []
 
-            result.append((image_id, characters, tags))
+            result.append((image_id, characters, tags_with_extended))
 
         return result
 
 
-def get_untagged_character_images() -> List[Tuple[int, List[str]]]:
+def get_untagged_character_images() -> List[Tuple[int, List[Tuple[str, Optional[str]]]]]:
     """
     Get all images without any character tag (from local tagger or AI).
 
     Returns:
-        List of (image_id, tags) tuples
+        List of (image_id, tags_with_extended) tuples
+        where tags_with_extended is List[(tag_name, extended_category)]
     """
     with get_db_connection() as conn:
         cur = conn.cursor()
@@ -170,10 +225,10 @@ def get_untagged_character_images() -> List[Tuple[int, List[str]]]:
         if not image_ids:
             return []
 
-        # Get tags for these images
+        # Get tags with extended categories for these images
         placeholders = ','.join('?' * len(image_ids))
         cur.execute(f"""
-            SELECT it.image_id, t.name as tag_name
+            SELECT it.image_id, t.name as tag_name, t.extended_category
             FROM image_tags it
             JOIN tags t ON it.tag_id = t.id
             WHERE it.image_id IN ({placeholders})
@@ -182,7 +237,7 @@ def get_untagged_character_images() -> List[Tuple[int, List[str]]]:
 
         image_tags_map = defaultdict(list)
         for row in cur.fetchall():
-            image_tags_map[row['image_id']].append(row['tag_name'])
+            image_tags_map[row['image_id']].append((row['tag_name'], row['extended_category']))
 
         result = [(img_id, image_tags_map.get(img_id, [])) for img_id in image_ids]
         return result
@@ -217,12 +272,14 @@ def get_untagged_character_images_count() -> int:
 # Training Algorithm
 # ============================================================================
 
-def calculate_tag_weights(character_images: List[Tuple[int, List[str], List[str]]]) -> Dict[Tuple[str, str], Tuple[float, int]]:
+def calculate_tag_weights(character_images: List[Tuple[int, List[str], List[Tuple[str, Optional[str]]]]]) -> Dict[Tuple[str, str], Tuple[float, int]]:
     """
     Calculate log-likelihood ratio weights for individual tags.
+    Applies extended category multipliers to boost character-relevant tags.
 
     Args:
-        character_images: List of (image_id, characters, tags) tuples
+        character_images: List of (image_id, characters, tags_with_extended) tuples
+                         where tags_with_extended is List[(tag_name, extended_category)]
 
     Returns:
         dict: {(tag, character): (weight, sample_count)}
@@ -231,13 +288,17 @@ def calculate_tag_weights(character_images: List[Tuple[int, List[str], List[str]
     tag_character_counts = defaultdict(int)  # (tag, character) -> count
     character_counts = Counter()  # character -> total count
     tag_counts = Counter()  # tag -> total count across all characters
+    tag_extended_map = {}  # tag -> extended_category mapping
 
-    for image_id, characters, tags in character_images:
+    for image_id, characters, tags_with_extended in character_images:
         for character in characters:
             character_counts[character] += 1
-            for tag in tags:
+            for tag, extended_category in tags_with_extended:
                 tag_character_counts[(tag, character)] += 1
                 tag_counts[tag] += 1
+                # Store extended category for this tag (last one wins if multiple)
+                if extended_category:
+                    tag_extended_map[tag] = extended_category
 
     total_images = len(character_images)
     weights = {}
@@ -272,6 +333,12 @@ def calculate_tag_weights(character_images: List[Tuple[int, List[str], List[str]
             p_tag_given_not_character = max(p_tag_given_not_character, epsilon)
 
             weight = math.log(p_tag_given_character / p_tag_given_not_character)
+            
+            # Apply extended category multiplier to boost character-relevant tags
+            extended_category = tag_extended_map.get(tag)
+            if extended_category in EXTENDED_CATEGORY_WEIGHTS:
+                category_multiplier = EXTENDED_CATEGORY_WEIGHTS[extended_category]
+                weight *= category_multiplier
 
             # Only store meaningful weights
             if abs(weight) > 0.01:
@@ -280,7 +347,7 @@ def calculate_tag_weights(character_images: List[Tuple[int, List[str], List[str]
     return weights
 
 
-def find_frequent_tag_pairs(character_images: List[Tuple[int, List[str], List[str]]],
+def find_frequent_tag_pairs(character_images: List[Tuple[int, List[str], List[Tuple[str, Optional[str]]]]],
                             min_cooccurrence: int,
                             min_tag_frequency: int,
                             limit: int) -> List[Tuple[str, str, int]]:
@@ -288,7 +355,7 @@ def find_frequent_tag_pairs(character_images: List[Tuple[int, List[str], List[st
     Find tag pairs that appear together frequently enough to be useful.
 
     Args:
-        character_images: Training data
+        character_images: Training data with (image_id, characters, tags_with_extended)
         min_cooccurrence: Minimum times pair must appear together
         min_tag_frequency: Minimum images each tag must appear in
         limit: Maximum number of pairs to return
@@ -298,8 +365,8 @@ def find_frequent_tag_pairs(character_images: List[Tuple[int, List[str], List[st
     """
     # Count individual tag frequencies
     tag_frequencies = Counter()
-    for _, _, tags in character_images:
-        for tag in tags:
+    for _, _, tags_with_extended in character_images:
+        for tag, _ in tags_with_extended:
             tag_frequencies[tag] += 1
 
     # Filter to frequent tags
@@ -308,9 +375,9 @@ def find_frequent_tag_pairs(character_images: List[Tuple[int, List[str], List[st
 
     # Count pair co-occurrences
     pair_counts = Counter()
-    for _, _, tags in character_images:
-        # Only consider frequent tags
-        filtered_tags = [tag for tag in tags if tag in frequent_tags]
+    for _, _, tags_with_extended in character_images:
+        # Only consider frequent tags (extract tag names only)
+        filtered_tags = [tag for tag, _ in tags_with_extended if tag in frequent_tags]
 
         # Generate pairs (canonical order: tag1 < tag2)
         for tag1, tag2 in combinations(sorted(filtered_tags), 2):
@@ -326,13 +393,13 @@ def find_frequent_tag_pairs(character_images: List[Tuple[int, List[str], List[st
     return frequent_pairs[:limit]
 
 
-def calculate_tag_pair_weights(character_images: List[Tuple[int, List[str], List[str]]],
+def calculate_tag_pair_weights(character_images: List[Tuple[int, List[str], List[Tuple[str, Optional[str]]]]],
                                frequent_pairs: List[Tuple[str, str, int]]) -> Dict[Tuple[str, str, str], Tuple[float, int]]:
     """
     Calculate log-likelihood ratio weights for tag pairs.
 
     Args:
-        character_images: List of (image_id, characters, tags) tuples
+        character_images: List of (image_id, characters, tags_with_extended) tuples
         frequent_pairs: List of (tag1, tag2, count) pairs to calculate weights for
 
     Returns:
@@ -346,12 +413,13 @@ def calculate_tag_pair_weights(character_images: List[Tuple[int, List[str], List
     character_counts = Counter()  # character -> total count
     pair_counts = Counter()  # (tag1, tag2) -> total count across all characters
 
-    for image_id, characters, tags in character_images:
+    for image_id, characters, tags_with_extended in character_images:
         for character in characters:
             character_counts[character] += 1
 
-            # Generate pairs from this image's tags
-            sorted_tags = sorted(tags)
+            # Generate pairs from this image's tags (extract tag names only)
+            tag_names = [tag for tag, _ in tags_with_extended]
+            sorted_tags = sorted(tag_names)
             for tag1, tag2 in combinations(sorted_tags, 2):
                 if (tag1, tag2) in pair_set:
                     pair_character_counts[(tag1, tag2, character)] += 1
@@ -763,14 +831,16 @@ def infer_all_untagged_images() -> Dict:
 
     print(f"Running inference on {len(untagged_images)} untagged images...")
 
-    for image_id, tags in untagged_images:
+    for image_id, tags_with_extended in untagged_images:
         stats['processed'] += 1
 
-        if not tags:
+        if not tags_with_extended:
             stats['skipped_low_confidence'] += 1
             continue
 
-        predictions = predict_characters(tags, tag_weights, pair_weights, config)
+        # Extract tag names only for prediction
+        tag_names = [tag for tag, _ in tags_with_extended]
+        predictions = predict_characters(tag_names, tag_weights, pair_weights, config)
 
         if predictions:
             stats['tagged'] += 1

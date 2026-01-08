@@ -21,14 +21,22 @@ Successfully implemented a complete character inference system for ChibiBooru fo
 
 #### Character Service (`services/character_service.py`)
 - **Configuration Management**: Get/update/reset config values
+- **Extended Category Integration**: Leverages ChibiBooru's 22-category "Platinum Schema"
+  - Physical traits (Body_Hair, Body_Face, Body_Physique) get 1.3-1.5x weight boost
+  - Character-specific attire (Attire_Main, Attire_Inner, Attire_Legwear) get 1.1-1.2x boost
+  - Situational tags (Action, Pose, Expression) get 0.5x weight reduction
+  - Environmental/technical tags (Setting, Framing, Style) get 0.1-0.2x weight reduction
+  - Automatically applies category-based multipliers during training
 - **Training Algorithm**: 
   - Extracts character-tagged images from booru sources (danbooru, e621, gelbooru, yandere)
+  - Retrieves extended category information for each tag from database
   - Calculates log-likelihood ratio weights for tags and tag pairs
+  - Applies extended category multipliers to prioritize character-relevant features
   - Stores weights in model database
   - Tracks metadata (training date, sample counts, character counts)
 - **Inference Algorithm**:
   - Multi-label prediction (can predict multiple characters per image)
-  - Tag-based scoring using log-likelihood weights
+  - Tag-based scoring using log-likelihood weights with extended category boosts
   - Softmax probability normalization
   - Configurable confidence thresholds and max predictions
 - **Data Management**: Apply/clear character tags, batch operations
@@ -155,6 +163,26 @@ Following the rating service pattern:
 - Can be distributed as pre-trained model
 - Smaller file size for version control
 - Independent backup/restore
+
+### Extended Category Intelligence
+Leverages ChibiBooru's Platinum Schema (22 extended categories) for smarter inference:
+
+**High-Value Tags (1.3x-1.5x boost)**:
+- `02_Body_Hair` - Hair color/style (twintails, blonde_hair) - 1.5x
+- `03_Body_Face` - Eye color (blue_eyes, red_eyes) - 1.4x
+- `01_Body_Physique` - Physical traits (animal_ears, tail, horns) - 1.3x
+- `05_Attire_Main` - Signature outfits (school_uniform, kimono) - 1.2x
+
+**Low-Value Tags (0.1x-0.5x reduction)**:
+- `09_Action`, `10_Pose`, `11_Expression` - Situational states - 0.5x
+- `14_Setting`, `15_Framing` - Environmental/technical - 0.1-0.2x
+- `19_Meta_Attributes`, `20_Meta_Text` - Metadata - 0.1x
+
+**Benefits**:
+- Hair/eye color tags are weighted 15x more than camera angles
+- Character-specific physical traits get priority over generic poses
+- Reduces false positives from common situational tags
+- Improves accuracy by focusing on permanent character features
 
 ## Testing Results
 
