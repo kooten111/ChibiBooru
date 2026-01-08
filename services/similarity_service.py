@@ -394,15 +394,12 @@ class SemanticIndex:
         
         return results
 
-# Global singleton instance
-_semantic_index = None
-
 def get_semantic_index() -> SemanticIndex:
-    """Get the global semantic index singleton."""
-    global _semantic_index
-    if _semantic_index is None:
-        _semantic_index = SemanticIndex()
-    return _semantic_index
+    """
+    Get the global semantic index singleton.
+    Thread-safe due to SemanticIndex's singleton implementation.
+    """
+    return SemanticIndex()
 
 # Backend Interface
 class SemanticBackend:
@@ -1186,8 +1183,8 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
                 print(f"[Similarity] Batch complete. Saved {len(results_buffer)} results.")
                 
                 # Rebuild semantic index if we saved any new embeddings
-                has_semantic = any('new_embedding' in r for r in results_buffer)
-                if has_semantic and SEMANTIC_AVAILABLE:
+                has_new_embeddings = any('new_embedding' in r for r in results_buffer)
+                if has_new_embeddings and SEMANTIC_AVAILABLE:
                     print("[Similarity] Rebuilding semantic index with new embeddings...")
                     get_semantic_index().rebuild()
     
