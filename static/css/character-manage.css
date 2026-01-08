@@ -3,7 +3,7 @@
 /* Main Layout Container */
 .character-manage-container {
     display: flex;
-    height: calc(100vh - 80px); /* Account for header */
+    height: calc(100vh - 80px); /* Account for header - matches base.css header height */
     gap: 0;
     background: var(--bg-gradient-start);
     position: relative;

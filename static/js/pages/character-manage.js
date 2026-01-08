@@ -307,8 +307,8 @@ async function loadCharacterImages(characterName) {
     try {
         grid.innerHTML = '<div class="character-loading">Loading images...</div>';
         
-        // Fetch all images with characters and filter client-side
-        const response = await fetch(`/api/character/images?filter=all&limit=500`);
+        // Fetch images with characters, limit to reduce initial load
+        const response = await fetch(`/api/character/images?filter=all&limit=200`);
         const data = await response.json();
         const allImages = data.images || [];
         
@@ -323,13 +323,14 @@ async function loadCharacterImages(characterName) {
                 <div class="character-empty-state">
                     <div class="character-empty-state-icon">📸</div>
                     <div class="character-empty-state-text">No images found</div>
-                    <div class="character-empty-state-subtext">This character has no associated images</div>
+                    <div class="character-empty-state-subtext">This character has no associated images in the first 200 results</div>
                 </div>
             `;
             return;
         }
         
-        grid.innerHTML = images.slice(0, 100).map(image => {
+        // Limit to first 50 images for performance
+        grid.innerHTML = images.slice(0, 50).map(image => {
             const characterTag = (image.characters || []).find(ct => ct.name === characterName);
             const source = characterTag ? characterTag.source : 'unknown';
             
@@ -349,6 +350,15 @@ async function loadCharacterImages(characterName) {
                 </div>
             `;
         }).join('');
+        
+        // Show count if there are more images
+        if (images.length > 50) {
+            grid.innerHTML += `
+                <div style="grid-column: 1/-1; text-align: center; padding: var(--spacing-md); color: var(--text-muted); font-size: var(--font-size-sm);">
+                    Showing first 50 of ${images.length} images
+                </div>
+            `;
+        }
         
     } catch (error) {
         console.error('Error loading character images:', error);
