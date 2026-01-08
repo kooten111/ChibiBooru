@@ -371,6 +371,13 @@
     }
 }
 
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    .rating-bar-v2 .fill::after {
+        animation: none;
+    }
+}
+
 .rating-bar-v2.general .fill {
     background: var(--rating-general);
 }
@@ -653,6 +660,13 @@
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+    .processing-overlay-v2 .spinner {
+        animation: none;
     }
 }
 

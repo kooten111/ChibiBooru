@@ -733,7 +733,7 @@ def handle_infer_characters(request_data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
         for image_id in image_ids:
-            result = character_service.infer_characters_for_image(image_id)
+            result = character_service.infer_character_for_image(image_id)
             stats['processed'] += 1
             if result.get('characters_added', 0) > 0:
                 stats['tagged'] += 1

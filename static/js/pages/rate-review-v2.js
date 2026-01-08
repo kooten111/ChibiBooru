@@ -1,6 +1,9 @@
 // static/js/pages/rate-review-v2.js - Modern Rating Review Page
 import { showNotification } from '../utils/notifications.js';
 
+// Configuration constants
+const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.avi'];
+
 let images = [];
 let currentIndex = 0;
 let currentFilter = 'unrated';
@@ -53,11 +56,7 @@ function showCurrentImage() {
     const container = document.getElementById('imageDisplay');
     
     // Determine if it's a video
-    const isVideo = image.filepath && (
-        image.filepath.endsWith('.mp4') ||
-        image.filepath.endsWith('.webm') ||
-        image.filepath.endsWith('.mov')
-    );
+    const isVideo = image.filepath && VIDEO_EXTENSIONS.some(ext => image.filepath.toLowerCase().endsWith(ext));
     
     // Create media element
     let mediaHTML;
