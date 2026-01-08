@@ -141,10 +141,10 @@ def get_character_tagged_images(sources: List[str] = None) -> List[Tuple[int, Li
 
         # Get all images from raw_metadata with character tags
         cur.execute("""
-            SELECT i.id, i.md5, rm.data, i.source_name
+            SELECT i.id, i.md5, rm.data, i.active_source
             FROM images i
             JOIN raw_metadata rm ON i.id = rm.image_id
-            WHERE i.source_name IN ({})
+            WHERE i.active_source IN ({})
         """.format(','.join('?' * len(sources))), sources)
 
         result = []
@@ -153,11 +153,19 @@ def get_character_tagged_images(sources: List[str] = None) -> List[Tuple[int, Li
 
         for row in cur.fetchall():
             image_id = row['id']
-            source_name = row['source_name']
+            source_name = row['active_source']
             
             try:
-                source_data = json.loads(row['data']) if row['data'] else {}
+                raw_metadata = json.loads(row['data']) if row['data'] else {}
             except (json.JSONDecodeError, TypeError):
+                continue
+
+            # Get the actual source data from the nested structure
+            # raw_metadata has structure: {"sources": {"danbooru": {...}, "e621": {...}}}
+            sources = raw_metadata.get('sources', {})
+            source_data = sources.get(source_name, {})
+            
+            if not source_data:
                 continue
 
             # Extract character tags
@@ -211,7 +219,7 @@ def get_untagged_character_images() -> List[Tuple[int, List[Tuple[str, Optional[
         cur.execute("""
             SELECT i.id
             FROM images i
-            WHERE i.source_name = 'local_tagger'
+            WHERE i.active_source = 'local_tagger'
               AND NOT EXISTS (
                   SELECT 1 FROM image_tags it
                   JOIN tags t ON it.tag_id = t.id
@@ -256,7 +264,7 @@ def get_untagged_character_images_count() -> int:
         cur.execute("""
             SELECT COUNT(*) as count
             FROM images i
-            WHERE i.source_name = 'local_tagger'
+            WHERE i.active_source = 'local_tagger'
               AND NOT EXISTS (
                   SELECT 1 FROM image_tags it
                   JOIN tags t ON it.tag_id = t.id

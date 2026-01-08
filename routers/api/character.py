@@ -228,7 +228,7 @@ async def api_get_images_for_character():
             cur.execute("""
                 SELECT i.id, i.filepath
                 FROM images i
-                WHERE i.source_name = 'local_tagger'
+                WHERE i.active_source = 'local_tagger'
                   AND NOT EXISTS (
                       SELECT 1 FROM image_tags it
                       JOIN tags t ON it.tag_id = t.id
