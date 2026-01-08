@@ -17,23 +17,21 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Optional dependencies for Semantic Similarity
-# Keep numpy and faiss for FAISS index operations (these are lightweight)
-# Remove onnxruntime - all ML inference goes through ML Worker
+# FAISS is now in ml_worker only - main app doesn't need it
+# Keep numpy for embedding vectors
 try:
     import numpy as np
-    import faiss
-    NUMPY_FAISS_AVAILABLE = True
+    NUMPY_AVAILABLE = True
 except ImportError:
-    NUMPY_FAISS_AVAILABLE = False
+    NUMPY_AVAILABLE = False
     np = None
-    faiss = None
 
 # ML Worker client - always import for semantic similarity
 if config.ENABLE_SEMANTIC_SIMILARITY:
     try:
         from ml_worker.client import get_ml_worker_client
         ML_WORKER_AVAILABLE = True
-        SEMANTIC_AVAILABLE = NUMPY_FAISS_AVAILABLE  # Need numpy/faiss for FAISS index
+        SEMANTIC_AVAILABLE = NUMPY_AVAILABLE  # Only need numpy for embeddings, FAISS is in ml_worker
     except ImportError:
         ML_WORKER_AVAILABLE = False
         SEMANTIC_AVAILABLE = False
@@ -287,127 +285,86 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
 # Semantic Embedding & Search
 # ============================================================================
 
+# Backend Interface
+class SemanticBackend:
+    """Abstract base class for semantic similarity backends."""
+    def is_available(self) -> bool:
+        raise NotImplementedError
+        
+    def get_embedding(self, image_path: str, model_path: str) -> Optional[np.ndarray]:
+        raise NotImplementedError
+        
+    def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
+        raise NotImplementedError
+
+class MLWorkerSemanticBackend(SemanticBackend):
+    """Default backend using ML Worker process via IPC."""
+    def is_available(self) -> bool:
+        return ML_WORKER_AVAILABLE
+        
+    def get_embedding(self, image_path: str, model_path: str) -> Optional[np.ndarray]:
+        if not ML_WORKER_AVAILABLE:
+            return None
+        try:
+            client = get_ml_worker_client()
+            result = client.compute_similarity(image_path=image_path, model_path=model_path)
+            embedding = result['embedding']
+            return np.array(embedding, dtype=np.float32)
+        except Exception as e:
+            print(f"[Similarity] ML Worker error for {image_path}: {e}")
+            return None
+            
+    def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
+        if not ML_WORKER_AVAILABLE:
+            return []
+        try:
+            client = get_ml_worker_client()
+            result = client.search_similar(query_embedding=query_embedding, limit=limit)
+            return result.get('results', [])
+        except Exception as e:
+            print(f"[Similarity] ML Worker search failed: {e}")
+            return []
+
 class SemanticSearchEngine:
+    """
+    Semantic similarity engine.
+    Delegates actual work to a backend (ML Worker by default, or Local for inside worker).
+    """
     def __init__(self):
         self.model_path = config.SEMANTIC_MODEL_PATH
-        self.ml_worker_ready = False  # Flag to indicate ML Worker is available
-        self.index = None
-        self.image_ids = [] # map index ID to image ID
-        self.index_dirty = True
-        self.last_access_time = None  # Track when index was last used
-        self.index_loaded = False  # Track if index is currently loaded
+        self.ml_worker_ready = False
+        self._backend = MLWorkerSemanticBackend()
+        
+    def set_backend(self, backend: SemanticBackend):
+        """Override the backend (e.g. for running inside the worker process)"""
+        self._backend = backend
         
     def load_model(self):
-        """
-        Check if semantic similarity is available via ML Worker.
-        No longer loads ONNX models directly - all inference via ML Worker.
-        """
-        if not SEMANTIC_AVAILABLE:
-            return False
+        """Check availability."""
+        if not SEMANTIC_AVAILABLE: return False
         
-        if not ML_WORKER_AVAILABLE:
-            print("[Similarity] ERROR: ML Worker not available for semantic similarity")
+        if not self._backend.is_available():
+            print("[Similarity] ERROR: Backend not available for semantic similarity")
             return False
             
         if not os.path.exists(self.model_path):
             print(f"[Similarity] Model not found at {self.model_path}")
             return False
         
-        # Mark as ready if ML Worker is available
         self.ml_worker_ready = True
         return True
 
     def get_embedding(self, image_path: str) -> Optional[np.ndarray]:
-        """
-        Get embedding for an image via ML Worker.
-        No fallback to local loading - ML Worker is the only way.
-        """
-        if not ML_WORKER_AVAILABLE:
-            print(f"[Similarity] ERROR: ML Worker not available. Cannot compute embedding for {image_path}")
+        """Get embedding via backend."""
+        if not self.ml_worker_ready and not self.load_model():
             return None
-            
-        try:
-            client = get_ml_worker_client()
-            result = client.compute_similarity(
-                image_path=image_path,
-                model_path=self.model_path
-            )
-            embedding = result['embedding']
-            return np.array(embedding, dtype=np.float32)
-        except Exception as e:
-            print(f"[Similarity] ML Worker error for {image_path}: {e}")
-            print(f"[Similarity] ERROR: ML Worker failed. Skipping file.")
-            return None
-
-    def build_index(self):
-        if not SEMANTIC_AVAILABLE: return
-        print("[Similarity] Building Semantic Index...")
-        ids, matrix = similarity_db.get_all_embeddings()
-        if len(ids) == 0:
-            print("[Similarity] No embeddings found in DB.")
-            self.index = None
-            self.image_ids = []
-            self.index_loaded = False
-            return
-
-        # Normalize metrics for Cosine Similarity (Inner Product on normalized vectors)
-        faiss.normalize_L2(matrix)
-        
-        dimension = matrix.shape[1]
-        self.index = faiss.IndexFlatIP(dimension)
-        self.index.add(matrix)
-        self.image_ids = ids
-        self.index_dirty = False
-        self.index_loaded = True
-        self.last_access_time = time.time()
-        print(f"[Similarity] Index built with {len(ids)} items.")
+        return self._backend.get_embedding(image_path, self.model_path)
     
-    def unload_index(self):
-        """Unload FAISS index to free memory."""
-        if self.index_loaded:
-            print("[Similarity] Unloading FAISS index to free memory...")
-            self.index = None
-            self.image_ids = []
-            self.index_loaded = False
-            self.last_access_time = None
-    
-    def check_idle_timeout(self):
-        """Check if index should be unloaded due to inactivity."""
-        if not config.SIMILARITY_CACHE_ENABLED:
-            return  # Don't auto-unload if cache is disabled
-            
-        if self.index_loaded and self.last_access_time:
-            idle_time = time.time() - self.last_access_time
-            if idle_time > config.FAISS_IDLE_TIMEOUT:
-                print(f"[Similarity] Index idle for {int(idle_time)}s, unloading...")
-                self.unload_index()
-
-
-    def search(self, embedding: np.ndarray, k: int = 20):
-        # Check if index should be unloaded due to idle timeout
-        self.check_idle_timeout()
-        
-        if self.index is None or self.index_dirty:
-            self.build_index()
-        
-        if self.index is None: return [] # Still empty
-        
-        # Update access time
-        self.last_access_time = time.time()
-        
-        # Normalize query
-        query = embedding.reshape(1, -1).astype(np.float32)
-        faiss.normalize_L2(query)
-        
-        distances, indices = self.index.search(query, k)
-        
-        results = []
-        for dist, idx in zip(distances[0], indices[0]):
-            if idx == -1: continue
-            if idx < len(self.image_ids):
-                results.append((self.image_ids[idx], float(dist)))
-                
-        return results
+    def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
+        """Search via backend."""
+        if not self.ml_worker_ready and not self.load_model():
+            return []
+        return self._backend.search_similar(query_embedding, limit)
 
 def get_semantic_engine():
     global _semantic_engine
@@ -415,13 +372,16 @@ def get_semantic_engine():
         _semantic_engine = SemanticSearchEngine()
     return _semantic_engine
 
+def set_semantic_backend(backend: SemanticBackend):
+    """Global helper to set the backend for the singleton engine."""
+    get_semantic_engine().set_backend(backend)
+
 def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
-    """Find semantically similar images."""
+    """Find semantically similar images using ml_worker for FAISS operations."""
     if not SEMANTIC_AVAILABLE: return []
     
     # 1. Get embedding for query image
     # First check DB
-    # We need image_id for DB lookup. Map filepath -> ID
     with get_db_connection() as conn:
         row = conn.execute("SELECT id FROM images WHERE filepath = ?", (filepath,)).fetchone()
         if not row: return []
@@ -429,7 +389,7 @@ def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
 
     embedding = similarity_db.get_embedding(image_id)
     
-    # If not in DB, compute it
+    # If not in DB, compute it via ml_worker
     if embedding is None:
         full_path = os.path.join("static/images", filepath)
         if os.path.exists(full_path):
@@ -438,19 +398,23 @@ def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
             if embedding is not None:
                 # Save it
                 similarity_db.save_embedding(image_id, embedding)
-                engine.index_dirty = True # Mark index as needing update (or partial add?)
     
     if embedding is None: return []
     
-    # 2. Search
-    engine = get_semantic_engine()
-    results = engine.search(embedding, k=limit)
+    # 2. Search via backend
+    try:
+        engine = get_semantic_engine()
+        query_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+        search_results = engine.search_similar(query_list, limit)
+    except Exception as e:
+        print(f"[Similarity] Semantic search failed: {e}")
+        return []
     
     # 3. Resolve results
-    if not results: return []
+    if not search_results: return []
     
-    ids = [r[0] for r in results]
-    scores = {r[0]: r[1] for r in results}
+    ids = [r['image_id'] for r in search_results]
+    scores = {r['image_id']: r['score'] for r in search_results}
     
     with get_db_connection() as conn:
         placeholders = ','.join('?' * len(ids))
@@ -459,8 +423,6 @@ def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
     resolved = []
     for row in rows:
         sim_score = scores.get(row['id'], 0)
-        # Convert cosine similarity (-1 to 1) to distance-like (0 to 1 where 0 is close? or just score)
-        # User wants similarity score.
         resolved.append({
             'path': f"images/{row['filepath']}",
             'thumb': get_thumbnail_path(f"images/{row['filepath']}"),

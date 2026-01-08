@@ -316,122 +316,29 @@ def tag_video_with_frames(video_filepath, num_frames=5):
         print("[Video Tagger] ERROR: ML Worker not available. Cannot process video.")
         return None
 
-    import subprocess
-    import tempfile
-
-    # Check if ffmpeg/ffprobe are available
-    ffmpeg_path, ffprobe_path = check_ffmpeg_available()
-    if not ffmpeg_path or not ffprobe_path:
-        return None
-
-    print(f"[Video Tagger] Extracting {num_frames} frames from: {os.path.basename(video_filepath)}")
+    print(f"[Video Tagger] Analyzing video via ML Worker: {os.path.basename(video_filepath)}")
 
     try:
-        # Get video duration first
-        duration_cmd = [
-            ffprobe_path, '-v', 'error', '-show_entries', 'format=duration',
-            '-of', 'default=noprint_wrappers=1:nokey=1', video_filepath
-        ]
-        duration_result = subprocess.run(duration_cmd, capture_output=True, text=True, check=True)
-        duration = float(duration_result.stdout.strip())
-
-        # Extract frames at evenly spaced intervals
-        frame_times = [duration * (i + 1) / (num_frames + 1) for i in range(num_frames)]
-
-        # Store all tags from all frames with their confidence scores
-        all_tags_with_scores = {}
-        
+        from ml_worker.client import get_ml_worker_client
         client = get_ml_worker_client()
-
-        for i, timestamp in enumerate(frame_times):
-            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
-                temp_frame_path = temp_frame.name
-
-            try:
-                # Extract frame at timestamp
-                subprocess.run([
-                    ffmpeg_path, '-ss', str(timestamp), '-i', video_filepath,
-                    '-vframes', '1', '-strict', 'unofficial', '-y', temp_frame_path
-                ], check=True, capture_output=True)
-
-                # Tag frame using ML Worker
-                try:
-                    result = client.tag_image(
-                        image_path=temp_frame_path,
-                        model_path=tagger_config['model_path'],
-                        threshold=tagger_config.get('threshold', 0.50),
-                        character_threshold=0.85,
-                        metadata_path=tagger_config.get('metadata_path')
-                    )
-                    
-                    # Process predictions from ML Worker
-                    all_predictions = result.get('all_predictions', [])
-                    for pred in all_predictions:
-                        tag_name = pred['tag_name']
-                        category = pred['category']
-                        confidence = pred['confidence']
-                        
-                        if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
-                            continue
-                        
-                        key = (tag_name, category)
-                        
-                        # Keep track of max probability and count
-                        if key in all_tags_with_scores:
-                            all_tags_with_scores[key]['count'] += 1
-                            all_tags_with_scores[key]['max_prob'] = max(all_tags_with_scores[key]['max_prob'], confidence)
-                        else:
-                            all_tags_with_scores[key] = {'count': 1, 'max_prob': confidence}
-                            
-                except Exception as e:
-                    print(f"[Video Tagger] Error tagging frame {i+1}: {e}")
-                    continue
-
-            finally:
-                if os.path.exists(temp_frame_path):
-                    os.unlink(temp_frame_path)
-
-        if not all_tags_with_scores:
-            print("[Video Tagger] No tags found in any frame.")
-            return None
-
-        # Merge tags: Keep tags that appear in at least 2 frames OR have very high confidence
-        tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": [], "species": []}
-
-        for (tag_name, category), scores in all_tags_with_scores.items():
-            # Include tag if it appears in multiple frames or has very high confidence
-            if scores['count'] >= 2 or scores['max_prob'] >= 0.8:
-                if category in tags_by_category:
-                    tags_by_category[category].append(tag_name)
-                else:
-                    tags_by_category["general"].append(tag_name)
-
-        total_tags = sum(len(tags) for tags in tags_by_category.values())
-        print(f"[Video Tagger] Merged tags from {num_frames} frames: {total_tags} tags found.")
-
+        
+        # Call ML Worker to handle extraction and tagging
+        result = client.tag_video(
+            video_path=os.path.abspath(video_filepath), # Use absolute path
+            num_frames=num_frames,
+            model_path=tagger_config['model_path'],
+            threshold=tagger_config.get('threshold', 0.50),
+            character_threshold=0.85,
+            metadata_path=tagger_config.get('metadata_path')
+        )
+        
         return {
             "source": "local_tagger",
-            "data": {
-                "tags": tags_by_category,
-                "tagger_name": tagger_config.get('name', 'Unknown') + " (video)"
-            }
+            "data": result
         }
 
-    except subprocess.CalledProcessError as e:
-        print(f"[Video Tagger] ERROR: Failed to extract frames from video.")
-        print(f"[Video Tagger] Video file: {os.path.basename(video_filepath)}")
-        print(f"[Video Tagger] Command failed with exit code {e.returncode}")
-        if e.stderr:
-            print(f"[Video Tagger] Error output: {e.stderr.decode('utf-8', errors='ignore').strip()}")
-        print(f"[Video Tagger] The video file may be corrupted or in an unsupported format.")
-        return None
-    except FileNotFoundError as e:
-        print(f"[Video Tagger] ERROR: Required tool not found: {e}")
-        print(f"[Video Tagger] Please ensure ffmpeg and ffprobe are installed and in your PATH.")
-        return None
     except Exception as e:
-        print(f"[Video Tagger] ERROR during video analysis: {e}")
-        print(f"[Video Tagger] Video file: {os.path.basename(video_filepath)}")
+        print(f"[Video Tagger] ERROR during video analysis via ML Worker: {e}")
         return None
 
 def extract_tag_data(data, source):
@@ -514,6 +421,28 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
 
     if not os.path.exists(thumb_path):
         os.makedirs(os.path.dirname(thumb_path), exist_ok=True)
+        
+        # Try using ML Worker first
+        if ML_WORKER_AVAILABLE:
+            try:
+                from ml_worker.client import get_ml_worker_client
+                client = get_ml_worker_client()
+                
+                # Use ML Worker for all types (zip, video, image)
+                # It handles logic internally
+                print(f"[Thumbnail] Generating via ML Worker: {filename}")
+                result = client.generate_thumbnail(
+                    filepath=os.path.abspath(filepath),
+                    output_path=os.path.abspath(thumb_path),
+                    size=THUMB_SIZE
+                )
+                
+                if result and result.get('success'):
+                    return
+            except Exception as e:
+                print(f"[Thumbnail] ML Worker generation failed: {e}. Falling back to local.")
+                # Fall through to local logic
+
         try:
             # Check if this is a zip animation
             if filepath.lower().endswith('.zip'):

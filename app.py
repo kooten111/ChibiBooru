@@ -59,7 +59,7 @@ def create_app():
         """Redirect to startup page if app is not fully initialized."""
         if not _app_ready:
             # Allow these paths during startup
-            allowed_paths = ['/startup', '/api/ready', '/static/', '/favicon']
+            allowed_paths = ['/startup', '/api/ready', '/static/', '/favicon', '/api/system/']
             path = request.path
             
             if not any(path.startswith(p) for p in allowed_paths):

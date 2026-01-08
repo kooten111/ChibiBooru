@@ -4,20 +4,19 @@ from database import get_db_connection
 from utils.file_utils import normalize_image_path
 import traceback
 
-async def edit_tags_service():
+def edit_tags_service(data):
     """Service to update tags for an image with category support.
 
     This is for MANUAL USER EDITS only and records deltas for preservation
     across database rebuilds.
     """
-    data = await request.json
     filepath = normalize_image_path(data.get('filepath', ''))
 
     # Check if we have categorized tags (new format) or plain tags (old format)
     categorized_tags = data.get('categorized_tags')
 
     if not filepath:
-        return jsonify({"error": "Filepath is required"}), 400
+        return {"error": "Filepath is required"}, 400
 
     try:
         if categorized_tags:
@@ -40,12 +39,12 @@ async def edit_tags_service():
             # Selective reload: only update this image and tag counts
             from core.cache_manager import invalidate_image_cache
             invalidate_image_cache(filepath)
-            return jsonify({"status": "success"})
+            return {"status": "success"}
         else:
-            return jsonify({"error": "Failed to update tags in the database"}), 500
+            return {"error": "Failed to update tags in the database"}, 500
     except Exception as e:
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
 def autocomplete():
     """Enhanced autocomplete with grouped suggestions by type and category."""

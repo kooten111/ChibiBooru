@@ -266,52 +266,58 @@ async def rebuild_similarity_cache():
     task_id = f"similarity_cache_{uuid.uuid4().hex[:8]}"
     
     async def rebuild_cache_task(task_id, manager):
-        """Background task for rebuilding similarity cache with progress updates."""
+        """Background task for rebuilding similarity cache via ML Worker."""
         from services import monitor_service as mon
-        
-        mon.add_log("Starting similarity cache rebuild...", "info")
-        
-        loop = asyncio.get_running_loop()
-        
+        from ml_worker.client import get_ml_worker_client
         import time
-        last_update_time = 0
         
-        def progress_callback(current, total):
-            nonlocal last_update_time
-            current_time = time.time()
+        mon.add_log("Starting similarity cache rebuild via ML Worker...", "info")
+        
+        try:
+            client = get_ml_worker_client()
+            response = client.rebuild_cache(similarity_type='blended')
+            worker_job_id = response['job_id']
             
-            # Throttle updates: only update if 0.5s passed OR it's the final update
-            if (current_time - last_update_time > 0.5) or (current >= total):
-                last_update_time = current_time
-                future = asyncio.run_coroutine_threadsafe(
-                    manager.update_progress(task_id, current, total, "Rebuilding similarity cache..."), 
-                    loop
-                )
-                # We don't wait for the future
-        
-        # Run synchronous service function in thread
-        stats = await asyncio.to_thread(
-            similarity_cache.rebuild_cache_full,
-            similarity_type='blended',
-            progress_callback=progress_callback
-        )
-        
-        success = stats['success']
-        failed = stats['failed']
-        total = stats['total']
-        
-        result_msg = f"✓ Similarity cache rebuild complete: {success} cached, {failed} failed"
-        mon.add_log(result_msg, "success")
-        
-        # Update task to 100%
-        await manager.update_progress(task_id, total, total, "Complete")
-        
-        return {
-            'success': success,
-            'failed': failed,
-            'total': total,
-            'message': f"Cached {success} images ({failed} failed)"
-        }
+            mon.add_log(f"Worker job started: {worker_job_id}", "info")
+            
+            # Poll for completion
+            while True:
+                job_status = client.get_job_status(worker_job_id)
+                status = job_status.get('status')
+                progress = job_status.get('progress', 0)
+                message = job_status.get('message', 'Processing...')
+                
+                # Forward progress to frontend
+                await manager.update_progress(task_id, progress, 100, message)
+                
+                if status == 'completed':
+                    result = job_status.get('result', {})
+                    success = result.get('success', 0)
+                    failed = result.get('failed', 0)
+                    total = result.get('total', 0)
+                    
+                    result_msg = f"✓ Similarity cache rebuild complete: {success} cached, {failed} failed"
+                    mon.add_log(result_msg, "success")
+                    
+                    await manager.update_progress(task_id, 100, 100, "Complete")
+                    
+                    return {
+                        'success': success,
+                        'failed': failed,
+                        'total': total,
+                        'message': f"Cached {success} images ({failed} failed)"
+                    }
+                    
+                elif status == 'failed':
+                    error_msg = job_status.get('error', 'Unknown worker error')
+                    mon.add_log(f"Worker job failed: {error_msg}", "error")
+                    raise Exception(f"Worker job failed: {error_msg}")
+                    
+                await asyncio.sleep(1)
+                
+        except Exception as e:
+            mon.add_log(f"Similarity cache rebuild failed: {e}", "error")
+            raise e
     
     # Start background task
     monitor_service.add_log("Similarity cache rebuild task started...", "info")

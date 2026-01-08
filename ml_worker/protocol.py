@@ -18,6 +18,7 @@ class RequestType(str, Enum):
     TAG_IMAGE = "tag_image"
     UPSCALE_IMAGE = "upscale_image"
     COMPUTE_SIMILARITY = "compute_similarity"
+    SEARCH_SIMILAR = "search_similar"  # Search for similar images using FAISS index
     HEALTH_CHECK = "health_check"
     SHUTDOWN = "shutdown"
     TRAIN_RATING_MODEL = "train_rating_model"
@@ -25,6 +26,10 @@ class RequestType(str, Enum):
     TRAIN_CHARACTER_MODEL = "train_character_model"
     INFER_CHARACTERS = "infer_characters"
     GET_JOB_STATUS = "get_job_status"
+    REBUILD_CACHE = "rebuild_cache"
+    EXTRACT_ANIMATION = "extract_animation"
+    TAG_VIDEO = "tag_video"
+    GENERATE_THUMBNAIL = "generate_thumbnail"
 
 
 class ResponseStatus(str, Enum):
@@ -229,6 +234,73 @@ class Request:
             request_id,
             {
                 "job_id": job_id
+            }
+        )
+
+    @staticmethod
+    def search_similar(request_id: str, query_embedding: list,
+                       limit: int = 50) -> Dict[str, Any]:
+        """Create a search_similar request to find similar images via FAISS."""
+        return Request.create(
+            RequestType.SEARCH_SIMILAR,
+            request_id,
+            {
+                "query_embedding": query_embedding,
+                "limit": limit
+            }
+        )
+
+    @staticmethod
+    def rebuild_cache(request_id: str, similarity_type: str = 'blended') -> Dict[str, Any]:
+        """Create a rebuild_cache request"""
+        return Request.create(
+            RequestType.REBUILD_CACHE,
+            request_id,
+            {
+                "similarity_type": similarity_type
+            }
+        )
+
+    @staticmethod
+    def extract_animation(request_id: str, zip_path: str, output_dir: str) -> Dict[str, Any]:
+        """Create an extract_animation request"""
+        return Request.create(
+            RequestType.EXTRACT_ANIMATION,
+            request_id,
+            {
+                "zip_path": zip_path,
+                "output_dir": output_dir
+            }
+        )
+
+    @staticmethod
+    def tag_video(request_id: str, video_path: str, num_frames: int = 5,
+                  model_path: str = None, threshold: float = 0.35,
+                  character_threshold: float = 0.85, metadata_path: str = None) -> Dict[str, Any]:
+        """Create a tag_video request"""
+        return Request.create(
+            RequestType.TAG_VIDEO,
+            request_id,
+            {
+                "video_path": video_path,
+                "num_frames": num_frames,
+                "model_path": model_path,
+                "threshold": threshold,
+                "character_threshold": character_threshold,
+                "metadata_path": metadata_path
+            }
+        )
+
+    @staticmethod
+    def generate_thumbnail(request_id: str, filepath: str, output_path: str, size: int = 512) -> Dict[str, Any]:
+        """Create a generate_thumbnail request"""
+        return Request.create(
+            RequestType.GENERATE_THUMBNAIL,
+            request_id,
+            {
+                "filepath": filepath,
+                "output_path": output_path,
+                "size": size
             }
         )
 

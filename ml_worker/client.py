@@ -202,6 +202,9 @@ class MLWorkerClient:
                         # Receive response
                         response = Message.recv_message(sock, timeout=self.timeout)
 
+                        if response is None:
+                             raise MLWorkerError("Worker returned no response (connection closed or empty)")
+
                         # Check response status
                         if response['status'] == ResponseStatus.SUCCESS.value:
                             return response['data']
@@ -481,6 +484,110 @@ class MLWorkerClient:
         request_id = str(uuid.uuid4())
         request = Request.get_job_status(request_id, job_id)
         return self._send_request(request)
+
+    def search_similar(self, query_embedding: List[float],
+                       limit: int = 50) -> Dict[str, Any]:
+        """
+        Search for similar images using FAISS index in ML Worker.
+        
+        This keeps FAISS in the worker process so it can be unloaded
+        when the worker terminates after idle timeout.
+
+        Args:
+            query_embedding: 1024-d embedding vector for query image
+            limit: Maximum number of similar images to return
+
+        Returns:
+            Dict with:
+                - results: List of (image_id, score) tuples
+
+        Raises:
+            MLWorkerError: If search fails
+        """
+        request_id = str(uuid.uuid4())
+        request = Request.search_similar(request_id, query_embedding, limit)
+        return self._send_request(request)
+
+    def rebuild_cache(self, similarity_type: str = 'blended', timeout: float = 1200.0) -> Dict[str, Any]:
+        """
+        Rebuild similarity cache via ML Worker.
+
+        Args:
+            similarity_type: Type of similarity to rebuild ('blended', 'visual', etc.)
+            timeout: Request timeout in seconds (default 1200s for full rebuild)
+
+        Returns:
+            Dict with job info (job_id, status)
+
+        Raises:
+            MLWorkerError: If request fails
+        """
+        request_id = str(uuid.uuid4())
+        request = Request.rebuild_cache(request_id, similarity_type)
+
+        # Temporarily increase timeout for this request
+        old_timeout = self.timeout
+        try:
+            self.timeout = timeout
+            return self._send_request(request)
+        finally:
+            self.timeout = old_timeout
+
+    def extract_animation(self, zip_path: str, output_dir: str) -> Dict[str, Any]:
+        """
+        Extract animation frames from a zip file via ML Worker.
+
+        Args:
+            zip_path: Path to the zip file
+            output_dir: Directory to extract frames to
+
+        Returns:
+            Dict with animation metadata
+        """
+        request_id = str(uuid.uuid4())
+        request = Request.extract_animation(request_id, zip_path, output_dir)
+        return self._send_request(request)
+
+    def tag_video(self, video_path: str, num_frames: int = 5,
+                  model_path: str = None, threshold: float = 0.35,
+                  character_threshold: float = 0.85, metadata_path: str = None) -> Dict[str, Any]:
+        """
+        Tag a video by extracting frames and processing them via ML Worker.
+
+        Args:
+            video_path: Path to the video file
+            num_frames: Number of frames to extract
+            model_path: Path to ONNX model
+            threshold: Confidence threshold
+            character_threshold: Character threshold
+            metadata_path: Path to metadata file
+
+        Returns:
+            Dict with merged tags
+        """
+        request_id = str(uuid.uuid4())
+        request = Request.tag_video(
+            request_id, video_path, num_frames,
+            model_path, threshold, character_threshold, metadata_path
+        )
+        return self._send_request(request)
+
+    def generate_thumbnail(self, filepath: str, output_path: str, size: int = 512) -> Dict[str, Any]:
+        """
+        Generate a thumbnail for an image or video via ML Worker.
+
+        Args:
+            filepath: Path to source file
+            output_path: Path to save thumbnail
+            size: Thumbnail size (default 512)
+
+        Returns:
+            Dict with status
+        """
+        request_id = str(uuid.uuid4())
+        request = Request.generate_thumbnail(request_id, filepath, output_path, size)
+        return self._send_request(request)
+
 
     def __del__(self):
         """Cleanup on deletion"""

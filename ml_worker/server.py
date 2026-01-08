@@ -13,10 +13,15 @@ import json
 import socket
 import signal
 import time
+import zipfile
 import threading
+import subprocess
+import tempfile
+import shutil
 import logging
+import numpy as np
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -26,6 +31,7 @@ from ml_worker.protocol import (
     validate_request
 )
 from ml_worker.backends import ensure_backend_ready, setup_backend_environment, get_torch_device
+from services import similarity_service
 
 # Configure logging
 logging.basicConfig(
@@ -107,6 +113,292 @@ _tagger_metadata = None
 _upscaler_model = None
 _upscaler_device = None
 _similarity_model = None
+
+# Constants for animation extraction
+FRAME_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp')
+
+def natural_sort_key(s: str) -> List:
+    """Sort key for natural sorting."""
+    import re
+    return [int(text) if text.isdigit() else text.lower()
+            for text in re.split(r'(\d+)', s)]
+
+def is_valid_frame(filename: str) -> bool:
+    """Check if a filename is a valid image frame."""
+    if filename.startswith('.') or filename.startswith('__'):
+        return False
+    return filename.lower().endswith(FRAME_EXTENSIONS)
+
+def handle_extract_animation(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle extract_animation request.
+    
+    Args:
+        request_data: {zip_path, output_dir}
+        
+    Returns:
+        Dict with animation metadata
+    """
+    zip_filepath = request_data['zip_path']
+    extract_dir = request_data['output_dir']
+    
+    logger.info(f"Extracting zip animation: {os.path.basename(zip_filepath)}")
+    
+    try:
+        from PIL import Image
+        
+        with zipfile.ZipFile(zip_filepath, 'r') as zf:
+            # Get list of image files in the zip
+            all_files = zf.namelist()
+            
+            # Filter to only image files
+            image_files = [f for f in all_files if is_valid_frame(os.path.basename(f))]
+            
+            if not image_files:
+                raise ValueError(f"No valid image files found in {zip_filepath}")
+            
+            # Sort files naturally
+            image_files = sorted(image_files, key=natural_sort_key)
+            
+            # Create extraction directory
+            os.makedirs(extract_dir, exist_ok=True)
+            
+            # Extract and rename files for consistent ordering
+            frames = []
+            first_frame_path = None
+            width, height = None, None
+            
+            for i, img_file in enumerate(image_files):
+                # Get extension from original file
+                ext = os.path.splitext(img_file)[1].lower()
+                # Create numbered filename for consistent ordering
+                frame_filename = f"frame_{i:05d}{ext}"
+                frame_path = os.path.join(extract_dir, frame_filename)
+                
+                # Extract the file
+                with zf.open(img_file) as src:
+                    with open(frame_path, 'wb') as dst:
+                        dst.write(src.read())
+                
+                frames.append(frame_filename)
+                
+                # Get dimensions from first frame
+                if i == 0:
+                    first_frame_path = frame_path
+                    try:
+                        with Image.open(frame_path) as img:
+                            width, height = img.size
+                    except Exception as e:
+                        logger.warning(f"Error reading first frame dimensions: {e}")
+            
+            # Save metadata
+            metadata = {
+                "frame_count": len(frames),
+                "frames": frames,
+                "width": width,
+                "height": height,
+                "default_fps": 10,
+                "original_files": image_files
+            }
+            
+            metadata_path = os.path.join(extract_dir, "animation.json")
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            logger.info(f"Extracted {len(frames)} frames")
+            
+            return {
+                "extract_dir": extract_dir,
+                "first_frame": first_frame_path,
+                **metadata
+            }
+            
+    except Exception as e:
+        logger.error(f"Error extracting zip animation: {e}")
+        raise
+
+def handle_tag_video(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle tag_video request.
+    Extracts frames using ffmpeg and tags them using internal tagger.
+    """
+    video_filepath = request_data['video_path']
+    num_frames = request_data.get('num_frames', 5)
+    
+    # Reuse params for tagging
+    model_path = request_data['model_path']
+    threshold = request_data.get('threshold', 0.35)
+    
+    logger.info(f"Tagging video: {os.path.basename(video_filepath)} ({num_frames} frames)")
+    
+    # Check ffmpeg
+    ffmpeg_path = shutil.which('ffmpeg')
+    ffprobe_path = shutil.which('ffprobe')
+    
+    if not ffmpeg_path or not ffprobe_path:
+        raise RuntimeError("ffmpeg/ffprobe not found in worker environment")
+        
+    try:
+        # Get duration
+        duration_cmd = [
+            ffprobe_path, '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1', video_filepath
+        ]
+        duration_result = subprocess.run(duration_cmd, capture_output=True, text=True, check=True)
+        duration = float(duration_result.stdout.strip())
+
+        # Extract frames
+        frame_times = [duration * (i + 1) / (num_frames + 1) for i in range(num_frames)]
+        
+        all_tags_with_scores = {}
+        
+        for i, timestamp in enumerate(frame_times):
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
+                temp_frame_path = temp_frame.name
+            
+            try:
+                subprocess.run([
+                    ffmpeg_path, '-ss', str(timestamp), '-i', video_filepath,
+                    '-vframes', '1', '-strict', 'unofficial', '-y', temp_frame_path
+                ], check=True, capture_output=True)
+                
+                # Tag using internal handler function directly
+                # We need to construct a request payload for handle_tag_image
+                tag_request = {
+                    "image_path": temp_frame_path,
+                    "model_path": model_path,
+                    "threshold": threshold,
+                    "character_threshold": request_data.get('character_threshold', 0.85),
+                    "metadata_path": request_data.get('metadata_path')
+                }
+                
+                result = handle_tag_image(tag_request)
+                
+                # Merge logic
+                all_predictions = result.get('all_predictions', [])
+                for pred in all_predictions:
+                    tag_name = pred['tag_name']
+                    category = pred['category']
+                    confidence = pred['confidence']
+                    
+                    if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
+                        continue
+                    
+                    key = (tag_name, category)
+                    
+                    if key in all_tags_with_scores:
+                        all_tags_with_scores[key]['count'] += 1
+                        all_tags_with_scores[key]['max_prob'] = max(all_tags_with_scores[key]['max_prob'], confidence)
+                    else:
+                        all_tags_with_scores[key] = {'count': 1, 'max_prob': confidence}
+                        
+            except Exception as e:
+                logger.warning(f"Error tagging frame {i+1}: {e}")
+                continue
+            finally:
+                if os.path.exists(temp_frame_path):
+                    os.unlink(temp_frame_path)
+                    
+        # Final merge
+        if not all_tags_with_scores:
+            logger.warning("No tags found in any frame")
+            return {"tags": {}, "tagger_name": "unknown"}
+            
+        tags_by_category = {"general": [], "character": [], "copyright": [], "artist": [], "meta": [], "species": []}
+
+        for (tag_name, category), scores in all_tags_with_scores.items():
+            if scores['count'] >= 2 or scores['max_prob'] >= 0.8:
+                if category in tags_by_category:
+                    tags_by_category[category].append(tag_name)
+                else:
+                    tags_by_category["general"].append(tag_name)
+                    
+        return {
+            "tags": tags_by_category,
+            "tagger_name": _tagger_metadata.get('model_info', {}).get('name', 'Unknown') + " (video)" if _tagger_metadata else "video"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error tagging video: {e}")
+        raise
+
+def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle generate_thumbnail request.
+    Generates thumbnail for image, video, or zip animation.
+    """
+    filepath = request_data['filepath']
+    output_path = request_data['output_path']
+    size = request_data.get('size', 512)
+    
+    logger.info(f"Generating thumbnail for: {os.path.basename(filepath)}")
+    
+    # Ensure output directory exists
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    try:
+        from PIL import Image
+        
+        # Handle Zip Animation
+        if filepath.lower().endswith('.zip'):
+            with zipfile.ZipFile(filepath, 'r') as zf:
+                all_files = zf.namelist()
+                image_files = [f for f in all_files if is_valid_frame(os.path.basename(f))]
+                
+                if not image_files:
+                    raise ValueError(f"No valid images in zip: {filepath}")
+                
+                image_files = sorted(image_files, key=natural_sort_key)
+                first_frame = image_files[0]
+                
+                with zf.open(first_frame) as src:
+                    with Image.open(src) as img:
+                        if img.mode in ('RGBA', 'LA', 'P'):
+                            background = Image.new('RGB', img.size, (255, 255, 255))
+                            if img.mode == 'P': img = img.convert('RGBA')
+                            background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                            img = background
+                        img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                        img.save(output_path, 'WEBP', quality=85, method=6)
+                        
+        # Handle Video
+        elif filepath.lower().endswith(('.mp4', '.webm')):
+            ffmpeg_path = shutil.which('ffmpeg')
+            if not ffmpeg_path:
+                raise RuntimeError("ffmpeg not found")
+                
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
+                temp_frame_path = temp_frame.name
+            
+            try:
+                subprocess.run([
+                    ffmpeg_path, '-ss', '0.1', '-i', filepath, '-vframes', '1',
+                    '-strict', 'unofficial', '-y', temp_frame_path
+                ], check=True, capture_output=True)
+                
+                with Image.open(temp_frame_path) as img:
+                    img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                    img.save(output_path, 'WEBP', quality=85, method=6)
+            finally:
+                if os.path.exists(temp_frame_path):
+                    os.unlink(temp_frame_path)
+                    
+        # Handle Regular Image
+        else:
+            with Image.open(filepath) as img:
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P': img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                    img = background
+                img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                img.save(output_path, 'WEBP', quality=85, method=6)
+                
+        return {"success": True, "output_path": output_path}
+        
+    except Exception as e:
+        logger.error(f"Error generating thumbnail: {e}")
+        raise
 
 
 def update_activity():
@@ -607,7 +899,71 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def handle_search_similar(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle search_similar request - build FAISS index and search.
+    
+    This keeps FAISS in the worker process so memory is freed when
+    worker terminates after idle timeout.
+
+    Args:
+        request_data: {query_embedding: list, limit: int}
+
+    Returns:
+        Dict with search results
+    """
+    query_embedding = request_data['query_embedding']
+    limit = request_data.get('limit', 50)
+
+    logger.info(f"Searching for similar images (limit: {limit})")
+
+    # Lazy load FAISS and numpy (ONLY in worker process)
+    import faiss
+    import numpy as np
+    
+    # Import database functions
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from services import similarity_db
+
+    # Get all embeddings from database
+    ids, matrix = similarity_db.get_all_embeddings()
+    
+    if len(ids) == 0:
+        logger.warning("No embeddings found in database")
+        return {"results": []}
+
+    # Build FAISS index
+    logger.info(f"Building FAISS index with {len(ids)} embeddings...")
+    faiss.normalize_L2(matrix)
+    dimension = matrix.shape[1]
+    index = faiss.IndexFlatIP(dimension)
+    index.add(matrix)
+    
+    # Prepare query
+    query = np.array(query_embedding, dtype=np.float32).reshape(1, -1)
+    faiss.normalize_L2(query)
+    
+    # Search
+    distances, indices = index.search(query, min(limit, len(ids)))
+    
+    # Build results
+    results = []
+    for dist, idx in zip(distances[0], indices[0]):
+        if idx == -1:
+            continue
+        if idx < len(ids):
+            results.append({
+                'image_id': int(ids[idx]),
+                'score': float(dist)
+            })
+    
+    logger.info(f"Found {len(results)} similar images")
+    
+    return {"results": results}
+
+
 def handle_health_check(request_data: Dict[str, Any]) -> Dict[str, Any]:
+
     """Handle health check request"""
     return {
         "status": "ok",
@@ -850,6 +1206,77 @@ def handle_get_job_status(request_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+class LocalSemanticBackend(similarity_service.SemanticBackend):
+    """
+    Local backend for when running INSIDE the worker process.
+    Calls the handler functions directly instead of going through IPC.
+    """
+    def is_available(self) -> bool:
+        return True
+        
+    def get_embedding(self, image_path: str, model_path: str) -> Optional[np.ndarray]:
+        try:
+            # Call handler directly
+            result = handle_compute_similarity({
+                'image_path': image_path,
+                'model_path': model_path
+            })
+            embedding = result['embedding']
+            return np.array(embedding, dtype=np.float32)
+        except Exception as e:
+            logger.error(f"Local backend embedding failed: {e}")
+            return None
+            
+    def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
+        try:
+            # Call handler directly
+            result = handle_search_similar({
+                'query_embedding': query_embedding,
+                'limit': limit
+            })
+            return result.get('results', [])
+        except Exception as e:
+            logger.error(f"Local backend search failed: {e}")
+            return []
+
+
+def handle_rebuild_cache(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle rebuild_cache request.
+    Restarts the cache build process in a background thread.
+    """
+    similarity_type = request_data.get('similarity_type', 'blended')
+    logger.info(f"Starting similarity cache rebuild ({similarity_type})...")
+    
+    # Import here to avoid circular dependencies
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from services import similarity_cache
+    
+    def _run_rebuild(progress_callback=None):
+        logger.info(f"Rebuilding cache ({similarity_type})...")
+        
+        def adapter(current, total):
+            if progress_callback:
+                pct = int(current / total * 100) if total > 0 else 0
+                progress_callback(pct, f"Processed {current}/{total} images")
+            
+        stats = similarity_cache.rebuild_cache_full(
+            similarity_type=similarity_type,
+            progress_callback=adapter
+        )
+        
+        logger.info(f"Rebuild complete. Stats: {stats}")
+        return stats
+        
+    job_id = start_job(_run_rebuild)
+    
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "message": "Cache rebuild started"
+    }
+
+
 def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle a request message.
@@ -881,7 +1308,12 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
             result = handle_compute_similarity(request_data)
             return Response.success(request_id, result)
 
+        elif request_type == RequestType.SEARCH_SIMILAR.value:
+            result = handle_search_similar(request_data)
+            return Response.success(request_id, result)
+
         elif request_type == RequestType.HEALTH_CHECK.value:
+
             result = handle_health_check(request_data)
             return Response.success(request_id, result)
 
@@ -903,6 +1335,22 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
 
         elif request_type == RequestType.GET_JOB_STATUS.value:
             result = handle_get_job_status(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.REBUILD_CACHE.value:
+            result = handle_rebuild_cache(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.EXTRACT_ANIMATION.value:
+            result = handle_extract_animation(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.TAG_VIDEO.value:
+            result = handle_tag_video(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.GENERATE_THUMBNAIL.value:
+            result = handle_generate_thumbnail(request_data)
             return Response.success(request_id, result)
 
         elif request_type == RequestType.SHUTDOWN.value:
@@ -997,6 +1445,14 @@ def run_server():
     try:
         backend = ensure_backend_ready()
         logger.info(f"Backend strictly configured: {backend}")
+        
+        # Inject LocalSemanticBackend so worker uses itself for embeddings/search
+        # instead of trying to connect to its own socket
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from services import similarity_service
+        similarity_service.set_semantic_backend(LocalSemanticBackend())
+        logger.info("Injected LocalSemanticBackend for worker process")
+        
     except Exception as e:
         logger.error(f"Failed to set up backend: {e}")
         # Build might fail if ensure_backend_ready crashes process directly

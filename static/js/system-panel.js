@@ -307,9 +307,22 @@ function pollTaskProgress(taskId, actionName, buttonElement, originalText) {
     const pollInterval = 1000; // Poll every second
 
     const updateButton = (status) => {
-        if (buttonElement && status.progress !== undefined && status.total !== undefined) {
+        if (!buttonElement) return;
+
+        if (status.total !== undefined && status.progress !== undefined) {
+            // Count-based progress
             const percentage = status.total > 0 ? Math.round((status.progress / status.total) * 100) : 0;
             buttonElement.innerHTML = `⏳ ${percentage}% (${status.progress}/${status.total})`;
+        } else if (status.progress !== undefined) {
+            // Percentage-based progress (ML worker style)
+            buttonElement.innerHTML = `⏳ ${status.progress}%`;
+            // If message is short enough, append it
+            if (status.message && status.message.length < 30) {
+                buttonElement.innerHTML += ` <span style="font-size:0.8em">(${status.message})</span>`;
+            }
+        } else if (status.message) {
+            // Message only
+            buttonElement.innerHTML = `⏳ ${status.message}`;
         }
     };
 
@@ -393,15 +406,135 @@ function systemGenerateThumbnails(event) {
 
 function systemGenerateHashes(event) {
     if (event) event.preventDefault();
-    systemAction('/api/similarity/generate-hashes', event.target, 'Generate Image Hashes');
+    showConfirm('This will generate perceptual hashes for images without them. Continue?', () => {
+        systemAction('/api/similarity/generate-hashes', event.target, 'Generate Image Hashes');
+    });
 }
 
 function systemRebuildSimilarityCache(event) {
     if (event) event.preventDefault();
     showConfirm('This will rebuild the similarity cache for all images. This may take several minutes. Continue?', () => {
-        systemAction('/api/similarity/rebuild-cache', event.target, 'Rebuild Similarity Cache');
+        systemAction('/api/similarity/rebuild-cache', event.target, 'Rebuild Similarity Cache', { similarity_type: 'blended' });
     });
 }
+
+/**
+ * Show a progress modal for long-running background tasks.
+ * @param {string} endpoint - The API endpoint to call
+ * @param {string} actionName - Human-readable name for the action
+ */
+function showProgressModal(endpoint, actionName) {
+    if (!SYSTEM_SECRET) {
+        showNotification('System secret not configured', 'error');
+        return;
+    }
+
+    // Clone and show the modal
+    const template = document.getElementById('progress-modal-template');
+    if (!template) {
+        console.error('Progress modal template not found, falling back to button progress');
+        systemAction(endpoint, null, actionName);
+        return;
+    }
+
+    const clone = template.content.cloneNode(true);
+    const overlay = clone.querySelector('.progress-modal-overlay');
+    const modal = overlay.querySelector('.progress-modal');
+    const titleEl = overlay.querySelector('#progress-title');
+    const statusEl = overlay.querySelector('#progress-status-text');
+    const progressBar = overlay.querySelector('#progress-bar-fill');
+    const detailsEl = overlay.querySelector('#progress-details');
+
+    titleEl.textContent = actionName;
+    document.body.appendChild(overlay);
+
+    // Start the task
+    const url = `${endpoint}?secret=${encodeURIComponent(SYSTEM_SECRET)}`;
+
+    fetch(url, { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'started' && data.task_id) {
+                // Poll for progress
+                pollProgressModal(data.task_id, actionName, overlay, modal, statusEl, progressBar, detailsEl);
+            } else if (data.error === 'Unauthorized') {
+                localStorage.removeItem('system_secret');
+                SYSTEM_SECRET = null;
+                showNotification('Invalid system secret', 'error');
+                updateSecretUI();
+                document.body.removeChild(overlay);
+            } else {
+                throw new Error(data.error || 'Failed to start task');
+            }
+        })
+        .catch(err => {
+            showNotification(`${actionName} failed: ${err.message}`, 'error');
+            document.body.removeChild(overlay);
+        });
+}
+
+function pollProgressModal(taskId, actionName, overlay, modal, statusEl, progressBar, detailsEl) {
+    const pollInterval = 500; // Poll every 500ms for smoother updates
+
+    const poll = () => {
+        fetch(`/api/task_status?task_id=${encodeURIComponent(taskId)}`)
+            .then(res => res.json())
+            .then(status => {
+                // Update progress UI
+                if (status.progress !== undefined && status.total !== undefined) {
+                    const percentage = status.total > 0 ? Math.round((status.progress / status.total) * 100) : 0;
+                    progressBar.style.width = `${percentage}%`;
+                    detailsEl.textContent = `${status.progress.toLocaleString()} / ${status.total.toLocaleString()} (${percentage}%)`;
+                }
+
+                if (status.message) {
+                    statusEl.textContent = status.message;
+                }
+
+                if (status.status === 'completed') {
+                    // Show success state
+                    modal.classList.add('success');
+                    statusEl.textContent = 'Complete!';
+                    progressBar.style.width = '100%';
+
+                    const msg = status.result?.message || `${actionName} completed successfully`;
+
+                    // Close modal after short delay
+                    setTimeout(() => {
+                        document.body.removeChild(overlay);
+                        showNotification(msg, 'success');
+                        loadLogs();
+                        loadSystemStatus();
+                    }, 800);
+                } else if (status.status === 'failed') {
+                    document.body.removeChild(overlay);
+                    showNotification(`${actionName} failed: ${status.error}`, 'error');
+                } else if (status.status === 'running' || status.status === 'pending') {
+                    // Continue polling
+                    setTimeout(poll, pollInterval);
+                } else {
+                    // Unknown status, close modal
+                    document.body.removeChild(overlay);
+                }
+            })
+            .catch(err => {
+                console.error('Error polling task status:', err);
+                document.body.removeChild(overlay);
+                showNotification(`Error checking ${actionName} progress`, 'error');
+            });
+    };
+
+    // Start polling
+    poll();
+}
+
+function systemRebuildSimilarityCache(event) {
+    if (event) event.preventDefault();
+    showConfirm('This will rebuild the similarity cache for all images. This may take several minutes. Continue?', () => {
+        showProgressModal('/api/similarity/rebuild-cache', 'Rebuild Similarity Cache');
+    });
+}
+
 
 function systemReloadData(event) {
     if (event) event.preventDefault();
@@ -670,6 +803,7 @@ window.systemDatabaseHealthCheck = systemDatabaseHealthCheck;
 window.systemStartMonitor = systemStartMonitor;
 window.systemStopMonitor = systemStopMonitor;
 window.systemClearImpliedTags = systemClearImpliedTags;
+window.systemRebuildSimilarityCache = systemRebuildSimilarityCache;
 window.saveSystemSecret = saveSystemSecret;
 window.clearSystemSecret = clearSystemSecret;
 

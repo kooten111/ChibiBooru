@@ -162,9 +162,11 @@
                             <div class="settings-item">
                                 <div class="settings-info">
                                     <span class="settings-label">Rebuild Similarity Cache</span>
-                                    <span class="settings-desc">Pre-compute top-50 similar images for all images. Frees ~300MB RAM by removing need for live FAISS index.</span>
+                                    <span class="settings-desc">Pre-compute top-50 similar images for all images. Frees
+                                        ~300MB RAM by removing need for live FAISS index.</span>
                                 </div>
-                                <button class="btn btn-warning" onclick="systemRebuildSimilarityCache(event)">Rebuild</button>
+                                <button class="btn btn-warning"
+                                    onclick="systemRebuildSimilarityCache(event)">Rebuild</button>
                             </div>
                         </div>
 
@@ -415,5 +417,265 @@
                 </div>
             </div>
         </div>
+    </template>
+    <template id="progress-modal-template">
+        <div class="progress-modal-overlay">
+            <div class="progress-modal">
+                <div class="progress-mascot">
+                    <img src="{{ url_for('static', filename='mascot/mascot.webp') or '/static/mascot/mascot.webp' }}"
+                        alt="Mascot" class="progress-mascot-image">
+                    <div class="progress-loading-ring"></div>
+                </div>
+                <h3 class="progress-title" id="progress-title">Processing...</h3>
+                <div class="progress-status">
+                    <span id="progress-status-text">Starting...</span>
+                    <div class="progress-loading-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-bar-fill"></div>
+                </div>
+                <div class="progress-details" id="progress-details">0 / 0</div>
+                <button class="progress-cancel-btn" id="progress-cancel-btn" style="display: none;">Cancel</button>
+            </div>
+        </div>
+        <style>
+            .progress-modal-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.85);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                animation: progressFadeIn 0.3s ease-out;
+            }
+
+            .progress-modal {
+                background: linear-gradient(135deg, rgba(30, 35, 45, 0.95) 0%, rgba(20, 25, 35, 0.98) 100%);
+                border: 1px solid rgba(135, 206, 235, 0.2);
+                border-radius: 16px;
+                padding: 40px;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(135, 206, 235, 0.1);
+                min-width: 350px;
+                max-width: 450px;
+            }
+
+            .progress-mascot {
+                position: relative;
+                width: 140px;
+                height: 140px;
+                margin: 0 auto 24px;
+            }
+
+            .progress-mascot-image {
+                width: 90px;
+                height: auto;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                animation: progressFloat 3s ease-in-out infinite;
+                filter: drop-shadow(0 10px 30px rgba(135, 206, 235, 0.3));
+            }
+
+            .progress-loading-ring {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                border: 3px solid transparent;
+                border-top-color: var(--primary-blue, #87ceeb);
+                border-right-color: var(--primary-blue-dark, #5fa8c4);
+                animation: progressSpin 1.5s linear infinite;
+            }
+
+            .progress-loading-ring::before {
+                content: '';
+                position: absolute;
+                top: 5px;
+                left: 5px;
+                right: 5px;
+                bottom: 5px;
+                border-radius: 50%;
+                border: 3px solid transparent;
+                border-top-color: rgba(135, 206, 235, 0.4);
+                animation: progressSpin 2s linear infinite reverse;
+            }
+
+            .progress-title {
+                font-size: 1.5rem;
+                font-weight: 600;
+                background: linear-gradient(135deg, #87ceeb, #5fa8c4);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+                margin: 0 0 16px;
+            }
+
+            .progress-status {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                color: #a0a8b0;
+                font-size: 1rem;
+                margin-bottom: 20px;
+            }
+
+            #progress-status-text {
+                min-width: 150px;
+            }
+
+            .progress-loading-dots {
+                display: flex;
+                gap: 4px;
+            }
+
+            .progress-loading-dots span {
+                width: 5px;
+                height: 5px;
+                background: var(--primary-blue, #87ceeb);
+                border-radius: 50%;
+                animation: progressBounce 1.4s infinite ease-in-out both;
+            }
+
+            .progress-loading-dots span:nth-child(1) {
+                animation-delay: -0.32s;
+            }
+
+            .progress-loading-dots span:nth-child(2) {
+                animation-delay: -0.16s;
+            }
+
+            .progress-loading-dots span:nth-child(3) {
+                animation-delay: 0s;
+            }
+
+            .progress-bar-container {
+                width: 100%;
+                height: 6px;
+                background: rgba(135, 206, 235, 0.2);
+                border-radius: 3px;
+                margin-bottom: 12px;
+                overflow: hidden;
+            }
+
+            .progress-bar-fill {
+                height: 100%;
+                width: 0%;
+                background: linear-gradient(90deg, #87ceeb, #5fa8c4);
+                border-radius: 3px;
+                transition: width 0.3s ease-out;
+                position: relative;
+            }
+
+            .progress-bar-fill::after {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+                animation: progressShimmer 1.5s infinite;
+            }
+
+            .progress-details {
+                color: #6a7280;
+                font-size: 0.9rem;
+                font-family: monospace;
+            }
+
+            .progress-cancel-btn {
+                margin-top: 20px;
+                padding: 8px 24px;
+                background: rgba(239, 68, 68, 0.2);
+                border: 1px solid rgba(239, 68, 68, 0.5);
+                color: #ef4444;
+                border-radius: 8px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+
+            .progress-cancel-btn:hover {
+                background: rgba(239, 68, 68, 0.3);
+            }
+
+            .progress-modal.success .progress-loading-ring {
+                border-color: #10b981;
+                animation: none;
+            }
+
+            .progress-modal.success .progress-title {
+                background: linear-gradient(135deg, #10b981, #059669);
+                -webkit-background-clip: text;
+                background-clip: text;
+            }
+
+            @keyframes progressFadeIn {
+                from {
+                    opacity: 0;
+                }
+
+                to {
+                    opacity: 1;
+                }
+            }
+
+            @keyframes progressFloat {
+
+                0%,
+                100% {
+                    transform: translate(-50%, -50%);
+                }
+
+                50% {
+                    transform: translate(-50%, calc(-50% - 8px));
+                }
+            }
+
+            @keyframes progressSpin {
+                from {
+                    transform: rotate(0deg);
+                }
+
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            @keyframes progressBounce {
+
+                0%,
+                80%,
+                100% {
+                    transform: scale(0);
+                }
+
+                40% {
+                    transform: scale(1);
+                }
+            }
+
+            @keyframes progressShimmer {
+                from {
+                    transform: translateX(-100%);
+                }
+
+                to {
+                    transform: translateX(100%);
+                }
+            }
+        </style>
     </template>
 </div>

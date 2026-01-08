@@ -148,7 +148,7 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
     return result
 
 
-async def delete_upscaled_image(filepath: str) -> Dict:
+def delete_upscaled_image(filepath: str) -> Dict:
     """Delete the upscaled version of an image."""
     result = {
         'success': False,

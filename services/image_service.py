@@ -17,14 +17,11 @@ import requests
 import asyncio
 import uuid
 
-def get_images_for_api():
+def get_images_for_api(search_query, page, seed):
     """Service for the infinite scroll API."""
     from services import query_service  # Import here to avoid circular import
     
-    search_query = request.args.get('query', '').strip().lower()
-    page = request.args.get('page', 1, type=int)
     per_page = 50
-    seed = request.args.get('seed', default=None, type=int)
 
     # Use the same search logic as the main page for consistency
     search_results, should_shuffle = query_service.perform_search(search_query)
@@ -38,23 +35,28 @@ def get_images_for_api():
     end_idx = start_idx + per_page
 
     from core.cache_manager import get_image_tags_as_string
-
-    images_page = [
-        {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": get_image_tags_as_string(img)}
-        for img in search_results[start_idx:end_idx]
-    ]
-
-    return jsonify({
+    
+    # Process images directly (already running in thread)
+    images_page = _process_images_for_api(search_results[start_idx:end_idx])
+    
+    return {
         "images": images_page,
         "page": page,
         "total_pages": total_pages,
         "total_results": total_results,
         "has_more": page < total_pages
-    })
+    }
 
-async def delete_image_service():
+def _process_images_for_api(images):
+    from core.cache_manager import get_image_tags_as_string
+    return [
+        {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": get_image_tags_as_string(img)}
+        for img in images
+    ]
+
+
+def delete_image_service(data):
     """Service to delete an image and its data."""
-    data = await request.json
     # The filepath from the frontend is 'images/folder/image.jpg'
     # We need the path relative to the 'static/images' directory, which is 'folder/image.jpg'
     filepath = normalize_image_path(data.get('filepath', ''))
@@ -107,28 +109,27 @@ async def delete_image_service():
             # Remove upscaled version if it exists
             try:
                 from services.upscaler_service import delete_upscaled_image
-                await delete_upscaled_image(filepath)
+                delete_upscaled_image(filepath)
             except Exception as e:
                 print(f"Failed to delete upscaled image for {filepath}: {e}")
         else:
             print("No database entry or files were found to delete.")
 
 
-        return jsonify({"status": "success", "message": "Deletion process completed."})
+        return {"status": "success", "message": "Deletion process completed."}
     except Exception as e:
         # Log the full error to the console for easier debugging in the future.
         import traceback
         traceback.print_exc()
         print(f"Error deleting image {filepath}: {e}")
-        return jsonify({"error": "An unexpected error occurred during deletion."}), 500
+        return {"error": "An unexpected error occurred during deletion."}, 500
 
-async def delete_images_bulk_service():
+def delete_images_bulk_service(data):
     """Service to delete multiple images at once."""
-    data = await request.json
     filepaths = data.get('filepaths', [])
 
     if not filepaths or not isinstance(filepaths, list):
-        return jsonify({"error": "filepaths array is required"}), 400
+        return {"error": "filepaths array is required"}, 400
 
     results = {
         "total": len(filepaths),
@@ -167,7 +168,7 @@ async def delete_images_bulk_service():
                 models.remove_image_from_cache(clean_filepath)
                 # Remove upscaled version if it exists
                 from services.upscaler_service import delete_upscaled_image
-                await delete_upscaled_image(clean_filepath)
+                delete_upscaled_image(clean_filepath)
                 
                 results["deleted"] += 1
             else:
@@ -184,23 +185,21 @@ async def delete_images_bulk_service():
         from core.cache_manager import invalidate_tag_cache
         invalidate_tag_cache()
 
-    return jsonify({
+    return {
         "status": "success" if results["failed"] == 0 else "partial",
         "message": f"Deleted {results['deleted']} of {results['total']} images",
         "results": results
-    })
+    }
 
-async def download_images_bulk_service():
-    """Service to download multiple images as a zip file."""
-    from quart import send_file
+def prepare_bulk_download(data):
+    """Prepare a zip file of multiple images."""
     import zipfile
     import io
     
-    data = await request.json
     filepaths = data.get('filepaths', [])
 
     if not filepaths or not isinstance(filepaths, list):
-        return jsonify({"error": "filepaths array is required"}), 400
+        return {"error": "filepaths array is required"}, 400
 
     # Create a zip file in memory
     zip_buffer = io.BytesIO()
@@ -237,30 +236,22 @@ async def download_images_bulk_service():
 
     # Check if any files were added
     if files_added == 0:
-        return jsonify({
+        return {
             "error": "No valid images found",
             "errors": errors
-        }), 404
+        }, 404
 
     # Seek to the beginning of the buffer
     zip_buffer.seek(0)
+    return zip_buffer
 
-    # Return the zip file
-    return await send_file(
-        zip_buffer,
-        mimetype='application/zip',
-        as_attachment=True,
-        attachment_filename='images.zip'
-    )
-
-async def retry_tagging_service():
+def retry_tagging_service(data):
     """Service to retry tagging for an image that was previously tagged with local_tagger."""
-    data = await request.json
     filepath = normalize_image_path(data.get('filepath', ''))
     skip_local_fallback = data.get('skip_local_fallback', False)
 
     if not filepath:
-        return jsonify({"error": "Filepath is required"}), 400
+        return {"error": "Filepath is required"}, 400
 
     try:
         # Check if the image exists and was tagged with local_tagger
@@ -274,7 +265,7 @@ async def retry_tagging_service():
             result = cursor.fetchone()
 
             if not result:
-                return jsonify({"error": "Image not found in database"}), 404
+                return {"error": "Image not found in database"}, 404
 
             image_id = result['id']
             md5 = result['md5']
@@ -287,7 +278,7 @@ async def retry_tagging_service():
         # Construct full filepath
         full_path = os.path.join("static/images", filepath)
         if not os.path.exists(full_path):
-            return jsonify({"error": "Image file not found on disk"}), 404
+            return {"error": "Image file not found on disk"}, 404
 
         # Try to fetch metadata from online sources first
         all_results = processing.search_all_sources(md5)
@@ -351,15 +342,15 @@ async def retry_tagging_service():
 
         if not all_results:
             if skip_local_fallback:
-                return jsonify({
+                return {
                     "error": "No online sources found. Current tags preserved.",
                     "status": "no_online_results"
-                }), 200
+                }, 200
             else:
-                return jsonify({
+                return {
                     "error": "No metadata found from any source",
                     "status": "no_results"
-                }), 200
+                }, 200
 
         # Determine the primary source based on priority
         import config
@@ -493,18 +484,18 @@ async def retry_tagging_service():
 
         print(f"[Retry Tagging] Successfully updated tags for {filepath} (new source: {source_name})")
 
-        return jsonify({
+        return {
             "status": "success",
             "message": f"Successfully retagged from {source_name}",
             "new_source": source_name,
             "old_source": active_source,
             "tag_count": sum(len(tags_str.split()) for tags_str in categorized_tags.values() if tags_str)
-        })
+        }
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return {"error": str(e)}, 500
 
 async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_local_fallback: bool, pixiv_only: bool = False):
     """Background task to process bulk retry tagging."""

@@ -42,7 +42,7 @@ def is_valid_frame(filename: str) -> bool:
 
 def extract_zip_animation(zip_filepath: str, md5: str) -> Optional[Dict]:
     """
-    Extract images from a zip file for animation playback.
+    Extract images from a zip file for animation playback using ML Worker.
     
     Args:
         zip_filepath: Path to the zip file
@@ -54,79 +54,27 @@ def extract_zip_animation(zip_filepath: str, md5: str) -> Optional[Dict]:
     ensure_animations_dir()
     
     try:
-        with zipfile.ZipFile(zip_filepath, 'r') as zf:
-            # Get list of image files in the zip
-            all_files = zf.namelist()
+        # Get target directory
+        extract_dir = get_animation_dir(md5)
+        
+        # Use ML Worker for extraction
+        from ml_worker.client import get_ml_worker_client
+        client = get_ml_worker_client()
+        
+        # This call blocks until the worker finishes extraction
+        # Since this runs in a thread pool (via ingest_service or similar), it's safe.
+        result = client.extract_animation(
+            zip_path=os.path.abspath(zip_filepath),
+            output_dir=os.path.abspath(extract_dir)
+        )
+        
+        if result:
+            print(f"[ZipAnimation] Extracted {result.get('frame_count')} frames via ML Worker")
             
-            # Filter to only image files
-            image_files = [f for f in all_files if is_valid_frame(os.path.basename(f))]
+        return result
             
-            if not image_files:
-                print(f"[ZipAnimation] No valid image files found in {zip_filepath}")
-                return None
-            
-            # Sort files naturally (handling numeric sequences)
-            image_files = sorted(image_files, key=natural_sort_key)
-            
-            # Create extraction directory
-            extract_dir = get_animation_dir(md5)
-            os.makedirs(extract_dir, exist_ok=True)
-            
-            # Extract and rename files for consistent ordering
-            frames = []
-            first_frame_path = None
-            width, height = None, None
-            
-            for i, img_file in enumerate(image_files):
-                # Get extension from original file
-                ext = os.path.splitext(img_file)[1].lower()
-                # Create numbered filename for consistent ordering
-                frame_filename = f"frame_{i:05d}{ext}"
-                frame_path = os.path.join(extract_dir, frame_filename)
-                
-                # Extract the file
-                with zf.open(img_file) as src:
-                    with open(frame_path, 'wb') as dst:
-                        dst.write(src.read())
-                
-                frames.append(frame_filename)
-                
-                # Get dimensions from first frame
-                if i == 0:
-                    first_frame_path = frame_path
-                    try:
-                        with Image.open(frame_path) as img:
-                            width, height = img.size
-                    except Exception as e:
-                        print(f"[ZipAnimation] Error reading first frame dimensions: {e}")
-            
-            # Save metadata
-            metadata = {
-                "frame_count": len(frames),
-                "frames": frames,
-                "width": width,
-                "height": height,
-                "default_fps": 10,  # Default playback speed
-                "original_files": image_files
-            }
-            
-            metadata_path = os.path.join(extract_dir, "animation.json")
-            with open(metadata_path, 'w') as f:
-                json.dump(metadata, f, indent=2)
-            
-            print(f"[ZipAnimation] Extracted {len(frames)} frames from {os.path.basename(zip_filepath)}")
-            
-            return {
-                "extract_dir": extract_dir,
-                "first_frame": first_frame_path,
-                **metadata
-            }
-            
-    except zipfile.BadZipFile:
-        print(f"[ZipAnimation] Invalid zip file: {zip_filepath}")
-        return None
     except Exception as e:
-        print(f"[ZipAnimation] Error extracting {zip_filepath}: {e}")
+        print(f"[ZipAnimation] Error extracting {zip_filepath} via ML Worker: {e}")
         import traceback
         traceback.print_exc()
         return None
