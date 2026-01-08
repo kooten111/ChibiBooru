@@ -11,10 +11,9 @@ SAMPLE_IMAGE_LIMIT = 6
 
 def reload_cache():
     """Reload data cache after modifications."""
-    # Reload tag ID cache if enabled (new tags were added)
-    if config.TAG_ID_CACHE_ENABLED:
-        from core.tag_id_cache import reload_tag_id_cache
-        reload_tag_id_cache()
+    # Reload tag ID cache (new tags were added)
+    from core.tag_id_cache import reload_tag_id_cache
+    reload_tag_id_cache()
 
     # Reload main cache (tag_counts, image_data, etc.)
     from core.cache_manager import reload_tag_counts

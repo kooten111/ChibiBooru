@@ -264,11 +264,8 @@ ML_WORKER_BACKEND = os.environ.get('ML_WORKER_BACKEND', 'auto')
 # ML worker socket path (Unix domain socket for IPC)
 ML_WORKER_SOCKET = os.environ.get('ML_WORKER_SOCKET', '/tmp/chibibooru_ml_worker.sock')
 
-# Enable tag ID optimization (store tags as int32 arrays instead of strings)
-# When enabled, in-memory cache stores compact integer arrays instead of string objects
-# Saves ~200-500 MB by using 4-byte int32 IDs vs 50+ byte strings per tag
-# Cache is rebuilt on startup - no data migration needed
-TAG_ID_CACHE_ENABLED = os.environ.get('TAG_ID_CACHE_ENABLED', 'true').lower() in ('true', '1', 'yes')
+# Note: Tag ID optimization is now always enabled
+# All tag storage uses int32 IDs for memory efficiency (~200-500 MB savings)
 
 
 def is_supported_media(filepath: str) -> bool:

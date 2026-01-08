@@ -655,8 +655,7 @@ def get_tags_with_extended_categories(tag_names):
     if not tag_names:
         return []
 
-    from core.cache_manager import get_tag_counts
-    tag_counts = get_tag_counts()
+    from core.tag_id_cache import get_tag_count_by_name
 
     with get_db_connection() as conn:
         # Create placeholders for SQL query
@@ -675,7 +674,7 @@ def get_tags_with_extended_categories(tag_names):
         result = []
         for tag_name in tag_names:
             extended_cat = tag_to_extended_cat.get(tag_name, None)
-            count = tag_counts.get(tag_name, 0)
+            count = get_tag_count_by_name(tag_name)
             result.append((tag_name, count, extended_cat))
 
         return result

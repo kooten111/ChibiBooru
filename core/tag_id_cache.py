@@ -127,3 +127,56 @@ def reload_tag_id_cache():
         _tag_id_cache.reload()
     else:
         _tag_id_cache = TagIDCache()
+
+
+# ============================================================================
+# Helper Functions for Tag Count Lookups (Memory Optimization)
+# ============================================================================
+
+def get_tag_count_by_name(tag_name: str) -> int:
+    """
+    Get the usage count for a tag by its name.
+
+    This function bridges the gap between name-based code and ID-based caches.
+    It converts the tag name to an ID and looks up the count in the ID-based cache.
+
+    Args:
+        tag_name: Tag name string
+
+    Returns:
+        Usage count for the tag, or 0 if not found
+    """
+    from core.cache_manager import get_tag_counts
+
+    cache = get_tag_id_cache()
+    tag_id = cache.get_id(tag_name)
+    if tag_id is None:
+        return 0
+
+    tag_counts = get_tag_counts()
+    return tag_counts.get(tag_id, 0)
+
+
+def get_tag_counts_as_dict() -> dict[str, int]:
+    """
+    Get all tag counts as a name->count dictionary.
+
+    This converts the internal ID-based cache to a name-based dict
+    for compatibility with code that needs to iterate over all tags.
+
+    Returns:
+        Dictionary mapping tag names to their usage counts
+    """
+    from core.cache_manager import get_tag_counts
+
+    cache = get_tag_id_cache()
+    tag_counts_by_id = get_tag_counts()
+
+    # Convert ID->count dict to name->count dict
+    result = {}
+    for tag_id, count in tag_counts_by_id.items():
+        tag_name = cache.get_name(tag_id)
+        if tag_name:
+            result[tag_name] = count
+
+    return result

@@ -111,17 +111,21 @@ async def home():
         if should_shuffle:
             random.Random(seed).shuffle(search_results)
 
+        from core.cache_manager import get_image_tags_as_string
+
         total_results = len(search_results)
         images_to_show = [
-            {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": img.get('tags', '')}
+            {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": get_image_tags_as_string(img)}
             for img in search_results[:50]
         ]
 
         random_tags = []
-        tag_counts = models.get_tag_counts()
-        if not search_query and tag_counts:
-            available_tags = list(tag_counts.items())
-            random_tags = random.sample(available_tags, min(len(available_tags), 30))
+        if not search_query:
+            from core.tag_id_cache import get_tag_counts_as_dict
+            tag_counts_dict = get_tag_counts_as_dict()
+            if tag_counts_dict:
+                available_tags = list(tag_counts_dict.items())
+                random_tags = random.sample(available_tags, min(len(available_tags), 30))
 
         return stats, images_to_show, random_tags, total_results
 
@@ -146,10 +150,11 @@ async def tags_browser():
     stats = query_service.get_enhanced_stats()
 
     # Get random tags for explore section
+    from core.tag_id_cache import get_tag_counts_as_dict
     random_tags = []
-    tag_counts = models.get_tag_counts()
-    if tag_counts:
-        available_tags = list(tag_counts.items())
+    tag_counts_dict = get_tag_counts_as_dict()
+    if tag_counts_dict:
+        available_tags = list(tag_counts_dict.items())
         random_tags = random.sample(available_tags, min(len(available_tags), 30))
 
     return await render_template(
@@ -243,17 +248,18 @@ async def show_image(filepath):
     # Check for upscaled version
     upscaled_image_url = upscaler_service.get_upscale_url(lookup_path)
 
-    tag_counts = models.get_tag_counts()
+    from core.tag_id_cache import get_tag_count_by_name
+
     stats = query_service.get_enhanced_stats()
 
     # Get general tags grouped by their extended categories
     general_tags = sorted((data.get("tags_general") or "").split())
-    
+
     # Include merged local tagger predictions if available
     merged_general = data.get('merged_general_tags', [])
     if merged_general:
         general_tags = sorted(set(general_tags) | set(merged_general))
-    
+
     tags_with_extended_categories = models.get_tags_with_extended_categories(general_tags)
 
     # Group tags by extended category for display
@@ -264,7 +270,7 @@ async def show_image(filepath):
         extended_grouped_tags[extended_cat].append((tag, count))
 
     # Keep the old format for backward compatibility (all general tags together)
-    tags_with_counts = [(tag, tag_counts.get(tag, 0)) for tag in general_tags if tag]
+    tags_with_counts = [(tag, get_tag_count_by_name(tag)) for tag in general_tags if tag]
 
     # Get rating tags from image_tags table and merge them into meta category
     rating_tags = []
@@ -285,11 +291,11 @@ async def show_image(filepath):
     meta_with_rating = sorted(set(meta_tags) | set(rating_tags))
 
     categorized_tags = {
-        "character": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_character") or "").split()) if t],
-        "copyright": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_copyright") or "").split()) if t],
-        "artist": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_artist") or "").split()) if t],
-        "species": [(t, tag_counts.get(t, 0)) for t in sorted((data.get("tags_species") or "").split()) if t],
-        "meta": [(t, tag_counts.get(t, 0)) for t in meta_with_rating if t],
+        "character": [(t, get_tag_count_by_name(t)) for t in sorted((data.get("tags_character") or "").split()) if t],
+        "copyright": [(t, get_tag_count_by_name(t)) for t in sorted((data.get("tags_copyright") or "").split()) if t],
+        "artist": [(t, get_tag_count_by_name(t)) for t in sorted((data.get("tags_artist") or "").split()) if t],
+        "species": [(t, get_tag_count_by_name(t)) for t in sorted((data.get("tags_species") or "").split()) if t],
+        "meta": [(t, get_tag_count_by_name(t)) for t in meta_with_rating if t],
     }
 
     # Get tags that were added via implication rules (source='implication')
@@ -306,13 +312,13 @@ async def show_image(filepath):
         # 1. Update categorized_tags / tags_with_counts (Legacy/Sidebar)
         if category == 'general' or category not in categorized_tags:
             if not any(t[0] == tag_name for t in tags_with_counts):
-                tags_with_counts.append((tag_name, tag_counts.get(tag_name, 0)))
+                tags_with_counts.append((tag_name, get_tag_count_by_name(tag_name)))
                 tags_with_counts.sort(key=lambda x: x[0])
         else:
             # Handle standard categories
             current_list = categorized_tags[category]
             if not any(t[0] == tag_name for t in current_list):
-                current_list.append((tag_name, tag_counts.get(tag_name, 0)))
+                current_list.append((tag_name, get_tag_count_by_name(tag_name)))
                 current_list.sort(key=lambda x: x[0])
 
         # 2. Update extended_grouped_tags (Main Display)
@@ -320,10 +326,10 @@ async def show_image(filepath):
         if category == 'general':
             if extended_cat not in extended_grouped_tags:
                 extended_grouped_tags[extended_cat] = []
-            
+
             target_list = extended_grouped_tags[extended_cat]
             if not any(t[0] == tag_name for t in target_list):
-                 target_list.append((tag_name, tag_counts.get(tag_name, 0)))
+                 target_list.append((tag_name, get_tag_count_by_name(tag_name)))
                  target_list.sort(key=lambda x: x[0])
 
     # Fetch family images first to exclude them from similarity results

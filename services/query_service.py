@@ -16,16 +16,16 @@ def _initialize_similarity_cache():
     if _tag_category_cache is not None:
         return
 
-    # Load all tag categories from database once
+    # Load all tag categories from database using IDs as keys for memory efficiency
     from database import get_db_connection
     with get_db_connection() as conn:
-        query = "SELECT name, category FROM tags"
+        query = "SELECT id, category FROM tags"
         results = conn.execute(query).fetchall()
-        _tag_category_cache = {row['name']: row['category'] or 'general' for row in results}
+        _tag_category_cache = {row['id']: row['category'] or 'general' for row in results}
 
-    # Cache tag counts and image count
+    # Cache tag counts (already ID-based) and image count
     _similarity_context_cache = {
-        'tag_counts': models.get_tag_counts(),
+        'tag_counts': models.get_tag_counts(),  # Dict[int, int] - tag_id -> count
         'total_images': models.get_image_count()
     }
 
@@ -42,15 +42,24 @@ register_cache_invalidation_callback(invalidate_similarity_cache)
 
 @lru_cache(maxsize=10000)
 def _get_tag_weight(tag):
-    """Get the combined IDF and category weight for a tag (cached)."""
+    """Get the combined IDF and category weight for a tag name (cached)."""
     _initialize_similarity_cache()
 
-    # Get IDF weight
-    tag_freq = _similarity_context_cache['tag_counts'].get(tag, 1)
+    # Convert tag name to ID for lookups
+    from core.tag_id_cache import get_tag_id_cache
+    cache = get_tag_id_cache()
+    tag_id = cache.get_id(tag)
+
+    if tag_id is None:
+        # Tag doesn't exist, return minimal weight
+        return 0.1
+
+    # Get IDF weight using tag ID
+    tag_freq = _similarity_context_cache['tag_counts'].get(tag_id, 1)
     idf_weight = 1.0 / log(tag_freq + 1)
 
-    # Get category weight
-    category = _tag_category_cache.get(tag, 'general')
+    # Get category weight using tag ID
+    category = _tag_category_cache.get(tag_id, 'general')
     category_weight = config.SIMILARITY_CATEGORY_WEIGHTS.get(category, 1.0)
 
     return idf_weight * category_weight
@@ -99,16 +108,20 @@ def calculate_weighted_similarity(tags1, tags2):
 
 def get_enhanced_stats():
     """Get detailed statistics about the collection from the database."""
-    tag_counts = models.get_tag_counts()
+    from core.tag_id_cache import get_tag_counts_as_dict
+
+    tag_counts_by_id = models.get_tag_counts()
+    tag_counts_by_name = get_tag_counts_as_dict()  # Convert IDs to names for display
     image_count = models.get_image_count()
+
     return {
         'total': image_count,
         'with_metadata': image_count,
         'without_metadata': 0,
-        'total_tags': len(tag_counts),
+        'total_tags': len(tag_counts_by_id),
         'avg_tags_per_image': models.get_avg_tags_per_image(),
         'source_breakdown': models.get_source_breakdown(),
-        'top_tags': sorted(tag_counts.items(), key=lambda x: x[1], reverse=True)[:20],
+        'top_tags': sorted(tag_counts_by_name.items(), key=lambda x: x[1], reverse=True)[:20],
         'category_counts': models.get_category_counts(),
         'saucenao_used': models.get_saucenao_lookup_count(),
         'local_tagger_used': models.get_source_breakdown().get('local_tagger', 0)

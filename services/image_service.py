@@ -37,8 +37,10 @@ def get_images_for_api():
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
 
+    from core.cache_manager import get_image_tags_as_string
+
     images_page = [
-        {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": img.get('tags', '')}
+        {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": get_image_tags_as_string(img)}
         for img in search_results[start_idx:end_idx]
     ]
 
