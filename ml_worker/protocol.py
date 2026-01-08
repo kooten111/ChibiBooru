@@ -18,7 +18,6 @@ class RequestType(str, Enum):
     TAG_IMAGE = "tag_image"
     UPSCALE_IMAGE = "upscale_image"
     COMPUTE_SIMILARITY = "compute_similarity"
-    SEARCH_SIMILAR = "search_similar"  # Search for similar images using FAISS index
     HEALTH_CHECK = "health_check"
     SHUTDOWN = "shutdown"
     TRAIN_RATING_MODEL = "train_rating_model"
@@ -234,19 +233,6 @@ class Request:
             request_id,
             {
                 "job_id": job_id
-            }
-        )
-
-    @staticmethod
-    def search_similar(request_id: str, query_embedding: list,
-                       limit: int = 50) -> Dict[str, Any]:
-        """Create a search_similar request to find similar images via FAISS."""
-        return Request.create(
-            RequestType.SEARCH_SIMILAR,
-            request_id,
-            {
-                "query_embedding": query_embedding,
-                "limit": limit
             }
         )
 

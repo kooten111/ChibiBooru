@@ -899,69 +899,6 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def handle_search_similar(request_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Handle search_similar request - build FAISS index and search.
-    
-    This keeps FAISS in the worker process so memory is freed when
-    worker terminates after idle timeout.
-
-    Args:
-        request_data: {query_embedding: list, limit: int}
-
-    Returns:
-        Dict with search results
-    """
-    query_embedding = request_data['query_embedding']
-    limit = request_data.get('limit', 50)
-
-    logger.info(f"Searching for similar images (limit: {limit})")
-
-    # Lazy load FAISS and numpy (ONLY in worker process)
-    import faiss
-    import numpy as np
-    
-    # Import database functions
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from services import similarity_db
-
-    # Get all embeddings from database
-    ids, matrix = similarity_db.get_all_embeddings()
-    
-    if len(ids) == 0:
-        logger.warning("No embeddings found in database")
-        return {"results": []}
-
-    # Build FAISS index
-    logger.info(f"Building FAISS index with {len(ids)} embeddings...")
-    faiss.normalize_L2(matrix)
-    dimension = matrix.shape[1]
-    index = faiss.IndexFlatIP(dimension)
-    index.add(matrix)
-    
-    # Prepare query
-    query = np.array(query_embedding, dtype=np.float32).reshape(1, -1)
-    faiss.normalize_L2(query)
-    
-    # Search
-    distances, indices = index.search(query, min(limit, len(ids)))
-    
-    # Build results
-    results = []
-    for dist, idx in zip(distances[0], indices[0]):
-        if idx == -1:
-            continue
-        if idx < len(ids):
-            results.append({
-                'image_id': int(ids[idx]),
-                'score': float(dist)
-            })
-    
-    logger.info(f"Found {len(results)} similar images")
-    
-    return {"results": results}
-
-
 def handle_health_check(request_data: Dict[str, Any]) -> Dict[str, Any]:
 
     """Handle health check request"""
@@ -1306,10 +1243,6 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
 
         elif request_type == RequestType.COMPUTE_SIMILARITY.value:
             result = handle_compute_similarity(request_data)
-            return Response.success(request_id, result)
-
-        elif request_type == RequestType.SEARCH_SIMILAR.value:
-            result = handle_search_similar(request_data)
             return Response.success(request_id, result)
 
         elif request_type == RequestType.HEALTH_CHECK.value:

@@ -485,29 +485,6 @@ class MLWorkerClient:
         request = Request.get_job_status(request_id, job_id)
         return self._send_request(request)
 
-    def search_similar(self, query_embedding: List[float],
-                       limit: int = 50) -> Dict[str, Any]:
-        """
-        Search for similar images using FAISS index in ML Worker.
-        
-        This keeps FAISS in the worker process so it can be unloaded
-        when the worker terminates after idle timeout.
-
-        Args:
-            query_embedding: 1024-d embedding vector for query image
-            limit: Maximum number of similar images to return
-
-        Returns:
-            Dict with:
-                - results: List of (image_id, score) tuples
-
-        Raises:
-            MLWorkerError: If search fails
-        """
-        request_id = str(uuid.uuid4())
-        request = Request.search_similar(request_id, query_embedding, limit)
-        return self._send_request(request)
-
     def rebuild_cache(self, similarity_type: str = 'blended', timeout: float = 1200.0) -> Dict[str, Any]:
         """
         Rebuild similarity cache via ML Worker.
