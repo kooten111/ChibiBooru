@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rating UI Modernization - Preview</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0f1a;
+            color: #e8e8e8;
+            margin: 0;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #06b6d4 0%, #87ceeb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1rem;
+        }
+        
+        h2 {
+            color: #06b6d4;
+            margin-top: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .section {
+            background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(40, 40, 60, 0.95) 100%);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .feature-card {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(6, 182, 212, 0.4);
+            box-shadow: 0 8px 25px rgba(6, 182, 212, 0.3);
+        }
+        
+        .feature-title {
+            color: #06b6d4;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: 1.1rem;
+        }
+        
+        .feature-desc {
+            color: #d0d0d0;
+            font-size: 0.9rem;
+        }
+        
+        .screenshot-placeholder {
+            background: rgba(30, 30, 45, 0.6);
+            border: 2px dashed rgba(6, 182, 212, 0.3);
+            border-radius: 0.75rem;
+            padding: 3rem;
+            text-align: center;
+            color: #888;
+            margin: 1.5rem 0;
+        }
+        
+        .code-block {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-family: 'JetBrains Mono', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        
+        .badge {
+            display: inline-block;
+            background: rgba(6, 182, 212, 0.2);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .success {
+            background: rgba(74, 222, 128, 0.2);
+            border-color: rgba(74, 222, 128, 0.3);
+        }
+        
+        .list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .list li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+        
+        .list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #06b6d4;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Rating UI Modernization - Visual Preview</h1>
+        <p style="font-size: 1.1rem; color: #d0d0d0;">
+            Complete redesign of Rating Management and Review interfaces with ML Worker integration
+        </p>
+        
+        <div class="section">
+            <h2>✅ Implementation Status</h2>
+            <div style="margin-top: 1rem;">
+                <span class="badge success">✓ ML Worker Protocol</span>
+                <span class="badge success">✓ API Integration</span>
+                <span class="badge success">✓ Modern Templates</span>
+                <span class="badge success">✓ CSS Styling</span>
+                <span class="badge success">✓ JavaScript</span>
+                <span class="badge success">✓ Routes</span>
+                <span class="badge success">✓ Accessibility</span>
+                <span class="badge success">✓ Security (CodeQL Clean)</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🎯 Key Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-title">🧠 ML Worker Integration</div>
+                    <div class="feature-desc">
+                        Training and inference run in isolated process, preventing main app blocking. 
+                        Automatic fallback to direct calls if unavailable.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">🎨 Modern Dark Theme</div>
+                    <div class="feature-desc">
+                        Deep blue-black (#0a0f1a) background with cyan (#06b6d4) accents. 
+                        Glassmorphism panels with backdrop blur effects.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">📊 Three-Panel Layout</div>
+                    <div class="feature-desc">
+                        Sidebar for quick stats, main content with tabs, and details panel for configuration. 
+                        Responsive and collapsible.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">⌨️ Keyboard Shortcuts</div>
+                    <div class="feature-desc">
+                        Full keyboard navigation support. Rate images with 1-4, navigate with arrows, 
+                        train with T, infer with I.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">♿ Accessibility</div>
+                    <div class="feature-desc">
+                        Respects prefers-reduced-motion for animations, semantic HTML, 
+                        keyboard navigation, proper labels.
+                    </div>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-title">🔒 Security</div>
+                    <div class="feature-desc">
+                        Zero CodeQL alerts, proper input validation, XSS prevention, 
+                        parameterized queries, CSRF protection.
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>📸 Rating Management Dashboard (/rate/manage/v2)</h2>
+            
+            <div class="screenshot-placeholder">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+                <div style="font-size: 1.2rem; color: #06b6d4; margin-bottom: 0.5rem;">Rating Management Dashboard</div>
+                <div>Three-panel layout with sidebar, tabbed content, and configuration panel</div>
+            </div>
+            
+            <ul class="list">
+                <li><strong>Header Bar:</strong> Status badges, quick action buttons (Train, Infer All, Clear AI, Settings)</li>
+                <li><strong>Left Sidebar:</strong> Training samples, unique tags, tag pairs, unrated count, distribution bars</li>
+                <li><strong>Main Content:</strong> 3 tabs - Dashboard (model status), Review Queue (image grid), Model Insights (top tags/pairs)</li>
+                <li><strong>Right Panel:</strong> Configuration sliders for thresholds (General, Sensitive, Questionable, Explicit)</li>
+                <li><strong>Footer:</strong> Status messages and keyboard shortcuts hints</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>🖼️ Rating Review Interface (/rate/review/v2)</h2>
+            
+            <div class="screenshot-placeholder">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">✨</div>
+                <div style="font-size: 1.2rem; color: #06b6d4; margin-bottom: 0.5rem;">Rating Review Interface</div>
+                <div>Single-image rating flow with AI suggestions and keyboard shortcuts</div>
+            </div>
+            
+            <ul class="list">
+                <li><strong>Header:</strong> Progress indicator (Image X / Y), filter pills (Unrated, AI-Predicted, All)</li>
+                <li><strong>Large Image Display:</strong> Centered image/video with AI suggestion badge and confidence bar</li>
+                <li><strong>Rating Buttons:</strong> Four color-coded buttons (General-green, Sensitive-blue, Questionable-orange, Explicit-red)</li>
+                <li><strong>Navigation:</strong> Previous, Skip, Next buttons with keyboard shortcuts</li>
+                <li><strong>Tags Panel:</strong> Collapsible tag display showing all non-rating tags</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>🔧 Technical Implementation</h2>
+            
+            <h3 style="color: #87ceeb; margin-top: 1.5rem;">ML Worker Protocol Extensions</h3>
+            <div class="code-block">
+# New Request Types
+TRAIN_RATING_MODEL    - Train rating inference model
+INFER_RATINGS         - Run rating inference
+TRAIN_CHARACTER_MODEL - Train character inference model
+INFER_CHARACTERS      - Run character inference
+GET_JOB_STATUS        - Query job status (future)
+
+# Client Methods
+client.train_rating_model(timeout=600.0)
+client.infer_ratings(image_ids=None, timeout=600.0)
+client.train_character_model(timeout=600.0)
+client.infer_characters(image_ids=None, timeout=600.0)
+            </div>
+            
+            <h3 style="color: #87ceeb; margin-top: 1.5rem;">File Changes</h3>
+            <div class="code-block">
+Modified Files:
+  ml_worker/protocol.py      - Request types and builders
+  ml_worker/server.py        - Request handlers
+  ml_worker/client.py        - Client methods
+  routers/api/rating.py      - ML Worker integration
+  routers/api/character.py   - ML Worker integration
+  routers/web.py             - v2 routes
+
+New Files:
+  templates/rate_manage_v2.html       - Modern dashboard
+  templates/rate_review_v2.html       - Modern review UI
+  static/css/rating-modern.css        - Dark theme styles
+  static/js/pages/rate-manage-v2.js   - Dashboard logic
+  static/js/pages/rate-review-v2.js   - Review logic
+  docs/RATING_UI_MODERNIZATION.md     - Documentation
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>🚀 Usage</h2>
+            
+            <h3 style="color: #87ceeb;">Access the New UI</h3>
+            <div class="code-block">
+# Rating Management Dashboard
+http://localhost:8000/rate/manage/v2
+
+# Rating Review Interface
+http://localhost:8000/rate/review/v2
+
+# Legacy versions still available at:
+http://localhost:8000/rate/manage
+http://localhost:8000/rate/review
+            </div>
+            
+            <h3 style="color: #87ceeb; margin-top: 1.5rem;">Keyboard Shortcuts</h3>
+            <div class="code-block">
+Rating Management:
+  T  - Train model
+  I  - Infer all ratings
+  R  - Refresh statistics
+
+Rating Review:
+  1-4  - Set rating (General, Sensitive, Questionable, Explicit)
+  ←/P  - Previous image
+  →/N  - Next image
+  S    - Skip image
+  T    - Toggle tags panel
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>📊 Benefits</h2>
+            <ul class="list">
+                <li><strong>Non-Blocking Operations:</strong> Training and inference no longer freeze the UI</li>
+                <li><strong>Better UX:</strong> Modern, intuitive interface with visual feedback</li>
+                <li><strong>Faster Workflow:</strong> Keyboard shortcuts and streamlined layout</li>
+                <li><strong>Better Insights:</strong> Model insights tab shows what the AI learned</li>
+                <li><strong>Improved Accessibility:</strong> Motion reduction, keyboard navigation, semantic HTML</li>
+                <li><strong>Maintainable Code:</strong> Modular JavaScript, clean CSS architecture</li>
+                <li><strong>Secure:</strong> Zero security vulnerabilities (CodeQL clean)</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>🔮 Future Enhancements</h2>
+            <ul class="list">
+                <li>Real-time job status polling with progress bars</li>
+                <li>Batch rating for multiple images</li>
+                <li>Customizable keyboard shortcuts</li>
+                <li>Dark/light theme toggle</li>
+                <li>Configuration export/import</li>
+                <li>Training history and analytics</li>
+                <li>Browser notifications for completed operations</li>
+            </ul>
+        </div>
+        
+        <div class="section" style="text-align: center; padding: 3rem;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+            <div style="font-size: 1.5rem; color: #06b6d4; margin-bottom: 0.5rem;">
+                Implementation Complete!
+            </div>
+            <div style="color: #d0d0d0;">
+                All features implemented, tested, and ready for use
+            </div>
+        </div>
+    </div>
+</body>
+</html>
