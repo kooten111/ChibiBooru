@@ -255,6 +255,7 @@ def tag_with_local_tagger(filepath):
             image_path=filepath,
             model_path=tagger_config['model_path'],
             threshold=tagger_config.get('threshold', 0.50),
+            storage_threshold=tagger_config.get('storage_threshold', 0.50),
             character_threshold=0.85,
             metadata_path=tagger_config.get('metadata_path')
         )
@@ -328,6 +329,7 @@ def tag_video_with_frames(video_filepath, num_frames=5):
             num_frames=num_frames,
             model_path=tagger_config['model_path'],
             threshold=tagger_config.get('threshold', 0.50),
+            storage_threshold=tagger_config.get('storage_threshold', 0.50),
             character_threshold=0.85,
             metadata_path=tagger_config.get('metadata_path')
         )

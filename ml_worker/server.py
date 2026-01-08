@@ -268,6 +268,7 @@ def handle_tag_video(request_data: Dict[str, Any]) -> Dict[str, Any]:
                     "image_path": temp_frame_path,
                     "model_path": model_path,
                     "threshold": threshold,
+                    "storage_threshold": request_data.get('storage_threshold', 0.50),
                     "character_threshold": request_data.get('character_threshold', 0.85),
                     "metadata_path": request_data.get('metadata_path')
                 }
@@ -277,9 +278,14 @@ def handle_tag_video(request_data: Dict[str, Any]) -> Dict[str, Any]:
                 # Merge logic
                 all_predictions = result.get('all_predictions', [])
                 for pred in all_predictions:
+                    confidence = pred['confidence']
+                    
+                    # Apply threshold BEFORE merging - use the same threshold as images
+                    if confidence < threshold:
+                        continue
+                    
                     tag_name = pred['tag_name']
                     category = pred['category']
-                    confidence = pred['confidence']
                     
                     if tag_name.startswith('rating:') or tag_name.startswith('rating_'):
                         continue
@@ -529,7 +535,7 @@ def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     idx_to_tag = tag_mapping['idx_to_tag']
     tag_to_category = tag_mapping['tag_to_category']
 
-    storage_threshold = 0.10
+    storage_threshold = request_data.get('storage_threshold', 0.50)
     display_threshold = threshold
 
     all_predictions = []

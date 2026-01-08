@@ -237,6 +237,7 @@ class MLWorkerClient:
     def tag_image(self, image_path: str, model_path: str,
                   threshold: float = 0.35,
                   character_threshold: float = 0.85,
+                  storage_threshold: float = 0.50,
                   metadata_path: Optional[str] = None) -> Dict[str, Any]:
         """
         Tag an image using the local tagger model.
@@ -246,6 +247,7 @@ class MLWorkerClient:
             model_path: Path to ONNX model file
             threshold: Confidence threshold for general tags
             character_threshold: Confidence threshold for character tags
+            storage_threshold: Confidence threshold for storing predictions
             metadata_path: Optional path to metadata JSON
 
         Returns:
@@ -263,7 +265,8 @@ class MLWorkerClient:
             "image_path": image_path,
             "model_path": model_path,
             "threshold": threshold,
-            "character_threshold": character_threshold
+            "character_threshold": character_threshold,
+            "storage_threshold": storage_threshold
         }
 
         if metadata_path:
@@ -274,7 +277,8 @@ class MLWorkerClient:
             image_path,
             model_path,
             threshold,
-            character_threshold
+            character_threshold,
+            storage_threshold
         )
 
         return self._send_request(request)
@@ -527,7 +531,8 @@ class MLWorkerClient:
 
     def tag_video(self, video_path: str, num_frames: int = 5,
                   model_path: str = None, threshold: float = 0.35,
-                  character_threshold: float = 0.85, metadata_path: str = None) -> Dict[str, Any]:
+                  character_threshold: float = 0.85, metadata_path: str = None,
+                  storage_threshold: float = 0.50) -> Dict[str, Any]:
         """
         Tag a video by extracting frames and processing them via ML Worker.
 
@@ -538,6 +543,7 @@ class MLWorkerClient:
             threshold: Confidence threshold
             character_threshold: Character threshold
             metadata_path: Path to metadata file
+            storage_threshold: Confidence threshold for storing predictions
 
         Returns:
             Dict with merged tags
@@ -545,7 +551,7 @@ class MLWorkerClient:
         request_id = str(uuid.uuid4())
         request = Request.tag_video(
             request_id, video_path, num_frames,
-            model_path, threshold, character_threshold, metadata_path
+            model_path, threshold, character_threshold, metadata_path, storage_threshold
         )
         return self._send_request(request)
 

@@ -126,7 +126,8 @@ class Request:
 
     @staticmethod
     def tag_image(request_id: str, image_path: str, model_path: str,
-                  threshold: float = 0.35, character_threshold: float = 0.85) -> Dict[str, Any]:
+                  threshold: float = 0.35, character_threshold: float = 0.85,
+                  storage_threshold: float = 0.50) -> Dict[str, Any]:
         """Create a tag_image request"""
         return Request.create(
             RequestType.TAG_IMAGE,
@@ -135,7 +136,8 @@ class Request:
                 "image_path": image_path,
                 "model_path": model_path,
                 "threshold": threshold,
-                "character_threshold": character_threshold
+                "character_threshold": character_threshold,
+                "storage_threshold": storage_threshold
             }
         )
 
@@ -262,7 +264,8 @@ class Request:
     @staticmethod
     def tag_video(request_id: str, video_path: str, num_frames: int = 5,
                   model_path: str = None, threshold: float = 0.35,
-                  character_threshold: float = 0.85, metadata_path: str = None) -> Dict[str, Any]:
+                  character_threshold: float = 0.85, metadata_path: str = None,
+                  storage_threshold: float = 0.50) -> Dict[str, Any]:
         """Create a tag_video request"""
         return Request.create(
             RequestType.TAG_VIDEO,
@@ -273,7 +276,8 @@ class Request:
                 "model_path": model_path,
                 "threshold": threshold,
                 "character_threshold": character_threshold,
-                "metadata_path": metadata_path
+                "metadata_path": metadata_path,
+                "storage_threshold": storage_threshold
             }
         )
 
