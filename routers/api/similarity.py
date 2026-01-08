@@ -247,3 +247,93 @@ async def compute_hash_for_image(filepath):
     else:
         return {'error': 'Failed to compute hash'}, 500
 
+
+@api_blueprint.route('/similarity/rebuild-cache', methods=['POST'])
+@api_handler()
+@require_secret
+async def rebuild_similarity_cache():
+    """
+    Rebuild the pre-computed similarity cache for all images.
+    
+    POST /api/similarity/rebuild-cache
+    Requires secret authorization.
+    Returns a task_id for polling progress.
+    """
+    import uuid
+    from services.background_tasks import task_manager
+    from services import monitor_service, similarity_cache
+    
+    task_id = f"similarity_cache_{uuid.uuid4().hex[:8]}"
+    
+    async def rebuild_cache_task(task_id, manager):
+        """Background task for rebuilding similarity cache with progress updates."""
+        from services import monitor_service as mon
+        
+        mon.add_log("Starting similarity cache rebuild...", "info")
+        
+        loop = asyncio.get_running_loop()
+        
+        import time
+        last_update_time = 0
+        
+        def progress_callback(current, total):
+            nonlocal last_update_time
+            current_time = time.time()
+            
+            # Throttle updates: only update if 0.5s passed OR it's the final update
+            if (current_time - last_update_time > 0.5) or (current >= total):
+                last_update_time = current_time
+                future = asyncio.run_coroutine_threadsafe(
+                    manager.update_progress(task_id, current, total, "Rebuilding similarity cache..."), 
+                    loop
+                )
+                # We don't wait for the future
+        
+        # Run synchronous service function in thread
+        stats = await asyncio.to_thread(
+            similarity_cache.rebuild_cache_full,
+            similarity_type='blended',
+            progress_callback=progress_callback
+        )
+        
+        success = stats['success']
+        failed = stats['failed']
+        total = stats['total']
+        
+        result_msg = f"✓ Similarity cache rebuild complete: {success} cached, {failed} failed"
+        mon.add_log(result_msg, "success")
+        
+        # Update task to 100%
+        await manager.update_progress(task_id, total, total, "Complete")
+        
+        return {
+            'success': success,
+            'failed': failed,
+            'total': total,
+            'message': f"Cached {success} images ({failed} failed)"
+        }
+    
+    # Start background task
+    monitor_service.add_log("Similarity cache rebuild task started...", "info")
+    await task_manager.start_task(task_id, rebuild_cache_task)
+    
+    return {
+        'status': 'started',
+        'task_id': task_id,
+        'message': 'Similarity cache rebuild started in background'
+    }
+
+
+@api_blueprint.route('/similarity/cache-stats')
+@api_handler()
+async def get_cache_stats():
+    """
+    Get statistics about similarity cache coverage.
+    
+    GET /api/similarity/cache-stats
+    """
+    from services import similarity_cache
+    stats = await asyncio.to_thread(similarity_cache.get_cache_stats)
+    
+    return stats
+

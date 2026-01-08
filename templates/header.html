@@ -159,6 +159,13 @@
                                 </div>
                                 <button class="btn btn-primary" onclick="systemGenerateHashes(event)">Generate</button>
                             </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Rebuild Similarity Cache</span>
+                                    <span class="settings-desc">Pre-compute top-50 similar images for all images. Frees ~300MB RAM by removing need for live FAISS index.</span>
+                                </div>
+                                <button class="btn btn-warning" onclick="systemRebuildSimilarityCache(event)">Rebuild</button>
+                            </div>
                         </div>
 
                         <div class="settings-group">

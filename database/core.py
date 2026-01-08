@@ -348,6 +348,24 @@ def initialize_database():
         """)
 
         # ===================================================================
+        # Similarity Cache Table
+        # ===================================================================
+        # Pre-computed similarity results for fast sidebar lookups
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS similar_images_cache (
+            source_image_id INTEGER NOT NULL,
+            similar_image_id INTEGER NOT NULL,
+            similarity_score REAL NOT NULL,
+            similarity_type TEXT NOT NULL,
+            rank INTEGER NOT NULL,
+            computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (source_image_id, similar_image_id, similarity_type),
+            FOREIGN KEY (source_image_id) REFERENCES images(id) ON DELETE CASCADE,
+            FOREIGN KEY (similar_image_id) REFERENCES images(id) ON DELETE CASCADE
+        )
+        """)
+
+        # ===================================================================
         # Indexes
         # ===================================================================
 
@@ -385,6 +403,10 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_rating ON rating_tag_pair_weights(rating)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_weight ON rating_tag_pair_weights(weight DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_tags ON rating_tag_pair_weights(tag1, tag2)")
+
+        # Similarity cache indexes
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_similar_lookup ON similar_images_cache(source_image_id, similarity_type, rank)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_computed_at ON similar_images_cache(computed_at)")
 
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='images_fts'")
         fts_exists = cur.fetchone()

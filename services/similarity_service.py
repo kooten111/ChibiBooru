@@ -1170,7 +1170,8 @@ def find_blended_similar(
     tag_threshold: float = 0.1,
     semantic_threshold: float = 0.3,
     exclude_family: bool = False,
-    limit: int = 12
+    limit: int = 12,
+    use_cache: bool = True
 ) -> List[Dict]:
     """
     Find similar images using a weighted blend of visual, semantic, and tag similarity.
@@ -1185,11 +1186,48 @@ def find_blended_similar(
         semantic_threshold: Min semantic similarity score (0-1, higher = stricter)
         exclude_family: If True, exclude images in the same parent/child chain
         limit: Maximum number of results to return (default 12 for sidebar)
+        use_cache: If True, check cache first (default True for performance)
         
     Returns:
         List of similar images, limited to specified count
     """
     from services import query_service
+    
+    # Check cache first if enabled (and using default parameters)
+    if use_cache and config.SIMILARITY_CACHE_ENABLED:
+        # Only use cache if using default/standard parameters
+        # This ensures cache is used for the common sidebar case
+        is_default_params = (
+            visual_weight == 0.2 and 
+            tag_weight == 0.2 and 
+            semantic_weight == 0.6 and
+            visual_threshold == 15 and
+            tag_threshold == 0.1 and
+            semantic_threshold == 0.3
+        )
+        
+        if is_default_params:
+            # Get image ID from filepath
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM images WHERE filepath = ?", (filepath,))
+                row = cursor.fetchone()
+                if row:
+                    from services import similarity_cache
+                    cached_results = similarity_cache.get_similar_from_cache(
+                        row['id'], 
+                        limit=limit,
+                        similarity_type='blended'
+                    )
+                    
+                    if cached_results:
+                        # Apply family filter if requested
+                        if exclude_family:
+                            family_filepaths = _get_family_filepaths(filepath)
+                            family_paths = {f"images/{fp}" for fp in family_filepaths}
+                            cached_results = [r for r in cached_results if r['path'] not in family_paths]
+                        
+                        return cached_results[:limit]
     
     # Get family filepaths to exclude if requested
     family_paths = set()
