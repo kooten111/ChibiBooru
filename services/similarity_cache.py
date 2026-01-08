@@ -152,7 +152,8 @@ def compute_and_cache_for_image(
         results = find_blended_similar(
             filepath,
             limit=config.SIMILARITY_CACHE_SIZE,
-            exclude_family=False  # Cache everything, filter at retrieval
+            exclude_family=False,  # Cache everything, filter at retrieval
+            use_cache=False  # IMPORTANT: Don't use cache when building cache!
         )
     elif similarity_type == 'semantic':
         from services.similarity_service import find_semantic_similar
