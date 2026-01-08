@@ -294,6 +294,8 @@ class SemanticSearchEngine:
         self.index = None
         self.image_ids = [] # map index ID to image ID
         self.index_dirty = True
+        self.last_access_time = None  # Track when index was last used
+        self.index_loaded = False  # Track if index is currently loaded
         
     def load_model(self):
         """
@@ -345,6 +347,7 @@ class SemanticSearchEngine:
             print("[Similarity] No embeddings found in DB.")
             self.index = None
             self.image_ids = []
+            self.index_loaded = False
             return
 
         # Normalize metrics for Cosine Similarity (Inner Product on normalized vectors)
@@ -355,13 +358,42 @@ class SemanticSearchEngine:
         self.index.add(matrix)
         self.image_ids = ids
         self.index_dirty = False
+        self.index_loaded = True
+        self.last_access_time = time.time()
         print(f"[Similarity] Index built with {len(ids)} items.")
+    
+    def unload_index(self):
+        """Unload FAISS index to free memory."""
+        if self.index_loaded:
+            print("[Similarity] Unloading FAISS index to free memory...")
+            self.index = None
+            self.image_ids = []
+            self.index_loaded = False
+            self.last_access_time = None
+    
+    def check_idle_timeout(self):
+        """Check if index should be unloaded due to inactivity."""
+        if not config.SIMILARITY_CACHE_ENABLED:
+            return  # Don't auto-unload if cache is disabled
+            
+        if self.index_loaded and self.last_access_time:
+            idle_time = time.time() - self.last_access_time
+            if idle_time > config.FAISS_IDLE_TIMEOUT:
+                print(f"[Similarity] Index idle for {int(idle_time)}s, unloading...")
+                self.unload_index()
+
 
     def search(self, embedding: np.ndarray, k: int = 20):
+        # Check if index should be unloaded due to idle timeout
+        self.check_idle_timeout()
+        
         if self.index is None or self.index_dirty:
             self.build_index()
         
         if self.index is None: return [] # Still empty
+        
+        # Update access time
+        self.last_access_time = time.time()
         
         # Normalize query
         query = embedding.reshape(1, -1).astype(np.float32)

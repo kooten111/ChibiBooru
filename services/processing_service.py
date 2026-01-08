@@ -1376,6 +1376,22 @@ def process_image_file(filepath, move_from_ingest=True):
                     row = cursor.fetchone()
                     if row:
                         similarity_db.save_embedding(row['id'], hashes['embedding'])
+                        
+                        # Compute and cache similarities if cache is enabled
+                        if config.SIMILARITY_CACHE_ENABLED:
+                            try:
+                                from services import similarity_cache
+                                # Queue for background processing to not block ingestion
+                                # For now, do it inline since we're already in a background thread
+                                similarity_cache.compute_and_cache_for_image(
+                                    row['id'],
+                                    similarity_type='blended',
+                                    force=True
+                                )
+                                print(f"[Processing] Cached similarities for {filename}")
+                            except Exception as e:
+                                # Don't fail ingestion if caching fails
+                                print(f"[Processing] WARNING: Failed to cache similarities for {filename}: {e}")
             except Exception as e:
                 print(f"[Processing] WARNING: Failed to save embedding for {filename}: {e}")
         
