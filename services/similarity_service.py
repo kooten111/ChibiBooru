@@ -288,18 +288,19 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
 # Semantic Embedding & Search
 # ============================================================================
 
+# Import threading at module level for singleton
+import threading
+
 class SemanticIndex:
     """
     FAISS-based semantic similarity index.
     Singleton pattern to keep index in memory for fast searches.
     """
     _instance = None
-    _lock = None
+    _lock = threading.Lock()
     
     def __new__(cls):
         if cls._instance is None:
-            import threading
-            cls._lock = threading.Lock()
             with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
@@ -338,6 +339,7 @@ class SemanticIndex:
             return
         
         # Normalize embeddings for cosine similarity (IndexFlatIP with normalized vectors = cosine)
+        # Note: modifies matrix in-place, but this is safe since get_all_embeddings() returns a new array
         faiss.normalize_L2(matrix)
         
         # Build FAISS index
@@ -371,8 +373,9 @@ class SemanticIndex:
         if not isinstance(query_embedding, np.ndarray):
             query_embedding = np.array(query_embedding, dtype=np.float32)
         
-        # Reshape to 2D array for FAISS
-        query = query_embedding.reshape(1, -1)
+        # Make a copy and reshape to 2D array for FAISS
+        # (copy to avoid modifying the caller's array)
+        query = query_embedding.copy().reshape(1, -1)
         
         # Normalize query for cosine similarity
         faiss.normalize_L2(query)
