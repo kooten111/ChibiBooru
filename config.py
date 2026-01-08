@@ -219,6 +219,20 @@ VISUAL_SIMILARITY_THRESHOLD = int(os.environ.get('VISUAL_SIMILARITY_THRESHOLD', 
 # If False, visual similarity will rely only on fast pHash/ColorHash.
 ENABLE_SEMANTIC_SIMILARITY = os.environ.get('ENABLE_SEMANTIC_SIMILARITY', 'true').lower() in ('true', '1', 'yes')
 
+# ==================== SIMILARITY CACHE SETTINGS ====================
+
+# Use pre-computed cache for sidebar similarity lookups
+# When enabled, similarities are pre-computed and stored in SQLite
+# This saves ~300-400 MB RAM by not keeping FAISS index loaded
+SIMILARITY_CACHE_ENABLED = os.environ.get('SIMILARITY_CACHE_ENABLED', 'true').lower() in ('true', '1', 'yes')
+
+# Number of similar images to pre-compute and cache per image
+SIMILARITY_CACHE_SIZE = int(os.environ.get('SIMILARITY_CACHE_SIZE', 50))
+
+# Seconds before unloading idle FAISS index (5 minutes default)
+# Only used when cache is enabled - FAISS loaded on-demand for computation
+FAISS_IDLE_TIMEOUT = int(os.environ.get('FAISS_IDLE_TIMEOUT', 300))
+
 # ==================== FILE TYPES ====================
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')

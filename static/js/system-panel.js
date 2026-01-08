@@ -396,6 +396,13 @@ function systemGenerateHashes(event) {
     systemAction('/api/similarity/generate-hashes', event.target, 'Generate Image Hashes');
 }
 
+function systemRebuildSimilarityCache(event) {
+    if (event) event.preventDefault();
+    showConfirm('This will rebuild the similarity cache for all images. This may take several minutes. Continue?', () => {
+        systemAction('/api/similarity/rebuild-cache', event.target, 'Rebuild Similarity Cache');
+    });
+}
+
 function systemReloadData(event) {
     if (event) event.preventDefault();
     systemAction('/api/reload', event.target, 'Reload Data');
