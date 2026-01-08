@@ -620,6 +620,168 @@ def handle_health_check(request_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def handle_train_rating_model(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle train_rating_model request.
+    
+    Returns:
+        Dict with training statistics
+    """
+    logger.info("Training rating model...")
+    
+    # Import rating service
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from services import rating_service
+    
+    # Run training
+    stats = rating_service.train_model()
+    
+    logger.info(f"Rating model training complete: {stats}")
+    return stats
+
+
+def handle_infer_ratings(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle infer_ratings request.
+    
+    Args:
+        request_data: {image_ids: list | None}
+    
+    Returns:
+        Dict with inference statistics
+    """
+    image_ids = request_data.get('image_ids', [])
+    
+    logger.info(f"Running rating inference (image_ids: {len(image_ids) if image_ids else 'all unrated'})")
+    
+    # Import rating service
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from services import rating_service
+    
+    # Run inference
+    if image_ids:
+        # Infer specific images
+        stats = {
+            'processed': 0,
+            'rated': 0,
+            'skipped_low_confidence': 0,
+            'by_rating': {r: 0 for r in rating_service.RATINGS}
+        }
+        
+        for image_id in image_ids:
+            result = rating_service.infer_rating_for_image(image_id)
+            stats['processed'] += 1
+            if result['rated']:
+                stats['rated'] += 1
+                stats['by_rating'][result['rating']] += 1
+            else:
+                stats['skipped_low_confidence'] += 1
+    else:
+        # Infer all unrated
+        stats = rating_service.infer_all_unrated_images()
+    
+    logger.info(f"Rating inference complete: {stats}")
+    return stats
+
+
+def handle_train_character_model(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle train_character_model request.
+    
+    Returns:
+        Dict with training statistics
+    """
+    logger.info("Training character model...")
+    
+    # Import character service
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from services import character_service
+    
+    # Run training
+    stats = character_service.train_model()
+    
+    logger.info(f"Character model training complete: {stats}")
+    return stats
+
+
+def handle_infer_characters(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle infer_characters request.
+    
+    Args:
+        request_data: {image_ids: list | None}
+    
+    Returns:
+        Dict with inference statistics
+    """
+    image_ids = request_data.get('image_ids', [])
+    
+    logger.info(f"Running character inference (image_ids: {len(image_ids) if image_ids else 'all untagged'})")
+    
+    # Import character service
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from services import character_service
+    
+    # Run inference
+    if image_ids:
+        # Infer specific images
+        stats = {
+            'processed': 0,
+            'tagged': 0,
+            'skipped': 0,
+            'characters_added': 0
+        }
+        
+        for image_id in image_ids:
+            result = character_service.infer_character_for_image(image_id)
+            stats['processed'] += 1
+            if result.get('characters_added', 0) > 0:
+                stats['tagged'] += 1
+                stats['characters_added'] += result['characters_added']
+            else:
+                stats['skipped'] += 1
+    else:
+        # Infer all untagged
+        stats = character_service.infer_all_untagged_images()
+    
+    logger.info(f"Character inference complete: {stats}")
+    return stats
+
+
+# Job status tracking (simple in-memory store)
+_job_store = {}
+
+
+def handle_get_job_status(request_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handle get_job_status request.
+    
+    Args:
+        request_data: {job_id: str}
+    
+    Returns:
+        Dict with job status
+    """
+    job_id = request_data.get('job_id')
+    
+    if not job_id:
+        raise ValueError("job_id is required")
+    
+    job = _job_store.get(job_id)
+    
+    if not job:
+        return {
+            "found": False,
+            "job_id": job_id
+        }
+    
+    return {
+        "found": True,
+        "job_id": job_id,
+        **job
+    }
+
+
 def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle a request message.
@@ -653,6 +815,26 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
 
         elif request_type == RequestType.HEALTH_CHECK.value:
             result = handle_health_check(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.TRAIN_RATING_MODEL.value:
+            result = handle_train_rating_model(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.INFER_RATINGS.value:
+            result = handle_infer_ratings(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.TRAIN_CHARACTER_MODEL.value:
+            result = handle_train_character_model(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.INFER_CHARACTERS.value:
+            result = handle_infer_characters(request_data)
+            return Response.success(request_id, result)
+
+        elif request_type == RequestType.GET_JOB_STATUS.value:
+            result = handle_get_job_status(request_data)
             return Response.success(request_id, result)
 
         elif request_type == RequestType.SHUTDOWN.value:
