@@ -17,21 +17,24 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Optional dependencies for Semantic Similarity
-# FAISS is now in ml_worker only - main app doesn't need it
-# Keep numpy for embedding vectors
+# FAISS is now in main app for fast in-memory search
 try:
     import numpy as np
+    import faiss
     NUMPY_AVAILABLE = True
+    FAISS_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
+    FAISS_AVAILABLE = False
     np = None
+    faiss = None
 
-# ML Worker client - always import for semantic similarity
+# ML Worker client - for embedding computation only
 if config.ENABLE_SEMANTIC_SIMILARITY:
     try:
         from ml_worker.client import get_ml_worker_client
         ML_WORKER_AVAILABLE = True
-        SEMANTIC_AVAILABLE = NUMPY_AVAILABLE  # Only need numpy for embeddings, FAISS is in ml_worker
+        SEMANTIC_AVAILABLE = NUMPY_AVAILABLE and FAISS_AVAILABLE  # Need numpy and FAISS for semantic search
     except ImportError:
         ML_WORKER_AVAILABLE = False
         SEMANTIC_AVAILABLE = False
@@ -285,6 +288,121 @@ def compute_colorhash_for_file(filepath: str) -> Optional[str]:
 # Semantic Embedding & Search
 # ============================================================================
 
+class SemanticIndex:
+    """
+    FAISS-based semantic similarity index.
+    Singleton pattern to keep index in memory for fast searches.
+    """
+    _instance = None
+    _lock = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            import threading
+            cls._lock = threading.Lock()
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+            
+        self.index = None
+        self.ids = []
+        self.dimension = 1024
+        self._initialized = True
+        
+        # Build index on initialization if embeddings exist
+        if FAISS_AVAILABLE and SEMANTIC_AVAILABLE:
+            try:
+                self._build_index()
+            except Exception as e:
+                print(f"[SemanticIndex] Failed to build index on init: {e}")
+    
+    def _build_index(self):
+        """Build FAISS index from all embeddings in database."""
+        if not FAISS_AVAILABLE:
+            print("[SemanticIndex] FAISS not available")
+            return
+            
+        # Get all embeddings from database
+        ids, matrix = similarity_db.get_all_embeddings()
+        
+        if len(ids) == 0:
+            print("[SemanticIndex] No embeddings found in database")
+            self.index = None
+            self.ids = []
+            return
+        
+        # Normalize embeddings for cosine similarity (IndexFlatIP with normalized vectors = cosine)
+        faiss.normalize_L2(matrix)
+        
+        # Build FAISS index
+        self.dimension = matrix.shape[1]
+        self.index = faiss.IndexFlatIP(self.dimension)
+        self.index.add(matrix)
+        self.ids = ids
+        
+        print(f"[SemanticIndex] Built FAISS index with {len(ids)} embeddings")
+    
+    def rebuild(self):
+        """Rebuild the index from scratch (call after adding new embeddings)."""
+        print("[SemanticIndex] Rebuilding index...")
+        self._build_index()
+    
+    def search(self, query_embedding: np.ndarray, limit: int = 50) -> List[Dict]:
+        """
+        Search for similar images using FAISS index.
+        
+        Args:
+            query_embedding: 1024-d embedding vector (numpy array or list)
+            limit: Maximum number of results
+            
+        Returns:
+            List of dicts with 'image_id' and 'score'
+        """
+        if not FAISS_AVAILABLE or self.index is None:
+            return []
+        
+        # Convert to numpy array if needed
+        if not isinstance(query_embedding, np.ndarray):
+            query_embedding = np.array(query_embedding, dtype=np.float32)
+        
+        # Reshape to 2D array for FAISS
+        query = query_embedding.reshape(1, -1)
+        
+        # Normalize query for cosine similarity
+        faiss.normalize_L2(query)
+        
+        # Search
+        distances, indices = self.index.search(query, min(limit, len(self.ids)))
+        
+        # Build results
+        results = []
+        for dist, idx in zip(distances[0], indices[0]):
+            if idx == -1:
+                continue
+            if idx < len(self.ids):
+                results.append({
+                    'image_id': int(self.ids[idx]),
+                    'score': float(dist)
+                })
+        
+        return results
+
+# Global singleton instance
+_semantic_index = None
+
+def get_semantic_index() -> SemanticIndex:
+    """Get the global semantic index singleton."""
+    global _semantic_index
+    if _semantic_index is None:
+        _semantic_index = SemanticIndex()
+    return _semantic_index
+
 # Backend Interface
 class SemanticBackend:
     """Abstract base class for semantic similarity backends."""
@@ -315,15 +433,12 @@ class MLWorkerSemanticBackend(SemanticBackend):
             return None
             
     def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
-        if not ML_WORKER_AVAILABLE:
-            return []
-        try:
-            client = get_ml_worker_client()
-            result = client.search_similar(query_embedding=query_embedding, limit=limit)
-            return result.get('results', [])
-        except Exception as e:
-            print(f"[Similarity] ML Worker search failed: {e}")
-            return []
+        """
+        Deprecated: Search is now done locally with FAISS in main process.
+        This method is kept for backward compatibility but returns empty list.
+        """
+        print("[Similarity] Warning: MLWorkerSemanticBackend.search_similar is deprecated. Use SemanticIndex directly.")
+        return []
 
 class SemanticSearchEngine:
     """
@@ -377,7 +492,7 @@ def set_semantic_backend(backend: SemanticBackend):
     get_semantic_engine().set_backend(backend)
 
 def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
-    """Find semantically similar images using ml_worker for FAISS operations."""
+    """Find semantically similar images using local FAISS index."""
     if not SEMANTIC_AVAILABLE: return []
     
     # 1. Get embedding for query image
@@ -398,14 +513,15 @@ def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
             if embedding is not None:
                 # Save it
                 similarity_db.save_embedding(image_id, embedding)
+                # Rebuild index to include new embedding
+                get_semantic_index().rebuild()
     
     if embedding is None: return []
     
-    # 2. Search via backend
+    # 2. Search using local FAISS index
     try:
-        engine = get_semantic_engine()
-        query_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
-        search_results = engine.search_similar(query_list, limit)
+        semantic_index = get_semantic_index()
+        search_results = semantic_index.search(embedding, limit)
     except Exception as e:
         print(f"[Similarity] Semantic search failed: {e}")
         return []
@@ -1067,6 +1183,12 @@ def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Di
             if results_buffer:
                 _bulk_save_hashes(results_buffer)
                 print(f"[Similarity] Batch complete. Saved {len(results_buffer)} results.")
+                
+                # Rebuild semantic index if we saved any new embeddings
+                has_semantic = any('new_embedding' in r for r in results_buffer)
+                if has_semantic and SEMANTIC_AVAILABLE:
+                    print("[Similarity] Rebuilding semantic index with new embeddings...")
+                    get_semantic_index().rebuild()
     
     return total_stats
 
