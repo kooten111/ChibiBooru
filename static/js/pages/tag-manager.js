@@ -33,11 +33,10 @@ const state = {
     currentTag: null
 };
 
-// Initialize
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadWorkingSetFromStorage();
     initializeEventListeners();
-    initializeKeyboardShortcuts();
     switchMode('tags');
 });
 
@@ -242,67 +241,7 @@ function initializeEventListeners() {
     document.getElementById('confirmDeleteBtn').addEventListener('click', confirmDelete);
 }
 
-// Initialize Keyboard Shortcuts
-function initializeKeyboardShortcuts() {
-    document.addEventListener('keydown', (e) => {
-        // Ignore if typing in input
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
-            if (e.key === 'Escape') {
-                e.target.blur();
-            }
-            return;
-        }
 
-        // Global shortcuts
-        if (e.key === '1') {
-            switchMode('tags');
-        } else if (e.key === '2') {
-            switchMode('images');
-        } else if (e.key === '3') {
-            switchMode('stats');
-        } else if (e.key === '/' && !e.shiftKey) {
-            e.preventDefault();
-            if (state.currentMode === 'tags') {
-                document.getElementById('tagSearchInput').focus();
-            } else if (state.currentMode === 'images') {
-                document.getElementById('imageSearchInput').focus();
-            }
-        } else if (e.key === '?') {
-            document.getElementById('helpModal').style.display = 'flex';
-        } else if (e.key === 'Escape') {
-            // Close modals
-            document.querySelectorAll('.modal').forEach(modal => {
-                modal.style.display = 'none';
-            });
-            // Clear selections
-            state.tags.selected.clear();
-            state.images.selected.clear();
-            updateTagTable();
-            updateImageGrid();
-        }
-
-        // Tag mode shortcuts
-        if (state.currentMode === 'tags') {
-            if (e.key === 'd' && state.tags.selected.size > 0) {
-                showDeleteModal();
-            } else if (e.key === 'm' && state.tags.selected.size > 1) {
-                showMergeModal();
-            } else if (e.key === 'c' && state.tags.selected.size > 0) {
-                document.getElementById('bulkBaseCategorySelect').focus();
-            }
-        }
-
-        // Image mode shortcuts
-        if (state.currentMode === 'images') {
-            if (e.key === 't') {
-                document.getElementById('addTagInput').focus();
-            } else if (e.key === 'A' && e.shiftKey) {
-                e.preventDefault();
-                document.getElementById('selectAllImages').click();
-            }
-        }
-    });
-}
 
 // Switch Mode
 function switchMode(mode) {

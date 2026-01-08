@@ -53,8 +53,8 @@ def update_config(key: str, value: float) -> None:
     with get_model_connection() as conn:
         cur = conn.cursor()
         cur.execute(
-            "UPDATE rating_inference_config SET value = ? WHERE key = ?",
-            (value, key)
+            "INSERT OR REPLACE INTO rating_inference_config (key, value) VALUES (?, ?)",
+            (key, value)
         )
         conn.commit()
 
@@ -88,7 +88,7 @@ def reset_config_to_defaults() -> None:
 # Data Retrieval
 # ============================================================================
 
-def get_rated_images(sources: List[str] = None) -> List[Tuple[int, str, List[str]]]:
+def get_rated_images(sources: List[str] = None, progress_callback=None) -> List[Tuple[int, str, List[str]]]:
     """
     Get all images with rating tags from trusted sources.
 
@@ -126,18 +126,30 @@ def get_rated_images(sources: List[str] = None) -> List[Tuple[int, str, List[str
             return []
 
         image_ids = list(rated_image_map.keys())
-        placeholders = ','.join('?' * len(image_ids))
-        cur.execute(f"""
-            SELECT it.image_id, t.name as tag_name
-            FROM image_tags it
-            JOIN tags t ON it.tag_id = t.id
-            WHERE it.image_id IN ({placeholders})
-              AND t.name NOT IN ({','.join('?' * len(RATINGS))})
-        """, image_ids + RATINGS)
-
+        total_images = len(image_ids)
+        
         image_tags_map = defaultdict(list)
-        for row in cur.fetchall():
-            image_tags_map[row['image_id']].append(row['tag_name'])
+        
+        # Batch processing to avoid SQLite limit and provide progress
+        batch_size = 900 # Safe limit for SQLite variables
+        for i in range(0, total_images, batch_size):
+            batch = image_ids[i:i + batch_size]
+            
+            if progress_callback:
+                progress = 5 + int((i / total_images) * 15) # 5-20% range
+                progress_callback(progress, f"Loading tags for images {i+1}-{min(i+len(batch), total_images)}/{total_images}...")
+            
+            placeholders = ','.join('?' * len(batch))
+            cur.execute(f"""
+                SELECT it.image_id, t.name as tag_name
+                FROM image_tags it
+                JOIN tags t ON it.tag_id = t.id
+                WHERE it.image_id IN ({placeholders})
+                  AND t.name NOT IN ({','.join('?' * len(RATINGS))})
+            """, batch + RATINGS)
+
+            for row in cur.fetchall():
+                image_tags_map[row['image_id']].append(row['tag_name'])
 
         # Combine into result
         result = []
@@ -397,9 +409,12 @@ def calculate_tag_pair_weights(rated_images: List[Tuple[int, str, List[str]]],
     return weights
 
 
-def train_model() -> Dict:
+def train_model(progress_callback=None) -> Dict:
     """
     Train the rating inference model on all trusted ratings.
+
+    Args:
+        progress_callback: Optional callable(percent, message)
 
     Returns:
         dict: Training statistics including sample counts, duration, etc.
@@ -408,12 +423,18 @@ def train_model() -> Dict:
         ValueError: If not enough training samples available
     """
     start_time = datetime.now()
+    
+    if progress_callback:
+        progress_callback(0, "Initializing training...")
 
     config = get_config()
     min_samples = int(config['min_training_samples'])
 
     # Get training data
-    rated_images = get_rated_images(sources=['user', 'original'])
+    if progress_callback:
+        progress_callback(5, "Loading rated images...")
+        
+    rated_images = get_rated_images(sources=['user', 'original'], progress_callback=progress_callback)
 
     if len(rated_images) < min_samples:
         raise ValueError(
@@ -424,11 +445,17 @@ def train_model() -> Dict:
     print(f"Training on {len(rated_images)} rated images...")
 
     # Calculate individual tag weights
+    if progress_callback:
+        progress_callback(20, f"Calculating weights for {len(rated_images)} images...")
+    
     print("Calculating individual tag weights...")
     tag_weights = calculate_tag_weights(rated_images)
     print(f"Calculated weights for {len(tag_weights)} tag-rating pairs")
 
     # Find frequent tag pairs
+    if progress_callback:
+        progress_callback(50, "Finding frequent tag pairs...")
+        
     print("Finding frequent tag pairs...")
     frequent_pairs = find_frequent_tag_pairs(
         rated_images,
@@ -439,6 +466,9 @@ def train_model() -> Dict:
     print(f"Found {len(frequent_pairs)} frequent tag pairs")
 
     # Calculate pair weights
+    if progress_callback:
+        progress_callback(70, "Calculating tag pair weights...")
+        
     print("Calculating tag pair weights...")
     pair_weights = calculate_tag_pair_weights(rated_images, frequent_pairs)
     print(f"Calculated weights for {len(pair_weights)} pair-rating combinations")
@@ -455,20 +485,27 @@ def train_model() -> Dict:
         pruning_threshold = config.get('pruning_threshold', 0.0)
 
         # Insert new tag weights with optional pruning
-        tag_weight_count = 0
+        if progress_callback:
+            progress_callback(90, "Saving model weights...")
+
+        # Insert new tag weights with optional pruning
+        tag_weight_params = []
         for (tag, rating), (weight, sample_count) in tag_weights.items():
             # Apply pruning threshold (disabled by default with 0.0)
             if abs(weight) >= pruning_threshold:
                 tag_id = get_or_create_tag_id(conn, tag)
                 rating_id = get_or_create_rating_id(conn, rating)
-                cur.execute(
-                    "INSERT INTO rating_tag_weights (tag_id, rating_id, weight, sample_count) VALUES (?, ?, ?, ?)",
-                    (tag_id, rating_id, weight, sample_count)
-                )
-                tag_weight_count += 1
+                tag_weight_params.append((tag_id, rating_id, weight, sample_count))
+        
+        if tag_weight_params:
+            cur.executemany(
+                "INSERT INTO rating_tag_weights (tag_id, rating_id, weight, sample_count) VALUES (?, ?, ?, ?)",
+                tag_weight_params
+            )
+        tag_weight_count = len(tag_weight_params)
 
         # Insert new pair weights with optional pruning
-        pair_weight_count = 0
+        pair_weight_params = []
         for (tag1, tag2, rating), (weight, co_count) in pair_weights.items():
             # Apply pruning threshold (disabled by default with 0.0)
             if abs(weight) >= pruning_threshold:
@@ -478,11 +515,14 @@ def train_model() -> Dict:
                 if tag1_id > tag2_id:
                     tag1_id, tag2_id = tag2_id, tag1_id
                 rating_id = get_or_create_rating_id(conn, rating)
-                cur.execute(
-                    "INSERT INTO rating_tag_pair_weights (tag1_id, tag2_id, rating_id, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
-                    (tag1_id, tag2_id, rating_id, weight, co_count)
-                )
-                pair_weight_count += 1
+                pair_weight_params.append((tag1_id, tag2_id, rating_id, weight, co_count))
+        
+        if pair_weight_params:
+            cur.executemany(
+                "INSERT INTO rating_tag_pair_weights (tag1_id, tag2_id, rating_id, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
+                pair_weight_params
+            )
+        pair_weight_count = len(pair_weight_params)
 
         # Update metadata
         cur.execute(
@@ -597,8 +637,14 @@ def calculate_rating_scores(image_tags: List[str],
             scores[rating] += weight
 
     # Accumulate tag pair weights
+    # Limit tags to prevent O(n²) explosion for images with many tags
     pair_multiplier = config['pair_weight_multiplier']
+    MAX_TAGS_FOR_PAIRS = 100  # 100 tags = ~5000 pairs, which is manageable
+    
+    # Use only the first N tags (sorted for consistency)
     sorted_tags = sorted(image_tags)
+    if len(sorted_tags) > MAX_TAGS_FOR_PAIRS:
+        sorted_tags = sorted_tags[:MAX_TAGS_FOR_PAIRS]
 
     for tag1, tag2 in combinations(sorted_tags, 2):
         for rating in RATINGS:
@@ -724,14 +770,20 @@ def infer_rating_for_image(image_id: int) -> Dict:
         return {'rated': False, 'rating': None, 'confidence': confidence}
 
 
-def infer_all_unrated_images() -> Dict:
+def infer_all_unrated_images(progress_callback=None) -> Dict:
     """
     Run inference on all images without rating tags.
+    
+    Args:
+        progress_callback: Optional callable(percent, message)
 
     Returns:
         dict: Statistics about inference run
     """
     start_time = datetime.now()
+    
+    if progress_callback:
+        progress_callback(0, "Initializing inference...")
 
     # Load weights once for efficiency
     tag_weights, pair_weights = load_weights()
@@ -741,6 +793,13 @@ def infer_all_unrated_images() -> Dict:
         raise ValueError("Model not trained. Run train_model() first.")
 
     unrated_images = get_unrated_images()
+    
+    if not unrated_images:
+        if progress_callback:
+            progress_callback(100, "No unrated images found.")
+        return {
+            'processed': 0, 'rated': 0, 'skipped_low_confidence': 0, 'by_rating': {}, 'duration_seconds': 0
+        }
 
     stats = {
         'processed': 0,
@@ -750,8 +809,10 @@ def infer_all_unrated_images() -> Dict:
     }
 
     print(f"Running inference on {len(unrated_images)} unrated images...")
+    
+    total_images = len(unrated_images)
 
-    for image_id, tags in unrated_images:
+    for i, (image_id, tags) in enumerate(unrated_images):
         stats['processed'] += 1
 
         if not tags:
@@ -767,8 +828,18 @@ def infer_all_unrated_images() -> Dict:
         else:
             stats['skipped_low_confidence'] += 1
 
-        if stats['processed'] % 100 == 0:
-            print(f"  Processed {stats['processed']}/{len(unrated_images)}...")
+        if (i + 1) % 10 == 0 or (i + 1) == total_images:
+            percent = int((i + 1) / total_images * 90)
+            if progress_callback:
+                progress_callback(percent, f"Processed {i + 1}/{total_images}...")
+            
+            # Log less frequently
+            if (i + 1) % 50 == 0:
+                print(f"  Processed {stats['processed']}/{len(unrated_images)}...")
+            
+    # Final progress update
+    if progress_callback:
+        progress_callback(100, "Inference complete!")
 
     duration = (datetime.now() - start_time).total_seconds()
     stats['duration_seconds'] = round(duration, 2)

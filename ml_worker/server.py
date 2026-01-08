@@ -620,24 +620,75 @@ def handle_health_check(request_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+import uuid
+import traceback
+
+class JobRunner(threading.Thread):
+    def __init__(self, job_id: str, target, args=(), kwargs=None):
+        super().__init__()
+        self.job_id = job_id
+        self.target = target
+        self.args = args
+        self.kwargs = kwargs or {}
+        self.daemon = True
+        
+    def run(self):
+        try:
+            _job_store[self.job_id]['status'] = 'running'
+            
+            def progress_callback(percent, message):
+                _job_store[self.job_id]['progress'] = percent
+                _job_store[self.job_id]['message'] = message
+            
+            # Inject progress_callback if target accepts it
+            result = self.target(progress_callback=progress_callback, *self.args, **self.kwargs)
+            
+            _job_store[self.job_id]['status'] = 'completed'
+            _job_store[self.job_id]['progress'] = 100
+            _job_store[self.job_id]['result'] = result
+            
+        except Exception as e:
+            logger.error(f"Job {self.job_id} failed: {e}")
+            logger.error(traceback.format_exc())
+            _job_store[self.job_id]['status'] = 'failed'
+            _job_store[self.job_id]['error'] = str(e)
+
+def start_job(target, *args, **kwargs) -> str:
+    """Start a background job and return its ID"""
+    job_id = str(uuid.uuid4())
+    _job_store[job_id] = {
+        'status': 'pending',
+        'progress': 0,
+        'message': 'Starting...',
+        'created_at': time.time()
+    }
+    
+    runner = JobRunner(job_id, target, args, kwargs)
+    runner.start()
+    
+    return job_id
+
+
 def handle_train_rating_model(request_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle train_rating_model request.
     
     Returns:
-        Dict with training statistics
+        Dict with job info (job_id, status)
     """
-    logger.info("Training rating model...")
+    logger.info("Starting rating model training background job...")
     
     # Import rating service
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from services import rating_service
     
-    # Run training
-    stats = rating_service.train_model()
+    job_id = start_job(rating_service.train_model)
     
-    logger.info(f"Rating model training complete: {stats}")
-    return stats
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "message": "Training started in background"
+    }
 
 
 def handle_infer_ratings(request_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -648,40 +699,57 @@ def handle_infer_ratings(request_data: Dict[str, Any]) -> Dict[str, Any]:
         request_data: {image_ids: list | None}
     
     Returns:
-        Dict with inference statistics
+        Dict with job info (job_id, status)
     """
     image_ids = request_data.get('image_ids', [])
     
-    logger.info(f"Running rating inference (image_ids: {len(image_ids) if image_ids else 'all unrated'})")
+    logger.info(f"Starting rating inference background job (image_ids: {len(image_ids) if image_ids else 'all unrated'})")
     
     # Import rating service
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from services import rating_service
     
-    # Run inference
-    if image_ids:
-        # Infer specific images
-        stats = {
-            'processed': 0,
-            'rated': 0,
-            'skipped_low_confidence': 0,
-            'by_rating': {r: 0 for r in rating_service.RATINGS}
-        }
-        
-        for image_id in image_ids:
-            result = rating_service.infer_rating_for_image(image_id)
-            stats['processed'] += 1
-            if result['rated']:
-                stats['rated'] += 1
-                stats['by_rating'][result['rating']] += 1
-            else:
-                stats['skipped_low_confidence'] += 1
-    else:
-        # Infer all unrated
-        stats = rating_service.infer_all_unrated_images()
+    # Define wrapper for infer_specific which doesn't support callback yet
+    # Or just support callback for infer_all which is the main long-running task
     
-    logger.info(f"Rating inference complete: {stats}")
-    return stats
+    if image_ids:
+        # Wrapper for specific images
+        def _run_specific(progress_callback=None):
+            if progress_callback:
+                progress_callback(0, "Processing specific images...")
+                
+            stats = {
+                'processed': 0,
+                'rated': 0,
+                'skipped_low_confidence': 0,
+                'by_rating': {r: 0 for r in rating_service.RATINGS}
+            }
+            
+            total = len(image_ids)
+            for i, image_id in enumerate(image_ids):
+                result = rating_service.infer_rating_for_image(image_id)
+                stats['processed'] += 1
+                if result['rated']:
+                    stats['rated'] += 1
+                    stats['by_rating'][result['rating']] += 1
+                else:
+                    stats['skipped_low_confidence'] += 1
+                
+                if progress_callback and (i + 1) % 10 == 0:
+                     progress_callback(int((i+1)/total * 100), f"Processed {i+1}/{total}")
+                     
+            return stats
+            
+        job_id = start_job(_run_specific)
+    else:
+        # Infer all unrated supports callback natively now
+        job_id = start_job(rating_service.infer_all_unrated_images)
+    
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "message": "Inference started in background"
+    }
 
 
 def handle_train_character_model(request_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -697,7 +765,7 @@ def handle_train_character_model(request_data: Dict[str, Any]) -> Dict[str, Any]
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from services import character_service
     
-    # Run training
+    # TODO: Make this async too if needed, for now keep synchronous
     stats = character_service.train_model()
     
     logger.info(f"Character model training complete: {stats}")

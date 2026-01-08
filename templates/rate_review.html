@@ -9,56 +9,164 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/rating.css') + '?v=2' }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
 </head>
 
-<body>
+<body class="gallery-page">
     {% include 'header.html' %}
 
-    <div class="rate-container">
-        <div class="rate-review-header">
-            <div class="rate-review-title">Rate Images</div>
-            <div class="rate-progress" id="rateProgress">Loading...</div>
-        </div>
+    <div class="container">
+        <!-- Header Bar -->
+        <div class="header-content"
+            style="flex-direction: column; align-items: flex-start; gap: 1rem; margin-bottom: 2rem;">
+            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
+                <h1>
+                    <span>✨</span>
+                    Rate Images
+                </h1>
 
-        <div class="rate-filters">
-            <label>
-                <input type="radio" name="filter" value="unrated" checked id="filterUnrated">
-                Only Unrated
-            </label>
-            <label>
-                <input type="radio" name="filter" value="ai_predicted" id="filterAI">
-                Only AI-Predicted
-            </label>
-            <label>
-                <input type="radio" name="filter" value="all" id="filterAll">
-                All Images
-            </label>
-        </div>
+                <!-- Progress Indicator -->
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div id="progressText" style="color: var(--primary-blue);">
+                        Loading...
+                    </div>
+                    <div class="rate-progress-container">
+                        <div id="progressBar" class="rate-progress-bar"></div>
+                    </div>
+                </div>
+            </div>
 
-        <div class="image-display" id="imageDisplay">
-            <div class="loading-state" id="loadingState">
-                Loading images...
+            <!-- Filter Pills -->
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; width: 100%;">
+                <label class="btn btn-secondary btn-small" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="radio" name="filter" value="unrated" checked id="filterUnrated"
+                        onchange="changeFilter()" style="accent-color: var(--primary-blue);">
+                    <span>❓ Unrated</span>
+                </label>
+                <label class="btn btn-secondary btn-small" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="radio" name="filter" value="ai_predicted" id="filterAI" onchange="changeFilter()"
+                        style="accent-color: var(--primary-blue);">
+                    <span>🤖 AI-Predicted</span>
+                </label>
+                <label class="btn btn-secondary btn-small" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="radio" name="filter" value="all" id="filterAll" onchange="changeFilter()"
+                        style="accent-color: var(--primary-blue);">
+                    <span>📋 All Images</span>
+                </label>
+                <button class="btn btn-secondary btn-small" onclick="shuffleImages()" style="margin-left: auto;">
+                    <span>🔀</span>
+                    Shuffle
+                </button>
             </div>
         </div>
 
-        <div class="keyboard-hints">
-            <strong>Keyboard Shortcuts:</strong>
-            <kbd>1</kbd> General &nbsp;
-            <kbd>2</kbd> Sensitive &nbsp;
-            <kbd>3</kbd> Questionable &nbsp;
-            <kbd>4</kbd> Explicit &nbsp;
-            <kbd>→</kbd> or <kbd>N</kbd> Next &nbsp;
-            <kbd>←</kbd> or <kbd>P</kbd> Previous &nbsp;
-            <kbd>S</kbd> Skip
+        <!-- Main Image Display -->
+        <div style="position: relative; margin-bottom: 2rem;">
+            <!-- AI Suggestion Badge (hidden by default) -->
+            <div class="ai-suggestion-badge" id="aiSuggestion" style="display: none;">
+                <span>🤖</span>
+                <span id="aiSuggestionText">AI suggests: General</span>
+            </div>
+
+            <!-- Confidence Bar (hidden by default) -->
+            <div class="confidence-bar-overlay" id="confidenceBar" style="display: none;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: #fff;">Confidence</span>
+                    <span id="confidenceValue" style="color: var(--primary-blue);">0%</span>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); height: 4px; border-radius: 2px;">
+                    <div id="confidenceFill"
+                        style="height: 100%; background: var(--primary-blue); width: 0%; border-radius: 2px;"></div>
+                </div>
+            </div>
+
+            <!-- Image container -->
+            <div class="image-display-container" id="imageDisplay">
+                <div id="loadingState" style="padding: 4rem; color: var(--text-muted);">
+                    Loading images...
+                </div>
+            </div>
+        </div>
+
+        <!-- Rating Controls -->
+        <div style="max-width: 1000px; margin: 0 auto;">
+            <div class="rating-controls-grid">
+                <button class="rating-btn general" onclick="setRating('rating:general', 1)">
+                    <span style="font-size: 1.2em; font-weight: bold;">General</span>
+                    <span class="rating-shortcut">Press <kbd>1</kbd></span>
+                </button>
+                <button class="rating-btn sensitive" onclick="setRating('rating:sensitive', 2)">
+                    <span style="font-size: 1.2em; font-weight: bold;">Sensitive</span>
+                    <span class="rating-shortcut">Press <kbd>2</kbd></span>
+                </button>
+                <button class="rating-btn questionable" onclick="setRating('rating:questionable', 3)">
+                    <span style="font-size: 1.2em; font-weight: bold;">Questionable</span>
+                    <span class="rating-shortcut">Press <kbd>3</kbd></span>
+                </button>
+                <button class="rating-btn explicit" onclick="setRating('rating:explicit', 4)">
+                    <span style="font-size: 1.2em; font-weight: bold;">Explicit</span>
+                    <span class="rating-shortcut">Press <kbd>4</kbd></span>
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <div class="nav-controls">
+                <button class="btn btn-secondary" onclick="previousImage()">
+                    <span>←</span>
+                    Previous
+                    <span style="margin-left: 0.5rem;"><kbd>P</kbd></span>
+                </button>
+                <button class="btn btn-warning" onclick="skipImage()">
+                    <span>⏭️</span>
+                    Skip
+                    <span style="margin-left: 0.5rem;"><kbd>S</kbd></span>
+                </button>
+                <button class="btn btn-secondary" onclick="nextImage()">
+                    Next
+                    <span>→</span>
+                    <span style="margin-left: 0.5rem;"><kbd>N</kbd></span>
+                </button>
+            </div>
+
+            <!-- Image Tags (Collapsible) -->
+            <div class="panel" style="margin-top: 3rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
+                    onclick="toggleTags()">
+                    <h3 style="margin: 0; color: var(--primary-blue);">
+                        Image Tags
+                        <span id="tagCount" style="font-size: 0.8em; color: var(--text-muted); margin-left: 0.5rem;">(0
+                            tags)</span>
+                    </h3>
+                    <span id="tagsToggleIcon" style="font-size: 1.5em; transition: transform 0.3s ease;">▼</span>
+                </div>
+                <div id="imageTags" style="margin-top: 1rem; display: none;">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Status Bar -->
+        <div
+            style="margin-top: 4rem; padding: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; color: var(--text-muted);">
+            <div class="left">
+                <span id="footerStatus">Ready</span>
+            </div>
+            <div class="right">
+                <span>Keyboard Shortcuts:</span>
+                <span><kbd>1-4</kbd> Rate</span>
+                <span><kbd>← →</kbd> Navigate</span>
+                <span><kbd>S</kbd> Skip</span>
+                <span><kbd>T</kbd> Toggle Tags</span>
+            </div>
         </div>
     </div>
 
-
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
     <script src="{{ url_for('static', filename='js/header.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/pages/rate-review.js') }}"></script>
     <script type="module">
         import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";

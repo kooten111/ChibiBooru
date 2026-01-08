@@ -1,205 +1,365 @@
-// static/js/pages/rate-review.js - Rating Review Page
+// static/js/pages/rate-review.js - Modern Rating Review Page
 import { showNotification } from '../utils/notifications.js';
 
-let currentImages = [];
-let currentIndex = 0;
+// Configuration constants
+const RATING_KEYS = {
+    '1': 'rating:general',
+    '2': 'rating:sensitive',
+    '3': 'rating:questionable',
+    '4': 'rating:explicit'
+};
+
+const RATING_COLORS = {
+    'rating:general': 'var(--rating-general)',
+    'rating:sensitive': 'var(--rating-sensitive)',
+    'rating:questionable': 'var(--rating-questionable)',
+    'rating:explicit': 'var(--rating-explicit)'
+};
+
+// State
+let currentImage = null;
 let currentFilter = 'unrated';
+let isLoading = false;
+let imageHistory = []; // Stack for previous images
+let preloadedImage = null; // For preloading next image
 
-// Keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    // Don't trigger if user is typing in an input
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-    switch (e.key) {
-        case '1':
-            setRating('rating:general');
-            break;
-        case '2':
-            setRating('rating:sensitive');
-            break;
-        case '3':
-            setRating('rating:questionable');
-            break;
-        case '4':
-            setRating('rating:explicit');
-            break;
-        case 'n':
-        case 'N':
-        case 'ArrowRight':
-            nextImage();
-            break;
-        case 'p':
-        case 'P':
-        case 'ArrowLeft':
-            previousImage();
-            break;
-        case 's':
-        case 'S':
-            skipImage();
-            break;
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    // Check initial filter from URL or default
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('filter')) {
+        currentFilter = urlParams.get('filter');
+        const radio = document.querySelector(`input[name="filter"][value="${currentFilter}"]`);
+        if (radio) radio.checked = true;
     }
+
+    // Initial load
+    loadNextImage();
+
+    // Setup keyboard shortcuts
+    setupKeyboard();
+
+    // Setup tags toggle
+    document.getElementById('tagsToggleIcon').addEventListener('click', toggleTags);
 });
 
-// Filter change handlers
-document.querySelectorAll('input[name="filter"]').forEach(radio => {
-    radio.addEventListener('change', (e) => {
-        currentFilter = e.target.value;
-        currentIndex = 0;
-        loadImages();
+// Setup keyboard shortcuts
+function setupKeyboard() {
+    document.addEventListener('keydown', (e) => {
+        // Ignore if input focused
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        // Rating shortcuts (1-4)
+        if (RATING_KEYS[e.key]) {
+            setRating(RATING_KEYS[e.key], parseInt(e.key));
+            return;
+        }
+
+        switch (e.key.toLowerCase()) {
+            case 'arrowright':
+            case 'n':
+                nextImage();
+                break;
+            case 'arrowleft':
+            case 'p':
+                previousImage();
+                break;
+            case 's':
+                skipImage();
+                break;
+            case 't':
+                toggleTags();
+                break;
+        }
     });
-});
+}
 
-async function loadImages() {
-    const loadingState = document.getElementById('loadingState');
-    if (loadingState) {
-        loadingState.style.display = 'block';
+// Change filter
+window.changeFilter = function () {
+    const radios = document.getElementsByName('filter');
+    for (const radio of radios) {
+        if (radio.checked) {
+            currentFilter = radio.value;
+            break;
+        }
     }
-    document.getElementById('imageDisplay').innerHTML = '<div class="loading-state">Loading images...</div>';
+    // Reset history when filter changes
+    imageHistory = [];
+    loadNextImage();
+};
+
+// Load next image
+window.loadNextImage = async function () {
+    if (isLoading) return;
+    isLoading = true;
+
+    const display = document.getElementById('imageDisplay');
+    const loadingState = document.getElementById('loadingState');
+
+    // Show loading state if taking too long
+    const loadingTimeout = setTimeout(() => {
+        display.innerHTML = '';
+        display.appendChild(loadingState);
+        loadingState.style.display = 'block';
+        updateProgress('Loading...', 0);
+    }, 200);
 
     try {
-        const response = await fetch('/api/rate/images?filter=' + currentFilter);
-        const data = await response.json();
+        let data;
 
-        currentImages = data.images || [];
-        currentIndex = 0;
-
-        if (currentImages.length === 0) {
-            document.getElementById('imageDisplay').innerHTML =
-                '<div class="no-images-state">No images to rate! 🎉</div>';
-            document.getElementById('rateProgress').textContent = 'All done!';
+        // Use preloaded image if available
+        if (preloadedImage) {
+            data = preloadedImage;
+            preloadedImage = null;
         } else {
-            displayCurrentImage();
+            const response = await fetch(`/api/rate/next?filter=${currentFilter}`);
+            data = await response.json();
+        }
+
+        clearTimeout(loadingTimeout);
+
+        if (data.error) {
+            showEmptyState(data.error);
+        } else {
+            currentImage = data;
+            renderImage(data);
+            // Preload next one
+            preloadNext();
         }
     } catch (error) {
-        console.error('Error loading images:', error);
-        document.getElementById('imageDisplay').innerHTML =
-            '<div class="no-images-state">Error loading images: ' + error.message + '</div>';
-        document.getElementById('rateProgress').textContent = 'Error';
+        clearTimeout(loadingTimeout);
+        console.error('Error loading image:', error);
+        showNotification('Error loading image', 'error');
+        showEmptyState('Error loading images. Please try again.');
+    } finally {
+        isLoading = false;
+        updateProgress('Ready', 100);
+    }
+};
+
+// Preload next image data
+async function preloadNext() {
+    try {
+        const response = await fetch(`/api/rate/next?filter=${currentFilter}`);
+        const data = await response.json();
+        if (!data.error) {
+            preloadedImage = data;
+            // Preload actual image asset
+            const img = new Image();
+            img.src = '/images/' + data.filepath;
+        }
+    } catch (e) {
+        // Ignore preload errors
     }
 }
 
-function displayCurrentImage() {
-    if (currentImages.length === 0) {
-        document.getElementById('imageDisplay').innerHTML =
-            '<div class="no-images-state">No images to rate! 🎉</div>';
-        return;
-    }
+// Render image to DOM
+function renderImage(data) {
+    const container = document.getElementById('imageDisplay');
+    const isVideo = data.filepath.match(/\.(mp4|webm|mov)$/i);
 
-    const image = currentImages[currentIndex];
-    const progress = `Image ${currentIndex + 1} / ${currentImages.length}`;
-    document.getElementById('rateProgress').textContent = progress;
-
-    const filepath = image.filepath || image.path; // Support both old and new API
-    const isVideo = filepath.endsWith('.mp4') || filepath.endsWith('.webm');
-    const videoType = filepath.endsWith('.webm') ? 'video/webm' : 'video/mp4';
-    const mediaTag = isVideo
-        ? `<video controls autoplay loop preload="metadata"><source src="/static/images/${filepath}" type="${videoType}"></video>`
-        : `<img src="/static/images/${filepath}" alt="Image to rate">`;
-
-    let aiSuggestion = '';
-    if (image.ai_rating && image.ai_confidence) {
-        const ratingName = image.ai_rating.split(':')[1];
-        const confidence = Math.round(image.ai_confidence * 100);
-        aiSuggestion = `
-            <div class="ai-suggestion">
-                <strong>AI Suggestion:</strong> ${ratingName} (${confidence}% confidence)
-            </div>
+    let content = '';
+    if (isVideo) {
+        content = `
+            <video src="/images/${data.filepath}" controls autoplay loop muted 
+                   style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+            </video>
+        `;
+    } else {
+        content = `
+            <img src="/images/${data.filepath}" alt="Image to rate" 
+                 style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); object-fit: contain;">
         `;
     }
 
-    const tags = (image.tags || []).map(tag => `<span class="tag">${tag}</span>`).join('');
+    container.innerHTML = content;
 
-    document.getElementById('imageDisplay').innerHTML = `
-        ${mediaTag}
-        <div class="image-info">
-            ${aiSuggestion}
-            <div class="image-tags">
-                ${tags}
-            </div>
-            <div class="rating-buttons">
-                <button class="rating-btn rating-btn-general" onclick="setRating('rating:general')">
-                    General<br><small>(1)</small>
-                </button>
-                <button class="rating-btn rating-btn-sensitive" onclick="setRating('rating:sensitive')">
-                    Sensitive<br><small>(2)</small>
-                </button>
-                <button class="rating-btn rating-btn-questionable" onclick="setRating('rating:questionable')">
-                    Questionable<br><small>(3)</small>
-                </button>
-                <button class="rating-btn rating-btn-explicit" onclick="setRating('rating:explicit')">
-                    Explicit<br><small>(4)</small>
-                </button>
-            </div>
-            <div class="navigation-buttons">
-                <button class="nav-btn" onclick="previousImage()" ${currentIndex === 0 ? 'disabled' : ''}>
-                    ← Previous (P)
-                </button>
-                <button class="nav-btn" onclick="skipImage()">
-                    Skip (S)
-                </button>
-                <button class="nav-btn nav-btn-primary" onclick="nextImage()" ${currentIndex >= currentImages.length - 1 ? 'disabled' : ''}>
-                    Next (N / →)
-                </button>
+    // Update AI suggestion
+    const aiBadge = document.getElementById('aiSuggestion');
+    const aiText = document.getElementById('aiSuggestionText');
+    const confidenceBar = document.getElementById('confidenceBar');
+    const confidenceFill = document.getElementById('confidenceFill');
+    const confidenceValue = document.getElementById('confidenceValue');
+
+    if (data.ai_rating) {
+        const ratingName = data.ai_rating.replace('rating:', '');
+        const confidence = (data.ai_confidence * 100).toFixed(1);
+
+        aiText.textContent = `AI suggests: ${ratingName.charAt(0).toUpperCase() + ratingName.slice(1)}`;
+        aiBadge.className = `ai-suggestion-badge ${ratingName}`; // Helper class for color
+        aiBadge.style.display = 'flex';
+
+        // Update confidence bar
+        confidenceValue.textContent = `${confidence}%`;
+        confidenceFill.style.width = `${confidence}%`;
+
+        // Color code confidence
+        if (data.ai_confidence > 0.8) confidenceFill.style.background = 'var(--success)';
+        else if (data.ai_confidence > 0.5) confidenceFill.style.background = 'var(--warning)';
+        else confidenceFill.style.background = 'var(--rating-explicit)'; // Low confidence red
+
+        confidenceBar.style.display = 'block';
+    } else {
+        aiBadge.style.display = 'none';
+        confidenceBar.style.display = 'none';
+    }
+
+    // Render tags (initially hidden if collapsed)
+    renderTags(data.tags);
+    updateTagCount(Object.values(data.tags).reduce((a, b) => a + b.length, 0));
+}
+
+// Render tags
+function renderTags(tags) {
+    const container = document.getElementById('imageTags');
+    const sortedCategories = ['character', 'copyright', 'artist', 'general', 'meta'];
+
+    let html = '';
+
+    sortedCategories.forEach(cat => {
+        if (tags[cat] && tags[cat].length > 0) {
+            html += `
+                <div class="tag-category">
+                    <h4 class="category-name ${cat}">${cat.charAt(0).toUpperCase() + cat.slice(1)}</h4>
+                    <div class="tag-list">
+                        ${tags[cat].map(tag => `
+                            <span class="tag ${cat}" onclick="window.open('/tags?query=${tag}', '_blank')">
+                                ${tag}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    container.innerHTML = html;
+}
+
+// Set rating
+window.setRating = async function (rating, keyIndex) {
+    if (!currentImage || isLoading) return;
+
+    // Visual feedback on button
+    const btn = document.querySelector(`.rating-btn:nth-child(${keyIndex})`);
+    btn.classList.add('active');
+    setTimeout(() => btn.classList.remove('active'), 200);
+
+    // Optimistic UI: Immediately load next
+    const previous = currentImage; // Save for history
+
+    try {
+        // Send request in background
+        fetch('/api/rate/rate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                image_id: currentImage.id,
+                rating: rating
+            })
+        }).then(res => res.json()).then(data => {
+            if (data.status !== 'success') {
+                showNotification('Failed to save rating', 'error');
+            } else {
+                showNotification(`Rated as ${rating.replace('rating:', '')}`, 'success');
+            }
+        });
+
+        // Add to history
+        imageHistory.push(previous);
+
+        // Move next
+        loadNextImage();
+
+    } catch (error) {
+        console.error('Rating error:', error);
+        showNotification('Network error', 'error');
+    }
+};
+
+// Skip image
+window.skipImage = function () {
+    if (!currentImage) return;
+
+    showNotification('Skipped image', 'info');
+    imageHistory.push(currentImage);
+    loadNextImage();
+};
+
+// Previous image
+window.previousImage = function () {
+    if (imageHistory.length === 0) {
+        showNotification('No previous image', 'warning');
+        return;
+    }
+
+    const prev = imageHistory.pop();
+    currentImage = prev;
+    renderImage(prev);
+
+    // Put back preloaded if any
+    if (preloadedImage) {
+        // We lose the preloaded one if we go back, effectively
+        // Or we could create a forward stack, but simplest is just re-fetch if needed
+        preloadedImage = null;
+    }
+};
+
+// Next image
+window.nextImage = function () {
+    // Just alias to skip for now, effectively skipping without rating
+    skipImage();
+};
+
+// Toggle tags visibility
+window.toggleTags = function () {
+    const tagsDiv = document.getElementById('imageTags');
+    const icon = document.getElementById('tagsToggleIcon');
+
+    if (tagsDiv.style.display === 'none') {
+        tagsDiv.style.display = 'block';
+        icon.style.transform = 'rotate(180deg)';
+    } else {
+        tagsDiv.style.display = 'none';
+        icon.style.transform = 'rotate(0deg)';
+    }
+};
+
+// Update tag count
+function updateTagCount(count) {
+    document.getElementById('tagCount').textContent = `(${count} tags)`;
+}
+
+// Show empty state
+function showEmptyState(message) {
+    const container = document.getElementById('imageDisplay');
+    container.innerHTML = `
+        <div style="text-align: center; padding: 4rem; color: var(--text-muted);">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">🎉</div>
+            <h3>${message || 'All done!'}</h3>
+            <p>No more images found matching the current filter.</p>
+            <div style="margin-top: 2rem;">
+                <button class="btn btn-primary" onclick="window.location.reload()">Refresh Page</button>
             </div>
         </div>
     `;
+
+    // Hide specialized UI elements
+    document.getElementById('aiSuggestion').style.display = 'none';
+    document.getElementById('confidenceBar').style.display = 'none';
 }
 
-async function setRating(rating) {
-    const image = currentImages[currentIndex];
-
-    try {
-        const response = await fetch('/api/rate/set', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                image_id: image.id,
-                rating: rating
-            })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            // Move to next image
-            nextImage();
-        } else {
-            showNotification('Error setting rating: ' + result.error, 'error');
-        }
-    } catch (error) {
-        console.error('Error setting rating:', error);
-        showNotification('Error setting rating: ' + error.message, 'error');
-    }
+// Update progress bar
+function updateProgress(text, percent) {
+    document.getElementById('progressText').textContent = text;
+    document.getElementById('progressBar').style.width = `${percent}%`;
 }
 
-function nextImage() {
-    if (currentIndex < currentImages.length - 1) {
-        currentIndex++;
-        displayCurrentImage();
-    } else {
-        // Reload images to get new ones
-        loadImages();
-    }
-}
-
-function previousImage() {
-    if (currentIndex > 0) {
-        currentIndex--;
-        displayCurrentImage();
-    }
-}
-
-function skipImage() {
-    nextImage();
-}
-
-// Expose functions to window for onclick handlers
-window.setRating = setRating;
-window.nextImage = nextImage;
-window.previousImage = previousImage;
-window.skipImage = skipImage;
-
-// Load images on page load
-loadImages();
+// Shuffle images (client side effective reload with shuffle)
+window.shuffleImages = async function () {
+    showNotification('Shuffling queue...', 'info');
+    // Clear preload
+    preloadedImage = null;
+    // Reload
+    loadNextImage();
+};

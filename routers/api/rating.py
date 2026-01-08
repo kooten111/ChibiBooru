@@ -19,8 +19,9 @@ async def api_train_model():
     try:
         from ml_worker.client import get_ml_worker_client
         client = get_ml_worker_client()
-        stats = client.train_rating_model(timeout=600.0)
-        return {"stats": stats, "source": "ml_worker"}
+        # Returns job info now
+        response = client.train_rating_model(timeout=10.0)
+        return response
     except Exception as e:
         logger.warning(f"ML Worker unavailable, falling back to direct training: {e}")
         # Fallback to direct call if ML Worker unavailable
@@ -32,21 +33,22 @@ async def api_train_model():
 @api_handler()
 async def api_infer_ratings():
     """Run inference on unrated images or a specific image via ML Worker."""
-    data = await request.get_json() or {}
+    data = await request.get_json(silent=True) or {}
     image_id = data.get('image_id')
 
     try:
         from ml_worker.client import get_ml_worker_client
         client = get_ml_worker_client()
         
+        # Returns job info now
         if image_id:
             # Infer single image
-            result = client.infer_ratings(image_ids=[image_id], timeout=60.0)
-            return {"result": result, "source": "ml_worker"}
+            response = client.infer_ratings(image_ids=[image_id], timeout=10.0)
         else:
             # Infer all unrated images
-            stats = client.infer_ratings(image_ids=None, timeout=600.0)
-            return {"stats": stats, "source": "ml_worker"}
+            response = client.infer_ratings(image_ids=None, timeout=10.0)
+            
+        return response
     except Exception as e:
         logger.warning(f"ML Worker unavailable, falling back to direct inference: {e}")
         # Fallback to direct call if ML Worker unavailable
@@ -56,6 +58,21 @@ async def api_infer_ratings():
         else:
             stats = rating_inference.infer_all_unrated_images()
             return {"stats": stats, "source": "direct", "warning": "ML Worker unavailable"}
+
+
+@api_blueprint.route('/rate/job/<job_id>', methods=['GET'])
+@api_handler()
+async def api_get_job_status(job_id):
+    """Get status of an ML Worker job."""
+    try:
+        from ml_worker.client import get_ml_worker_client
+        client = get_ml_worker_client()
+        status = client.get_job_status(job_id)
+        return status
+    except Exception as e:
+        # If ML worker is unavailable, return a response the frontend understands
+        logger.warning(f"Failed to get job status for {job_id}: {e}")
+        return {"found": False, "error": str(e)}
 
 
 @api_blueprint.route('/rate/clear_ai', methods=['POST'])
@@ -236,7 +253,7 @@ async def api_get_images_for_rating():
 
             images.append({
                 'id': image_id,
-                'filepath': filepath,
+                'filepath': f"images/{filepath}" if not filepath.startswith('images/') else filepath,
                 'thumb': get_thumbnail_path(filepath),
                 'rating': rating,
                 'rating_source': rating_source,
