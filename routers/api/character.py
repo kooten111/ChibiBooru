@@ -3,6 +3,9 @@ from . import api_blueprint
 from services import character_service
 from database import get_db_connection
 from utils import api_handler, success_response, error_response
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Character Inference API Endpoints
@@ -11,26 +14,47 @@ from utils import api_handler, success_response, error_response
 @api_blueprint.route('/character/train', methods=['POST'])
 @api_handler()
 async def api_train_character_model():
-    """Train the character inference model."""
-    stats = character_service.train_model()
-    return {"stats": stats}
+    """Train the character inference model via ML Worker."""
+    try:
+        from ml_worker.client import get_ml_worker_client
+        client = get_ml_worker_client()
+        stats = client.train_character_model(timeout=600.0)
+        return {"stats": stats, "source": "ml_worker"}
+    except Exception as e:
+        logger.warning(f"ML Worker unavailable, falling back to direct training: {e}")
+        # Fallback to direct call if ML Worker unavailable
+        stats = character_service.train_model()
+        return {"stats": stats, "source": "direct", "warning": "ML Worker unavailable"}
 
 
 @api_blueprint.route('/character/infer', methods=['POST'])
 @api_handler()
 async def api_infer_characters():
-    """Run inference on untagged images or a specific image."""
+    """Run inference on untagged images or a specific image via ML Worker."""
     data = await request.get_json() or {}
     image_id = data.get('image_id')
 
-    if image_id:
-        # Infer single image
-        result = character_service.infer_character_for_image(image_id)
-        return {"result": result}
-    else:
-        # Infer all untagged images
-        stats = character_service.infer_all_untagged_images()
-        return {"stats": stats}
+    try:
+        from ml_worker.client import get_ml_worker_client
+        client = get_ml_worker_client()
+        
+        if image_id:
+            # Infer single image
+            result = client.infer_characters(image_ids=[image_id], timeout=60.0)
+            return {"result": result, "source": "ml_worker"}
+        else:
+            # Infer all untagged images
+            stats = client.infer_characters(image_ids=None, timeout=600.0)
+            return {"stats": stats, "source": "ml_worker"}
+    except Exception as e:
+        logger.warning(f"ML Worker unavailable, falling back to direct inference: {e}")
+        # Fallback to direct call if ML Worker unavailable
+        if image_id:
+            result = character_service.infer_character_for_image(image_id)
+            return {"result": result, "source": "direct", "warning": "ML Worker unavailable"}
+        else:
+            stats = character_service.infer_all_untagged_images()
+            return {"stats": stats, "source": "direct", "warning": "ML Worker unavailable"}
 
 
 @api_blueprint.route('/character/infer/<int:image_id>', methods=['POST'])

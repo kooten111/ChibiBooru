@@ -20,6 +20,11 @@ class RequestType(str, Enum):
     COMPUTE_SIMILARITY = "compute_similarity"
     HEALTH_CHECK = "health_check"
     SHUTDOWN = "shutdown"
+    TRAIN_RATING_MODEL = "train_rating_model"
+    INFER_RATINGS = "infer_ratings"
+    TRAIN_CHARACTER_MODEL = "train_character_model"
+    INFER_CHARACTERS = "infer_characters"
+    GET_JOB_STATUS = "get_job_status"
 
 
 class ResponseStatus(str, Enum):
@@ -174,6 +179,57 @@ class Request:
             RequestType.SHUTDOWN,
             request_id,
             {}
+        )
+
+    @staticmethod
+    def train_rating_model(request_id: str) -> Dict[str, Any]:
+        """Create a train_rating_model request"""
+        return Request.create(
+            RequestType.TRAIN_RATING_MODEL,
+            request_id,
+            {}
+        )
+
+    @staticmethod
+    def infer_ratings(request_id: str, image_ids: list = None) -> Dict[str, Any]:
+        """Create an infer_ratings request"""
+        return Request.create(
+            RequestType.INFER_RATINGS,
+            request_id,
+            {
+                "image_ids": image_ids if image_ids is not None else []
+            }
+        )
+
+    @staticmethod
+    def train_character_model(request_id: str) -> Dict[str, Any]:
+        """Create a train_character_model request"""
+        return Request.create(
+            RequestType.TRAIN_CHARACTER_MODEL,
+            request_id,
+            {}
+        )
+
+    @staticmethod
+    def infer_characters(request_id: str, image_ids: list = None) -> Dict[str, Any]:
+        """Create an infer_characters request"""
+        return Request.create(
+            RequestType.INFER_CHARACTERS,
+            request_id,
+            {
+                "image_ids": image_ids if image_ids is not None else []
+            }
+        )
+
+    @staticmethod
+    def get_job_status(request_id: str, job_id: str) -> Dict[str, Any]:
+        """Create a get_job_status request"""
+        return Request.create(
+            RequestType.GET_JOB_STATUS,
+            request_id,
+            {
+                "job_id": job_id
+            }
         )
 
 
