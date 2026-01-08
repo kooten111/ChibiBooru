@@ -7,10 +7,12 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/rating-modern.css') + '?v=1' }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
 </head>
 
 <body class="rate-container-v2">
@@ -59,22 +61,22 @@
         <!-- Left Sidebar -->
         <aside class="rate-sidebar-v2" id="sidebar">
             <h3>Quick Stats</h3>
-            
+
             <div class="stat-card-v2">
                 <div class="label">Training Samples</div>
                 <div class="value" id="trainingSamples">-</div>
             </div>
-            
+
             <div class="stat-card-v2">
                 <div class="label">Unique Tags</div>
                 <div class="value" id="uniqueTags">-</div>
             </div>
-            
+
             <div class="stat-card-v2">
                 <div class="label">Tag Pairs</div>
                 <div class="value" id="tagPairs">-</div>
             </div>
-            
+
             <div class="stat-card-v2">
                 <div class="label">Unrated Images</div>
                 <div class="value" id="unratedCount">-</div>
@@ -106,8 +108,9 @@
             <!-- Dashboard Tab -->
             <div class="tab-content-v2 active" id="tab-dashboard">
                 <h2 style="color: var(--cyan-accent); margin-bottom: 2rem;">Model Status</h2>
-                
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+
+                <div
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
                     <div class="stat-card-v2">
                         <div class="label">Model Status</div>
                         <div class="value" id="modelStatus">Not Trained</div>
@@ -115,7 +118,7 @@
                             Never trained
                         </div>
                     </div>
-                    
+
                     <div class="stat-card-v2">
                         <div class="label">Pending Corrections</div>
                         <div class="value" id="pendingCorrections">0</div>
@@ -123,18 +126,20 @@
                             User corrections since last training
                         </div>
                     </div>
-                    
+
                     <div class="stat-card-v2">
                         <div class="label">Model Health</div>
                         <div class="value" id="modelHealth">Unknown</div>
-                        <div style="margin-top: 0.5rem; font-size: 0.85em; color: var(--text-muted);" id="modelHealthDesc">
+                        <div style="margin-top: 0.5rem; font-size: 0.85em; color: var(--text-muted);"
+                            id="modelHealthDesc">
                             Checking...
                         </div>
                     </div>
                 </div>
 
                 <h3 style="color: var(--cyan-accent); margin: 2rem 0 1rem;">Recent Activity</h3>
-                <div id="recentActivity" style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 0.75rem;">
+                <div id="recentActivity"
+                    style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 0.75rem;">
                     <p style="color: var(--text-muted);">No recent activity</p>
                 </div>
             </div>
@@ -145,7 +150,8 @@
                     <h2 style="color: var(--cyan-accent); margin: 0;">AI-Inferred Images</h2>
                     <div style="display: flex; gap: 1rem; align-items: center;">
                         <label style="font-size: 0.9em;">
-                            <select id="reviewFilter" onchange="loadReviewImages()" style="padding: 0.5rem; border-radius: 0.5rem; background: var(--modern-panel-light); border: 1px solid var(--cyan-border); color: var(--text-primary);">
+                            <select id="reviewFilter" onchange="loadReviewImages()"
+                                style="padding: 0.5rem; border-radius: 0.5rem; background: var(--modern-panel-light); border: 1px solid var(--cyan-border); color: var(--text-primary);">
                                 <option value="ai_predicted">AI-Inferred</option>
                                 <option value="unrated">Unrated</option>
                                 <option value="all">All</option>
@@ -157,7 +163,7 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <div class="image-grid-v2" id="reviewImageGrid">
                     <!-- Will be populated by JavaScript -->
                 </div>
@@ -166,12 +172,13 @@
             <!-- Model Insights Tab -->
             <div class="tab-content-v2" id="tab-insights">
                 <h2 style="color: var(--cyan-accent); margin-bottom: 2rem;">Model Insights</h2>
-                
+
                 <div style="margin-bottom: 2rem;">
                     <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted);">
                         Select Rating:
                     </label>
-                    <select id="insightRating" onchange="loadInsights()" style="padding: 0.75rem; border-radius: 0.75rem; background: var(--modern-panel-light); border: 1px solid var(--cyan-border); color: var(--text-primary); width: 100%; max-width: 300px;">
+                    <select id="insightRating" onchange="loadInsights()"
+                        style="padding: 0.75rem; border-radius: 0.75rem; background: var(--modern-panel-light); border: 1px solid var(--cyan-border); color: var(--text-primary); width: 100%; max-width: 300px;">
                         <option value="rating:general">General</option>
                         <option value="rating:sensitive">Sensitive</option>
                         <option value="rating:questionable">Questionable</option>
@@ -186,7 +193,7 @@
                             <!-- Will be populated by JavaScript -->
                         </div>
                     </div>
-                    
+
                     <div>
                         <h3 style="color: var(--cyan-accent); margin-bottom: 1rem;">Top Tag Pairs</h3>
                         <div id="topPairs" style="max-height: 500px; overflow-y: auto;">
@@ -200,46 +207,46 @@
         <!-- Right Details Panel -->
         <aside class="rate-details-v2" id="detailsPanel">
             <h3>Configuration</h3>
-            
+
             <div id="configPanel">
                 <div style="margin-bottom: 1.5rem;">
                     <label style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
                         General Threshold
                     </label>
-                    <input type="range" id="threshold_general" min="0" max="1" step="0.05" value="0.5" 
-                           oninput="updateConfigValue('threshold_general', this.value)"
-                           style="width: 100%;">
-                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);" id="threshold_general_value">0.5</div>
+                    <input type="range" id="threshold_general" min="0" max="1" step="0.05" value="0.5"
+                        oninput="updateConfigValue('threshold_general', this.value)" style="width: 100%;">
+                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);"
+                        id="threshold_general_value">0.5</div>
                 </div>
 
                 <div style="margin-bottom: 1.5rem;">
                     <label style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
                         Sensitive Threshold
                     </label>
-                    <input type="range" id="threshold_sensitive" min="0" max="1" step="0.05" value="0.6" 
-                           oninput="updateConfigValue('threshold_sensitive', this.value)"
-                           style="width: 100%;">
-                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);" id="threshold_sensitive_value">0.6</div>
+                    <input type="range" id="threshold_sensitive" min="0" max="1" step="0.05" value="0.6"
+                        oninput="updateConfigValue('threshold_sensitive', this.value)" style="width: 100%;">
+                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);"
+                        id="threshold_sensitive_value">0.6</div>
                 </div>
 
                 <div style="margin-bottom: 1.5rem;">
                     <label style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
                         Questionable Threshold
                     </label>
-                    <input type="range" id="threshold_questionable" min="0" max="1" step="0.05" value="0.7" 
-                           oninput="updateConfigValue('threshold_questionable', this.value)"
-                           style="width: 100%;">
-                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);" id="threshold_questionable_value">0.7</div>
+                    <input type="range" id="threshold_questionable" min="0" max="1" step="0.05" value="0.7"
+                        oninput="updateConfigValue('threshold_questionable', this.value)" style="width: 100%;">
+                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);"
+                        id="threshold_questionable_value">0.7</div>
                 </div>
 
                 <div style="margin-bottom: 1.5rem;">
                     <label style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
                         Explicit Threshold
                     </label>
-                    <input type="range" id="threshold_explicit" min="0" max="1" step="0.05" value="0.8" 
-                           oninput="updateConfigValue('threshold_explicit', this.value)"
-                           style="width: 100%;">
-                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);" id="threshold_explicit_value">0.8</div>
+                    <input type="range" id="threshold_explicit" min="0" max="1" step="0.05" value="0.8"
+                        oninput="updateConfigValue('threshold_explicit', this.value)" style="width: 100%;">
+                    <div style="text-align: right; font-size: 0.85em; color: var(--cyan-accent);"
+                        id="threshold_explicit_value">0.8</div>
                 </div>
 
                 <button class="btn-v2 primary" onclick="saveConfig()" style="width: 100%;">

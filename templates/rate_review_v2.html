@@ -7,10 +7,12 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/rating-modern.css') + '?v=1' }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
 </head>
 
 <body class="rate-container-v2">
@@ -22,29 +24,35 @@
             <span>✨</span>
             Rate Images
         </h1>
-        
+
         <!-- Progress Indicator -->
         <div style="margin-top: 1rem; display: flex; align-items: center; gap: 2rem;">
             <div id="progressText" style="font-size: 1.1em; color: var(--cyan-accent);">
                 Loading...
             </div>
-            <div style="flex: 1; max-width: 400px; background: rgba(255,255,255,0.05); height: 8px; border-radius: 1rem; overflow: hidden;">
-                <div id="progressBar" style="height: 100%; background: var(--cyan-accent); width: 0%; transition: width 0.3s ease; border-radius: 1rem;"></div>
+            <div
+                style="flex: 1; max-width: 400px; background: rgba(255,255,255,0.05); height: 8px; border-radius: 1rem; overflow: hidden;">
+                <div id="progressBar"
+                    style="height: 100%; background: var(--cyan-accent); width: 0%; transition: width 0.3s ease; border-radius: 1rem;">
+                </div>
             </div>
         </div>
 
         <!-- Filter Pills -->
         <div style="margin-top: 1.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                <input type="radio" name="filter" value="unrated" checked id="filterUnrated" onchange="changeFilter()" style="accent-color: var(--cyan-accent);">
+                <input type="radio" name="filter" value="unrated" checked id="filterUnrated" onchange="changeFilter()"
+                    style="accent-color: var(--cyan-accent);">
                 <span>❓ Unrated</span>
             </label>
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                <input type="radio" name="filter" value="ai_predicted" id="filterAI" onchange="changeFilter()" style="accent-color: var(--cyan-accent);">
+                <input type="radio" name="filter" value="ai_predicted" id="filterAI" onchange="changeFilter()"
+                    style="accent-color: var(--cyan-accent);">
                 <span>🤖 AI-Predicted</span>
             </label>
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                <input type="radio" name="filter" value="all" id="filterAll" onchange="changeFilter()" style="accent-color: var(--cyan-accent);">
+                <input type="radio" name="filter" value="all" id="filterAll" onchange="changeFilter()"
+                    style="accent-color: var(--cyan-accent);">
                 <span>📋 All Images</span>
             </label>
             <button class="btn-v2" onclick="shuffleImages()" style="margin-left: auto;">
@@ -55,24 +63,27 @@
     </div>
 
     <!-- Main Image Display -->
-    <div class="image-display-v2" id="imageDisplay" style="margin: 2rem; position: relative;">
-        <div id="loadingState" style="padding: 4rem; color: var(--text-muted);">
-            Loading images...
-        </div>
-        
-        <!-- AI Suggestion Badge (hidden by default) -->
-        <div class="ai-suggestion" id="aiSuggestion" style="display: none;">
+    <div style="margin: 2rem; position: relative;">
+        <!-- AI Suggestion Badge (hidden by default) - Outside imageDisplay to persist -->
+        <div class="ai-suggestion" id="aiSuggestion" style="display: none; margin-bottom: 1rem;">
             <span>🤖</span>
             <span id="aiSuggestionText">AI suggests: General</span>
         </div>
-        
-        <!-- Confidence Bar (hidden by default) -->
-        <div class="confidence-bar" id="confidenceBar" style="display: none;">
+
+        <!-- Confidence Bar (hidden by default) - Outside imageDisplay to persist -->
+        <div class="confidence-bar" id="confidenceBar" style="display: none; margin-bottom: 1rem;">
             <div class="label">
                 Confidence: <span id="confidenceValue">0%</span>
             </div>
             <div class="bar">
                 <div class="fill" id="confidenceFill" style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <!-- Image container - this gets replaced by JS -->
+        <div class="image-display-v2" id="imageDisplay">
+            <div id="loadingState" style="padding: 4rem; color: var(--text-muted);">
+                Loading images...
             </div>
         </div>
     </div>
@@ -118,11 +129,14 @@
         </div>
 
         <!-- Image Tags (Collapsible) -->
-        <div style="margin-top: 3rem; background: var(--modern-panel); backdrop-filter: var(--blur-md); border: 1px solid var(--cyan-border); border-radius: 1rem; padding: 1.5rem;">
-            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="toggleTags()">
+        <div
+            style="margin-top: 3rem; background: var(--modern-panel); backdrop-filter: var(--blur-md); border: 1px solid var(--cyan-border); border-radius: 1rem; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
+                onclick="toggleTags()">
                 <h3 style="color: var(--cyan-accent); margin: 0;">
                     Image Tags
-                    <span id="tagCount" style="font-size: 0.8em; color: var(--text-muted); margin-left: 0.5rem;">(0 tags)</span>
+                    <span id="tagCount" style="font-size: 0.8em; color: var(--text-muted); margin-left: 0.5rem;">(0
+                        tags)</span>
                 </h3>
                 <span id="tagsToggleIcon" style="font-size: 1.5em; transition: transform 0.3s ease;">▼</span>
             </div>

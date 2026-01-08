@@ -9,11 +9,11 @@
     --cyan-accent-medium: rgba(6, 182, 212, 0.4);
     --cyan-border: rgba(6, 182, 212, 0.2);
     --cyan-border-hover: rgba(6, 182, 212, 0.4);
-    
+
     --modern-bg: #0a0f1a;
     --modern-panel: rgba(15, 23, 42, 0.8);
     --modern-panel-light: rgba(30, 41, 59, 0.6);
-    
+
     /* Rating colors */
     --rating-general: #4ade80;
     --rating-sensitive: #60a5fa;
@@ -266,6 +266,7 @@
         opacity: 0;
         transform: translateY(10px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -572,10 +573,7 @@
     box-shadow: var(--shadow-xl);
 }
 
-.image-display-v2 .ai-suggestion {
-    position: absolute;
-    top: var(--spacing-xl);
-    left: var(--spacing-xl);
+.ai-suggestion {
     background: var(--modern-panel-light);
     backdrop-filter: var(--blur-md);
     border: var(--border-width) solid var(--cyan-border);
@@ -584,14 +582,12 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    width: fit-content;
 }
 
-.image-display-v2 .confidence-bar {
-    position: absolute;
-    bottom: var(--spacing-xl);
-    left: 50%;
-    transform: translateX(-50%);
-    width: 300px;
+.confidence-bar {
+    width: 100%;
+    max-width: 400px;
     background: var(--modern-panel-light);
     backdrop-filter: var(--blur-md);
     border: var(--border-width) solid var(--cyan-border);
@@ -712,7 +708,7 @@
     .rate-layout-v2 {
         grid-template-columns: 1fr;
     }
-    
+
     .rate-sidebar-v2,
     .rate-details-v2 {
         position: static;
@@ -723,7 +719,7 @@
     .rating-buttons-v2 {
         grid-template-columns: 1fr 1fr;
     }
-    
+
     .action-buttons-v2 {
         flex-direction: column;
     }

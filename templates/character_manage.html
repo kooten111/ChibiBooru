@@ -31,7 +31,7 @@
                     <span class="character-search-icon">🔍</span>
                     <input type="text" id="characterSearch" placeholder="Search characters...">
                 </div>
-                
+
                 <div class="character-filters">
                     <select class="character-filter-select" id="sourceFilter">
                         <option value="all">All Sources</option>
@@ -39,16 +39,16 @@
                         <option value="ai">🤖 AI</option>
                         <option value="booru">📚 Booru</option>
                     </select>
-                    
+
                     <select class="character-filter-select" id="sortBy">
                         <option value="total">Total</option>
                         <option value="samples">Samples</option>
                         <option value="name">Name</option>
                     </select>
-                    
+
                     <button class="character-sort-toggle" id="sortDirection" title="Toggle sort direction">↓</button>
                 </div>
-                
+
                 <div class="character-mini-stats">
                     <div class="character-mini-stat">
                         <div class="character-mini-stat-value" id="shownCount">0</div>
@@ -64,12 +64,12 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="character-list-container" id="characterList">
                 <!-- Populated by JavaScript -->
             </div>
         </div>
-        
+
         <!-- Center Panel - Main Content -->
         <div class="character-center-panel">
             <div class="character-center-header">
@@ -77,7 +77,7 @@
                     <h1>🧠 Character Management</h1>
                     <div class="character-model-badge" id="modelBadge">Loading...</div>
                 </div>
-                
+
                 <div class="character-header-stats">
                     <div class="character-header-stat">
                         <span>👥</span>
@@ -90,7 +90,7 @@
                         <span>untagged</span>
                     </div>
                 </div>
-                
+
                 <div class="character-action-buttons">
                     <button class="action-btn action-btn-success" onclick="trainModel()">✨ Train</button>
                     <button class="action-btn action-btn-primary" onclick="inferCharacters()">⚡ Infer All</button>
@@ -98,27 +98,28 @@
                     <button class="action-btn action-btn-danger" onclick="retrainAll()">♻️ Full Retrain</button>
                 </div>
             </div>
-            
+
             <div class="character-tab-nav">
-                <button class="character-tab-btn active" data-tab="images">📸 Character Images</button>
-                <button class="character-tab-btn" data-tab="prediction">🔮 Prediction Preview</button>
+                <button class="character-tab-btn" data-tab="images">📸 Character Images</button>
+                <button class="character-tab-btn active" data-tab="prediction">🔮 Prediction Preview</button>
                 <button class="character-tab-btn" data-tab="insights">📊 Model Insights</button>
             </div>
-            
+
             <div class="character-tab-content">
                 <!-- Images Tab -->
-                <div class="character-tab-pane active" id="imagesPane">
+                <div class="character-tab-pane" id="imagesPane">
                     <div class="character-images-grid" id="characterImagesGrid">
                         <div class="character-empty-state">
                             <div class="character-empty-state-icon">👈</div>
                             <div class="character-empty-state-text">Select a character</div>
-                            <div class="character-empty-state-subtext">Choose a character from the list to view their images</div>
+                            <div class="character-empty-state-subtext">Choose a character from the list to view their
+                                images</div>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Prediction Tab -->
-                <div class="character-tab-pane" id="predictionPane">
+                <div class="character-tab-pane active" id="predictionPane">
                     <div class="character-prediction-form">
                         <div class="character-prediction-input-group">
                             <div style="flex: 1;">
@@ -126,11 +127,12 @@
                                 <input type="number" id="predictionImageId" placeholder="Enter image ID">
                             </div>
                             <div style="display: flex; align-items: flex-end;">
-                                <button class="action-btn action-btn-primary" onclick="predictImageById()">🔮 Predict</button>
+                                <button class="action-btn action-btn-primary" onclick="predictImageById()">🔮
+                                    Predict</button>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="character-prediction-results" id="predictionResults">
                         <div class="character-empty-state">
                             <div class="character-empty-state-icon">🔮</div>
@@ -139,7 +141,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Insights Tab -->
                 <div class="character-tab-pane" id="insightsPane">
                     <div class="character-insights-stats">
@@ -157,10 +159,11 @@
                         </div>
                         <div class="character-stat-card">
                             <div class="character-stat-card-label">Last Trained</div>
-                            <div class="character-stat-card-value" id="lastTrained" style="font-size: var(--font-size-sm);">Never</div>
+                            <div class="character-stat-card-value" id="lastTrained"
+                                style="font-size: var(--font-size-sm);">Never</div>
                         </div>
                     </div>
-                    
+
                     <div class="character-distribution-chart">
                         <h3>Character Distribution</h3>
                         <div id="distributionChart"></div>
@@ -168,7 +171,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Right Panel - Details/Weights/Config -->
         <div class="character-right-panel">
             <div class="character-right-panel-tabs">
@@ -176,7 +179,7 @@
                 <button class="character-right-tab-btn" data-tab="weights">⚖️ Weights</button>
                 <button class="character-right-tab-btn" data-tab="config">⚙️ Config</button>
             </div>
-            
+
             <div class="character-right-panel-content">
                 <!-- Details Pane -->
                 <div class="character-right-pane active" id="detailsPane">
@@ -190,7 +193,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Weights Pane -->
                 <div class="character-right-pane" id="weightsPane">
                     <div class="character-detail-section">
@@ -203,7 +206,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Config Pane -->
                 <div class="character-right-pane" id="configPane">
                     <div class="character-detail-section">
@@ -219,7 +222,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Footer Status Bar -->
     <div class="character-footer-status">
         <div class="character-footer-status-item">
@@ -237,8 +240,9 @@
             </div>
         </div>
     </div>
-    
-    <div class="log-output" id="actionLog" style="position: fixed; bottom: 60px; right: 20px; max-width: 400px; max-height: 300px; overflow-y: auto; display: none; z-index: 1000; background: var(--bg-panel-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; box-shadow: var(--shadow-lg);">
+
+    <div class="log-output" id="actionLog"
+        style="position: fixed; bottom: 60px; right: 20px; max-width: 400px; max-height: 300px; overflow-y: auto; display: none; z-index: 1000; background: var(--bg-panel-dark); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; box-shadow: var(--shadow-lg);">
         <strong>Action Log:</strong>
         <pre id="actionLogContent" style="margin-top: 10px; white-space: pre-wrap;"></pre>
     </div>
