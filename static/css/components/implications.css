@@ -368,6 +368,8 @@
     font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: all var(--transition-normal);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .approve-btn {

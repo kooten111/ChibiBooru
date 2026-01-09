@@ -1,4 +1,5 @@
 // static/js/system-panel.js
+// v2.1 - Fixed duplicate function declaration and toggleDebugOptions export
 import { showNotification } from './utils/notifications.js';
 
 var systemStatusInterval = null;
@@ -411,12 +412,6 @@ function systemGenerateHashes(event) {
     });
 }
 
-function systemRebuildSimilarityCache(event) {
-    if (event) event.preventDefault();
-    showConfirm('This will rebuild the similarity cache for all images. This may take several minutes. Continue?', () => {
-        systemAction('/api/similarity/rebuild-cache', event.target, 'Rebuild Similarity Cache', { similarity_type: 'blended' });
-    });
-}
 
 /**
  * Show a progress modal for long-running background tasks.
@@ -527,14 +522,6 @@ function pollProgressModal(taskId, actionName, overlay, modal, statusEl, progres
     // Start polling
     poll();
 }
-
-function systemRebuildSimilarityCache(event) {
-    if (event) event.preventDefault();
-    showConfirm('This will rebuild the similarity cache for all images. This may take several minutes. Continue?', () => {
-        showProgressModal('/api/similarity/rebuild-cache', 'Rebuild Similarity Cache');
-    });
-}
-
 
 function systemReloadData(event) {
     if (event) event.preventDefault();
@@ -697,9 +684,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-function toggleDebugOptions() {
-    const debugOptions = document.getElementById('debugOptions');
-    const toggleButton = document.querySelector('.debug-toggle');
+function toggleDebugOptions(event) {
+    // Try to get the button from event, or fall back to querySelector
+    const toggleButton = event?.target?.closest('.debug-toggle') || document.querySelector('.debug-toggle');
+    
+    // Find the debug options container - could be sibling or in the same section
+    const debugSection = toggleButton?.closest('.debug-section');
+    const debugOptions = debugSection?.querySelector('#debugOptions') || document.getElementById('debugOptions');
+
+    if (!debugOptions || !toggleButton) {
+        console.error('Debug options elements not found', { debugOptions, toggleButton });
+        return;
+    }
 
     debugOptions.classList.toggle('open');
     toggleButton.classList.toggle('expanded');
@@ -803,7 +799,6 @@ window.systemDatabaseHealthCheck = systemDatabaseHealthCheck;
 window.systemStartMonitor = systemStartMonitor;
 window.systemStopMonitor = systemStopMonitor;
 window.systemClearImpliedTags = systemClearImpliedTags;
-window.systemRebuildSimilarityCache = systemRebuildSimilarityCache;
 window.saveSystemSecret = saveSystemSecret;
 window.clearSystemSecret = clearSystemSecret;
 
@@ -911,3 +906,10 @@ async function systemFindBrokenImages(event) {
 }
 
 window.systemFindBrokenImages = systemFindBrokenImages;
+
+async function systemPrecomputeCharacterPredictions(event) {
+    if (event) event.preventDefault();
+    showProgressModal('/api/character/precompute', 'Precompute Character Predictions');
+}
+
+window.systemPrecomputeCharacterPredictions = systemPrecomputeCharacterPredictions;

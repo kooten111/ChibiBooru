@@ -101,7 +101,8 @@
             <main class="panel panel-center">
                 <div class="tab-nav">
                     <button class="tab-btn" data-tab="images">Character Images</button>
-                    <button class="tab-btn active" data-tab="prediction">Prediction Preview</button>
+                    <button class="tab-btn active" data-tab="review">Review Untagged</button>
+                    <button class="tab-btn" data-tab="prediction">Prediction Preview</button>
                     <button class="tab-btn" data-tab="insights">Model Insights</button>
                 </div>
 
@@ -117,8 +118,24 @@
                         </div>
                     </div>
 
+                    <!-- Review Tab - Main view for untagged images with predictions -->
+                    <div class="tab-pane character-tab-pane active" id="reviewPane">
+                        <div class="panel-section">
+                            <div style="display: flex; gap: var(--spacing-md); align-items: center; margin-bottom: var(--spacing-md);">
+                                <button class="action-btn action-btn-secondary" onclick="loadReviewImages()">Refresh</button>
+                                <span style="color: var(--text-muted); font-size: var(--font-size-sm);" id="reviewCount">Loading...</span>
+                            </div>
+                        </div>
+                        <div class="image-grid" id="reviewImageGrid">
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🖼️</div>
+                                <div class="empty-state-text">Loading images...</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Prediction Tab -->
-                    <div class="tab-pane character-tab-pane active" id="predictionPane">
+                    <div class="tab-pane character-tab-pane" id="predictionPane">
                         <div class="panel-section">
                             <div style="display: flex; gap: var(--spacing-md); align-items: flex-end;">
                                 <div class="filter-group" style="flex: 1; margin-bottom: 0;">

@@ -7,6 +7,9 @@ let selectedCharacter = null;
 let currentSortBy = 'total';
 let currentSortDirection = 'desc';
 let currentSourceFilter = 'all';
+let currentPage = 1;
+let totalPages = 1;
+let isLoadingCharacters = false;
 
 function showLoading(message) {
     document.getElementById('loadingMessage').textContent = message;
@@ -65,8 +68,8 @@ async function loadStats() {
         document.getElementById('footerLastTrained').textContent = lastTrained;
         document.getElementById('footerTagsCount').textContent = metadata.unique_tags_used || '0';
 
-        // Load all characters
-        await loadAllCharacters();
+        // Load initial characters (first page only)
+        await loadAllCharacters(1);
 
         // Update config
         updateConfig(currentStats.config);
@@ -77,18 +80,41 @@ async function loadStats() {
     }
 }
 
-async function loadAllCharacters() {
+async function loadAllCharacters(page = 1, search = '') {
+    if (isLoadingCharacters) return;
+    
     try {
-        const response = await fetch('/api/character/characters');
+        isLoadingCharacters = true;
+        const params = new URLSearchParams({
+            page: page.toString(),
+            per_page: '100'
+        });
+        if (search) {
+            params.append('search', search);
+        }
+        
+        const response = await fetch(`/api/character/characters?${params}&include_distribution=false`);
         const data = await response.json();
-        allCharacters = data.characters || [];
+        
+        if (page === 1) {
+            allCharacters = data.characters || [];
+        } else {
+            // Append for pagination
+            allCharacters = [...allCharacters, ...(data.characters || [])];
+        }
+        
+        currentPage = data.pagination?.page || 1;
+        totalPages = data.pagination?.pages || 1;
         
         updateCharacterCount();
         renderCharacterList();
-        renderDistributionChart();
+        // Don't render distribution chart on initial load - it requires expensive distribution data
+        // renderDistributionChart();
     } catch (error) {
         console.error('Error loading characters:', error);
         showNotification('Error loading characters: ' + error.message, 'error');
+    } finally {
+        isLoadingCharacters = false;
     }
 }
 
@@ -747,11 +773,29 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.addEventListener('click', () => switchRightTab(btn.dataset.tab));
     });
     
-    // Character search
+    // Character search with debouncing
     const searchInput = document.getElementById('characterSearch');
+    let searchTimeout = null;
     if (searchInput) {
-        searchInput.addEventListener('input', renderCharacterList);
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(async () => {
+                currentPage = 1;
+                await loadAllCharacters(1, e.target.value);
+            }, 300);
+        });
     }
+    // Don't load review images immediately - let the page load first
+    // Load review images after a short delay to avoid blocking initial render
+    setTimeout(() => {
+        loadReviewImages();
+    }, 500);
+    // Don't load review images immediately - let the page load first
+    // Load review images after a short delay to avoid blocking initial render
+    setTimeout(() => {
+        loadReviewImages();
+    }, 500);
+    loadReviewImages();
     
     // Source filter
     const sourceFilter = document.getElementById('sourceFilter');
@@ -782,6 +826,110 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Review Images Functions
+async function loadReviewImages() {
+    const grid = document.getElementById('reviewImageGrid');
+    const countEl = document.getElementById('reviewCount');
+    
+    try {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-text">Loading images...</div></div>';
+        countEl.textContent = 'Loading...';
+        
+        const response = await fetch('/api/character/images?filter=untagged&limit=50&include_predictions=true');
+        const data = await response.json();
+        const images = data.images || [];
+        
+        countEl.textContent = `${images.length} untagged images`;
+        
+        if (images.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">✅</div>
+                    <div class="empty-state-text">All images are tagged!</div>
+                    <div class="empty-state-subtext">No untagged images found</div>
+                </div>
+            `;
+            return;
+        }
+        
+        grid.innerHTML = images.map(image => {
+            const predictions = image.predictions || [];
+            const predictionsHtml = predictions.length > 0 
+                ? `
+                    <div class="character-predictions" style="margin-top: var(--spacing-sm);">
+                        ${predictions.slice(0, 3).map(pred => {
+                            const confidencePercent = (pred.confidence * 100).toFixed(0);
+                            let confidenceClass = 'low';
+                            if (pred.confidence > 0.7) confidenceClass = 'high';
+                            else if (pred.confidence > 0.5) confidenceClass = 'medium';
+                            
+                            return `
+                                <div class="character-prediction-badge ${confidenceClass}" 
+                                     onclick="applyCharacterPrediction(${image.id}, '${pred.character.replace(/'/g, "\\'")}')"
+                                     title="Click to apply">
+                                    ${pred.character.replace(/_/g, ' ')} (${confidencePercent}%)
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `
+                : '<div style="margin-top: var(--spacing-sm); color: var(--text-muted); font-size: var(--font-size-sm);">No predictions</div>';
+            
+            return `
+                <div class="character-image-card" style="position: relative;">
+                    <img src="/${urlEncodePath(image.thumb)}" alt="Image ${image.id}"
+                         onclick="window.location.href='/image/${image.id}'"
+                         onerror="this.src='/static/placeholder.png'"
+                         style="cursor: pointer;">
+                    <div class="character-image-card-footer">
+                        <span>#${image.id}</span>
+                        <span style="font-size: var(--font-size-xs); color: var(--text-muted);">${image.tag_count} tags</span>
+                    </div>
+                    ${predictionsHtml}
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Error loading review images:', error);
+        grid.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">⚠️</div>
+                <div class="empty-state-text">Error loading images</div>
+                <div class="empty-state-subtext">${error.message}</div>
+            </div>
+        `;
+        showNotification('Error loading images: ' + error.message, 'error');
+    }
+}
+
+async function applyCharacterPrediction(imageId, characterName) {
+    if (!confirm(`Apply character "${characterName.replace(/_/g, ' ')}" to image #${imageId}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/character/apply/${imageId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ characters: [characterName] })
+        });
+        const result = await response.json();
+        
+        if (result.success !== false) {
+            showNotification(`Character "${characterName.replace(/_/g, ' ')}" applied successfully!`, 'success');
+            // Reload the review images
+            loadReviewImages();
+            // Reload stats to update counts
+            loadStats();
+        } else {
+            showNotification('Failed to apply character: ' + (result.error || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showNotification('Error applying character: ' + error.message, 'error');
+    }
+}
+
 // Make functions global
 window.trainModel = trainModel;
 window.inferCharacters = inferCharacters;
@@ -792,3 +940,5 @@ window.selectCharacter = selectCharacter;
 window.predictImageById = predictImageById;
 window.switchTab = switchTab;
 window.switchRightTab = switchRightTab;
+window.loadReviewImages = loadReviewImages;
+window.applyCharacterPrediction = applyCharacterPrediction;

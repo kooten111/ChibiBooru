@@ -120,7 +120,7 @@
                 </div>
 
                 <div class="debug-section">
-                    <button class="btn btn-secondary debug-toggle" onclick="toggleDebugOptions()">
+                    <button class="btn btn-secondary debug-toggle" onclick="toggleDebugOptions(event)">
                         🛠️ Debug Options
                         <span class="toggle-arrow">▼</span>
                     </button>
@@ -158,15 +158,6 @@
                                         detection.</span>
                                 </div>
                                 <button class="btn btn-primary" onclick="systemGenerateHashes(event)">Generate</button>
-                            </div>
-                            <div class="settings-item">
-                                <div class="settings-info">
-                                    <span class="settings-label">Rebuild Similarity Cache</span>
-                                    <span class="settings-desc">Pre-compute top-50 similar images for all images. Frees
-                                        ~300MB RAM by removing need for live FAISS index.</span>
-                                </div>
-                                <button class="btn btn-warning"
-                                    onclick="systemRebuildSimilarityCache(event)">Rebuild</button>
                             </div>
                         </div>
 
@@ -237,6 +228,13 @@
                                         embeddings.</span>
                                 </div>
                                 <button class="btn btn-warning" onclick="systemFindBrokenImages(event)">Scan</button>
+                            </div>
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-label">Precompute Character Predictions</span>
+                                    <span class="settings-desc">Pre-compute and store character predictions for untagged images (without applying them).</span>
+                                </div>
+                                <button class="btn btn-info" onclick="systemPrecomputeCharacterPredictions(event)">Precompute</button>
                             </div>
                         </div>
 

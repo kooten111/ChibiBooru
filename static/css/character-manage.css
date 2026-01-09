@@ -801,3 +801,54 @@
 .character-right-panel-content::-webkit-scrollbar-thumb:hover {
     background: var(--gradient-scrollbar-hover);
 }
+
+/* Character Prediction Badges (for review interface) */
+.character-predictions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
+}
+
+.character-prediction-badge {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    cursor: pointer;
+    transition: var(--transition-normal);
+    text-align: center;
+    border: 1px solid transparent;
+}
+
+.character-prediction-badge.high {
+    background: rgba(74, 222, 128, 0.2);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: #4ade80;
+}
+
+.character-prediction-badge.high:hover {
+    background: rgba(74, 222, 128, 0.3);
+    border-color: rgba(74, 222, 128, 0.6);
+}
+
+.character-prediction-badge.medium {
+    background: rgba(251, 146, 60, 0.2);
+    border-color: rgba(251, 146, 60, 0.4);
+    color: #fb923c;
+}
+
+.character-prediction-badge.medium:hover {
+    background: rgba(251, 146, 60, 0.3);
+    border-color: rgba(251, 146, 60, 0.6);
+}
+
+.character-prediction-badge.low {
+    background: rgba(148, 163, 184, 0.2);
+    border-color: rgba(148, 163, 184, 0.4);
+    color: #94a3b8;
+}
+
+.character-prediction-badge.low:hover {
+    background: rgba(148, 163, 184, 0.3);
+    border-color: rgba(148, 163, 184, 0.6);
+}
