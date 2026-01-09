@@ -423,55 +423,6 @@ class MLWorkerClient:
         finally:
             self.timeout = old_timeout
 
-    def train_character_model(self, timeout: float = 600.0) -> Dict[str, Any]:
-        """
-        Train character inference model via ML Worker.
-
-        Args:
-            timeout: Request timeout in seconds (default 600s for training)
-
-        Returns:
-            Dict with training statistics
-
-        Raises:
-            MLWorkerError: If training fails
-        """
-        request_id = str(uuid.uuid4())
-        request = Request.train_character_model(request_id)
-
-        # Temporarily increase timeout for this request
-        old_timeout = self.timeout
-        try:
-            self.timeout = timeout
-            return self._send_request(request)
-        finally:
-            self.timeout = old_timeout
-
-    def infer_characters(self, image_ids: List[int] = None, timeout: float = 600.0) -> Dict[str, Any]:
-        """
-        Run character inference via ML Worker.
-
-        Args:
-            image_ids: List of image IDs to infer (None = all untagged)
-            timeout: Request timeout in seconds (default 600s)
-
-        Returns:
-            Dict with inference statistics
-
-        Raises:
-            MLWorkerError: If inference fails
-        """
-        request_id = str(uuid.uuid4())
-        request = Request.infer_characters(request_id, image_ids)
-
-        # Temporarily increase timeout for this request
-        old_timeout = self.timeout
-        try:
-            self.timeout = timeout
-            return self._send_request(request)
-        finally:
-            self.timeout = old_timeout
-
     def get_job_status(self, job_id: str) -> Dict[str, Any]:
         """
         Get status of a long-running job.

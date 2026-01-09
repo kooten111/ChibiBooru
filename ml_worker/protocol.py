@@ -22,8 +22,6 @@ class RequestType(str, Enum):
     SHUTDOWN = "shutdown"
     TRAIN_RATING_MODEL = "train_rating_model"
     INFER_RATINGS = "infer_ratings"
-    TRAIN_CHARACTER_MODEL = "train_character_model"
-    INFER_CHARACTERS = "infer_characters"
     GET_JOB_STATUS = "get_job_status"
     REBUILD_CACHE = "rebuild_cache"
     EXTRACT_ANIMATION = "extract_animation"
@@ -201,26 +199,6 @@ class Request:
         """Create an infer_ratings request"""
         return Request.create(
             RequestType.INFER_RATINGS,
-            request_id,
-            {
-                "image_ids": image_ids if image_ids is not None else []
-            }
-        )
-
-    @staticmethod
-    def train_character_model(request_id: str) -> Dict[str, Any]:
-        """Create a train_character_model request"""
-        return Request.create(
-            RequestType.TRAIN_CHARACTER_MODEL,
-            request_id,
-            {}
-        )
-
-    @staticmethod
-    def infer_characters(request_id: str, image_ids: list = None) -> Dict[str, Any]:
-        """Create an infer_characters request"""
-        return Request.create(
-            RequestType.INFER_CHARACTERS,
             request_id,
             {
                 "image_ids": image_ids if image_ids is not None else []

@@ -11,11 +11,9 @@ from . import (
     system,
     saucenao,
     rating,
-    character,
     tag_categorization,
     animation,
     favourites,
     similarity,
-    tag_manager,
     upscaler
 )

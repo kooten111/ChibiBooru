@@ -269,7 +269,6 @@ Store image tags as numpy arrays of int32 IDs instead of space-separated strings
 **Files Modified**:
 - `core/tag_id_cache.py` (created) - 130 lines
 - `core/cache_manager.py` - Added dual-mode loading and helper functions
-- `routers/api/tag_manager.py` - Fixed reload_cache() bug, added tag ID reload
 - `config.py` - Added TAG_ID_CACHE_ENABLED flag
 
 **Tests Added**:

@@ -122,40 +122,21 @@ Four large rating buttons in a row:
 - Falls back to direct call if unavailable
 - Returns inference statistics and source
 
-### Character API (`routers/api/character.py`)
-
-#### `/api/character/train` (POST)
-- Uses ML Worker for training
-- Falls back to direct call if unavailable
-- Returns training statistics and source
-
-#### `/api/character/infer` (POST)
-- Uses ML Worker for inference
-- Supports single image or all untagged
-- Falls back to direct call if unavailable
-- Returns inference statistics and source
-
 ## ML Worker Protocol Extensions
 
 ### New Request Types
 - `TRAIN_RATING_MODEL` - Train rating inference model
 - `INFER_RATINGS` - Run rating inference on images
-- `TRAIN_CHARACTER_MODEL` - Train character inference model
-- `INFER_CHARACTERS` - Run character inference on images
 - `GET_JOB_STATUS` - Query status of long-running job (for future use)
 
 ### Client Methods (`ml_worker/client.py`)
 - `train_rating_model(timeout=600.0)` - Train rating model
 - `infer_ratings(image_ids=None, timeout=600.0)` - Infer ratings
-- `train_character_model(timeout=600.0)` - Train character model
-- `infer_characters(image_ids=None, timeout=600.0)` - Infer characters
 - `get_job_status(job_id)` - Get job status
 
 ### Server Handlers (`ml_worker/server.py`)
 - `handle_train_rating_model()` - Executes rating training
 - `handle_infer_ratings()` - Executes rating inference
-- `handle_train_character_model()` - Executes character training
-- `handle_infer_characters()` - Executes character inference
 - `handle_get_job_status()` - Returns job status (in-memory store)
 
 ## Routes
@@ -268,7 +249,6 @@ To start using the new UI:
 
 ## Credits
 
-- **Design Inspiration**: character-manage-prototype.jsx patterns
 - **Color Palette**: Tailwind CSS cyan colors
 - **Font**: JetBrains Mono
 - **Icons**: Emoji (universal support)

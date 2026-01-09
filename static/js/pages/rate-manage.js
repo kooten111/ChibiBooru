@@ -158,9 +158,9 @@ function updateConfigPanel(config) {
 
     // Training parameters with defaults matching config.py
     const trainingDefaults = {
-        'max_pair_count': 5000,
-        'min_tag_frequency': 10,
-        'min_pair_cooccurrence': 10
+        'max_pair_count': 15000,
+        'min_tag_frequency': 5,
+        'min_pair_cooccurrence': 5
     };
 
     Object.keys(trainingDefaults).forEach(field => {
@@ -267,7 +267,7 @@ function setupProgressBar(overlay, messageEl, progressEl) {
 function ensureOverlayCloseButton(overlay) {
     let closeBtn = overlay.querySelector('.close-overlay-btn');
     if (!closeBtn) {
-        const panel = overlay.querySelector('.panel');
+        const panel = overlay.querySelector('.loading-content');
         closeBtn = document.createElement('button');
         closeBtn.className = 'btn btn-secondary close-overlay-btn';
         closeBtn.textContent = 'Close';

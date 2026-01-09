@@ -70,19 +70,9 @@
             <span>Ratings</span>
         </a>
 
-        <a href="{{ url_for('main.character_manage') }}" class="stat-tab-button link-unstyled">
-            <span class="icon">👤</span>
-            <span>Characters</span>
-        </a>
-
         <a href="{{ url_for('main.tag_categorize') }}" class="stat-tab-button link-unstyled">
             <span class="icon">🏷️</span>
             <span>Categorize Tags</span>
-        </a>
-
-        <a href="{{ url_for('main.tag_manager') }}" class="stat-tab-button link-unstyled">
-            <span class="icon">📊</span>
-            <span>Tag Manager</span>
         </a>
 
         <button class="stat-tab-button" data-tab="system-panel">
@@ -228,13 +218,6 @@
                                         embeddings.</span>
                                 </div>
                                 <button class="btn btn-warning" onclick="systemFindBrokenImages(event)">Scan</button>
-                            </div>
-                            <div class="settings-item">
-                                <div class="settings-info">
-                                    <span class="settings-label">Precompute Character Predictions</span>
-                                    <span class="settings-desc">Pre-compute and store character predictions for untagged images (without applying them).</span>
-                                </div>
-                                <button class="btn btn-info" onclick="systemPrecomputeCharacterPredictions(event)">Precompute</button>
                             </div>
                         </div>
 

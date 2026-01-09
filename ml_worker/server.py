@@ -420,7 +420,22 @@ def get_idle_time() -> float:
 
 def should_shutdown() -> bool:
     """Check if worker should shutdown due to inactivity"""
-    return get_idle_time() > _idle_timeout
+    # 1. Check idle timeout
+    is_idle = get_idle_time() > _idle_timeout
+    
+    # 2. Check for active jobs
+    # If any job is running or pending, do NOT shutdown
+    has_active_jobs = any(
+        job['status'] in ('running', 'pending') 
+        for job in _job_store.values()
+    )
+    
+    if has_active_jobs:
+        # Effectively reset idle timer if working
+        update_activity()
+        return False
+        
+    return is_idle
 
 
 def get_onnx_providers() -> list:
@@ -1051,70 +1066,6 @@ def handle_infer_ratings(request_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def handle_train_character_model(request_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Handle train_character_model request.
-    
-    Returns:
-        Dict with training statistics
-    """
-    logger.info("Training character model...")
-    
-    # Import character service
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from services import character_service
-    
-    # TODO: Make this async too if needed, for now keep synchronous
-    stats = character_service.train_model()
-    
-    logger.info(f"Character model training complete: {stats}")
-    return stats
-
-
-def handle_infer_characters(request_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Handle infer_characters request.
-    
-    Args:
-        request_data: {image_ids: list | None}
-    
-    Returns:
-        Dict with inference statistics
-    """
-    image_ids = request_data.get('image_ids', [])
-    
-    logger.info(f"Running character inference (image_ids: {len(image_ids) if image_ids else 'all untagged'})")
-    
-    # Import character service
-    sys.path.insert(0, str(Path(__file__).parent.parent))
-    from services import character_service
-    
-    # Run inference
-    if image_ids:
-        # Infer specific images
-        stats = {
-            'processed': 0,
-            'tagged': 0,
-            'skipped': 0,
-            'characters_added': 0
-        }
-        
-        for image_id in image_ids:
-            result = character_service.infer_character_for_image(image_id)
-            stats['processed'] += 1
-            if result.get('characters_added', 0) > 0:
-                stats['tagged'] += 1
-                stats['characters_added'] += result['characters_added']
-            else:
-                stats['skipped'] += 1
-    else:
-        # Infer all untagged
-        stats = character_service.infer_all_untagged_images()
-    
-    logger.info(f"Character inference complete: {stats}")
-    return stats
-
-
 # Job status tracking (simple in-memory store)
 _job_store = {}
 
@@ -1262,14 +1213,6 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
 
         elif request_type == RequestType.INFER_RATINGS.value:
             result = handle_infer_ratings(request_data)
-            return Response.success(request_id, result)
-
-        elif request_type == RequestType.TRAIN_CHARACTER_MODEL.value:
-            result = handle_train_character_model(request_data)
-            return Response.success(request_id, result)
-
-        elif request_type == RequestType.INFER_CHARACTERS.value:
-            result = handle_infer_characters(request_data)
             return Response.success(request_id, result)
 
         elif request_type == RequestType.GET_JOB_STATUS.value:

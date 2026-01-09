@@ -249,15 +249,11 @@
 # New Request Types
 TRAIN_RATING_MODEL    - Train rating inference model
 INFER_RATINGS         - Run rating inference
-TRAIN_CHARACTER_MODEL - Train character inference model
-INFER_CHARACTERS      - Run character inference
 GET_JOB_STATUS        - Query job status (future)
 
 # Client Methods
 client.train_rating_model(timeout=600.0)
 client.infer_ratings(image_ids=None, timeout=600.0)
-client.train_character_model(timeout=600.0)
-client.infer_characters(image_ids=None, timeout=600.0)
             </div>
             
             <h3 style="color: #87ceeb; margin-top: 1.5rem;">File Changes</h3>
@@ -267,7 +263,6 @@ Modified Files:
   ml_worker/server.py        - Request handlers
   ml_worker/client.py        - Client methods
   routers/api/rating.py      - ML Worker integration
-  routers/api/character.py   - ML Worker integration
   routers/web.py             - v2 routes
 
 New Files:

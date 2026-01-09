@@ -228,6 +228,67 @@ def get_unrated_images_count() -> int:
         return cur.fetchone()['count']
 
 
+def get_unrated_images_batched(batch_size: int = 500, offset: int = 0, limit: int = None) -> List[Tuple[int, List[str]]]:
+    """
+    Get images without rating tags in batches to reduce memory usage.
+    
+    Args:
+        batch_size: Number of images to fetch per batch (default: 500)
+        offset: Starting offset for pagination
+        limit: Optional maximum total number of images to fetch
+    
+    Returns:
+        List of (image_id, tags) tuples for the current batch
+    """
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # Find images without rating tags with pagination
+        query = f"""
+            SELECT i.id
+            FROM images i
+            WHERE NOT EXISTS (
+                SELECT 1 FROM image_tags it
+                JOIN tags t ON it.tag_id = t.id
+                WHERE it.image_id = i.id
+                  AND t.name IN ({','.join('?' * len(RATINGS))})
+            )
+            ORDER BY i.id
+            LIMIT ?
+            OFFSET ?
+        """
+        
+        # Apply limit if specified
+        if limit is not None:
+            effective_limit = min(batch_size, limit - offset)
+            if effective_limit <= 0:
+                return []
+        else:
+            effective_limit = batch_size
+        
+        cur.execute(query, RATINGS + [effective_limit, offset])
+        image_ids = [row['id'] for row in cur.fetchall()]
+
+        if not image_ids:
+            return []
+
+        # Get tags for these images (only current batch)
+        placeholders = ','.join('?' * len(image_ids))
+        cur.execute(f"""
+            SELECT it.image_id, t.name as tag_name
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            WHERE it.image_id IN ({placeholders})
+        """, image_ids)
+
+        image_tags_map = defaultdict(list)
+        for row in cur.fetchall():
+            image_tags_map[row['image_id']].append(row['tag_name'])
+
+        result = [(img_id, image_tags_map.get(img_id, [])) for img_id in image_ids]
+        return result
+
+
 # ============================================================================
 # Training Algorithm
 # ============================================================================
@@ -477,51 +538,152 @@ def train_model(progress_callback=None) -> Dict:
         cur = conn.cursor()
 
         # Clear old weights
+        if progress_callback:
+            progress_callback(80, "Clearing old weights...")
+            
         cur.execute("DELETE FROM rating_tag_weights")
         cur.execute("DELETE FROM rating_tag_pair_weights")
+        conn.commit()
 
         # Get pruning threshold from config
         pruning_threshold = config.get('pruning_threshold', 0.0)
+        
+        # Batch size for inserts
+        BATCH_SIZE = 5000
 
-        # Insert new tag weights with optional pruning
+        # Pre-load all tags and ratings into memory caches
+        print("Pre-loading tag and rating IDs...")
         if progress_callback:
-            progress_callback(90, "Saving model weights...")
+            progress_callback(81, "Caching database IDs...")
+            
+        # Cache ratings
+        cur.execute("SELECT name, id FROM ratings")
+        rating_cache = {row['name']: row['id'] for row in cur.fetchall()}
+        
+        # Cache tags
+        cur.execute("SELECT name, id FROM tags")
+        tag_cache = {row['name']: row['id'] for row in cur.fetchall()}
+        
+        # Helper to get/create ID with cache
+        def get_cached_tag_id(name):
+            if name in tag_cache:
+                return tag_cache[name]
+            cur.execute("INSERT INTO tags (name) VALUES (?)", (name,))
+            new_id = cur.lastrowid
+            tag_cache[name] = new_id
+            return new_id
+            
+        def get_cached_rating_id(name):
+            if name in rating_cache:
+                return rating_cache[name]
+            cur.execute("INSERT INTO ratings (name) VALUES (?)", (name,))
+            new_id = cur.lastrowid
+            rating_cache[name] = new_id
+            return new_id
 
-        # Insert new tag weights with optional pruning
+        # Insert new tag weights with batch commits
+        if progress_callback:
+            progress_callback(85, "Saving tag weights...")
+
+        print("Writing tag weights in batches...")
         tag_weight_params = []
-        for (tag, rating), (weight, sample_count) in tag_weights.items():
+        tag_weight_count = 0
+        current_batch = 0
+        total_tags = len(tag_weights)
+        
+        for i, ((tag, rating), (weight, sample_count)) in enumerate(tag_weights.items()):
             # Apply pruning threshold (disabled by default with 0.0)
             if abs(weight) >= pruning_threshold:
-                tag_id = get_or_create_tag_id(conn, tag)
-                rating_id = get_or_create_rating_id(conn, rating)
+                tag_id = get_cached_tag_id(tag)
+                rating_id = get_cached_rating_id(rating)
                 tag_weight_params.append((tag_id, rating_id, weight, sample_count))
-        
+                current_batch += 1
+                tag_weight_count += 1
+                
+                if current_batch >= BATCH_SIZE:
+                    cur.executemany(
+                        "INSERT INTO rating_tag_weights (tag_id, rating_id, weight, sample_count) VALUES (?, ?, ?, ?)",
+                        tag_weight_params
+                    )
+                    conn.commit()
+                    tag_weight_params = []
+                    current_batch = 0
+                    
+                    # Report detailed progress for every batch
+                    if progress_callback:
+                        pct = 85 + int((i / total_tags) * 5)  # 85-90%
+                        progress_callback(pct, f"Saving tag weights... {i}/{total_tags}")
+
+        # Insert remaining tag weights
         if tag_weight_params:
             cur.executemany(
                 "INSERT INTO rating_tag_weights (tag_id, rating_id, weight, sample_count) VALUES (?, ?, ?, ?)",
                 tag_weight_params
             )
-        tag_weight_count = len(tag_weight_params)
+            conn.commit()
+            
+        # Cache stats for later
+        unique_tags_count = len({tag for tag, _ in tag_weights.keys()})
 
-        # Insert new pair weights with optional pruning
+        # Clear memory
+        del tag_weights
+        del tag_weight_params
+        # clear tag cache if memory is tight, but we need it for pairs next
+        # tag_cache.clear() # Keep for pairs
+        import gc
+        gc.collect()
+
+        # Insert new pair weights with batch commits
+        if progress_callback:
+            progress_callback(90, "Saving tag pair weights...")
+            
+        print("Writing pair weights in batches...")
         pair_weight_params = []
-        for (tag1, tag2, rating), (weight, co_count) in pair_weights.items():
+        pair_weight_count = 0
+        current_batch = 0
+        total_pairs = len(pair_weights)
+        
+        for i, ((tag1, tag2, rating), (weight, co_count)) in enumerate(pair_weights.items()):
             # Apply pruning threshold (disabled by default with 0.0)
             if abs(weight) >= pruning_threshold:
-                tag1_id = get_or_create_tag_id(conn, tag1)
-                tag2_id = get_or_create_tag_id(conn, tag2)
+                tag1_id = get_cached_tag_id(tag1)
+                tag2_id = get_cached_tag_id(tag2)
                 # Ensure tag1_id < tag2_id for database constraint
                 if tag1_id > tag2_id:
                     tag1_id, tag2_id = tag2_id, tag1_id
-                rating_id = get_or_create_rating_id(conn, rating)
+                rating_id = get_cached_rating_id(rating)
                 pair_weight_params.append((tag1_id, tag2_id, rating_id, weight, co_count))
+                current_batch += 1
+                pair_weight_count += 1
+                
+                if current_batch >= BATCH_SIZE:
+                    cur.executemany(
+                        "INSERT INTO rating_tag_pair_weights (tag1_id, tag2_id, rating_id, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
+                        pair_weight_params
+                    )
+                    conn.commit()
+                    pair_weight_params = []
+                    current_batch = 0
+                    
+                    # Report detailed progress for every batch
+                    if progress_callback:
+                        pct = 90 + int((i / total_pairs) * 5)  # 90-95%
+                        progress_callback(pct, f"Saving pair weights... {i}/{total_pairs}")
         
+        # Insert remaining pair weights
         if pair_weight_params:
             cur.executemany(
                 "INSERT INTO rating_tag_pair_weights (tag1_id, tag2_id, rating_id, weight, co_occurrence_count) VALUES (?, ?, ?, ?, ?)",
                 pair_weight_params
             )
-        pair_weight_count = len(pair_weight_params)
+            conn.commit()
+            
+        # Clear memory
+        del pair_weights
+        del pair_weight_params
+        del tag_cache
+        del rating_cache
+        gc.collect()
 
         # Update metadata
         cur.execute(
@@ -534,7 +696,7 @@ def train_model(progress_callback=None) -> Dict:
         )
         cur.execute(
             "INSERT OR REPLACE INTO rating_model_metadata (key, value, updated_at) VALUES (?, ?, ?)",
-            ('unique_tags_used', str(len({tag for tag, _ in tag_weights.keys()})), datetime.now())
+            ('unique_tags_used', str(unique_tags_count), datetime.now())
         )
         cur.execute(
             "INSERT OR REPLACE INTO rating_model_metadata (key, value, updated_at) VALUES (?, ?, ?)",
@@ -544,14 +706,17 @@ def train_model(progress_callback=None) -> Dict:
             "INSERT OR REPLACE INTO rating_model_metadata (key, value, updated_at) VALUES (?, ?, ?)",
             ('pending_user_corrections', '0', datetime.now())
         )
-
+        
         conn.commit()
+        
+        if progress_callback:
+            progress_callback(98, "Finalizing training...")
 
     duration = (datetime.now() - start_time).total_seconds()
 
     stats = {
         'training_samples': len(rated_images),
-        'unique_tags': len({tag for tag, _ in tag_weights.keys()}),
+        'unique_tags': unique_tags_count,
         'unique_pairs': len(frequent_pairs),
         'tag_weights_count': tag_weight_count,
         'pair_weights_count': pair_weight_count,
@@ -847,6 +1012,321 @@ def infer_all_unrated_images(progress_callback=None) -> Dict:
     print(f"  Rated: {stats['rated']}")
     print(f"  Skipped (low confidence): {stats['skipped_low_confidence']}")
 
+    return stats
+
+
+def _process_rating_chunk_worker(args):
+    """
+    Worker function for processing a chunk of images in parallel for rating inference.
+    This runs in a separate process, so it needs to load weights itself.
+    
+    Args:
+        args: Tuple of (image_chunk, tag_weights, pair_weights, config)
+            image_chunk: List of (image_id, tags) tuples
+    
+    Returns:
+        dict: {'ratings': {image_id: (rating, confidence)}, 'stats': {...}}
+    """
+    import os
+    import multiprocessing
+    import sys
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    # Log which process is handling this (for debugging)
+    process_id = os.getpid()
+    worker_name = multiprocessing.current_process().name
+    
+    print(f"[WORKER] {worker_name} (PID {process_id}) starting to process rating chunk", file=sys.stderr, flush=True)
+    sys.stderr.flush()
+    
+    image_chunk, tag_weights, pair_weights, config = args
+    
+    print(f"[WORKER] {worker_name} (PID {process_id}) processing {len(image_chunk)} images", file=sys.stderr, flush=True)
+    logger.info(f"Worker {worker_name} (PID {process_id}) processing {len(image_chunk)} images")
+    
+    ratings_dict = {}
+    stats = {
+        'processed': 0,
+        'rated': 0,
+        'skipped_low_confidence': 0,
+        'skipped_no_tags': 0
+    }
+    
+    for image_id, tags in image_chunk:
+        stats['processed'] += 1
+        
+        if not tags:
+            stats['skipped_no_tags'] += 1
+            continue
+        
+        # Predict rating (without storing - main process will batch store)
+        rating, confidence = predict_rating(tags, tag_weights, pair_weights, config)
+        
+        if rating:
+            ratings_dict[image_id] = (rating, confidence)
+            stats['rated'] += 1
+        else:
+            stats['skipped_low_confidence'] += 1
+    
+    print(f"[WORKER] {worker_name} (PID {process_id}) completed: {stats['processed']} processed, {stats['rated']} rated", file=sys.stderr, flush=True)
+    logger.info(f"Worker {worker_name} (PID {process_id}) completed: {stats['processed']} processed, {stats['rated']} rated")
+    return {'ratings': ratings_dict, 'stats': stats}
+
+
+def precompute_ratings_for_unrated_images(limit: int = None, progress_callback=None, batch_size: int = 200, num_workers: int = None) -> Dict:
+    """
+    Pre-compute and store rating predictions for unrated images using multiprocessing.
+    This allows the review interface to load quickly.
+    
+    Uses batched processing with multiprocessing to reduce memory usage and utilize multiple CPU cores.
+    
+    Args:
+        limit: Optional limit on number of images to process
+        progress_callback: Optional callback function(processed, total)
+        batch_size: Number of images to process per batch (default: 200)
+        num_workers: Number of parallel worker processes (default: auto-detect from CPU count, max 4)
+    
+    Returns:
+        dict: Statistics about precomputation
+    """
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    import os
+    import sys
+    
+    # Log to monitor service (visible in UI) - do this FIRST
+    try:
+        from services import monitor_service
+        monitor_service.add_log("=== Starting rating prediction precomputation ===", "info")
+    except Exception as e:
+        logger.error(f"Failed to log to monitor_service: {e}")
+    
+    logger.info("=== precompute_ratings_for_unrated_images called ===")
+    
+    start_time = datetime.now()
+    
+    # Load weights once for efficiency
+    tag_weights, pair_weights = load_weights()
+    config = get_config()
+    
+    if not tag_weights and not pair_weights:
+        raise ValueError("Model not trained. Run train_model() first.")
+    
+    # Get total count first for progress tracking
+    total_images = get_unrated_images_count()
+    if limit:
+        total_images = min(total_images, limit)
+    
+    stats = {
+        'processed': 0,
+        'rated': 0,
+        'skipped_low_confidence': 0,
+        'skipped_no_tags': 0,
+        'total': total_images
+    }
+    
+    # Determine number of workers
+    if num_workers is None:
+        try:
+            import config
+            num_workers = getattr(config, 'MAX_WORKERS', None)
+        except:
+            num_workers = None
+        
+        if num_workers is None or num_workers <= 0:
+            cpu_count = multiprocessing.cpu_count()
+            num_workers = max(1, min(cpu_count - 1, 4))  # Use up to 4 workers, leave 1 core free
+    
+    main_pid = os.getpid()
+    
+    # Log to monitor service (visible in UI)
+    try:
+        monitor_service.add_log(f"Main process PID: {main_pid}, Using {num_workers} worker processes", "info")
+        monitor_service.add_log(f"Pre-computing ratings for {total_images} unrated images (batch size: {batch_size})", "info")
+    except:
+        pass
+    
+    print(f"[MAIN] Main process PID: {main_pid}", file=sys.stderr, flush=True)
+    print(f"[MAIN] Starting ProcessPoolExecutor with {num_workers} workers...", file=sys.stderr, flush=True)
+    logger.info(f"Main process PID: {main_pid}")
+    logger.info(f"Pre-computing ratings for {total_images} unrated images (batch size: {batch_size}, workers: {num_workers})...")
+    
+    # Initialize progress callback with total count
+    if progress_callback:
+        progress_callback(0, total_images)
+    
+    # Process in batches to reduce memory usage
+    offset = 0
+    remaining = total_images
+    
+    # Use multiprocessing for CPU-bound prediction work
+    # Force 'spawn' method for better process isolation (works on all platforms)
+    try:
+        current_method = multiprocessing.get_start_method(allow_none=True)
+        try:
+            monitor_service.add_log(f"Multiprocessing start method: {current_method}", "info")
+        except:
+            pass
+        print(f"[MAIN] Current multiprocessing start method: {current_method}", file=sys.stderr, flush=True)
+        if current_method != 'spawn':
+            try:
+                multiprocessing.set_start_method('spawn', force=True)
+                try:
+                    monitor_service.add_log("Changed start method to 'spawn'", "info")
+                except:
+                    pass
+                print(f"[MAIN] Changed start method to 'spawn'", file=sys.stderr, flush=True)
+            except RuntimeError as e:
+                try:
+                    monitor_service.add_log(f"Could not change start method: {e}", "warning")
+                except:
+                    pass
+                print(f"[MAIN] Could not change start method (may already be set): {e}", file=sys.stderr, flush=True)
+    except Exception as e:
+        try:
+            monitor_service.add_log(f"Warning checking start method: {e}", "warning")
+        except:
+            pass
+        print(f"[MAIN] Warning checking start method: {e}", file=sys.stderr, flush=True)
+    
+    logger.info(f"Starting ProcessPoolExecutor with {num_workers} workers...")
+    try:
+        monitor_service.add_log(f"Creating ProcessPoolExecutor with {num_workers} workers for parallel processing", "info")
+    except:
+        pass
+    
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        while remaining > 0:
+            # Get current batch
+            current_batch_size = min(batch_size, remaining)
+            unrated_images = get_unrated_images_batched(
+                batch_size=current_batch_size,
+                offset=offset,
+                limit=limit
+            )
+            
+            if not unrated_images:
+                # No more images to process
+                break
+            
+            # Split batch into chunks for parallel processing
+            chunk_size = max(1, len(unrated_images) // num_workers)
+            if chunk_size == 0:
+                chunk_size = 1
+            
+            chunks = []
+            for i in range(0, len(unrated_images), chunk_size):
+                chunk = unrated_images[i:i + chunk_size]
+                if chunk:
+                    chunks.append((chunk, tag_weights, pair_weights, config))
+            
+            try:
+                monitor_service.add_log(f"Split batch of {len(unrated_images)} images into {len(chunks)} chunks", "info")
+            except:
+                pass
+            print(f"[MAIN] Split batch of {len(unrated_images)} images into {len(chunks)} chunks (chunk size: {chunk_size})", file=sys.stderr, flush=True)
+            logger.info(f"Split batch of {len(unrated_images)} images into {len(chunks)} chunks (chunk size: {chunk_size})")
+            
+            # Submit all chunks to workers
+            future_to_chunk = {}
+            for chunk_idx, chunk in enumerate(chunks):
+                try:
+                    try:
+                        monitor_service.add_log(f"Submitting chunk {chunk_idx + 1}/{len(chunks)} to worker...", "info")
+                    except:
+                        pass
+                    print(f"[MAIN] Submitting chunk {chunk_idx + 1}/{len(chunks)} to worker pool...", file=sys.stderr, flush=True)
+                    future = executor.submit(_process_rating_chunk_worker, chunk)
+                    future_to_chunk[future] = chunk
+                    print(f"[MAIN] Chunk {chunk_idx + 1} submitted successfully", file=sys.stderr, flush=True)
+                    logger.info(f"Submitted chunk {chunk_idx + 1}/{len(chunks)} to worker pool")
+                except Exception as e:
+                    error_msg = f"ERROR submitting chunk {chunk_idx + 1}: {e}"
+                    try:
+                        monitor_service.add_log(error_msg, "error")
+                    except:
+                        pass
+                    print(f"[MAIN] {error_msg}", file=sys.stderr, flush=True)
+                    logger.error(f"Error submitting chunk {chunk_idx + 1}: {e}", exc_info=True)
+            
+            # Collect results as they complete (progress updates as each chunk finishes)
+            all_ratings = {}
+            completed_chunks = 0
+            total_chunks = len(chunks)
+            
+            try:
+                monitor_service.add_log(f"Waiting for {total_chunks} chunks to complete...", "info")
+            except:
+                pass
+            
+            for future in as_completed(future_to_chunk):
+                try:
+                    result = future.result()
+                    all_ratings.update(result['ratings'])
+                    
+                    # Aggregate stats
+                    chunk_stats = result['stats']
+                    stats['processed'] += chunk_stats['processed']
+                    stats['rated'] += chunk_stats['rated']
+                    stats['skipped_low_confidence'] += chunk_stats['skipped_low_confidence']
+                    stats['skipped_no_tags'] += chunk_stats['skipped_no_tags']
+                    
+                    completed_chunks += 1
+                    
+                    try:
+                        monitor_service.add_log(f"Chunk {completed_chunks}/{total_chunks} completed: {chunk_stats['processed']} processed", "info")
+                    except:
+                        pass
+                    
+                    # Update progress after each chunk completes
+                    if progress_callback:
+                        progress_callback(stats['processed'], total_images)
+                        
+                except Exception as e:
+                    error_msg = f"Error processing chunk: {e}"
+                    try:
+                        monitor_service.add_log(error_msg, "error")
+                    except:
+                        pass
+                    logger.error(error_msg, exc_info=True)
+                    completed_chunks += 1  # Count failed chunks too
+            
+            # Batch store all ratings from this batch
+            if all_ratings:
+                for image_id, (rating, confidence) in all_ratings.items():
+                    set_image_rating(image_id, rating, source='ai_inference', confidence=confidence)
+                all_ratings = {}  # Clear to free memory
+            
+            # Get batch length before clearing
+            batch_length = len(unrated_images)
+            
+            # Clear the batch data to free memory
+            del unrated_images
+            
+            # Update offset and remaining count
+            offset += batch_length
+            remaining = total_images - offset
+            
+            # Log progress
+            if stats['processed'] % 100 == 0:
+                logger.info(f"  Processed {stats['processed']}/{total_images}...")
+            
+            # If we got fewer images than requested, we're done
+            if batch_length < current_batch_size:
+                break
+            
+            # Check if we've hit the limit
+            if limit and stats['processed'] >= limit:
+                break
+    
+    duration = (datetime.now() - start_time).total_seconds()
+    stats['duration_seconds'] = round(duration, 2)
+    
+    logger.info(f"Pre-computation complete in {duration:.2f}s")
+    logger.info(f"  Rated: {stats['rated']} images")
+    
     return stats
 
 

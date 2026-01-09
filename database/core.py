@@ -282,32 +282,6 @@ def initialize_database():
         """)
 
         # ===================================================================
-        # Character Predictions Table
-        # ===================================================================
-        # Stores character predictions with confidence scores.
-        # These are pre-computed predictions that can be displayed quickly
-        # without running inference on-the-fly.
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS character_predictions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_id INTEGER NOT NULL,
-            character_name TEXT NOT NULL,
-            confidence REAL NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (image_id) REFERENCES images (id) ON DELETE CASCADE,
-            UNIQUE(image_id, character_name)
-        )
-        """)
-        cur.execute("""
-        CREATE INDEX IF NOT EXISTS idx_character_predictions_image 
-        ON character_predictions(image_id)
-        """)
-        cur.execute("""
-        CREATE INDEX IF NOT EXISTS idx_character_predictions_confidence 
-        ON character_predictions(confidence DESC)
-        """)
-
         # ===================================================================
         # Rating Inference Tables
         # ===================================================================

@@ -72,17 +72,6 @@ async def rate_manage():
 
 
 # ============================================================================
-# Character Inference UI Routes
-# ============================================================================
-
-@main_blueprint.route('/character/manage')
-@login_required
-async def character_manage():
-    """Character management dashboard."""
-    return await render_template('character_manage.html', app_name=config.APP_NAME)
-
-
-# ============================================================================
 # Tag Categorization UI Routes
 # ============================================================================
 
@@ -91,13 +80,6 @@ async def character_manage():
 async def tag_categorize():
     """Interactive tag categorization interface."""
     return await render_template('tag_categorize.html', app_name=config.APP_NAME)
-
-
-@main_blueprint.route('/tag_manager')
-@login_required
-async def tag_manager():
-    """Comprehensive tag and image management interface."""
-    return await render_template('tag_manager.html', app_name=config.APP_NAME)
 
 
 @main_blueprint.route('/')

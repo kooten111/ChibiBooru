@@ -37,66 +37,6 @@ def estimate_memory_usage(tag_weights_count, pair_weights_count):
     pair_memory_mb = (pair_weights_count * 200) / (1024 * 1024)  # Pairs are larger
     return tag_memory_mb + pair_memory_mb
 
-def analyze_character_model():
-    """Analyze character model database."""
-    print("=" * 60)
-    print("CHARACTER MODEL DATABASE ANALYSIS")
-    print("=" * 60)
-    
-    try:
-        from repositories.character_repository import get_model_db_path
-        db_path = get_model_db_path()
-    except:
-        db_path = os.path.join(project_root, "character_model.db")
-    
-    if not os.path.exists(db_path):
-        print(f"Database not found: {db_path}")
-        return
-    
-    db_size = get_db_size_mb(db_path)
-    print(f"\nDatabase file: {db_path}")
-    print(f"File size: {db_size:.2f} MB")
-    
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    
-    # Count tag weights
-    tag_weights_count = count_weights(conn, "character_tag_weights")
-    print(f"\nTag weights: {tag_weights_count:,}")
-    
-    # Count pair weights
-    pair_weights_count = count_weights(conn, "character_tag_pair_weights")
-    print(f"Pair weights: {pair_weights_count:,}")
-    
-    # Count unique tags
-    cur.execute("SELECT COUNT(DISTINCT tag_id) as cnt FROM character_tag_weights")
-    unique_tags = cur.fetchone()['cnt']
-    print(f"Unique tags: {unique_tags:,}")
-    
-    # Count unique characters
-    cur.execute("SELECT COUNT(DISTINCT character_id) as cnt FROM character_tag_weights")
-    unique_characters = cur.fetchone()['cnt']
-    print(f"Unique characters: {unique_characters:,}")
-    
-    # Estimate memory usage
-    estimated_memory = estimate_memory_usage(tag_weights_count, pair_weights_count)
-    print(f"\nEstimated memory usage (all weights in dict): {estimated_memory:.2f} MB")
-    
-    # Sample a few weights to understand structure
-    cur.execute("""
-        SELECT t.name as tag, c.name as character, tw.weight
-        FROM character_tag_weights tw
-        JOIN tags t ON tw.tag_id = t.id
-        JOIN characters c ON tw.character_id = c.id
-        LIMIT 5
-    """)
-    print("\nSample tag weights:")
-    for row in cur.fetchall():
-        print(f"  ({row['tag']}, {row['character']}): {row['weight']:.3f}")
-    
-    conn.close()
-
 def analyze_rating_model():
     """Analyze rating model database."""
     print("\n" + "=" * 60)
@@ -189,21 +129,6 @@ def analyze_main_db():
             unrated_count = cur.fetchone()['cnt']
             print(f"Unrated images: {unrated_count:,}")
             
-            # Count untagged character images
-            cur.execute("""
-                SELECT COUNT(*) as cnt
-                FROM images i
-                WHERE i.active_source = 'local_tagger'
-                  AND NOT EXISTS (
-                      SELECT 1 FROM image_tags it
-                      JOIN tags t ON it.tag_id = t.id
-                      WHERE it.image_id = i.id
-                        AND t.category = 'character'
-                  )
-            """)
-            untagged_char_count = cur.fetchone()['cnt']
-            print(f"Untagged character images: {untagged_char_count:,}")
-            
             # Average tags per image
             cur.execute("""
                 SELECT AVG(tag_count) as avg_tags
@@ -229,7 +154,6 @@ if __name__ == "__main__":
     print("3. Image counts for processing")
     print("\n")
     
-    analyze_character_model()
     analyze_rating_model()
     analyze_main_db()
     

@@ -906,10 +906,3 @@ async function systemFindBrokenImages(event) {
 }
 
 window.systemFindBrokenImages = systemFindBrokenImages;
-
-async function systemPrecomputeCharacterPredictions(event) {
-    if (event) event.preventDefault();
-    systemAction('/api/character/precompute', event.target, 'Precompute Character Predictions');
-}
-
-window.systemPrecomputeCharacterPredictions = systemPrecomputeCharacterPredictions;

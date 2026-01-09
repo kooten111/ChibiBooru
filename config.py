@@ -100,7 +100,17 @@ DB_WAL_AUTOCHECKPOINT = int(os.environ.get('DB_WAL_AUTOCHECKPOINT', 1000))
 # ==================== PROCESSING ====================
 
 # Parallel processing
-MAX_WORKERS = 2  # Reduced for memory efficiency - each worker adds ~200-400MB due to SQLite memory mapping
+MAX_WORKERS = int(os.environ.get('MAX_WORKERS', 2))  # Reduced for memory efficiency - each worker adds ~200-400MB due to SQLite memory mapping
+
+# Weight loading mode for multiprocessing
+# Options: 'shared' (use shared memory), 'lazy' (query database on-demand), 'full' (load all into each worker)
+WEIGHT_LOADING_MODE = os.environ.get('WEIGHT_LOADING_MODE', 'shared').lower()
+
+# Batch size for multiprocessing operations
+MULTIPROCESSING_BATCH_SIZE = int(os.environ.get('MULTIPROCESSING_BATCH_SIZE', 200))
+
+# Enable SQLite WAL mode for better concurrent access
+ENABLE_WAL_MODE = os.environ.get('ENABLE_WAL_MODE', 'true').lower() in ('true', '1', 'yes')
 
 # Request timeouts
 REQUEST_TIMEOUT = 10  # seconds

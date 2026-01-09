@@ -20,7 +20,7 @@ async def api_train_model():
         from ml_worker.client import get_ml_worker_client
         client = get_ml_worker_client()
         # Returns job info now
-        response = client.train_rating_model(timeout=10.0)
+        response = client.train_rating_model(timeout=30.0)
         return response
     except Exception as e:
         logger.warning(f"ML Worker unavailable, falling back to direct training: {e}")
@@ -43,10 +43,10 @@ async def api_infer_ratings():
         # Returns job info now
         if image_id:
             # Infer single image
-            response = client.infer_ratings(image_ids=[image_id], timeout=10.0)
+            response = client.infer_ratings(image_ids=[image_id], timeout=30.0)
         else:
             # Infer all unrated images
-            response = client.infer_ratings(image_ids=None, timeout=10.0)
+            response = client.infer_ratings(image_ids=None, timeout=30.0)
             
         return response
     except Exception as e:
@@ -89,6 +89,80 @@ async def api_retrain_all():
     """Clear AI ratings, retrain, and re-infer everything."""
     result = rating_inference.retrain_and_reapply_all()
     return result
+
+
+@api_blueprint.route('/rate/precompute', methods=['POST'])
+@api_handler()
+async def api_precompute_ratings():
+    """Pre-compute and store rating predictions for unrated images using multiprocessing."""
+    import uuid
+    import asyncio
+    from services.background_tasks import task_manager
+    from services import monitor_service
+    import config
+    
+    data = await request.get_json() or {}
+    num_workers = data.get('num_workers', getattr(config, 'MAX_WORKERS', 2))
+    batch_size = data.get('batch_size', 200)
+    limit = data.get('limit', None)
+    
+    task_id = f"precompute_rating_{uuid.uuid4().hex[:8]}"
+    
+    async def precompute_task(task_id, manager, num_workers, batch_size, limit):
+        """Background task that runs rating precomputation."""
+        from services import monitor_service as mon
+        import time
+        
+        mon.add_log(f"Starting rating prediction precomputation with {num_workers} workers...", "info")
+        
+        # Get total count for progress tracking
+        total_count = rating_inference.get_unrated_images_count()
+        if limit:
+            total_count = min(total_count, limit)
+        
+        await manager.update_progress(task_id, 0, total_count, f"Starting with {num_workers} workers...")
+        
+        def progress_callback(processed, total):
+            """Progress callback for precomputation."""
+            asyncio.create_task(manager.update_progress(
+                task_id,
+                processed,
+                total,
+                f"Processing... ({processed}/{total})"
+            ))
+        
+        try:
+            # Run precomputation
+            stats = rating_inference.precompute_ratings_for_unrated_images(
+                limit=limit,
+                progress_callback=progress_callback,
+                batch_size=batch_size,
+                num_workers=num_workers
+            )
+            
+            await manager.update_progress(task_id, total_count, total_count, "Complete")
+            mon.add_log(f"✓ Rating precomputation complete: {stats['rated']} images rated", "success")
+            
+            return {
+                'processed': stats['processed'],
+                'rated': stats['rated'],
+                'skipped_low_confidence': stats['skipped_low_confidence'],
+                'duration_seconds': stats.get('duration_seconds', 0),
+                'num_workers': num_workers
+            }
+        except Exception as e:
+            mon.add_log(f"Rating precomputation failed: {str(e)}", "error")
+            raise
+    
+    # Start background task
+    monitor_service.add_log("Rating prediction precomputation task started...", "info")
+    await task_manager.start_task(task_id, precompute_task, num_workers, batch_size, limit)
+    
+    return {
+        'status': 'started',
+        'task_id': task_id,
+        'message': f'Precomputation started with {num_workers} workers'
+    }
 
 
 @api_blueprint.route('/rate/stats', methods=['GET'])
