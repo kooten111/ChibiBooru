@@ -1,27 +1,27 @@
 # services/system_service.py
 import os
 from quart import request, jsonify
+from typing import Dict, Any, List, Optional
+import config
 from database import models
 from services import processing_service as processing
 from utils.deduplication import scan_and_remove_duplicates
+from utils.decorators import require_secret_sync, require_secret
+from utils.logging_config import get_logger
 from . import monitor_service
-import subprocess
-import sys
 
-RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
+logger = get_logger('SystemService')
 
-def scan_and_process_service():
+@require_secret_sync
+def scan_and_process_service() -> Any:
     """Service to find and process new, untracked images."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         # First, process new images
         processed_count = monitor_service.run_scan()
 
         # Then, clean orphaned image_tags entries (broken foreign keys)
-        print("Checking for orphaned image_tags entries...")
+        logger.info("Checking for orphaned image_tags entries...")
         from database import get_db_connection
         orphaned_tags_count = 0
         with get_db_connection() as conn:
@@ -34,18 +34,18 @@ def scan_and_process_service():
             orphaned_tags_count = cursor.fetchone()[0]
 
             if orphaned_tags_count > 0:
-                print(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
+                logger.info(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
                 cursor.execute("""
                     DELETE FROM image_tags
                     WHERE image_id NOT IN (SELECT id FROM images)
                 """)
                 conn.commit()
-                print(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
+                logger.info(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
 
         # Then, clean orphaned image records for manually deleted files
-        print("Checking for orphaned image records...")
+        logger.info("Checking for orphaned image records...")
         db_filepaths = models.get_all_filepaths()
-        print(f"Database has {len(db_filepaths)} image records")
+        logger.debug(f"Database has {len(db_filepaths)} image records")
 
         disk_filepaths = set()
         for root, _, files in os.walk("static/images"):
@@ -53,34 +53,34 @@ def scan_and_process_service():
                 full_path = os.path.join(root, file)
                 rel_path = os.path.relpath(full_path, "static/images").replace('\\', '/')
                 disk_filepaths.add(rel_path)
-        print(f"Disk has {len(disk_filepaths)} files")
+        logger.debug(f"Disk has {len(disk_filepaths)} files")
 
         orphans = db_filepaths - disk_filepaths
         cleaned_count = 0
-        print(f"Found {len(orphans)} orphaned image records")
+        logger.info(f"Found {len(orphans)} orphaned image records")
 
         if orphans:
-            print(f"Cleaning {len(orphans)} orphaned image records...")
+            logger.info(f"Cleaning {len(orphans)} orphaned image records...")
             for orphan_path in orphans:
                 if models.delete_image(orphan_path):
                     cleaned_count += 1
-            print(f"Cleaned {cleaned_count} orphaned image records")
+            logger.info(f"Cleaned {cleaned_count} orphaned image records")
         else:
-            print("No orphaned image records to clean")
+            logger.info("No orphaned image records to clean")
 
         # Reload data to update tag counts after cleaning
         if cleaned_count > 0 or orphaned_tags_count > 0:
-            print(f"Reloading data to update tag counts...")
+            logger.info("Reloading data to update tag counts...")
             from core.cache_manager import load_data_from_db_async
             load_data_from_db_async()
-            print("Data reload complete")
+            logger.info("Data reload complete")
 
         # Optimize query planner if new images were added
         if processed_count > 0:
-            print("New images added. Analyzing database statistics...")
+            logger.info("New images added. Analyzing database statistics...")
             with get_db_connection() as conn:
                 conn.execute("ANALYZE")
-            print("Database analysis complete")
+            logger.info("Database analysis complete")
 
         # Build response message
         messages = []
@@ -109,11 +109,9 @@ def scan_and_process_service():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@require_secret_sync
 def rebuild_service():
     """Service to re-process all tags from the raw_metadata in the database."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         monitor_service.stop_monitor()
         
@@ -128,11 +126,9 @@ def rebuild_service():
         load_data_from_db_async()
         return jsonify({"error": str(e)}), 500
 
+@require_secret_sync
 def rebuild_categorized_service():
     """Service to back-fill the categorized tag columns in the images table."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         updated_count = models.rebuild_categorized_tags_from_relations()
         from core.cache_manager import load_data_from_db_async
@@ -145,11 +141,9 @@ def rebuild_categorized_service():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@require_secret_sync
 def apply_merged_sources_service():
     """Service to apply merged sources to all images with multiple sources."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         import config
         from database import get_db_connection
@@ -234,12 +228,9 @@ def apply_merged_sources_service():
         monitor_service.add_log(f"Fatal error during merge: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500
         
+@require_secret_sync
 def recount_tags_service():
     """Service to recount all tag usage counts."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         monitor_service.add_log("Recounting all tags...", "info")
         models.reload_tag_counts()
@@ -257,12 +248,9 @@ def recount_tags_service():
         monitor_service.add_log(f"Error recounting tags: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500
 
+@require_secret_sync
 def recategorize_service():
     """Service to recategorize misplaced tags without full rebuild."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         changes = models.recategorize_misplaced_tags()
         models.load_data_from_db()  # Refresh cache
@@ -274,17 +262,31 @@ def recategorize_service():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-def validate_secret_service():
-    """Service to validate if the provided secret matches RELOAD_SECRET."""
+def validate_secret_service() -> Dict[str, Any]:
+    """
+    Service to validate if the provided secret matches config.RELOAD_SECRET.
+    
+    This endpoint does not require authentication (it's used to validate secrets).
+    
+    Returns:
+        JSON response with success=True and valid=True/False indicating if the secret is correct
+    """
     secret = request.args.get('secret', '') or request.form.get('secret', '')
 
-    if secret and secret == RELOAD_SECRET:
+    if secret and secret == config.RELOAD_SECRET:
         return jsonify({"success": True, "valid": True})
     else:
         return jsonify({"success": True, "valid": False})
 
-def get_system_status():
-    """Service to get system status, including monitor status."""
+def get_system_status() -> Dict[str, Any]:
+    """
+    Service to get system status, including monitor status.
+    
+    Returns:
+        JSON response containing:
+        - monitor: Current monitor service status
+        - collection: Total images and unprocessed count
+    """
     monitor_status = monitor_service.get_status()
     unprocessed_count = 0
     try:
@@ -300,12 +302,9 @@ def get_system_status():
         },
     })
     
+@require_secret_sync
 def reload_data():
     """Service to trigger a data reload from the database."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-
     if models.load_data_from_db():
         image_count = models.get_image_count()
         tag_count = len(models.get_tag_counts())
@@ -313,11 +312,9 @@ def reload_data():
     else:
         return jsonify({"error": "Failed to reload data"}), 500
 
+@require_secret_sync
 def trigger_thumbnails():
     """Service to manually trigger thumbnail generation."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
     try:
         from services.health_service import check_missing_thumbnails
         result = check_missing_thumbnails(auto_fix=True)
@@ -331,12 +328,9 @@ def trigger_thumbnails():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@require_secret
 async def deduplicate_service():
     """Service to run MD5 deduplication scan."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-
     data = await request.json or {}
     dry_run = data.get('dry_run', True)
 
@@ -348,18 +342,15 @@ async def deduplicate_service():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@require_secret
 async def clean_orphans_service():
     """Service to find and remove database entries for deleted files."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-
     data = await request.json or {}
     dry_run = data.get('dry_run', True)
 
     try:
         # First, clean orphaned image_tags entries (broken foreign keys)
-        print("Checking for orphaned image_tags entries...")
+        logger.info("Checking for orphaned image_tags entries...")
         from database import get_db_connection
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -373,17 +364,17 @@ async def clean_orphans_service():
             orphaned_tags_count = cursor.fetchone()[0]
 
             if orphaned_tags_count > 0:
-                print(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
+                logger.info(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
                 if not dry_run:
                     cursor.execute("""
                         DELETE FROM image_tags
                         WHERE image_id NOT IN (SELECT id FROM images)
                     """)
                     conn.commit()
-                    print(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
+                    logger.info(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
 
         # Then, find and remove image records for deleted files
-        print("Checking for orphaned image records...")
+        logger.info("Checking for orphaned image records...")
         db_filepaths = models.get_all_filepaths()
 
         disk_filepaths = set()
@@ -413,10 +404,10 @@ async def clean_orphans_service():
 
             # Always reload data after cleaning to update tag counts and image cache
             if cleaned_count > 0 or orphaned_tags_count > 0:
-                print(f"Cleaned {cleaned_count} orphaned image records and {orphaned_tags_count} orphaned tag entries.")
-                print("Reloading data to update tag counts...")
+                logger.info(f"Cleaned {cleaned_count} orphaned image records and {orphaned_tags_count} orphaned tag entries.")
+                logger.info("Reloading data to update tag counts...")
                 models.load_data_from_db()
-                print("Tag counts updated after orphan cleanup.")
+                logger.info("Tag counts updated after orphan cleanup.")
                 message = f"Cleaned {cleaned_count} orphaned images and {orphaned_tags_count} orphaned tag entries. Tag counts updated."
             else:
                 message = f"No orphaned entries found. Database is clean!"
@@ -434,28 +425,18 @@ async def clean_orphans_service():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-def reindex_database_service():
+@require_secret_sync
+def reindex_database_service() -> Any:
     """Service to optimize the database (VACUUM and REINDEX)."""
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
-        from database import get_db_connection
+        from database.transaction_helpers import get_db_connection_for_maintenance
         import time
         
         start_time = time.time()
         monitor_service.add_log("Starting database optimization...", "info")
         
-        # VACUUM cannot be run inside a transaction
-        # We need to use a connection with isolation_level=None (autocommit)
-        conn = get_db_connection()
-        conn.isolation_level = None
-        
-        try:
-            # Enable auto-vacuum to keep DB size in check
-            conn.execute("PRAGMA auto_vacuum = FULL")
-            
+        # Use maintenance connection helper for VACUUM/REINDEX operations
+        with get_db_connection_for_maintenance() as conn:
             # Rebuild FTS index
             monitor_service.add_log("Rebuilding FTS index...", "info")
             conn.execute("INSERT INTO images_fts(images_fts) VALUES('rebuild')")
@@ -471,8 +452,6 @@ def reindex_database_service():
             # Analyze for query planner optimization
             monitor_service.add_log("Analyzing database statistics...", "info")
             conn.execute("ANALYZE")
-        finally:
-            conn.close()
             
         duration = time.time() - start_time
         message = f"Optimization complete: Rebuilt FTS & standard indexes, vacuumed database, and updated statistics ({duration:.2f}s)."
@@ -489,7 +468,15 @@ def reindex_database_service():
         monitor_service.add_log(f"Database optimization failed: {str(e)}", "error")
 
 async def get_task_status_service():
-    """Service to get the status of a background task."""
+    """
+    Service to get the status of a background task.
+    
+    Query Parameters:
+        task_id: ID of the task to check
+        
+    Returns:
+        JSON response with task status, or 404 if task not found
+    """
     from services.background_tasks import task_manager
 
     task_id = request.args.get('task_id')
@@ -504,7 +491,17 @@ async def get_task_status_service():
 
 
 async def database_health_check_service():
-    """Service to run database health checks and optionally fix issues."""
+    """
+    Service to run database health checks and optionally fix issues.
+    
+    Request Body (JSON):
+        auto_fix: If True, automatically fix issues found (default: True)
+        include_thumbnails: If True, check for missing thumbnails (default: False)
+        include_tag_deltas: If True, check tag delta consistency (default: True)
+        
+    Returns:
+        JSON response with health check results including issues found and fixed
+    """
     data = await request.json or {}
     auto_fix = data.get('auto_fix', True)
     include_thumbnails = data.get('include_thumbnails', False)
@@ -531,15 +528,12 @@ async def database_health_check_service():
         return jsonify({"error": str(e)}), 500
 
 
+@require_secret_sync
 def bulk_retag_local_service():
     """
     Service to wipe all local tagger predictions and re-run local tagger for all images.
     This populates the local_tagger_predictions table with fresh data.
     """
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-
     try:
         from database import get_db_connection
         from repositories import tagger_predictions_repository
@@ -629,10 +623,21 @@ def bulk_retag_local_service():
         return jsonify({"error": str(e)}), 500
 
 
-async def find_broken_images_service():
+async def find_broken_images_service() -> Dict[str, Any]:
     """
     Service to find images with missing tags, hashes, or embeddings.
-    Returns a list of broken images and their issues.
+    
+    Scans the database for images with:
+    - Missing perceptual hash (phash)
+    - No tags associated
+    - Missing embeddings (if semantic similarity enabled)
+    - Invalid embedding dimensions
+    
+    Returns:
+        JSON response containing:
+        - total_broken: Total number of broken images found
+        - images: List of broken images (limited to first 100) with their issues
+        - has_more: Whether there are more than 100 broken images
     """
     try:
         from database import get_db_connection
@@ -746,20 +751,32 @@ async def find_broken_images_service():
         return jsonify({"error": str(e)}), 500
 
 
-async def cleanup_broken_images_service():
+@require_secret
+async def cleanup_broken_images_service() -> Dict[str, Any]:
     """
     Service to cleanup or retry broken images.
     Actions:
+    - 'scan': Just find and return count of broken images
     - 'delete': Remove broken images from database and move files back to ingest
     - 'retry': Re-process broken images (regenerate hashes/embeddings)
     - 'delete_permanent': Remove from database and delete files permanently
     """
+    from utils.validation import validate_enum, validate_list_of_integers
+    
     data = await request.json or {}
-    action = data.get('action', 'scan')  # scan, delete, retry, delete_permanent
-    image_ids = data.get('image_ids', [])  # Specific IDs, or empty for all broken
+    action = validate_enum(
+        data.get('action', 'scan'),
+        param_name='action',
+        allowed_values=['scan', 'delete', 'retry', 'delete_permanent']
+    )
+    image_ids = validate_list_of_integers(
+        data.get('image_ids', []),
+        param_name='image_ids',
+        allow_empty=True
+    )
     
     secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != RELOAD_SECRET:
+    if secret != config.RELOAD_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
     
     try:

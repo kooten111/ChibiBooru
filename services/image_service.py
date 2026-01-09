@@ -10,6 +10,7 @@ from utils.tag_extraction import (
     merge_tag_sources,
     deduplicate_categorized_tags
 )
+from typing import Dict, Any, List, Optional, Tuple
 import os
 import json
 import random
@@ -17,7 +18,7 @@ import requests
 import asyncio
 import uuid
 
-def get_images_for_api(search_query, page, seed):
+def get_images_for_api(search_query: str, page: int, seed: Optional[int]) -> Dict[str, Any]:
     """Service for the infinite scroll API."""
     from services import query_service  # Import here to avoid circular import
     
@@ -55,7 +56,7 @@ def _process_images_for_api(images):
     ]
 
 
-def delete_image_service(data):
+def delete_image_service(data: Dict[str, Any]) -> Dict[str, Any]:
     """Service to delete an image and its data."""
     # The filepath from the frontend is 'images/folder/image.jpg'
     # We need the path relative to the 'static/images' directory, which is 'folder/image.jpg'
@@ -124,12 +125,20 @@ def delete_image_service(data):
         print(f"Error deleting image {filepath}: {e}")
         return {"error": "An unexpected error occurred during deletion."}, 500
 
-def delete_images_bulk_service(data):
+def delete_images_bulk_service(data: Dict[str, Any]) -> Dict[str, Any]:
     """Service to delete multiple images at once."""
+    from utils.validation import validate_list_of_integers, validate_string
+    
+    # Validate filepaths parameter
     filepaths = data.get('filepaths', [])
-
     if not filepaths or not isinstance(filepaths, list):
-        return {"error": "filepaths array is required"}, 400
+        raise ValueError("filepaths array is required")
+    
+    # Validate each filepath is a string
+    for i, filepath in enumerate(filepaths):
+        if not isinstance(filepath, str):
+            raise ValueError(f"filepaths[{i}] must be a string")
+        validate_string(filepath, f"filepaths[{i}]", min_length=1)
 
     results = {
         "total": len(filepaths),
@@ -191,15 +200,22 @@ def delete_images_bulk_service(data):
         "results": results
     }
 
-def prepare_bulk_download(data):
+def prepare_bulk_download(data: Dict[str, Any]) -> Tuple[Any, int]:
     """Prepare a zip file of multiple images."""
     import zipfile
     import io
+    from utils.validation import validate_string
     
     filepaths = data.get('filepaths', [])
 
     if not filepaths or not isinstance(filepaths, list):
-        return {"error": "filepaths array is required"}, 400
+        raise ValueError("filepaths array is required")
+    
+    # Validate each filepath is a string
+    for i, filepath in enumerate(filepaths):
+        if not isinstance(filepath, str):
+            raise ValueError(f"filepaths[{i}] must be a string")
+        validate_string(filepath, f"filepaths[{i}]", min_length=1)
 
     # Create a zip file in memory
     zip_buffer = io.BytesIO()

@@ -16,11 +16,14 @@ from utils.tag_extraction import (
     merge_tag_sources,
     deduplicate_categorized_tags
 )
+from utils.logging_config import get_logger
 import time
 from collections import deque
 from threading import Lock
 import fcntl
 import shutil
+
+logger = get_logger('ProcessingService')
 
 # ML Worker client - always import (no fallback to local loading)
 try:
@@ -28,8 +31,8 @@ try:
     ML_WORKER_AVAILABLE = True
 except ImportError:
     ML_WORKER_AVAILABLE = False
-    print("ERROR: ML Worker client not available. ML operations will fail.")
-    print("Ensure ml_worker module is installed and accessible.")
+    logger.error("ML Worker client not available. ML operations will fail.")
+    logger.error("Ensure ml_worker module is installed and accessible.")
 
 # Load from config
 SAUCENAO_API_KEY = config.SAUCENAO_API_KEY
@@ -891,32 +894,29 @@ def process_image_file(filepath, move_from_ingest=True):
     # Check if file exists (race condition check for concurrent processing)
     if not os.path.exists(filepath):
         msg = f"[Processing] File not found (likely processed by another thread): {filepath}"
-        print(msg)
+        logger.error(msg)
         return False, msg
     
     filename = os.path.basename(filepath)
-    print(f"[Processing] Starting: {filename}")
-    
-    # Debug logging for investigation - REMOVED
-
+    logger.info(f"Starting: {filename}")
     
     # Calculate MD5 immediately
     try:
         md5 = get_file_md5(filepath)
         if md5 is None:
             msg = f"[Processing] ERROR: Failed to calculate MD5 for {filename} (File not found or unreadable)"
-            print(msg)
+            logger.error(msg)
             return False, msg
     except Exception as e:
         msg = f"[Processing] ERROR: Failed to calculate MD5 for {filename}: {e}"
-        print(msg)
+        logger.error(msg)
         return False, msg
     
     # Check for duplicate in database (with lock)
     lock_fd, acquired = acquire_processing_lock(md5)
     if not acquired:
         msg = f"[Processing] Skipped: {filename} (already being processed by another thread)"
-        print(msg)
+        logger.error(msg)
         return False, msg
     
     try:
@@ -929,7 +929,7 @@ def process_image_file(filepath, move_from_ingest=True):
                     existing_filepath = row['filepath']
             
             msg = f"[Processing] Duplicate detected: {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
-            print(msg)
+            logger.error(msg)
             
             # Remove duplicate file if it exists
             if os.path.exists(filepath):
@@ -962,7 +962,7 @@ def process_image_file(filepath, move_from_ingest=True):
             else:
                 # FAIL-FAST: Video tagging failed
                 msg = f"[Processing] ERROR: Video tagging failed for {filename}. File NOT ingested."
-                print(msg)
+                logger.error(msg)
                 return False, msg
         else:
             # Standard image processing
@@ -1019,7 +1019,7 @@ def process_image_file(filepath, move_from_ingest=True):
                 else:
                     # FAIL-FAST: Local tagger was required but failed
                     msg = f"[Processing] ERROR: Local tagger failed for {filename}. File NOT ingested."
-                    print(msg)
+                    logger.error(msg)
                     return False, msg
         
         # ========== STAGE 3: HASH COMPUTATION (ALL IN ONE PASS) ==========
@@ -1033,7 +1033,7 @@ def process_image_file(filepath, move_from_ingest=True):
         else:
             # FAIL-FAST: Hash computation is required
             msg = f"[Processing] ERROR: Failed to compute perceptual hash for {filename}. File NOT ingested."
-            print(msg)
+            logger.error(msg)
             return False, msg
         
         # Compute color hash
@@ -1056,7 +1056,7 @@ def process_image_file(filepath, move_from_ingest=True):
             else:
                 # FAIL-FAST: Similarity is enabled but embedding failed
                 msg = f"[Processing] ERROR: Failed to compute similarity embedding for {filename}. File NOT ingested."
-                print(msg)
+                logger.error(msg)
                 return False, msg
         
         # ========== STAGE 4: FILE OPERATIONS ==========
@@ -1156,7 +1156,7 @@ def process_image_file(filepath, move_from_ingest=True):
                         
                         if attempt > 50:
                             msg = f"[Processing] ERROR: Too many filename collisions for {filename} (gave up after 50 attempts)"
-                            print(msg)
+                            logger.error(msg)
                             return False, msg
                 else:
                     # Found a free slot!
@@ -1170,7 +1170,7 @@ def process_image_file(filepath, move_from_ingest=True):
                         return False, msg
                     except Exception as e:
                         msg = f"[Processing] ERROR: Failed to move file to {new_path}: {e}"
-                        print(msg)
+                        logger.error(msg)
 
                         return False, msg
         
@@ -1289,7 +1289,7 @@ def process_image_file(filepath, move_from_ingest=True):
         
         if not success:
             msg = f"[Processing] ERROR: Database insert failed for {filename}"
-            print(msg)
+            logger.error(msg)
 
             return False, msg
 
@@ -1360,16 +1360,16 @@ def process_image_file(filepath, move_from_ingest=True):
                     row = cursor.fetchone()
                     if row:
                         if apply_implications_for_image(row['id']):
-                            print(f"[Processing] Applied tag implications for: {filename}")
+                            logger.debug(f"Applied tag implications for: {filename}")
             except Exception as e:
-                print(f"[Processing] WARNING: Failed to apply implications for {filename}: {e}")
+                logger.warning(f"Failed to apply implications for {filename}: {e}")
         
-        print(f"[Processing] Successfully processed: {filename}")
+        logger.info(f"Successfully processed: {filename}")
         return True, "Successfully processed"
         
     except Exception as e:
         msg = f"[Processing] ERROR processing {filename}: {e}"
-        print(msg)
+        logger.error(msg)
         import traceback
         traceback.print_exc()
         return False, msg
