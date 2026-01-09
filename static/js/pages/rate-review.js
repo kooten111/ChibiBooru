@@ -1,5 +1,6 @@
 // static/js/pages/rate-review.js - Modern Rating Review Page
 import { showNotification } from '../utils/notifications.js';
+import { normalizeImagePath, getImageUrl } from '../utils/path-utils.js';
 
 // Configuration constants
 const RATING_KEYS = {
@@ -146,7 +147,8 @@ async function preloadNext() {
             preloadedImage = data;
             // Preload actual image asset
             const img = new Image();
-            img.src = '/images/' + data.filepath;
+            const normalizedPath = normalizeImagePath(data.filepath);
+            img.src = getImageUrl(normalizedPath);
         }
     } catch (e) {
         // Ignore preload errors
@@ -157,17 +159,21 @@ async function preloadNext() {
 function renderImage(data) {
     const container = document.getElementById('imageDisplay');
     const isVideo = data.filepath.match(/\.(mp4|webm|mov)$/i);
+    
+    // Normalize filepath to remove 'images/' prefix if present, then use getImageUrl
+    const normalizedPath = normalizeImagePath(data.filepath);
+    const imageUrl = getImageUrl(normalizedPath);
 
     let content = '';
     if (isVideo) {
         content = `
-            <video src="/images/${data.filepath}" controls autoplay loop muted 
+            <video src="${imageUrl}" controls autoplay loop muted 
                    style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
             </video>
         `;
     } else {
         content = `
-            <img src="/images/${data.filepath}" alt="Image to rate" 
+            <img src="${imageUrl}" alt="Image to rate" 
                  style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); object-fit: contain;">
         `;
     }

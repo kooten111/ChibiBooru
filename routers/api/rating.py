@@ -326,9 +326,12 @@ async def api_get_images_for_rating():
                 rating_source = rt['source']
                 break
 
+            # Remove 'images/' prefix if present (database stores paths relative to static/images/)
+            normalized_filepath = filepath.replace('images/', '', 1) if filepath.startswith('images/') else filepath
+            
             images.append({
                 'id': image_id,
-                'filepath': f"images/{filepath}" if not filepath.startswith('images/') else filepath,
+                'filepath': normalized_filepath,
                 'thumb': get_thumbnail_path(filepath),
                 'rating': rating,
                 'rating_source': rating_source,
@@ -438,9 +441,12 @@ async def api_get_next_image_for_rating():
         total_tag_count = sum(len(tags) for tags in tags_by_category.values())
         
         # Build response similar to /api/rate/images but for single image
+        # Remove 'images/' prefix if present (database stores paths relative to static/images/)
+        normalized_filepath = filepath.replace('images/', '', 1) if filepath.startswith('images/') else filepath
+        
         result = {
             'id': image_id,
-            'filepath': f"images/{filepath}" if not filepath.startswith('images/') else filepath,
+            'filepath': normalized_filepath,
             'thumb': get_thumbnail_path(filepath),
             'rating': rating,
             'rating_source': rating_source,
