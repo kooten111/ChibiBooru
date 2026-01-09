@@ -23,7 +23,7 @@ INGEST_DIRECTORY = "./ingest"
 # Data storage
 TAGS_FILE = "./tags.json"
 METADATA_DIR = "./metadata"
-DATABASE_PATH = "./booru.db"
+DATABASE_PATH = "./data/booru.db"
 
 # ==================== API KEYS ====================
 

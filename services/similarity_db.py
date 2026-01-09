@@ -6,7 +6,7 @@ import config
 from typing import List, Tuple, Optional, Dict
 from datetime import datetime
 
-DB_FILE = "similarity.db"
+DB_FILE = "data/similarity.db"
 
 def get_db_connection():
     """Create a database connection to the similarity database."""

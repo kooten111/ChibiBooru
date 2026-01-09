@@ -14,7 +14,7 @@ from typing import Optional, Dict
 from contextlib import contextmanager
 
 # Default model database path
-DEFAULT_MODEL_PATH = 'rating_model.db'
+DEFAULT_MODEL_PATH = 'data/rating_model.db'
 
 
 def get_model_db_path() -> str:

@@ -107,7 +107,7 @@ ChibiBooru is a self-hosted image booru application built with a layered archite
          │
          ↓
 ┌─────────────────────────────────────────────────────────────┐
-│             SQLite Database (booru.db)                      │
+│             SQLite Database (data/booru.db)                      │
 │                                                             │
 │  • Images table with FTS5 full-text search                 │
 │  • Tags, Sources, Pools                                    │

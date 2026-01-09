@@ -7,7 +7,7 @@ from contextlib import contextmanager
 
 logger = logging.getLogger('chibibooru.Database')
 
-DB_FILE = "booru.db"
+DB_FILE = "data/booru.db"
 
 # Thread-local storage for connection pooling
 # Each thread gets its own connection, which is reused across multiple calls

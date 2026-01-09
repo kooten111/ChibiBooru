@@ -21,8 +21,8 @@ ChibiBooru uses **SQLite 3** as its embedded database with several performance o
 - **Triggers**: Automatic FTS updates on data changes
 
 ### Database Files
-- **Main Database**: `booru.db` - Core application data
-- **Rating Model**: `rating_model.db` - AI rating inference data (deprecated, moved to main DB)
+- **Main Database**: `data/booru.db` - Core application data
+- **Rating Model**: `data/rating_model.db` - AI rating inference data (deprecated, moved to main DB)
 
 ### Connection Settings
 ```python

@@ -163,7 +163,7 @@ INGEST_DIRECTORY = "./ingest"            # Auto-processing folder
 ```python
 TAGS_FILE = "./tags.json"                # Legacy tags file
 METADATA_DIR = "./metadata"              # Metadata storage
-DATABASE_PATH = "./booru.db"             # Main database
+DATABASE_PATH = "./data/booru.db"             # Main database
 ```
 
 ---
