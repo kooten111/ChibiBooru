@@ -282,6 +282,29 @@ ML_WORKER_SOCKET = os.environ.get('ML_WORKER_SOCKET', '/tmp/chibibooru_ml_worker
 # All tag storage uses int32 IDs for memory efficiency (~200-500 MB savings)
 
 
+# ==================== ML MODEL TRAINING CONFIGURATION ====================
+
+# Character prediction model configuration
+CHARACTER_MODEL_CONFIG = {
+    'min_confidence': float(os.environ.get('CHAR_MIN_CONFIDENCE', 0.3)),
+    'max_predictions': int(os.environ.get('CHAR_MAX_PREDICTIONS', 3)),
+    'pair_weight_multiplier': float(os.environ.get('CHAR_PAIR_WEIGHT_MULTIPLIER', 1.5)),
+    'min_pair_cooccurrence': int(os.environ.get('CHAR_MIN_PAIR_COOCCURRENCE', 10)),
+    'min_tag_frequency': int(os.environ.get('CHAR_MIN_TAG_FREQUENCY', 10)),
+    'max_pair_count': int(os.environ.get('CHAR_MAX_PAIR_COUNT', 10000)),
+    'pruning_threshold': float(os.environ.get('CHAR_PRUNING_THRESHOLD', 0.0)),
+}
+
+# Rating prediction model configuration
+RATING_MODEL_CONFIG = {
+    'min_confidence': float(os.environ.get('RATING_MIN_CONFIDENCE', 0.4)),
+    'pair_weight_multiplier': float(os.environ.get('RATING_PAIR_WEIGHT_MULTIPLIER', 1.5)),
+    'min_tag_frequency': int(os.environ.get('RATING_MIN_TAG_FREQUENCY', 10)),
+    'min_pair_cooccurrence': int(os.environ.get('RATING_MIN_PAIR_COOCCURRENCE', 10)),
+    'max_pair_count': int(os.environ.get('RATING_MAX_PAIR_COUNT', 5000)),
+}
+
+
 def is_supported_media(filepath: str) -> bool:
     """Check if a file is a supported media type."""
     return filepath.lower().endswith(SUPPORTED_MEDIA_EXTENSIONS)

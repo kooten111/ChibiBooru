@@ -13,6 +13,8 @@ from collections import defaultdict, Counter
 from itertools import combinations
 from datetime import datetime
 from typing import Optional, Dict, List, Tuple
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from database import get_db_connection
 from repositories.character_repository import get_or_create_tag_id, get_or_create_character_id
@@ -96,20 +98,7 @@ def update_config(key: str, value: float) -> None:
 
 def reset_config_to_defaults() -> None:
     """Reset all config to factory defaults."""
-    defaults = {
-        'min_character_samples': 10,
-        'tag_weight': 1.0,
-        'vector_weight': 0.0,
-        'visual_weight': 0.0,
-        'k_neighbors': 5,
-        'min_confidence': 0.3,
-        'max_predictions': 3,
-        'pair_weight_multiplier': 1.5,
-        'min_pair_cooccurrence': 5,
-        'min_tag_frequency': 10,
-        'max_pair_count': 10000,
-        'pruning_threshold': 0.0,
-    }
+    defaults = get_default_config()
 
     with get_model_connection() as conn:
         cur = conn.cursor()
@@ -547,12 +536,19 @@ def train_model() -> Dict:
     Raises:
         ValueError: If not enough training samples available
     """
+    import sys
     start_time = datetime.now()
+
+    def report_progress(percent, message):
+        """Report progress to stdout for subprocess monitoring."""
+        print(f"PROGRESS:{percent}:{message}")
+        sys.stdout.flush()
 
     config = get_config()
     min_samples = int(config['min_character_samples'])
 
     # Get training data
+    report_progress(5, "Loading training data...")
     character_images = get_character_tagged_images()
 
     if len(character_images) < min_samples:
@@ -566,41 +562,48 @@ def train_model() -> Dict:
     for _, characters, _ in character_images:
         all_characters.update(characters)
 
-    print(f"Training on {len(character_images)} images with {len(all_characters)} unique characters...")
+    report_progress(15, f"Loaded {len(character_images)} images with {len(all_characters)} characters")
 
     # Calculate individual tag weights
-    print("Calculating individual tag weights...")
+    report_progress(25, "Calculating tag weights...")
     tag_weights = calculate_tag_weights(character_images)
-    print(f"Calculated weights for {len(tag_weights)} tag-character pairs")
+    report_progress(40, f"Calculated {len(tag_weights)} tag-character pairs")
 
     # Find frequent tag pairs
-    print("Finding frequent tag pairs...")
+    report_progress(45, "Finding frequent tag pairs...")
     frequent_pairs = find_frequent_tag_pairs(
         character_images,
         min_cooccurrence=int(config['min_pair_cooccurrence']),
         min_tag_frequency=int(config['min_tag_frequency']),
         limit=int(config['max_pair_count'])
     )
-    print(f"Found {len(frequent_pairs)} frequent tag pairs")
+    report_progress(55, f"Found {len(frequent_pairs)} frequent pairs")
 
     # Calculate pair weights
-    print("Calculating tag pair weights...")
+    report_progress(60, "Calculating pair weights...")
     pair_weights = calculate_tag_pair_weights(character_images, frequent_pairs)
-    print(f"Calculated weights for {len(pair_weights)} pair-character combinations")
+    report_progress(75, f"Calculated {len(pair_weights)} pair-character combinations")
 
-    # Store weights in database
+    report_progress(80, "Writing to database...")
+
+    # Store weights in database with batch commits
+    BATCH_SIZE = 5000  # Commit every 5000 inserts
+    
     with get_model_connection() as conn:
         cur = conn.cursor()
 
         # Clear old weights
         cur.execute("DELETE FROM character_tag_weights")
         cur.execute("DELETE FROM character_tag_pair_weights")
+        conn.commit()
 
         # Get pruning threshold from config
         pruning_threshold = config.get('pruning_threshold', 0.0)
 
-        # Insert new tag weights with optional pruning
+        # Insert new tag weights with batch commits
+        print("Writing tag weights in batches...")
         tag_weight_count = 0
+        batch_count = 0
         for (tag, character), (weight, sample_count) in tag_weights.items():
             # Apply pruning threshold (disabled by default with 0.0)
             if abs(weight) >= pruning_threshold:
@@ -611,9 +614,25 @@ def train_model() -> Dict:
                     (tag_id, character_id, weight, sample_count)
                 )
                 tag_weight_count += 1
+                batch_count += 1
+                
+                if batch_count >= BATCH_SIZE:
+                    conn.commit()
+                    batch_count = 0
+                    print(f"  Committed {tag_weight_count} tag weights...")
+        
+        conn.commit()  # Final commit for tag weights
+        print(f"Finished writing {tag_weight_count} tag weights")
+        
+        # Free tag_weights memory before processing pairs
+        del tag_weights
+        import gc
+        gc.collect()
 
-        # Insert new pair weights with optional pruning
+        # Insert new pair weights with batch commits
+        print("Writing pair weights in batches...")
         pair_weight_count = 0
+        batch_count = 0
         for (tag1, tag2, character), (weight, co_count) in pair_weights.items():
             # Apply pruning threshold (disabled by default with 0.0)
             if abs(weight) >= pruning_threshold:
@@ -628,6 +647,19 @@ def train_model() -> Dict:
                     (tag1_id, tag2_id, character_id, weight, co_count)
                 )
                 pair_weight_count += 1
+                batch_count += 1
+                
+                if batch_count >= BATCH_SIZE:
+                    conn.commit()
+                    batch_count = 0
+                    print(f"  Committed {pair_weight_count} pair weights...")
+        
+        conn.commit()  # Final commit for pair weights
+        print(f"Finished writing {pair_weight_count} pair weights")
+        
+        # Free pair_weights memory
+        del pair_weights
+        gc.collect()
 
         # Update metadata
         cur.execute(
@@ -644,7 +676,7 @@ def train_model() -> Dict:
         )
         cur.execute(
             "INSERT OR REPLACE INTO character_model_metadata (key, value, updated_at) VALUES (?, ?, ?)",
-            ('unique_tags_used', str(len({tag for tag, _ in tag_weights.keys()})), datetime.now())
+            ('unique_tags_used', str(tag_weight_count), datetime.now())
         )
         cur.execute(
             "INSERT OR REPLACE INTO character_model_metadata (key, value, updated_at) VALUES (?, ?, ?)",
@@ -724,6 +756,7 @@ def calculate_character_scores(image_tags: List[str],
                                config: Dict) -> Dict[str, float]:
     """
     Calculate raw scores for each character.
+    Optimized to use direct dictionary lookups instead of iterating through all characters.
 
     Args:
         image_tags: Tags to score
@@ -734,31 +767,27 @@ def calculate_character_scores(image_tags: List[str],
     Returns:
         dict: {character: raw_score}
     """
-    # Get all characters that have weights
-    all_characters = set()
-    for tag, character in tag_weights.keys():
-        all_characters.add(character)
-    for tag1, tag2, character in pair_weights.keys():
-        all_characters.add(character)
+    from collections import defaultdict
+    scores = defaultdict(float)
 
-    scores = {character: 0.0 for character in all_characters}
-
-    # Accumulate individual tag weights
+    # Accumulate individual tag weights - direct lookup for each tag
     for tag in image_tags:
-        for character in all_characters:
-            weight = tag_weights.get((tag, character), 0.0)
-            scores[character] += weight
+        # Only check weights that exist for this tag (direct lookup)
+        for (tag_key, character), weight in tag_weights.items():
+            if tag_key == tag:
+                scores[character] += weight
 
-    # Accumulate tag pair weights
+    # Accumulate tag pair weights - only check pairs that exist
     pair_multiplier = config['pair_weight_multiplier']
     sorted_tags = sorted(image_tags)
 
     for tag1, tag2 in combinations(sorted_tags, 2):
-        for character in all_characters:
-            pair_weight = pair_weights.get((tag1, tag2, character), 0.0)
-            scores[character] += pair_weight * pair_multiplier
+        # Direct lookup for this specific pair (check both orders)
+        for (t1, t2, character), pair_weight in pair_weights.items():
+            if (t1 == tag1 and t2 == tag2) or (t1 == tag2 and t2 == tag1):
+                scores[character] += pair_weight * pair_multiplier
 
-    return scores
+    return dict(scores)
 
 
 def scores_to_probabilities(scores: Dict[str, float]) -> Dict[str, float]:
@@ -956,21 +985,97 @@ def infer_all_untagged_images() -> Dict:
     return stats
 
 
-def precompute_predictions_for_untagged_images(limit: int = None, progress_callback=None, batch_size: int = 500) -> Dict:
+def _process_image_chunk_worker(args):
+    """
+    Worker function for processing a chunk of images in parallel.
+    This runs in a separate process, so it needs to load weights itself.
+    
+    Args:
+        args: Tuple of (image_chunk, tag_weights, pair_weights, config)
+            image_chunk: List of (image_id, tags_with_extended) tuples
+    
+    Returns:
+        dict: {'predictions': {image_id: predictions}, 'stats': {...}}
+    """
+    import os
+    import multiprocessing
+    import sys
+    
+    # Log which process is handling this (for debugging)
+    # Use print for subprocess visibility
+    process_id = os.getpid()
+    worker_name = multiprocessing.current_process().name
+    
+    # Log to monitor service (visible in UI) - but this might not work in subprocess
+    try:
+        from services import monitor_service
+        monitor_service.add_log(f"Worker {worker_name} (PID {process_id}) starting", "info")
+    except:
+        pass
+    
+    print(f"[WORKER] {worker_name} (PID {process_id}) starting to process chunk", file=sys.stderr, flush=True)
+    sys.stderr.flush()
+    
+    image_chunk, tag_weights, pair_weights, config = args
+    
+    print(f"[WORKER] {worker_name} (PID {process_id}) processing {len(image_chunk)} images", file=sys.stderr, flush=True)
+    logger.info(f"Worker {worker_name} (PID {process_id}) processing {len(image_chunk)} images")
+    
+    predictions_dict = {}
+    stats = {
+        'processed': 0,
+        'predictions_stored': 0,
+        'skipped_no_tags': 0
+    }
+    
+    for image_id, tags_with_extended in image_chunk:
+        stats['processed'] += 1
+        
+        if not tags_with_extended:
+            stats['skipped_no_tags'] += 1
+            continue
+        
+        # Extract tag names
+        tag_names = [tag for tag, _ in tags_with_extended]
+        
+        # Predict (without storing - main process will batch store)
+        predictions = predict_characters(tag_names, tag_weights, pair_weights, config,
+                                        store_predictions=False, image_id=image_id)
+        
+        if predictions:
+            predictions_dict[image_id] = predictions
+            stats['predictions_stored'] += len(predictions)
+    
+    print(f"[WORKER] {worker_name} (PID {process_id}) completed: {stats['processed']} processed, {stats['predictions_stored']} predictions", file=sys.stderr, flush=True)
+    logger.info(f"Worker {worker_name} (PID {process_id}) completed: {stats['processed']} processed, {stats['predictions_stored']} predictions")
+    return {'predictions': predictions_dict, 'stats': stats}
+
+
+def precompute_predictions_for_untagged_images(limit: int = None, progress_callback=None, batch_size: int = 200, num_workers: int = None) -> Dict:
     """
     Pre-compute and store character predictions for untagged images without applying them.
     This allows the review interface to load quickly.
     
-    Uses batched processing to reduce memory usage.
+    Uses batched processing with threading to reduce memory usage and utilize multiple CPU cores.
     
     Args:
         limit: Optional limit on number of images to process
         progress_callback: Optional callback function(processed, total)
-        batch_size: Number of images to process per batch (default: 500)
+        batch_size: Number of images to process per batch (default: 200)
+        num_workers: Number of parallel worker threads (default: auto-detect from CPU count, max 4)
     
     Returns:
         dict: Statistics about precomputation
     """
+    # Log to monitor service (visible in UI) - do this FIRST
+    try:
+        from services import monitor_service
+        monitor_service.add_log("=== Starting character prediction precomputation ===", "info")
+    except Exception as e:
+        logger.error(f"Failed to log to monitor_service: {e}")
+    
+    logger.info("=== precompute_predictions_for_untagged_images called ===")
+    
     start_time = datetime.now()
     
     # Load weights once for efficiency
@@ -992,61 +1097,204 @@ def precompute_predictions_for_untagged_images(limit: int = None, progress_callb
         'total': total_images
     }
     
-    logger.info(f"Pre-computing predictions for {total_images} untagged images (batch size: {batch_size})...")
+    # Determine number of workers
+    if num_workers is None:
+        try:
+            import config
+            num_workers = getattr(config, 'MAX_WORKERS', None)
+        except:
+            num_workers = None
+        
+        if num_workers is None or num_workers <= 0:
+            cpu_count = multiprocessing.cpu_count()
+            num_workers = max(1, min(cpu_count - 1, 4))  # Use up to 4 workers, leave 1 core free
+    
+    import os
+    import sys
+    main_pid = os.getpid()
+    
+    # Log to monitor service (visible in UI)
+    try:
+        monitor_service.add_log(f"Main process PID: {main_pid}, Using {num_workers} worker processes", "info")
+        monitor_service.add_log(f"Pre-computing predictions for {total_images} untagged images (batch size: {batch_size})", "info")
+    except:
+        pass
+    
+    print(f"[MAIN] Main process PID: {main_pid}", file=sys.stderr, flush=True)
+    print(f"[MAIN] Starting ProcessPoolExecutor with {num_workers} workers...", file=sys.stderr, flush=True)
+    logger.info(f"Main process PID: {main_pid}")
+    logger.info(f"Pre-computing predictions for {total_images} untagged images (batch size: {batch_size}, workers: {num_workers})...")
+    
+    # Initialize progress callback with total count
+    if progress_callback:
+        progress_callback(0, total_images)
+    
+    # Import batch storage function
+    from repositories.character_predictions_repository import store_predictions_batch
     
     # Process in batches to reduce memory usage
     offset = 0
     remaining = total_images
     
-    while remaining > 0:
-        # Get current batch
-        current_batch_size = min(batch_size, remaining)
-        untagged_images = get_untagged_character_images_batched(
-            batch_size=current_batch_size,
-            offset=offset,
-            limit=limit
-        )
-        
-        if not untagged_images:
-            # No more images to process
-            break
-        
-        # Process current batch
-        for image_id, tags_with_extended in untagged_images:
-            stats['processed'] += 1
+    # Use multiprocessing for CPU-bound prediction work
+    # Force 'spawn' method for better process isolation (works on all platforms)
+    try:
+        current_method = multiprocessing.get_start_method(allow_none=True)
+        try:
+            monitor_service.add_log(f"Multiprocessing start method: {current_method}", "info")
+        except:
+            pass
+        print(f"[MAIN] Current multiprocessing start method: {current_method}", file=sys.stderr, flush=True)
+        if current_method != 'spawn':
+            try:
+                multiprocessing.set_start_method('spawn', force=True)
+                try:
+                    monitor_service.add_log("Changed start method to 'spawn'", "info")
+                except:
+                    pass
+                print(f"[MAIN] Changed start method to 'spawn'", file=sys.stderr, flush=True)
+            except RuntimeError as e:
+                try:
+                    monitor_service.add_log(f"Could not change start method: {e}", "warning")
+                except:
+                    pass
+                print(f"[MAIN] Could not change start method (may already be set): {e}", file=sys.stderr, flush=True)
+    except Exception as e:
+        try:
+            monitor_service.add_log(f"Warning checking start method: {e}", "warning")
+        except:
+            pass
+        print(f"[MAIN] Warning checking start method: {e}", file=sys.stderr, flush=True)
+    
+    logger.info(f"Starting ProcessPoolExecutor with {num_workers} workers...")
+    try:
+        monitor_service.add_log(f"Creating ProcessPoolExecutor with {num_workers} workers for parallel processing", "info")
+    except:
+        pass
+    
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        while remaining > 0:
+            # Get current batch
+            current_batch_size = min(batch_size, remaining)
+            untagged_images = get_untagged_character_images_batched(
+                batch_size=current_batch_size,
+                offset=offset,
+                limit=limit
+            )
             
-            if not tags_with_extended:
-                stats['skipped_no_tags'] += 1
-                continue
+            if not untagged_images:
+                # No more images to process
+                break
             
-            # Extract tag names
-            tag_names = [tag for tag, _ in tags_with_extended]
+            # Split batch into chunks for parallel processing
+            chunk_size = max(1, len(untagged_images) // num_workers)
+            if chunk_size == 0:
+                chunk_size = 1
             
-            # Predict and store (without applying)
-            predictions = predict_characters(tag_names, tag_weights, pair_weights, config,
-                                            store_predictions=True, image_id=image_id)
+            chunks = []
+            for i in range(0, len(untagged_images), chunk_size):
+                chunk = untagged_images[i:i + chunk_size]
+                if chunk:
+                    chunks.append((chunk, tag_weights, pair_weights, config))
             
-            if predictions:
-                stats['predictions_stored'] += len(predictions)
+            try:
+                monitor_service.add_log(f"Split batch of {len(untagged_images)} images into {len(chunks)} chunks", "info")
+            except:
+                pass
+            print(f"[MAIN] Split batch of {len(untagged_images)} images into {len(chunks)} chunks (chunk size: {chunk_size})", file=sys.stderr, flush=True)
+            logger.info(f"Split batch of {len(untagged_images)} images into {len(chunks)} chunks (chunk size: {chunk_size})")
             
-            if progress_callback:
-                progress_callback(stats['processed'], total_images)
-        
-        # Update offset and remaining count
-        offset += len(untagged_images)
-        remaining = total_images - offset
-        
-        # Log progress
-        if stats['processed'] % 100 == 0 or len(untagged_images) < current_batch_size:
-            logger.info(f"  Processed {stats['processed']}/{total_images}...")
-        
-        # If we got fewer images than requested, we're done
-        if len(untagged_images) < current_batch_size:
-            break
-        
-        # Check if we've hit the limit
-        if limit and stats['processed'] >= limit:
-            break
+            # Submit all chunks to workers
+            future_to_chunk = {}
+            for chunk_idx, chunk in enumerate(chunks):
+                try:
+                    try:
+                        monitor_service.add_log(f"Submitting chunk {chunk_idx + 1}/{len(chunks)} to worker...", "info")
+                    except:
+                        pass
+                    print(f"[MAIN] Submitting chunk {chunk_idx + 1}/{len(chunks)} to worker pool...", file=sys.stderr, flush=True)
+                    future = executor.submit(_process_image_chunk_worker, chunk)
+                    future_to_chunk[future] = chunk
+                    print(f"[MAIN] Chunk {chunk_idx + 1} submitted successfully", file=sys.stderr, flush=True)
+                    logger.info(f"Submitted chunk {chunk_idx + 1}/{len(chunks)} to worker pool")
+                except Exception as e:
+                    error_msg = f"ERROR submitting chunk {chunk_idx + 1}: {e}"
+                    try:
+                        monitor_service.add_log(error_msg, "error")
+                    except:
+                        pass
+                    print(f"[MAIN] {error_msg}", file=sys.stderr, flush=True)
+                    logger.error(f"Error submitting chunk {chunk_idx + 1}: {e}", exc_info=True)
+                
+            # Collect results as they complete (progress updates as each chunk finishes)
+            all_predictions = {}
+            completed_chunks = 0
+            total_chunks = len(chunks)
+            
+            try:
+                monitor_service.add_log(f"Waiting for {total_chunks} chunks to complete...", "info")
+            except:
+                pass
+            
+            for future in as_completed(future_to_chunk):
+                try:
+                    result = future.result()
+                    all_predictions.update(result['predictions'])
+                    
+                    # Aggregate stats
+                    chunk_stats = result['stats']
+                    stats['processed'] += chunk_stats['processed']
+                    stats['predictions_stored'] += chunk_stats['predictions_stored']
+                    stats['skipped_no_tags'] += chunk_stats['skipped_no_tags']
+                    
+                    completed_chunks += 1
+                    
+                    try:
+                        monitor_service.add_log(f"Chunk {completed_chunks}/{total_chunks} completed: {chunk_stats['processed']} processed", "info")
+                    except:
+                        pass
+                    
+                    # Update progress after each chunk completes (more frequent updates)
+                    # This gives better progress visibility since chunks complete at different times
+                    if progress_callback:
+                        progress_callback(stats['processed'], total_images)
+                        
+                except Exception as e:
+                    error_msg = f"Error processing chunk: {e}"
+                    try:
+                        monitor_service.add_log(error_msg, "error")
+                    except:
+                        pass
+                    logger.error(error_msg, exc_info=True)
+                    completed_chunks += 1  # Count failed chunks too
+            
+            # Batch store all predictions from this batch
+            if all_predictions:
+                min_confidence = config.get('min_confidence', 0.3)
+                store_predictions_batch(all_predictions, min_confidence=min_confidence)
+                all_predictions = {}  # Clear to free memory
+            
+            # Get batch length before clearing
+            batch_length = len(untagged_images)
+            
+            # Clear the batch data to free memory
+            del untagged_images
+            
+            # Update offset and remaining count
+            offset += batch_length
+            remaining = total_images - offset
+            
+            # Log progress
+            if stats['processed'] % 100 == 0:
+                logger.info(f"  Processed {stats['processed']}/{total_images}...")
+            
+            # If we got fewer images than requested, we're done
+            if batch_length < current_batch_size:
+                break
+            
+            # Check if we've hit the limit
+            if limit and stats['processed'] >= limit:
+                break
     
     duration = (datetime.now() - start_time).total_seconds()
     stats['duration_seconds'] = round(duration, 2)

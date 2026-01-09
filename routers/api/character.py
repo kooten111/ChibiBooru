@@ -14,47 +14,142 @@ logger = logging.getLogger(__name__)
 @api_blueprint.route('/character/train', methods=['POST'])
 @api_handler()
 async def api_train_character_model():
-    """Train the character inference model via ML Worker."""
-    try:
-        from ml_worker.client import get_ml_worker_client
-        client = get_ml_worker_client()
-        stats = client.train_character_model(timeout=600.0)
-        return {"stats": stats, "source": "ml_worker"}
-    except Exception as e:
-        logger.warning(f"ML Worker unavailable, falling back to direct training: {e}")
-        # Fallback to direct call if ML Worker unavailable
-        stats = character_service.train_model()
-        return {"stats": stats, "source": "direct", "warning": "ML Worker unavailable"}
+    """Train the character inference model as a background task via subprocess (memory freed on exit)."""
+    import uuid
+    import asyncio
+    import subprocess
+    import json
+    import os
+    from services.background_tasks import task_manager
+    from services import monitor_service
+    
+    task_id = f"train_char_{uuid.uuid4().hex[:8]}"
+    
+    async def train_task(task_id, manager):
+        """Background task that runs the training worker and parses progress."""
+        monitor_service.add_log("Starting character model training...", "info")
+        await manager.update_progress(task_id, 0, 100, "Starting training...")
+        
+        worker_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'character_train_worker.py')
+        python_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'venv', 'bin', 'python3')
+        
+        process = subprocess.Popen(
+            [python_path, worker_script],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1, # Line buffered
+            cwd=os.path.dirname(worker_script)
+        )
+        
+        try:
+            stats = {}
+            # Read streaming output
+            while True:
+                line = process.stdout.readline()
+                if not line and process.poll() is not None:
+                    break
+                
+                if line:
+                    line = line.strip()
+                    if line.startswith('PROGRESS:'):
+                        # Format: PROGRESS:percent:message
+                        parts = line.split(':', 2)
+                        if len(parts) >= 3:
+                            percent = int(parts[1])
+                            message = parts[2]
+                            await manager.update_progress(task_id, percent, 100, message)
+                    elif line.startswith('STATS_JSON:'):
+                        try:
+                            stats = json.loads(line[11:])
+                        except:
+                            pass
+                    elif line.startswith('ERROR:'):
+                         monitor_service.add_log(f"Training Worker Error: {line[6:]}", "error")
+
+            # Check return code
+            if process.poll() != 0:
+                stderr = process.stderr.read()
+                raise Exception(f"Training failed: {stderr}")
+            
+            # Use data from stats
+            sample_count = stats.get('training_samples', 0)
+            tag_count = stats.get('tag_weights_count', 0)
+            pair_count = stats.get('pair_weights_count', 0)
+            
+            monitor_service.add_log(f"Training complete: {sample_count} samples, {tag_count} weights, {pair_count} pairs", "success")
+            await manager.update_progress(task_id, 100, 100, "Training complete!")
+            
+            return {
+                "success": True,
+                "stats": stats
+            }
+            
+        except Exception as e:
+            process.kill()
+            monitor_service.add_log(f"Training task crashed: {str(e)}", "error")
+            raise e
+            
+    # Start the task
+    await task_manager.start_task(task_id, train_task)
+    
+    return {"success": True, "task_id": task_id}
 
 
 @api_blueprint.route('/character/infer', methods=['POST'])
 @api_handler()
 async def api_infer_characters():
-    """Run inference on untagged images or a specific image via ML Worker."""
+    """Run inference as a subprocess (memory freed on exit)."""
+    import asyncio
+    import subprocess
+    import json
+    import os
+    
     data = await request.get_json() or {}
     image_id = data.get('image_id')
-
-    try:
-        from ml_worker.client import get_ml_worker_client
-        client = get_ml_worker_client()
+    
+    worker_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'character_infer_worker.py')
+    python_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'venv', 'bin', 'python3')
+    
+    def run_inference():
+        """Run inference in subprocess and parse results."""
+        cmd = [python_path, worker_script]
+        if image_id:
+            cmd.extend(['--image-id', str(image_id)])
         
-        if image_id:
-            # Infer single image
-            result = client.infer_characters(image_ids=[image_id], timeout=60.0)
-            return {"result": result, "source": "ml_worker"}
-        else:
-            # Infer all untagged images
-            stats = client.infer_characters(image_ids=None, timeout=600.0)
-            return {"stats": stats, "source": "ml_worker"}
-    except Exception as e:
-        logger.warning(f"ML Worker unavailable, falling back to direct inference: {e}")
-        # Fallback to direct call if ML Worker unavailable
-        if image_id:
-            result = character_service.infer_character_for_image(image_id)
-            return {"result": result, "source": "direct", "warning": "ML Worker unavailable"}
-        else:
-            stats = character_service.infer_all_untagged_images()
-            return {"stats": stats, "source": "direct", "warning": "ML Worker unavailable"}
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            cwd=os.path.dirname(worker_script)
+        )
+        
+        # Parse output
+        stats = {}
+        inference_result = {}
+        for line in result.stdout.split('\n'):
+            if line.startswith('STATS_JSON:'):
+                try:
+                    stats = json.loads(line[11:])
+                except:
+                    pass
+            elif line.startswith('RESULT_JSON:'):
+                try:
+                    inference_result = json.loads(line[12:])
+                except:
+                    pass
+        
+        if result.returncode != 0:
+            raise Exception(f"Inference failed: {result.stderr}")
+        
+        return stats if not image_id else inference_result
+    
+    result_data = await asyncio.to_thread(run_inference)
+    
+    if image_id:
+        return {"result": result_data, "source": "subprocess"}
+    else:
+        return {"stats": result_data, "source": "subprocess"}
 
 
 @api_blueprint.route('/character/infer/<int:image_id>', methods=['POST'])
@@ -265,89 +360,112 @@ async def api_top_weighted_tags_character():
 @api_blueprint.route('/character/precompute', methods=['POST'])
 @api_handler()
 async def api_precompute_predictions():
-    """Pre-compute and store character predictions for untagged images (without applying them)."""
+    """Pre-compute and store character predictions using standalone workers."""
     import uuid
     import asyncio
+    import subprocess
+    import os
     from services.background_tasks import task_manager
     from services import monitor_service
+    import config
     
     data = await request.get_json() or {}
-    limit = data.get('limit')  # Optional limit
-    batch_size = data.get('batch_size', 500)  # Default batch size: 500 images per batch
+    num_workers = data.get('num_workers', config.MAX_WORKERS)
     
     task_id = f"precompute_char_{uuid.uuid4().hex[:8]}"
     
-    async def precompute_task(task_id, manager, limit, batch_size):
-        """Background task for precomputing character predictions with progress updates."""
+    async def precompute_task(task_id, manager, num_workers):
+        """Background task that launches and monitors worker processes."""
         from services import monitor_service as mon
-        
-        mon.add_log(f"Starting character prediction precomputation (batch size: {batch_size})...", "info")
-        
-        loop = asyncio.get_running_loop()
-        
         import time
-        last_update_time = 0
         
-        def progress_callback(processed, total):
-            nonlocal last_update_time
-            current_time = time.time()
-            
-            # Throttle updates: only update if 0.1s passed OR it's the final update
-            if (current_time - last_update_time > 0.1) or (processed >= total):
-                last_update_time = current_time
-                future = asyncio.run_coroutine_threadsafe(
-                    manager.update_progress(
-                        task_id, 
-                        processed, 
-                        total, 
-                        f"Processing images... ({processed}/{total})"
-                    ), 
-                    loop
-                )
-                # We don't wait for the future
+        mon.add_log(f"Starting character prediction precomputation with {num_workers} workers...", "info")
+        
+        # Get total count for progress tracking
+        total_count = character_service.get_untagged_character_images_count()
+        await manager.update_progress(task_id, 0, total_count, f"Launching {num_workers} workers...")
+        
+        # Launch worker processes
+        workers = []
+        worker_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'character_worker.py')
         
         try:
-            # Run synchronous service function in thread
-            stats = await asyncio.to_thread(
-                character_service.precompute_predictions_for_untagged_images,
-                limit=limit,
-                progress_callback=progress_callback,
-                batch_size=batch_size
-            )
+            for i in range(num_workers):
+                env = os.environ.copy()
+                env['WORKER_ID'] = f'worker-{i+1}'
+                env['API_BASE_URL'] = f'http://localhost:{config.FLASK_PORT}'
+                env['BATCH_SIZE'] = '50'
+                
+                # Launch worker
+                process = subprocess.Popen(
+                    [os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'venv', 'bin', 'python3'), worker_script],
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+                workers.append(process)
+                mon.add_log(f"Launched worker {i+1} (PID {process.pid})", "info")
             
-            processed = stats.get('processed', 0)
-            total = stats.get('total', processed)  # Get total from stats, fallback to processed
-            predictions_stored = stats.get('predictions_stored', 0)
-            duration = stats.get('duration_seconds', 0)
             
-            result_msg = f"✓ Precomputation complete: {processed} processed, {predictions_stored} predictions stored"
-            if duration:
-                result_msg += f" in {duration}s"
-            mon.add_log(result_msg, "success")
+            # Monitor progress by polling untagged count
+            last_processed = 0
+            start_time = time.time()
             
-            # Update task to 100%
-            await manager.update_progress(task_id, total, total, "Complete")
+            while any(w.poll() is None for w in workers):
+                await asyncio.sleep(1)
+                
+                # Check current progress from database
+                current_untagged = character_service.get_untagged_character_images_count()
+                current_processed = total_count - current_untagged
+                
+                if current_processed != last_processed:
+                    last_processed = current_processed
+                    elapsed = int(time.time() - start_time)
+                    await manager.update_progress(
+                        task_id, 
+                        current_processed, 
+                        total_count, 
+                        f"Processing... ({current_processed}/{total_count}) - {elapsed}s elapsed"
+                    )
+
+                
+            # Wait for all workers to complete
+            for worker in workers:
+                worker.wait()
+                if worker.returncode != 0:
+                    stderr = worker.stderr.read().decode() if worker.stderr else ""
+                    mon.add_log(f"Worker {worker.pid} failed with code {worker.returncode}: {stderr[:200]}", "error")
+            
+            # Get final stats
+            final_count = total_count - character_service.get_untagged_character_images_count()
+            
+            await manager.update_progress(task_id, total_count, total_count, "Complete")
+            mon.add_log(f"✓ Precomputation complete: {final_count} images processed", "success")
             
             return {
-                'processed': processed,
-                'predictions_stored': predictions_stored,
-                'skipped_no_tags': stats.get('skipped_no_tags', 0),
-                'duration_seconds': duration,
-                'message': f"Precomputed {predictions_stored} predictions for {processed} images"
+                'processed': final_count,
+                'num_workers': num_workers,
+                'message': f'Processed {final_count} images with {num_workers} workers'
             }
+            
         except Exception as e:
+            # Clean up workers on error
+            for worker in workers:
+                if worker.poll() is None:
+                    worker.terminate()
             mon.add_log(f"Precomputation failed: {str(e)}", "error")
             raise
     
     # Start background task
     monitor_service.add_log("Character prediction precomputation task started...", "info")
-    await task_manager.start_task(task_id, precompute_task, limit, batch_size)
+    await task_manager.start_task(task_id, precompute_task, num_workers)
     
     return {
         'status': 'started',
         'task_id': task_id,
-        'message': 'Precomputation started in background'
+        'message': f'Precomputation started with {num_workers} workers'
     }
+
 
 
 @api_blueprint.route('/character/images', methods=['GET'])
@@ -494,3 +612,108 @@ async def api_get_images_for_character():
             'images': images,
             'count': len(images)
         }
+
+# ============================================================================
+# Worker API Endpoints (for distributed processing)
+# ============================================================================
+
+@api_blueprint.route('/character/work', methods=['GET'])
+@api_handler()
+async def api_get_character_work():
+    """
+    Get a batch of work for character prediction workers.
+    Workers pull batches dynamically to keep busy.
+    """
+    batch_size = int(request.args.get('batch_size', 50))
+    worker_id = request.args.get('worker_id', 'unknown')
+    
+    import uuid
+    from services import monitor_service
+    
+    # Get a batch of untagged images
+    batch_id = f"batch_{uuid.uuid4().hex[:8]}"
+    
+    try:
+        images = character_service.get_untagged_character_images_batched(
+            batch_size=batch_size,
+            offset=0,  # Will track via session/state later if needed
+            limit=batch_size
+        )
+        
+        if not images:
+            return {
+                'images': [],
+                'batch_id': None,
+                'message': 'No more work available'
+            }
+        
+        # Format for worker
+        work_items = []
+        for image_id, tags_with_extended in images:
+            tag_names = [tag for tag, _ in tags_with_extended]
+            work_items.append({
+                'image_id': image_id,
+                'tags': tag_names
+            })
+        
+        monitor_service.add_log(f"Dispatched batch {batch_id} ({len(work_items)} images) to worker {worker_id}", "info")
+        
+        return {
+            'images': work_items,
+            'batch_id': batch_id,
+            'count': len(work_items)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error creating work batch: {e}", exc_info=True)
+        return error_response(f"Failed to create work batch: {str(e)}")
+
+
+@api_blueprint.route('/character/results', methods=['POST'])
+@api_handler()
+async def api_submit_character_results():
+    """
+    Accept processed results from a worker.
+    Stores predictions in the database.
+    """
+    data = await request.get_json()
+    batch_id = data.get('batch_id')
+    worker_id = data.get('worker_id', 'unknown')
+    results = data.get('results', {})
+    
+    from services import monitor_service
+    from repositories.character_predictions_repository import store_predictions_batch
+    
+    try:
+        predictions = results.get('predictions', {})
+        stats = results.get('stats', {})
+        
+        if not predictions:
+            monitor_service.add_log(f"Worker {worker_id} submitted batch {batch_id} with no predictions", "warning")
+            return success_response("No predictions to store")
+        
+        # Store all predictions
+        config = character_service.get_config()
+        min_confidence = config.get('min_confidence', 0.3)
+        
+        # Convert string keys to int for image_id
+        predictions_int_keys = {
+            int(image_id): preds 
+            for image_id, preds in predictions.items()
+        }
+        
+        store_predictions_batch(predictions_int_keys, min_confidence=min_confidence)
+        
+        processed = stats.get('processed', 0)
+        predictions_stored = stats.get('predictions_stored', 0)
+        
+        monitor_service.add_log(
+            f"✓ Worker {worker_id} completed batch {batch_id}: {processed} processed, {predictions_stored} predictions stored",
+            "success"
+        )
+        
+        return success_response(f"Stored {predictions_stored} predictions from {processed} images")
+        
+    except Exception as e:
+        logger.error(f"Error storing worker results: {e}", exc_info=True)
+        return error_response(f"Failed to store results: {str(e)}")

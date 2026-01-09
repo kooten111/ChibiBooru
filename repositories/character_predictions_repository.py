@@ -148,3 +148,59 @@ def clear_all_predictions() -> int:
         count = cursor.rowcount
         conn.commit()
         return count
+
+
+def store_predictions_batch(predictions_by_image: Dict[int, List[tuple]], min_confidence: float = 0.0) -> int:
+    """
+    Store character predictions for multiple images in a single transaction.
+    Much faster than calling store_predictions individually.
+    
+    Args:
+        predictions_by_image: Dict mapping image_id to list of (character_name, confidence) tuples
+        min_confidence: Minimum confidence threshold for storing
+    
+    Returns:
+        Total number of predictions stored
+    """
+    if not predictions_by_image:
+        return 0
+    
+    # Filter and prepare all predictions
+    all_predictions = []
+    image_ids_to_clear = []
+    
+    for image_id, predictions in predictions_by_image.items():
+        if not predictions:
+            continue
+        
+        # Filter predictions above threshold
+        filtered = [(image_id, char, conf) for char, conf in predictions if conf >= min_confidence]
+        
+        if filtered:
+            all_predictions.extend(filtered)
+            image_ids_to_clear.append(image_id)
+    
+    if not all_predictions:
+        return 0
+    
+    # Batch delete and insert in a single transaction
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Clear existing predictions for all images in batch
+        if image_ids_to_clear:
+            placeholders = ','.join('?' * len(image_ids_to_clear))
+            cursor.execute(f"""
+                DELETE FROM character_predictions 
+                WHERE image_id IN ({placeholders})
+            """, image_ids_to_clear)
+        
+        # Insert all new predictions in one go
+        cursor.executemany("""
+            INSERT INTO character_predictions 
+            (image_id, character_name, confidence)
+            VALUES (?, ?, ?)
+        """, all_predictions)
+        
+        conn.commit()
+        return len(all_predictions)

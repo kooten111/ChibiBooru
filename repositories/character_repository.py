@@ -44,21 +44,18 @@ def _init_connection(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Insert default config
-    defaults = {
+    # Insert default config from centralized config
+    import config
+    defaults = config.CHARACTER_MODEL_CONFIG.copy()
+    
+    # Add character-specific settings not in centralized config
+    defaults.update({
         'min_character_samples': 10,
         'tag_weight': 1.0,
         'vector_weight': 0.0,  # Disabled by default (not implemented yet)
         'visual_weight': 0.0,  # Disabled by default (not implemented yet)
         'k_neighbors': 5,
-        'min_confidence': 0.3,
-        'max_predictions': 3,
-        'pair_weight_multiplier': 1.5,
-        'min_pair_cooccurrence': 5,
-        'min_tag_frequency': 10,
-        'max_pair_count': 10000,
-        'pruning_threshold': 0.0,  # Disabled by default (keep all weights)
-    }
+    })
 
     for key, value in defaults.items():
         cur.execute(

@@ -156,11 +156,11 @@ function updateConfigPanel(config) {
         if (display) display.textContent = parseFloat(value).toFixed(2);
     });
 
-    // Training parameters with defaults
+    // Training parameters with defaults matching config.py
     const trainingDefaults = {
-        'max_pair_count': 10000,
+        'max_pair_count': 5000,
         'min_tag_frequency': 10,
-        'min_pair_cooccurrence': 5
+        'min_pair_cooccurrence': 10
     };
 
     Object.keys(trainingDefaults).forEach(field => {

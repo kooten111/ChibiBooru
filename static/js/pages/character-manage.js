@@ -52,18 +52,18 @@ async function loadStats() {
         }
 
         const metadata = currentStats.metadata || {};
-        
+
         // Update header stats
         document.getElementById('untaggedCount').textContent = currentStats.untagged_images || '0';
         document.getElementById('untaggedMiniCount').textContent = currentStats.untagged_images || '0';
-        
+
         // Update insights panel
         const lastTrained = metadata.last_trained ? new Date(metadata.last_trained).toLocaleString() : 'Never';
         document.getElementById('lastTrained').textContent = lastTrained;
         document.getElementById('trainingSamples').textContent = metadata.training_sample_count || '0';
         document.getElementById('uniqueCharacters').textContent = metadata.unique_characters || '0';
         document.getElementById('uniqueTags').textContent = metadata.unique_tags_used || '0';
-        
+
         // Update footer
         document.getElementById('footerLastTrained').textContent = lastTrained;
         document.getElementById('footerTagsCount').textContent = metadata.unique_tags_used || '0';
@@ -82,7 +82,7 @@ async function loadStats() {
 
 async function loadAllCharacters(page = 1, search = '') {
     if (isLoadingCharacters) return;
-    
+
     try {
         isLoadingCharacters = true;
         const params = new URLSearchParams({
@@ -92,20 +92,20 @@ async function loadAllCharacters(page = 1, search = '') {
         if (search) {
             params.append('search', search);
         }
-        
+
         const response = await fetch(`/api/character/characters?${params}&include_distribution=false`);
         const data = await response.json();
-        
+
         if (page === 1) {
             allCharacters = data.characters || [];
         } else {
             // Append for pagination
             allCharacters = [...allCharacters, ...(data.characters || [])];
         }
-        
+
         currentPage = data.pagination?.page || 1;
         totalPages = data.pagination?.pages || 1;
-        
+
         updateCharacterCount();
         renderCharacterList();
         // Don't render distribution chart on initial load - it requires expensive distribution data
@@ -124,7 +124,7 @@ function updateCharacterCount() {
 
 function getFilteredAndSortedCharacters() {
     let filtered = [...allCharacters];
-    
+
     // Apply source filter
     if (currentSourceFilter !== 'all') {
         filtered = filtered.filter(char => {
@@ -134,14 +134,14 @@ function getFilteredAndSortedCharacters() {
             return true;
         });
     }
-    
+
     // Apply search filter
     const searchInput = document.getElementById('characterSearch');
     if (searchInput && searchInput.value) {
         const searchTerm = searchInput.value.toLowerCase();
         filtered = filtered.filter(c => c.name.toLowerCase().includes(searchTerm));
     }
-    
+
     // Sort characters
     filtered.sort((a, b) => {
         let aVal, bVal;
@@ -156,19 +156,19 @@ function getFilteredAndSortedCharacters() {
             return currentSortDirection === 'desc' ? bVal - aVal : aVal - bVal;
         }
     });
-    
+
     return filtered;
 }
 
 function renderCharacterList() {
     const listContainer = document.getElementById('characterList');
     const filtered = getFilteredAndSortedCharacters();
-    
+
     // Update mini stats
     document.getElementById('shownCount').textContent = filtered.length;
     const totalSamples = filtered.reduce((sum, char) => sum + (char.sample_count || 0), 0);
     document.getElementById('totalSamples').textContent = totalSamples;
-    
+
     if (filtered.length === 0) {
         listContainer.innerHTML = `
             <div class="character-empty-state">
@@ -179,9 +179,9 @@ function renderCharacterList() {
         `;
         return;
     }
-    
+
     const maxCount = Math.max(...filtered.map(c => c.total || 0), 1);
-    
+
     listContainer.innerHTML = filtered.map(character => {
         const total = character.total || 0;
         const ai = character.ai || 0;
@@ -189,9 +189,9 @@ function renderCharacterList() {
         const original = character.original || 0;
         const samples = character.sample_count || 0;
         const percentage = (total / maxCount) * 100;
-        
+
         const isSelected = selectedCharacter && selectedCharacter.name === character.name;
-        
+
         return `
             <div class="character-list-item ${isSelected ? 'selected' : ''}" data-character="${character.name}" onclick="selectCharacter('${character.name}')">
                 <div class="character-list-item-name">${character.name.replace(/_/g, ' ')}</div>
@@ -235,7 +235,7 @@ function updateConfig(config) {
         { key: 'min_confidence', label: 'Min Confidence', min: 0, max: 1, step: 0.05 },
         { key: 'max_predictions', label: 'Max Predictions per Image', min: 1, max: 10, step: 1 },
         { key: 'pair_weight_multiplier', label: 'Pair Weight Multiplier', min: 0.5, max: 3, step: 0.1 },
-        { key: 'min_pair_cooccurrence', label: 'Min Pair Co-occurrence', min: 2, max: 20, step: 1 },
+        { key: 'min_pair_cooccurrence', label: 'Min Pair Co-occurrence', min: 2, max: 50, step: 1 },
         { key: 'min_tag_frequency', label: 'Min Tag Frequency', min: 5, max: 50, step: 5 },
         { key: 'max_pair_count', label: 'Max Tag Pairs', min: 5000, max: 200000, step: 5000 },
     ];
@@ -256,7 +256,7 @@ function updateConfig(config) {
 function selectCharacter(characterName) {
     selectedCharacter = allCharacters.find(c => c.name === characterName);
     if (!selectedCharacter) return;
-    
+
     // Update selected state in list
     document.querySelectorAll('.character-list-item').forEach(item => {
         if (item.dataset.character === characterName) {
@@ -265,20 +265,20 @@ function selectCharacter(characterName) {
             item.classList.remove('selected');
         }
     });
-    
+
     // Update details panel
     updateCharacterDetails();
-    
+
     // Load character images
     loadCharacterImages(characterName);
-    
+
     // Load character weights
     loadCharacterWeights(characterName);
 }
 
 function updateCharacterDetails() {
     const infoContainer = document.getElementById('characterInfo');
-    
+
     if (!selectedCharacter) {
         infoContainer.innerHTML = `
             <div class="character-empty-state">
@@ -288,13 +288,13 @@ function updateCharacterDetails() {
         `;
         return;
     }
-    
+
     const total = selectedCharacter.total || 0;
     const ai = selectedCharacter.ai || 0;
     const user = selectedCharacter.user || 0;
     const original = selectedCharacter.original || 0;
     const samples = selectedCharacter.sample_count || 0;
-    
+
     infoContainer.innerHTML = `
         <div class="character-detail-item">
             <span class="character-detail-label">Name</span>
@@ -329,21 +329,21 @@ function updateCharacterDetails() {
 
 async function loadCharacterImages(characterName) {
     const grid = document.getElementById('characterImagesGrid');
-    
+
     try {
         grid.innerHTML = '<div class="character-loading">Loading images...</div>';
-        
+
         // Fetch images with characters, limit to reduce initial load
         const response = await fetch(`/api/character/images?filter=all&limit=200`);
         const data = await response.json();
         const allImages = data.images || [];
-        
+
         // Filter images that have this character
         const images = allImages.filter(image => {
             const chars = image.characters || [];
             return chars.some(ct => ct.name === characterName);
         });
-        
+
         if (images.length === 0) {
             grid.innerHTML = `
                 <div class="character-empty-state">
@@ -354,17 +354,17 @@ async function loadCharacterImages(characterName) {
             `;
             return;
         }
-        
+
         // Limit to first 50 images for performance
         grid.innerHTML = images.slice(0, 50).map(image => {
             const characterTag = (image.characters || []).find(ct => ct.name === characterName);
             const source = characterTag ? characterTag.source : 'unknown';
-            
+
             let sourceBadge = '';
             if (source === 'user') sourceBadge = '<span class="character-source-badge user">👥 User</span>';
             else if (source === 'ai_inference') sourceBadge = '<span class="character-source-badge ai">🤖 AI</span>';
             else if (source.includes('booru') || source === 'original') sourceBadge = '<span class="character-source-badge booru">📚 Booru</span>';
-            
+
             return `
                 <div class="character-image-card" onclick="window.location.href='/image/${image.id}'">
                     <img src="/${urlEncodePath(image.thumb)}" alt="Image ${image.id}"
@@ -376,7 +376,7 @@ async function loadCharacterImages(characterName) {
                 </div>
             `;
         }).join('');
-        
+
         // Show count if there are more images
         if (images.length > 50) {
             grid.innerHTML += `
@@ -385,7 +385,7 @@ async function loadCharacterImages(characterName) {
                 </div>
             `;
         }
-        
+
     } catch (error) {
         console.error('Error loading character images:', error);
         grid.innerHTML = `
@@ -399,14 +399,14 @@ async function loadCharacterImages(characterName) {
 
 async function loadCharacterWeights(characterName) {
     const weightsContainer = document.getElementById('tagWeights');
-    
+
     try {
         weightsContainer.innerHTML = '<div class="character-loading">Loading weights...</div>';
-        
+
         const response = await fetch(`/api/character/top_tags?character=${encodeURIComponent(characterName)}&limit=30`);
         const data = await response.json();
         const tags = data.tags || [];
-        
+
         if (tags.length === 0) {
             weightsContainer.innerHTML = `
                 <div class="character-empty-state">
@@ -417,16 +417,16 @@ async function loadCharacterWeights(characterName) {
             `;
             return;
         }
-        
+
         const maxAbsWeight = Math.max(...tags.map(t => Math.abs(t.weight)));
-        
+
         weightsContainer.innerHTML = `
             <div class="character-weight-list">
                 ${tags.map(tag => {
-                    const isPositive = tag.weight > 0;
-                    const percentage = (Math.abs(tag.weight) / maxAbsWeight) * 100;
-                    
-                    return `
+            const isPositive = tag.weight > 0;
+            const percentage = (Math.abs(tag.weight) / maxAbsWeight) * 100;
+
+            return `
                         <div class="character-weight-item">
                             <div class="character-weight-header">
                                 <span class="character-weight-tag">${tag.tag}</span>
@@ -440,10 +440,10 @@ async function loadCharacterWeights(characterName) {
                             </div>
                         </div>
                     `;
-                }).join('')}
+        }).join('')}
             </div>
         `;
-        
+
     } catch (error) {
         console.error('Error loading character weights:', error);
         weightsContainer.innerHTML = `
@@ -457,32 +457,32 @@ async function loadCharacterWeights(characterName) {
 
 function renderDistributionChart() {
     const chartContainer = document.getElementById('distributionChart');
-    
+
     if (allCharacters.length === 0) {
         chartContainer.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No data available</p>';
         return;
     }
-    
+
     // Sort and take top 15
     const topCharacters = [...allCharacters]
         .sort((a, b) => (b.total || 0) - (a.total || 0))
         .slice(0, 15);
-    
+
     const maxCount = Math.max(...topCharacters.map(c => c.total || 0), 1);
-    
+
     chartContainer.innerHTML = `
         <div class="distribution-grid" style="max-height: none;">
             ${topCharacters.map(character => {
-                const total = character.total || 0;
-                const samples = character.sample_count || 0;
-                const percentage = (total / maxCount) * 100;
-                
-                // Pick a color based on hash of character name
-                const hash = character.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-                const colors = ['#4ade80', '#60a5fa', '#fb923c', '#f87171', '#a78bfa', '#fbbf24'];
-                const color = colors[hash % colors.length];
-                
-                return `
+        const total = character.total || 0;
+        const samples = character.sample_count || 0;
+        const percentage = (total / maxCount) * 100;
+
+        // Pick a color based on hash of character name
+        const hash = character.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const colors = ['#4ade80', '#60a5fa', '#fb923c', '#f87171', '#a78bfa', '#fbbf24'];
+        const color = colors[hash % colors.length];
+
+        return `
                     <div class="distribution-row" style="cursor: pointer;" onclick="selectCharacter('${character.name}')">
                         <div class="rating-label" style="overflow: hidden; text-overflow: ellipsis;" title="${character.name}">
                             ${character.name.replace(/_/g, ' ')}
@@ -493,136 +493,223 @@ function renderDistributionChart() {
                         </div>
                     </div>
                 `;
-            }).join('')}
+    }).join('')}
         </div>
     `;
 }
 
 async function trainModel() {
-    if (!confirm('Train the model on all booru-tagged images?')) return;
-    
-    clearLog();
-    showLoading('Training model...');
+    showConfirm('Train the model on all booru-tagged images?', async () => {
 
-    try {
-        const response = await fetch('/api/character/train', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-        const result = await response.json();
+        clearLog();
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingMessage = document.getElementById('loadingMessage');
 
-        hideLoading();
+        showLoading('Initializing training...');
 
-        if (result.success) {
-            showLog('✅ Training complete!');
-            showLog(JSON.stringify(result.stats, null, 2));
-            showNotification('Model trained successfully!', 'success');
-            loadStats();
-        } else {
-            showLog('❌ Training failed: ' + result.error);
-            showNotification('Training failed: ' + result.error, 'error');
+        // Add progress bar if it doesn't exist
+        let progressContainer = loadingOverlay.querySelector('.progress-container');
+        if (!progressContainer) {
+            progressContainer = document.createElement('div');
+            progressContainer.className = 'progress-container';
+            progressContainer.style.cssText = 'width: 100%; max-width: 400px; margin: 1rem auto; background: rgba(255,255,255,0.1); border-radius: 0.5rem; overflow: hidden; height: 8px;';
+            progressContainer.innerHTML = '<div class="progress-bar" style="height: 100%; width: 0%; background: var(--primary-blue); transition: width 0.3s ease;"></div>';
+            loadingMessage.parentNode.insertBefore(progressContainer, loadingMessage.nextSibling);
         }
-    } catch (error) {
-        hideLoading();
-        showLog('❌ Error: ' + error.message);
-        showNotification('Error: ' + error.message, 'error');
-    }
+        const progressBar = progressContainer.querySelector('.progress-bar');
+        progressBar.style.width = '0%';
+
+        try {
+            // Start training task
+            const response = await fetch('/api/character/train', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const startResult = await response.json();
+
+            if (!startResult.success || !startResult.task_id) {
+                throw new Error(startResult.error || 'Failed to start training task');
+            }
+
+            const taskId = startResult.task_id;
+
+            // Poll for progress
+            const pollInterval = setInterval(async () => {
+                try {
+                    const statusRes = await fetch(`/api/tasks/${taskId}`);
+                    const status = await statusRes.json();
+
+                    if (status.state === 'PROGRESS' || status.state === 'PENDING') {
+                        // Update progress bar
+                        const percent = status.current || 0;
+                        const message = status.status || 'Training...';
+                        progressBar.style.width = `${percent}%`;
+                        loadingMessage.textContent = `${message} (${percent}%)`;
+
+                    } else if (status.state === 'SUCCESS') {
+                        clearInterval(pollInterval);
+                        progressBar.style.width = '100%';
+                        loadingMessage.textContent = 'Training complete!';
+
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        hideLoading();
+
+                        const result = status.result;
+                        showLog('✅ Training complete!');
+                        if (result && result.stats) {
+                            showLog(JSON.stringify(result.stats, null, 2));
+                        }
+                        showNotification('Model trained successfully!', 'success');
+                        loadStats();
+
+                    } else if (status.state === 'FAILURE') {
+                        clearInterval(pollInterval);
+                        hideLoading();
+                        showLog('❌ Training failed: ' + status.status);
+                        showNotification('Training failed: ' + status.status, 'error');
+                    }
+                } catch (e) {
+                    console.error('Polling error:', e);
+                }
+            }, 1000);
+
+        } catch (error) {
+            hideLoading();
+            showLog('❌ Error: ' + error.message);
+            showNotification('Error: ' + error.message, 'error');
+            progressBar.style.width = '0%';
+        }
+    });
 }
 
 async function inferCharacters() {
-    if (!confirm('Run character inference on all untagged images?')) return;
-    
-    clearLog();
-    showLoading('Running inference...');
+    showConfirm('Run character inference on all untagged images?', async () => {
 
-    try {
-        const response = await fetch('/api/character/infer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-        const result = await response.json();
+        clearLog();
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingMessage = document.getElementById('loadingMessage');
 
-        hideLoading();
+        showLoading('Running inference...');
 
-        if (result.success) {
-            showLog('✅ Inference complete!');
-            showLog(JSON.stringify(result.stats, null, 2));
-            showNotification('Inference completed successfully!', 'success');
-            loadStats();
-        } else {
-            showLog('❌ Inference failed: ' + result.error);
-            showNotification('Inference failed: ' + result.error, 'error');
+        // Add progress bar if it doesn't exist
+        let progressContainer = loadingOverlay.querySelector('.progress-container');
+        if (!progressContainer) {
+            progressContainer = document.createElement('div');
+            progressContainer.className = 'progress-container';
+            progressContainer.style.cssText = 'width: 100%; max-width: 400px; margin: 1rem auto; background: rgba(255,255,255,0.1); border-radius: 0.5rem; overflow: hidden; height: 8px;';
+            progressContainer.innerHTML = '<div class="progress-bar" style="height: 100%; width: 0%; background: var(--primary-blue); transition: width 0.3s ease;"></div>';
+            loadingMessage.parentNode.insertBefore(progressContainer, loadingMessage.nextSibling);
         }
-    } catch (error) {
-        hideLoading();
-        showLog('❌ Error: ' + error.message);
-        showNotification('Error: ' + error.message, 'error');
-    }
+        const progressBar = progressContainer.querySelector('.progress-bar');
+        progressBar.style.width = '0%';
+
+        // Start progress animation BEFORE the fetch
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 5 + 2;
+            if (progress > 85) progress = 85;
+            progressBar.style.width = progress + '%';
+        }, 300);
+
+        try {
+            const response = await fetch('/api/character/infer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const result = await response.json();
+
+            // Complete the progress bar
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            await new Promise(resolve => setTimeout(resolve, 300));
+
+            hideLoading();
+
+            if (result.success) {
+                showLog('✅ Inference complete!');
+                showLog(JSON.stringify(result.stats, null, 2));
+                showNotification('Inference completed successfully!', 'success');
+                loadStats();
+            } else {
+                showLog('❌ Inference failed: ' + result.error);
+                showNotification('Inference failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            clearInterval(progressInterval);
+            hideLoading();
+            showLog('❌ Error: ' + error.message);
+            showNotification('Error: ' + error.message, 'error');
+        } finally {
+            progressBar.style.width = '0%';
+        }
+    });
 }
 
 async function clearAI() {
-    if (!confirm('Clear all AI-inferred character tags?')) return;
-    
-    clearLog();
-    showLoading('Clearing AI characters...');
+    showConfirm('Clear all AI-inferred character tags?', async () => {
 
-    try {
-        const response = await fetch('/api/character/clear_ai', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-        const result = await response.json();
+        clearLog();
+        showLoading('Clearing AI characters...');
 
-        hideLoading();
+        try {
+            const response = await fetch('/api/character/clear_ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const result = await response.json();
 
-        if (result.success) {
-            showLog(`✅ Cleared ${result.deleted_count} AI-inferred character tags`);
-            showNotification(`Cleared ${result.deleted_count} tags`, 'success');
-            loadStats();
-        } else {
-            showLog('❌ Failed: ' + result.error);
-            showNotification('Failed: ' + result.error, 'error');
+            hideLoading();
+
+            if (result.success) {
+                showLog(`✅ Cleared ${result.deleted_count} AI-inferred character tags`);
+                showNotification(`Cleared ${result.deleted_count} tags`, 'success');
+                loadStats();
+            } else {
+                showLog('❌ Failed: ' + result.error);
+                showNotification('Failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            hideLoading();
+            showLog('❌ Error: ' + error.message);
+            showNotification('Error: ' + error.message, 'error');
         }
-    } catch (error) {
-        hideLoading();
-        showLog('❌ Error: ' + error.message);
-        showNotification('Error: ' + error.message, 'error');
-    }
+    });
 }
 
 async function retrainAll() {
-    if (!confirm('Clear all AI characters, retrain model, and re-infer all images? This will take a while.')) return;
-    
-    clearLog();
-    showLoading('Retraining and reapplying...');
+    showConfirm('Clear all AI characters, retrain model, and re-infer all images? This will take a while.', async () => {
 
-    try {
-        const response = await fetch('/api/character/retrain_all', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
-        });
-        const result = await response.json();
+        clearLog();
+        showLoading('Retraining and reapplying...');
 
-        hideLoading();
+        try {
+            const response = await fetch('/api/character/retrain_all', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            });
+            const result = await response.json();
 
-        if (result.success) {
-            showLog('✅ Retrain and reapply complete!');
-            showLog(JSON.stringify(result, null, 2));
-            showNotification('Retrain and reapply completed!', 'success');
-            loadStats();
-        } else {
-            showLog('❌ Failed: ' + result.error);
-            showNotification('Failed: ' + result.error, 'error');
+            hideLoading();
+
+            if (result.success) {
+                showLog('✅ Retrain and reapply complete!');
+                showLog(JSON.stringify(result, null, 2));
+                showNotification('Retrain and reapply completed!', 'success');
+                loadStats();
+            } else {
+                showLog('❌ Failed: ' + result.error);
+                showNotification('Failed: ' + result.error, 'error');
+            }
+        } catch (error) {
+            hideLoading();
+            showLog('❌ Error: ' + error.message);
+            showNotification('Error: ' + error.message, 'error');
         }
-    } catch (error) {
-        hideLoading();
-        showLog('❌ Error: ' + error.message);
-        showNotification('Error: ' + error.message, 'error');
-    }
+    });
 }
 
 async function saveConfig() {
@@ -657,18 +744,18 @@ async function predictImageById() {
         showNotification('Please enter an image ID', 'error');
         return;
     }
-    
+
     const resultsContainer = document.getElementById('predictionResults');
-    
+
     try {
         resultsContainer.innerHTML = '<div class="character-loading">Loading predictions...</div>';
-        
+
         const response = await fetch(`/api/character/predict/${imageId}`);
         const data = await response.json();
-        
+
         const predictions = data.predictions || [];
         const tags = data.tags || [];
-        
+
         if (predictions.length === 0) {
             resultsContainer.innerHTML = `
                 <div class="character-empty-state">
@@ -679,13 +766,13 @@ async function predictImageById() {
             `;
             return;
         }
-        
+
         resultsContainer.innerHTML = predictions.map(pred => {
             const confidencePercent = (pred.confidence * 100).toFixed(1);
             let confidenceClass = 'low';
             if (pred.confidence > 0.7) confidenceClass = 'high';
             else if (pred.confidence > 0.5) confidenceClass = 'medium';
-            
+
             return `
                 <div class="character-prediction-item">
                     <div class="character-prediction-item-header">
@@ -694,18 +781,18 @@ async function predictImageById() {
                     </div>
                     <div class="character-prediction-tags">
                         ${pred.contributing_tags.map(ct => {
-                            const isPositive = ct.weight > 0;
-                            return `
+                const isPositive = ct.weight > 0;
+                return `
                                 <span class="character-prediction-tag ${isPositive ? 'positive' : 'negative'}">
                                     ${ct.tag} <span style="opacity: 0.7;">(${ct.weight > 0 ? '+' : ''}${ct.weight})</span>
                                 </span>
                             `;
-                        }).join('')}
+            }).join('')}
                     </div>
                 </div>
             `;
         }).join('');
-        
+
     } catch (error) {
         console.error('Error predicting:', error);
         resultsContainer.innerHTML = `
@@ -728,7 +815,7 @@ function switchTab(tabName) {
             btn.classList.remove('active');
         }
     });
-    
+
     // Update tab panes
     document.querySelectorAll('.character-tab-pane').forEach(pane => {
         if (pane.id === tabName + 'Pane') {
@@ -748,7 +835,7 @@ function switchRightTab(tabName) {
             btn.classList.remove('active');
         }
     });
-    
+
     // Update tab panes
     document.querySelectorAll('.character-right-pane').forEach(pane => {
         if (pane.id === tabName + 'Pane') {
@@ -763,16 +850,16 @@ function switchRightTab(tabName) {
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize page
     loadStats();
-    
+
     // Tab switching
     document.querySelectorAll('.character-tab-btn').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
-    
+
     document.querySelectorAll('.character-right-tab-btn').forEach(btn => {
         btn.addEventListener('click', () => switchRightTab(btn.dataset.tab));
     });
-    
+
     // Character search with debouncing
     const searchInput = document.getElementById('characterSearch');
     let searchTimeout = null;
@@ -796,7 +883,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadReviewImages();
     }, 500);
     loadReviewImages();
-    
+
     // Source filter
     const sourceFilter = document.getElementById('sourceFilter');
     if (sourceFilter) {
@@ -805,7 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCharacterList();
         });
     }
-    
+
     // Sort by
     const sortBy = document.getElementById('sortBy');
     if (sortBy) {
@@ -814,7 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderCharacterList();
         });
     }
-    
+
     // Sort direction toggle
     const sortDirection = document.getElementById('sortDirection');
     if (sortDirection) {
@@ -830,17 +917,17 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadReviewImages() {
     const grid = document.getElementById('reviewImageGrid');
     const countEl = document.getElementById('reviewCount');
-    
+
     try {
         grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><div class="empty-state-text">Loading images...</div></div>';
         countEl.textContent = 'Loading...';
-        
+
         const response = await fetch('/api/character/images?filter=untagged&limit=50&include_predictions=true');
         const data = await response.json();
         const images = data.images || [];
-        
+
         countEl.textContent = `${images.length} untagged images`;
-        
+
         if (images.length === 0) {
             grid.innerHTML = `
                 <div class="empty-state">
@@ -851,30 +938,30 @@ async function loadReviewImages() {
             `;
             return;
         }
-        
+
         grid.innerHTML = images.map(image => {
             const predictions = image.predictions || [];
-            const predictionsHtml = predictions.length > 0 
+            const predictionsHtml = predictions.length > 0
                 ? `
                     <div class="character-predictions" style="margin-top: var(--spacing-sm);">
                         ${predictions.slice(0, 3).map(pred => {
-                            const confidencePercent = (pred.confidence * 100).toFixed(0);
-                            let confidenceClass = 'low';
-                            if (pred.confidence > 0.7) confidenceClass = 'high';
-                            else if (pred.confidence > 0.5) confidenceClass = 'medium';
-                            
-                            return `
+                    const confidencePercent = (pred.confidence * 100).toFixed(0);
+                    let confidenceClass = 'low';
+                    if (pred.confidence > 0.7) confidenceClass = 'high';
+                    else if (pred.confidence > 0.5) confidenceClass = 'medium';
+
+                    return `
                                 <div class="character-prediction-badge ${confidenceClass}" 
                                      onclick="applyCharacterPrediction(${image.id}, '${pred.character.replace(/'/g, "\\'")}')"
                                      title="Click to apply">
                                     ${pred.character.replace(/_/g, ' ')} (${confidencePercent}%)
                                 </div>
                             `;
-                        }).join('')}
+                }).join('')}
                     </div>
                 `
                 : '<div style="margin-top: var(--spacing-sm); color: var(--text-muted); font-size: var(--font-size-sm);">No predictions</div>';
-            
+
             return `
                 <div class="character-image-card" style="position: relative;">
                     <img src="/${urlEncodePath(image.thumb)}" alt="Image ${image.id}"
@@ -889,7 +976,7 @@ async function loadReviewImages() {
                 </div>
             `;
         }).join('');
-        
+
     } catch (error) {
         console.error('Error loading review images:', error);
         grid.innerHTML = `
@@ -907,7 +994,7 @@ async function applyCharacterPrediction(imageId, characterName) {
     if (!confirm(`Apply character "${characterName.replace(/_/g, ' ')}" to image #${imageId}?`)) {
         return;
     }
-    
+
     try {
         const response = await fetch(`/api/character/apply/${imageId}`, {
             method: 'POST',
@@ -915,7 +1002,7 @@ async function applyCharacterPrediction(imageId, characterName) {
             body: JSON.stringify({ characters: [characterName] })
         });
         const result = await response.json();
-        
+
         if (result.success !== false) {
             showNotification(`Character "${characterName.replace(/_/g, ' ')}" applied successfully!`, 'success');
             // Reload the review images

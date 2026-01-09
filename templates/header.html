@@ -419,11 +419,6 @@
     <template id="progress-modal-template">
         <div class="progress-modal-overlay">
             <div class="progress-modal">
-                <div class="progress-mascot">
-                    <img src="{{ url_for('static', filename='mascot/mascot.webp') or '/static/mascot/mascot.webp' }}"
-                        alt="Mascot" class="progress-mascot-image">
-                    <div class="progress-loading-ring"></div>
-                </div>
                 <h3 class="progress-title" id="progress-title">Processing...</h3>
                 <div class="progress-status">
                     <span id="progress-status-text">Starting...</span>
@@ -459,56 +454,13 @@
                 background: linear-gradient(135deg, rgba(30, 35, 45, 0.95) 0%, rgba(20, 25, 35, 0.98) 100%);
                 border: 1px solid rgba(135, 206, 235, 0.2);
                 border-radius: 16px;
-                padding: 40px;
+                padding: 24px;
                 text-align: center;
                 box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px rgba(135, 206, 235, 0.1);
-                min-width: 350px;
-                max-width: 450px;
+                min-width: 300px;
+                max-width: 400px;
             }
 
-            .progress-mascot {
-                position: relative;
-                width: 140px;
-                height: 140px;
-                margin: 0 auto 24px;
-            }
-
-            .progress-mascot-image {
-                width: 90px;
-                height: auto;
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                animation: progressFloat 3s ease-in-out infinite;
-                filter: drop-shadow(0 10px 30px rgba(135, 206, 235, 0.3));
-            }
-
-            .progress-loading-ring {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                border-radius: 50%;
-                border: 3px solid transparent;
-                border-top-color: var(--primary-blue, #87ceeb);
-                border-right-color: var(--primary-blue-dark, #5fa8c4);
-                animation: progressSpin 1.5s linear infinite;
-            }
-
-            .progress-loading-ring::before {
-                content: '';
-                position: absolute;
-                top: 5px;
-                left: 5px;
-                right: 5px;
-                bottom: 5px;
-                border-radius: 50%;
-                border: 3px solid transparent;
-                border-top-color: rgba(135, 206, 235, 0.4);
-                animation: progressSpin 2s linear infinite reverse;
-            }
 
             .progress-title {
                 font-size: 1.5rem;

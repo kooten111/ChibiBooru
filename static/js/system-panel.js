@@ -909,7 +909,7 @@ window.systemFindBrokenImages = systemFindBrokenImages;
 
 async function systemPrecomputeCharacterPredictions(event) {
     if (event) event.preventDefault();
-    showProgressModal('/api/character/precompute', 'Precompute Character Predictions');
+    systemAction('/api/character/precompute', event.target, 'Precompute Character Predictions');
 }
 
 window.systemPrecomputeCharacterPredictions = systemPrecomputeCharacterPredictions;

@@ -61,18 +61,17 @@ def update_config(key: str, value: float) -> None:
 
 def reset_config_to_defaults() -> None:
     """Reset all config to factory defaults."""
-    defaults = {
+    import config
+    defaults = config.RATING_MODEL_CONFIG.copy()
+    
+    # Add rating-specific thresholds
+    defaults.update({
         'threshold_general': 0.5,
         'threshold_sensitive': 0.6,
         'threshold_questionable': 0.7,
         'threshold_explicit': 0.8,
-        'min_confidence': 0.4,
-        'pair_weight_multiplier': 1.5,
         'min_training_samples': 50,
-        'min_pair_cooccurrence': 5,
-        'min_tag_frequency': 10,
-        'max_pair_count': 10000,
-    }
+    })
 
     with get_model_connection() as conn:
         cur = conn.cursor()

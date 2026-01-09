@@ -46,20 +46,19 @@ def _init_connection(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Insert default config
-    defaults = {
+    # Insert default config from centralized config
+    import config
+    defaults = config.RATING_MODEL_CONFIG.copy()
+    
+    # Add rating-specific thresholds and settings
+    defaults.update({
         'threshold_general': 0.5,
         'threshold_sensitive': 0.6,
         'threshold_questionable': 0.7,
         'threshold_explicit': 0.8,
-        'min_confidence': 0.4,
-        'pair_weight_multiplier': 1.5,
         'min_training_samples': 50,
-        'min_pair_cooccurrence': 5,
-        'min_tag_frequency': 10,
-        'max_pair_count': 10000,
-        'pruning_threshold': 0.0,  # Disabled by default (keep all weights)
-    }
+        'pruning_threshold': 0.0,
+    })
 
     for key, value in defaults.items():
         cur.execute(
