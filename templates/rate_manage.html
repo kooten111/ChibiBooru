@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Rating Inference - {{ app_name }}</title>
@@ -8,166 +7,159 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
-
 </head>
-
 <body class="gallery-page">
     {% include 'header.html' %}
 
-    <!-- Processing Overlay -->
-    <div class="processing-overlay" id="processingOverlay">
-        <div class="panel" style="text-align: center; min-width: 300px;">
-            <div style="font-size: 2em; margin-bottom: 1rem;">⏳</div>
-            <div id="processingMessage" style="font-size: 1.2em; margin-bottom: 0.5rem;">Processing...</div>
-            <div id="processingProgress" style="color: var(--text-muted);"></div>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="processingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner">⏳</div>
+            <div class="loading-message" id="processingMessage">Processing...</div>
+            <div class="loading-progress" id="processingProgress"></div>
         </div>
     </div>
 
-    <div class="container">
-        <!-- Header Bar -->
-        <div class="header-content"
-            style="flex-direction: column; align-items: flex-start; gap: 1rem; margin-bottom: 2rem;">
-            <div style="width: 100%; display: flex; justify-content: space-between; align-items: center;">
-                <h1>
-                    <span>🧠</span>
+    <div class="page-container page-container-full">
+        <!-- Page Header -->
+        <div class="page-header" style="padding: var(--spacing-lg); margin-bottom: 0;">
+            <div class="page-header-left">
+                <h1 class="page-title">
+                    <span class="page-title-icon">🧠</span>
                     Rating Inference
                 </h1>
+            </div>
+            <div class="page-header-center">
                 <div id="statusBadges">
                     <!-- Will be populated by JavaScript -->
                 </div>
             </div>
-
-            <div class="action-buttons" style="display: flex; gap: 1rem;">
-                <button class="btn btn-success" onclick="trainModel()">
-                    <span>🎓</span> Train Model
+            <div class="page-header-right">
+                <button class="action-btn action-btn-success" onclick="trainModel()">
+                    Train Model
                 </button>
-                <button class="btn btn-primary" onclick="inferAll()">
-                    <span>🔮</span> Infer All
+                <button class="action-btn action-btn-primary" onclick="inferAll()">
+                    Infer All
                 </button>
-                <button class="btn btn-warning" onclick="clearAI()">
-                    <span>🗑️</span> Clear AI
+                <button class="action-btn action-btn-warning" onclick="clearAI()">
+                    Clear AI
                 </button>
             </div>
         </div>
 
         <!-- Three-panel layout -->
-        <div class="manage-grid" id="rateLayout">
-            <!-- Left Sidebar -->
-            <aside class="panel" id="sidebar" style="height: fit-content;">
-                <h3>Quick Stats</h3>
-
-                <div class="stat-card">
-                    <div class="label">Training Samples</div>
-                    <div class="value" id="trainingSamples">-</div>
+        <div class="panel-layout" id="rateLayout" style="padding: 0 var(--spacing-lg) var(--spacing-lg);">
+            <!-- Left Panel - Stats -->
+            <aside class="panel panel-left">
+                <div class="panel-header">
+                    <h3 class="panel-title">Quick Stats</h3>
                 </div>
 
-                <div class="stat-card">
-                    <div class="label">Unique Tags</div>
-                    <div class="value" id="uniqueTags">-</div>
+                <div class="stats-grid" style="grid-template-columns: 1fr;">
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="trainingSamples">-</div>
+                        <div class="stat-card-label">Training Samples</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="uniqueTags">-</div>
+                        <div class="stat-card-label">Unique Tags</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-card-value" id="tagPairs">-</div>
+                        <div class="stat-card-label">Tag Pairs</div>
+                    </div>
+
+                    <div class="stat-card info">
+                        <div class="stat-card-value" id="unratedCount">-</div>
+                        <div class="stat-card-label">Unrated Images</div>
+                    </div>
                 </div>
 
-                <div class="stat-card">
-                    <div class="label">Tag Pairs</div>
-                    <div class="value" id="tagPairs">-</div>
-                </div>
-
-                <div class="stat-card">
-                    <div class="label">Unrated Images</div>
-                    <div class="value" id="unratedCount">-</div>
-                </div>
-
-                <div style="margin-top: 2rem;">
-                    <h3>Distribution</h3>
+                <div class="panel-section" style="margin-top: var(--spacing-lg);">
+                    <h3 class="panel-section-title">Distribution</h3>
                     <div id="ratingDistribution">
                         <!-- Will be populated by JavaScript -->
                     </div>
                 </div>
             </aside>
 
-            <!-- Main Content -->
-            <main>
+            <!-- Center Panel - Main Content -->
+            <main class="panel panel-center">
                 <!-- Tabs -->
-                <div class="tabs-header">
+                <div class="tab-nav">
                     <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
-                        📊 Dashboard
+                        Dashboard
                     </button>
                     <button class="tab-btn" data-tab="review" onclick="switchTab('review')">
-                        🔍 Review Queue
+                        Review Queue
                     </button>
                     <button class="tab-btn" data-tab="insights" onclick="switchTab('insights')">
-                        💡 Model Insights
+                        Model Insights
                     </button>
                 </div>
 
                 <!-- Dashboard Tab -->
                 <div class="tab-pane active" id="tab-dashboard">
-                    <div class="panel" style="margin-bottom: 2rem;">
-                        <h2 style="color: var(--primary-blue); margin-top: 0;">Model Status</h2>
+                    <div class="panel-section">
+                        <h3 class="panel-section-title">Model Status</h3>
 
-                        <div
-                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem;">
+                        <div class="stats-grid">
                             <div class="stat-card">
-                                <div class="label">Model Status</div>
-                                <div class="value" id="modelStatus">Not Trained</div>
-                                <div style="margin-top: 0.5rem; font-size: 0.85em; color: var(--text-muted);"
-                                    id="lastTrained">
+                                <div class="stat-card-value" id="modelStatus">Not Trained</div>
+                                <div class="stat-card-label">Model Status</div>
+                                <div class="empty-state-subtext" id="lastTrained" style="margin-top: var(--spacing-xs);">
                                     Never trained
                                 </div>
                             </div>
 
                             <div class="stat-card">
-                                <div class="label">Pending Corrections</div>
-                                <div class="value" id="pendingCorrections">0</div>
-                                <div style="margin-top: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
+                                <div class="stat-card-value" id="pendingCorrections">0</div>
+                                <div class="stat-card-label">Pending Corrections</div>
+                                <div class="empty-state-subtext" style="margin-top: var(--spacing-xs);">
                                     User corrections since last training
                                 </div>
                             </div>
 
                             <div class="stat-card">
-                                <div class="label">Model Health</div>
-                                <div class="value" id="modelHealth">Unknown</div>
-                                <div style="margin-top: 0.5rem; font-size: 0.85em; color: var(--text-muted);"
-                                    id="modelHealthDesc">
+                                <div class="stat-card-value" id="modelHealth">Unknown</div>
+                                <div class="stat-card-label">Model Health</div>
+                                <div class="empty-state-subtext" id="modelHealthDesc" style="margin-top: var(--spacing-xs);">
                                     Checking...
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="panel">
-                        <h3 style="margin-top: 0;">Recent Activity</h3>
-                        <div id="recentActivity"
-                            style="padding: 1rem; border: 1px dashed var(--border-color); border-radius: var(--radius-md);">
-                            <p style="color: var(--text-muted); margin: 0;">No recent activity</p>
+                    <div class="panel-section">
+                        <h3 class="panel-section-title">Recent Activity</h3>
+                        <div id="recentActivity" class="empty-state">
+                            <div class="empty-state-text">No recent activity</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Review Queue Tab -->
                 <div class="tab-pane" id="tab-review">
-                    <div class="panel">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                            <h2 style="margin: 0; color: var(--primary-blue);">AI-Inferred Images</h2>
-                            <div style="display: flex; gap: 1rem; align-items: center;">
-                                <select id="reviewFilter" onchange="loadReviewImages()"
-                                    style="padding: 0.5rem; border-radius: 0.5rem; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary);">
+                    <div class="panel-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
+                            <h3 class="panel-section-title" style="margin: 0;">AI-Inferred Images</h3>
+                            <div style="display: flex; gap: var(--spacing-sm); align-items: center;">
+                                <select id="reviewFilter" onchange="loadReviewImages()" class="filter-select" style="width: auto;">
                                     <option value="ai_predicted">AI-Inferred</option>
                                     <option value="unrated">Unrated</option>
                                     <option value="all">All</option>
                                 </select>
-                                <button class="btn btn-secondary btn-small" onclick="loadReviewImages()">
-                                    <span>🔄</span> Refresh
+                                <button class="action-btn action-btn-secondary" onclick="loadReviewImages()">
+                                    Refresh
                                 </button>
                             </div>
                         </div>
 
-                        <div class="image-grid-thumbs" id="reviewImageGrid">
+                        <div class="image-grid" id="reviewImageGrid">
                             <!-- Will be populated by JavaScript -->
                         </div>
                     </div>
@@ -175,15 +167,12 @@
 
                 <!-- Model Insights Tab -->
                 <div class="tab-pane" id="tab-insights">
-                    <div class="panel">
-                        <h2 style="margin-top: 0; color: var(--primary-blue);">Model Insights</h2>
+                    <div class="panel-section">
+                        <h3 class="panel-section-title">Model Insights</h3>
 
-                        <div style="margin-bottom: 2rem;">
-                            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted);">
-                                Select Rating:
-                            </label>
-                            <select id="insightRating" onchange="loadInsights()"
-                                style="padding: 0.75rem; border-radius: 0.75rem; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); width: 100%; max-width: 300px;">
+                        <div class="filter-group" style="margin-bottom: var(--spacing-lg);">
+                            <label class="filter-label">Select Rating:</label>
+                            <select id="insightRating" onchange="loadInsights()" class="filter-select" style="max-width: 300px;">
                                 <option value="rating:general">General</option>
                                 <option value="rating:sensitive">Sensitive</option>
                                 <option value="rating:questionable">Questionable</option>
@@ -191,17 +180,17 @@
                             </select>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg);">
                             <div>
-                                <h3>Top Weighted Tags</h3>
-                                <div id="topTags" style="max-height: 500px; overflow-y: auto;">
+                                <h4 class="panel-section-title">Top Weighted Tags</h4>
+                                <div id="topTags" class="list-container">
                                     <!-- Will be populated by JavaScript -->
                                 </div>
                             </div>
 
                             <div>
-                                <h3>Top Tag Pairs</h3>
-                                <div id="topPairs" style="max-height: 500px; overflow-y: auto;">
+                                <h4 class="panel-section-title">Top Tag Pairs</h4>
+                                <div id="topPairs" class="list-container">
                                     <!-- Will be populated by JavaScript -->
                                 </div>
                             </div>
@@ -210,125 +199,90 @@
                 </div>
             </main>
 
-            <!-- Right Details Panel -->
-            <aside class="panel" id="titleDetailsPanel" style="height: fit-content;">
-                <h3>Configuration</h3>
+            <!-- Right Panel - Configuration -->
+            <aside class="panel panel-right">
+                <div class="panel-header">
+                    <h3 class="panel-title">Configuration</h3>
+                </div>
 
                 <div id="configPanel">
-                    <div
-                        style="margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
-                        <h4 style="margin-top: 0; color: var(--text-primary);">Training Parameters</h4>
+                    <div class="panel-section">
+                        <h4 class="panel-section-title">Training Parameters</h4>
 
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
-                                Max Tag Pairs
-                            </label>
-                            <input type="number" id="max_pair_count" min="100" max="1000000" step="100"
-                                style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary);"
-                                placeholder="5000">
+                        <div class="filter-group">
+                            <label class="filter-label">Max Tag Pairs</label>
+                            <input type="number" id="max_pair_count" class="filter-input" min="100" max="1000000" step="100" placeholder="5000">
                         </div>
 
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
-                                Min Tag Frequency
-                            </label>
-                            <input type="number" id="min_tag_frequency" min="1" max="1000" step="1"
-                                style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary);"
-                                placeholder="50">
+                        <div class="filter-group">
+                            <label class="filter-label">Min Tag Frequency</label>
+                            <input type="number" id="min_tag_frequency" class="filter-input" min="1" max="1000" step="1" placeholder="50">
                         </div>
 
-                        <div style="margin-bottom: 1rem;">
-                            <label
-                                style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
-                                Min Pair Co-occurrence
-                            </label>
-                            <input type="number" id="min_pair_cooccurrence" min="1" max="1000" step="1"
-                                style="width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-primary);"
-                                placeholder="10">
+                        <div class="filter-group">
+                            <label class="filter-label">Min Pair Co-occurrence</label>
+                            <input type="number" id="min_pair_cooccurrence" class="filter-input" min="1" max="1000" step="1" placeholder="10">
                         </div>
                     </div>
 
-                    <h4 style="margin-top: 0; color: var(--text-primary);">Inference Thresholds</h4>
+                    <div class="panel-section">
+                        <h4 class="panel-section-title">Inference Thresholds</h4>
 
-                    <div style="margin-bottom: 1.5rem;">
-                        <label
-                            style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
-                            General Threshold
-                        </label>
-                        <input type="range" id="threshold_general" min="0" max="1" step="0.05" value="0.5"
-                            oninput="updateConfigValue('threshold_general', this.value)"
-                            style="width: 100%; accent-color: var(--primary-blue);">
-                        <div style="text-align: right; color: var(--primary-blue);" id="threshold_general_value">0.5
+                        <div class="filter-group">
+                            <label class="filter-label">General Threshold</label>
+                            <input type="range" id="threshold_general" min="0" max="1" step="0.05" value="0.5"
+                                oninput="updateConfigValue('threshold_general', this.value)">
+                            <div style="text-align: right; color: var(--primary-blue);" id="threshold_general_value">0.5</div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label class="filter-label">Sensitive Threshold</label>
+                            <input type="range" id="threshold_sensitive" min="0" max="1" step="0.05" value="0.6"
+                                oninput="updateConfigValue('threshold_sensitive', this.value)">
+                            <div style="text-align: right; color: var(--primary-blue);" id="threshold_sensitive_value">0.6</div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label class="filter-label">Questionable Threshold</label>
+                            <input type="range" id="threshold_questionable" min="0" max="1" step="0.05" value="0.7"
+                                oninput="updateConfigValue('threshold_questionable', this.value)">
+                            <div style="text-align: right; color: var(--primary-blue);" id="threshold_questionable_value">0.7</div>
+                        </div>
+
+                        <div class="filter-group">
+                            <label class="filter-label">Explicit Threshold</label>
+                            <input type="range" id="threshold_explicit" min="0" max="1" step="0.05" value="0.8"
+                                oninput="updateConfigValue('threshold_explicit', this.value)">
+                            <div style="text-align: right; color: var(--primary-blue);" id="threshold_explicit_value">0.8</div>
                         </div>
                     </div>
 
-                    <div style="margin-bottom: 1.5rem;">
-                        <label
-                            style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
-                            Sensitive Threshold
-                        </label>
-                        <input type="range" id="threshold_sensitive" min="0" max="1" step="0.05" value="0.6"
-                            oninput="updateConfigValue('threshold_sensitive', this.value)"
-                            style="width: 100%; accent-color: var(--primary-blue);">
-                        <div style="text-align: right; color: var(--primary-blue);" id="threshold_sensitive_value">0.6
-                        </div>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <label
-                            style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
-                            Questionable Threshold
-                        </label>
-                        <input type="range" id="threshold_questionable" min="0" max="1" step="0.05" value="0.7"
-                            oninput="updateConfigValue('threshold_questionable', this.value)"
-                            style="width: 100%; accent-color: var(--primary-blue);">
-                        <div style="text-align: right; color: var(--primary-blue);" id="threshold_questionable_value">
-                            0.7</div>
-                    </div>
-
-                    <div style="margin-bottom: 1.5rem;">
-                        <label
-                            style="display: block; margin-bottom: 0.5rem; font-size: 0.85em; color: var(--text-muted);">
-                            Explicit Threshold
-                        </label>
-                        <input type="range" id="threshold_explicit" min="0" max="1" step="0.05" value="0.8"
-                            oninput="updateConfigValue('threshold_explicit', this.value)"
-                            style="width: 100%; accent-color: var(--primary-blue);">
-                        <div style="text-align: right; color: var(--primary-blue);" id="threshold_explicit_value">0.8
-                        </div>
-                    </div>
-
-                    <button class="btn btn-primary btn-full-width" onclick="saveConfig()" style="width: 100%;">
-                        💾 Save Configuration
+                    <button class="action-btn action-btn-primary" onclick="saveConfig()" style="width: 100%;">
+                        Save Configuration
                     </button>
                 </div>
             </aside>
         </div>
+    </div>
 
-        <!-- Footer Status Bar -->
-        <div
-            style="margin-top: 4rem; padding: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; color: var(--text-muted);">
-            <div class="left">
-                <span id="footerStatus">Ready</span>
-            </div>
-            <div class="right">
-                <span>Shortcuts:</span>
-                <span><kbd>T</kbd> Train</span>
-                <span><kbd>I</kbd> Infer</span>
-                <span><kbd>R</kbd> Refresh</span>
-            </div>
+    <!-- Page Footer -->
+    <div class="page-footer">
+        <div class="page-footer-left">
+            <span class="page-footer-item" id="footerStatus">Ready</span>
+        </div>
+        <div class="page-footer-shortcuts">
+            <span class="shortcut"><span class="shortcut-key">T</span> Train</span>
+            <span class="shortcut"><span class="shortcut-key">I</span> Infer</span>
+            <span class="shortcut"><span class="shortcut-key">R</span> Refresh</span>
         </div>
     </div>
 
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
     <script src="{{ url_for('static', filename='js/header.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/pages/rate-manage.js') + '?v=3' }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/rate-manage.js') + '?v=4' }}"></script>
     <script type="module">
         import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
         window.showNotification = showNotification;
     </script>
 </body>
-
 </html>
