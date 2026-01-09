@@ -2,13 +2,36 @@
 import logging
 import sqlite3
 import config
+import threading
+from contextlib import contextmanager
 
 logger = logging.getLogger('chibibooru.Database')
 
 DB_FILE = "booru.db"
 
-def get_db_connection():
-    """Create a database connection with optimized performance settings."""
+# Thread-local storage for connection pooling
+# Each thread gets its own connection, which is reused across multiple calls
+_thread_local = threading.local()
+
+
+def _validate_numeric_pragma_value(value, min_val=None, max_val=None, name="value"):
+    """Validate that a PRAGMA value is a safe numeric value."""
+    if not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be numeric, got {type(value).__name__}")
+    if min_val is not None and value < min_val:
+        raise ValueError(f"{name} must be >= {min_val}, got {value}")
+    if max_val is not None and value > max_val:
+        raise ValueError(f"{name} must be <= {max_val}, got {value}")
+    return int(value)  # PRAGMA values should be integers
+
+
+def _create_db_connection():
+    """
+    Create a new database connection with optimized performance settings.
+    
+    This is the internal function that actually creates connections.
+    Used by both the pool and direct connection creation.
+    """
     # Set timeout to 30 seconds to wait for locks instead of failing immediately
     conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=30.0)
 
@@ -23,7 +46,10 @@ def get_db_connection():
 
     # Increase cache size (configurable, default 64MB)
     # Negative value means KB
-    cache_size_kb = -1 * config.DB_CACHE_SIZE_MB * 1024
+    cache_size_mb = _validate_numeric_pragma_value(
+        config.DB_CACHE_SIZE_MB, min_val=1, max_val=10000, name="DB_CACHE_SIZE_MB"
+    )
+    cache_size_kb = -1 * cache_size_mb * 1024
     conn.execute(f"PRAGMA cache_size = {cache_size_kb}")
 
     # Increase page size for better performance with large blobs
@@ -31,18 +57,115 @@ def get_db_connection():
     conn.execute("PRAGMA page_size = 8192")
 
     # Memory-mapped I/O for faster reads (configurable, default 256MB)
-    mmap_size_bytes = config.DB_MMAP_SIZE_MB * 1024 * 1024
+    mmap_size_mb = _validate_numeric_pragma_value(
+        config.DB_MMAP_SIZE_MB, min_val=1, max_val=100000, name="DB_MMAP_SIZE_MB"
+    )
+    mmap_size_bytes = mmap_size_mb * 1024 * 1024
     conn.execute(f"PRAGMA mmap_size = {mmap_size_bytes}")
 
     # Increase temp store to memory for faster sorts/indexes
     conn.execute("PRAGMA temp_store = MEMORY")
 
     # Optimize for multiple readers (configurable)
-    conn.execute(f"PRAGMA wal_autocheckpoint = {config.DB_WAL_AUTOCHECKPOINT}")
+    wal_checkpoint = _validate_numeric_pragma_value(
+        config.DB_WAL_AUTOCHECKPOINT, min_val=1, max_val=1000000, name="DB_WAL_AUTOCHECKPOINT"
+    )
+    conn.execute(f"PRAGMA wal_autocheckpoint = {wal_checkpoint}")
 
     # Enable row factory for dict-like access
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _get_thread_local_connection():
+    """
+    Get or create a thread-local database connection.
+    
+    This implements connection pooling by reusing connections within the same thread.
+    Each thread gets its own connection, which reduces memory-mapped I/O multiplication
+    when multiple operations happen in the same thread (e.g., worker threads).
+    
+    Returns:
+        sqlite3.Connection: A database connection for the current thread
+    """
+    # Check if this thread already has a connection
+    if not hasattr(_thread_local, 'connection') or _thread_local.connection is None:
+        # Create a new connection for this thread
+        _thread_local.connection = _create_db_connection()
+        logger.debug(f"Created new database connection for thread {threading.current_thread().name}")
+    
+    # Verify connection is still valid
+    try:
+        _thread_local.connection.execute("SELECT 1")
+    except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+        # Connection is closed or invalid, create a new one
+        logger.warning(f"Thread connection was closed, creating new connection for thread {threading.current_thread().name}")
+        _thread_local.connection = _create_db_connection()
+    
+    return _thread_local.connection
+
+
+def _close_thread_local_connection():
+    """
+    Close the thread-local connection if it exists.
+    
+    This should be called when a thread is about to exit to ensure
+    proper cleanup of database connections.
+    """
+    if hasattr(_thread_local, 'connection') and _thread_local.connection is not None:
+        try:
+            _thread_local.connection.close()
+            logger.debug(f"Closed database connection for thread {threading.current_thread().name}")
+        except Exception as e:
+            logger.warning(f"Error closing thread connection: {e}")
+        finally:
+            _thread_local.connection = None
+
+
+@contextmanager
+def get_db_connection():
+    """
+    Get a database connection with connection pooling.
+    
+    This function implements thread-local connection pooling to reduce
+    memory-mapped I/O multiplication in worker threads. Each thread reuses
+    its own connection, which significantly reduces memory usage when multiple
+    database operations occur in the same thread.
+    
+    The connection is automatically managed as a context manager:
+    - On entry: Returns the thread-local connection (creates if needed)
+    - On exit: Connection remains open for reuse in the same thread
+    
+    For operations that require a fresh connection (e.g., maintenance operations),
+    use `get_db_connection_direct()` instead.
+    
+    Example:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM images")
+            results = cursor.fetchall()
+    
+    Yields:
+        sqlite3.Connection: A database connection (reused within the same thread)
+    """
+    conn = _get_thread_local_connection()
+    yield conn
+    # Connection remains open for reuse - don't close it here
+
+
+def get_db_connection_direct():
+    """
+    Create a new database connection without pooling.
+    
+    Use this for operations that require a fresh connection, such as:
+    - Maintenance operations (VACUUM, REINDEX)
+    - Operations that need isolation from other connections
+    - One-off operations where connection reuse isn't beneficial
+    
+    Returns:
+        sqlite3.Connection: A new database connection (not pooled)
+    """
+    return _create_db_connection()
 
 def initialize_database():
     """Create the database and tables if they don't exist."""
