@@ -3,6 +3,12 @@
 import { showNotification } from './utils/notifications.js';
 
 var systemStatusInterval = null;
+// SECURITY NOTE: System secret is stored in localStorage for convenience.
+// This is vulnerable to XSS attacks. For production deployments, consider:
+// 1. Using httpOnly cookies (requires backend changes)
+// 2. Implementing Content Security Policy (CSP) headers
+// 3. Ensuring all user inputs are properly sanitized
+// 4. Using sessionStorage instead if persistence across tabs isn't required
 var SYSTEM_SECRET = localStorage.getItem('system_secret');
 
 async function validateStoredSecret() {
