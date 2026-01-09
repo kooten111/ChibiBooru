@@ -90,12 +90,31 @@ def require_secret(func: Callable) -> Callable:
     """
     Decorator that requires system secret for the endpoint.
     Can be used standalone or with api_handler.
+    Works with both sync and async functions.
     """
     @wraps(func)
-    async def wrapper(*args, **kwargs):
+    async def async_wrapper(*args, **kwargs):
         from config import RELOAD_SECRET
         secret = request.args.get('secret', '') or request.form.get('secret', '')
         if secret != RELOAD_SECRET:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
-        return await func(*args, **kwargs)
-    return wrapper
+        if asyncio.iscoroutinefunction(func):
+            return await func(*args, **kwargs)
+        else:
+            return await asyncio.to_thread(func, *args, **kwargs)
+    return async_wrapper
+
+
+def require_secret_sync(func: Callable) -> Callable:
+    """
+    Decorator that requires system secret for synchronous service functions.
+    Returns a sync function that checks the secret before executing.
+    """
+    @wraps(func)
+    def sync_wrapper(*args, **kwargs):
+        from config import RELOAD_SECRET
+        secret = request.args.get('secret', '') or request.form.get('secret', '')
+        if secret != RELOAD_SECRET:
+            return jsonify({"error": "Unauthorized"}), 401
+        return func(*args, **kwargs)
+    return sync_wrapper
