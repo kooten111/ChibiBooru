@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ app_name }}</title>
+    <title>Tag Browser - {{ app_name }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 </head>
 <body>
@@ -18,12 +19,40 @@
 
     {% include 'header.html' %}
 
-    <div class="container">
-        <div class="tags-browser-header">
-            <h2>Tag Browser</h2>
+    <div class="page-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-left">
+                <h1 class="page-title">
+                    <span class="page-title-icon">🏷️</span>
+                    Tag Browser
+                </h1>
+            </div>
+            <div class="page-header-stats">
+                <div class="page-header-stat">
+                    <span class="page-header-stat-value">{{ stats.total_tags }}</span>
+                    <span>tags</span>
+                </div>
+                <div class="page-header-stat">
+                    <span class="page-header-stat-value">{{ stats.total }}</span>
+                    <span>images</span>
+                </div>
+                <div class="page-header-stat">
+                    <span class="page-header-stat-value">{{ stats.avg_tags_per_image }}</span>
+                    <span>avg/image</span>
+                </div>
+            </div>
+            <div class="page-header-right">
+                <a href="{{ url_for('main.tag_manager') }}" class="action-btn action-btn-primary">
+                    Tag Manager
+                </a>
+                <a href="{{ url_for('main.tag_categorize') }}" class="action-btn action-btn-secondary">
+                    Categorize Tags
+                </a>
+            </div>
         </div>
 
-        <!-- Collapsible Stats Sections -->
+        <!-- Stats Sections -->
         <div class="tags-stats-sections">
             <!-- Overview Section -->
             <div class="collapsible-section">
@@ -36,29 +65,25 @@
                     <div class="stats-grid">
                         <a href="{{ url_for('main.home') }}" class="link-unstyled">
                             <div class="stat-card">
-                                <div class="stat-card-number">{{ stats.total }}</div>
+                                <div class="stat-card-value">{{ stats.total }}</div>
                                 <div class="stat-card-label">Total Images</div>
                             </div>
                         </a>
                         <a href="{{ url_for('main.home', query='metadata:found') }}" class="link-unstyled">
                             <div class="stat-card success">
-                                <div class="stat-card-number">{{ stats.with_metadata }}</div>
+                                <div class="stat-card-value">{{ stats.with_metadata }}</div>
                                 <div class="stat-card-label">With Metadata</div>
                             </div>
                         </a>
                         <a href="{{ url_for('main.home', query='metadata:missing') }}" class="link-unstyled">
                             <div class="stat-card warning">
-                                <div class="stat-card-number">{{ stats.without_metadata }}</div>
+                                <div class="stat-card-value">{{ stats.without_metadata }}</div>
                                 <div class="stat-card-label">Missing Metadata</div>
                             </div>
                         </a>
                         <div class="stat-card">
-                            <div class="stat-card-number">{{ stats.total_tags }}</div>
+                            <div class="stat-card-value">{{ stats.total_tags }}</div>
                             <div class="stat-card-label">Unique Tags</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-number">{{ stats.avg_tags_per_image }}</div>
-                            <div class="stat-card-label">Avg Tags/Image</div>
                         </div>
                     </div>
                 </div>
@@ -77,7 +102,7 @@
                         {% for source, count in stats.source_breakdown.items() %}
                         <a href="{{ url_for('main.home', query='source:' + source) }}" class="link-unstyled">
                             <div class="stat-card">
-                                <div class="stat-card-number">{{ count }}</div>
+                                <div class="stat-card-value">{{ count }}</div>
                                 <div class="stat-card-label">{{ source|capitalize }}</div>
                             </div>
                         </a>
@@ -154,8 +179,8 @@
         </div>
 
         <!-- Tag Search and Filter -->
-        <div class="tags-search-section">
-            <input type="text" id="tagSearchInput" placeholder="Search for tags...">
+        <div class="filter-group">
+            <input type="text" id="tagSearchInput" class="filter-input" placeholder="Search for tags...">
         </div>
 
         <div class="category-filter-bar">
@@ -190,7 +215,7 @@
             <!-- Tags will be loaded dynamically via JavaScript -->
         </div>
 
-        <div class="loading-indicator hidden" id="loadingIndicator" style="text-align: center; padding: 20px; color: #888;">
+        <div class="loading-indicator hidden" id="loadingIndicator" style="text-align: center; padding: 20px; color: var(--text-muted);">
             Loading more tags...
         </div>
     </div>

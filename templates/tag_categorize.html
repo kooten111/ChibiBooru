@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Categorize Tags - {{ app_name }}</title>
@@ -8,201 +7,197 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/tag-categorization.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tag-categorization.css') + '?v=3' }}">
 </head>
-
 <body>
     {% include 'header.html' %}
 
-    <div class="categorize-container">
-        <div class="categorize-header">
-            <div class="categorize-title">Categorize Tags</div>
-            <div class="categorize-progress" id="categorizeProgress">Loading...</div>
+    <div class="page-container page-container-full">
+        <!-- Page Header -->
+        <div class="page-header" style="padding: var(--spacing-lg); margin-bottom: 0;">
+            <div class="page-header-left">
+                <h1 class="page-title">
+                    <span class="page-title-icon">🏷️</span>
+                    Categorize Tags
+                </h1>
+            </div>
+            <div class="page-header-stats" id="statsSummary">
+                <div class="page-header-stat">
+                    <span class="page-header-stat-value" id="statTotal">0</span>
+                    <span>total</span>
+                </div>
+                <div class="page-header-stat">
+                    <span class="page-header-stat-value" id="statCategorized">0</span>
+                    <span>categorized</span>
+                </div>
+                <div class="page-header-stat">
+                    <span class="page-header-stat-value" id="statUncategorized">0</span>
+                    <span>uncategorized</span>
+                </div>
+            </div>
+            <div class="page-header-right">
+                <button class="action-btn action-btn-primary" onclick="exportCategorizations()">
+                    Export
+                </button>
+                <button class="action-btn action-btn-secondary" onclick="document.getElementById('importFileInput').click()">
+                    Import
+                </button>
+                <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+                <button class="action-btn action-btn-success" onclick="syncBaseCategories()">
+                    Sync Base Categories
+                </button>
+            </div>
         </div>
 
-        <div class="stats-summary" id="statsSummary" style="display: none;">
-            <div class="stat-box">
-                <div class="stat-label">Total Tags</div>
-                <div class="stat-value" id="statTotal">0</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Categorized</div>
-                <div class="stat-value" id="statCategorized">0</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Uncategorized</div>
-                <div class="stat-value" id="statUncategorized">0</div>
-            </div>
+        <!-- Progress Bar -->
+        <div class="progress-bar-container" style="margin: 0 var(--spacing-lg);">
+            <div class="progress-bar-fill" id="categorizeProgress" style="width: 0%;"></div>
         </div>
 
-        <div class="categorize-layout">
-            <div class="left-sidebar">
-                <div class="categorization-guide">
-                    <div class="guide-header">Category Guide</div>
-                    <div class="guide-content">
-                        <div class="guide-section">
-                            <h3>Group 1: Identity</h3>
-                            <ul>
-                                <li><strong>Subject_Count:</strong> Count & gender</li>
-                                <li><strong>Body_Physique:</strong> Permanent body traits</li>
-                                <li><strong>Body_Hair:</strong> Head hair only</li>
-                                <li><strong>Body_Face:</strong> Eyes & face marks</li>
-                                <li><strong>Body_Genitalia:</strong> NSFW anatomy</li>
-                            </ul>
-                        </div>
-
-                        <div class="guide-section">
-                            <h3>Group 2: Context</h3>
-                            <ul>
-                                <li><strong>Attire_Main:</strong> Main clothing</li>
-                                <li><strong>Attire_Inner:</strong> Underwear/swimwear</li>
-                                <li><strong>Attire_Legwear:</strong> Socks & hosiery</li>
-                                <li><strong>Attire_Acc:</strong> Accessories</li>
-                                <li><strong>Status:</strong> State of being</li>
-                                <li><strong>Action:</strong> Active verbs</li>
-                                <li><strong>Pose:</strong> Body position</li>
-                                <li><strong>Expression:</strong> Emotion</li>
-                                <li><strong>Sexual_Act:</strong> NSFW interaction</li>
-                                <li><strong>Object:</strong> Props</li>
-                                <li><strong>Setting:</strong> Location</li>
-                            </ul>
-                        </div>
-
-                        <div class="guide-section">
-                            <h3>Group 3: Technical/Meta</h3>
-                            <ul>
-                                <li><strong>Framing:</strong> Camera angle</li>
-                                <li><strong>Focus:</strong> Part focus</li>
-                                <li><strong>Style_Art:</strong> Art style</li>
-                                <li><strong>Style_Tech:</strong> Visual effects</li>
-                                <li><strong>Meta_Attributes:</strong> Metadata</li>
-                                <li><strong>Meta_Text:</strong> Text & UI</li>
-                            </ul>
-                        </div>
-                    </div>
+        <!-- Three-panel layout -->
+        <div class="panel-layout" style="padding: var(--spacing-lg);">
+            <!-- Left Panel - Category Guide -->
+            <aside class="panel panel-left">
+                <div class="panel-header">
+                    <h3 class="panel-title">Category Guide</h3>
                 </div>
-            </div>
 
-            <div class="tag-display" id="tagDisplay">
-                <div class="loading-state" id="loadingState">
-                    Loading tags...
-                </div>
-            </div>
-
-            <div class="right-sidebar">
-                <div class="import-export-section">
-                    <div class="import-export-header">Import/Export</div>
-                    <div class="import-export-buttons">
-                        <button class="import-export-btn export-btn" onclick="exportCategorizations()">
-                            <span class="btn-icon">⬇</span> Export
-                        </button>
-                        <button class="import-export-btn import-btn"
-                            onclick="document.getElementById('importFileInput').click()">
-                            <span class="btn-icon">⬆</span> Import
-                        </button>
-                        <input type="file" id="importFileInput" accept=".json" style="display: none;"
-                            onchange="handleImportFile(event)">
-                    </div>
-                    <div class="import-export-header" style="margin-top: 20px;">Maintenance</div>
-                    <div class="import-export-buttons">
-                        <button class="import-export-btn" onclick="syncBaseCategories()"
-                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                            <span class="btn-icon">🔄</span> Sync Base Categories
-                        </button>
+                <div class="panel-section">
+                    <h4 class="panel-section-title">Group 1: Identity</h4>
+                    <div class="list-container" style="max-height: none;">
+                        <div class="list-item"><span class="list-item-name">Subject_Count</span><span class="list-item-meta">Count & gender</span></div>
+                        <div class="list-item"><span class="list-item-name">Body_Physique</span><span class="list-item-meta">Permanent body traits</span></div>
+                        <div class="list-item"><span class="list-item-name">Body_Hair</span><span class="list-item-meta">Head hair only</span></div>
+                        <div class="list-item"><span class="list-item-name">Body_Face</span><span class="list-item-meta">Eyes & face marks</span></div>
+                        <div class="list-item"><span class="list-item-name">Body_Genitalia</span><span class="list-item-meta">NSFW anatomy</span></div>
                     </div>
                 </div>
 
-                <div class="edit-tag-section">
-                    <div class="edit-tag-header">Edit Tag</div>
-                    <div class="edit-tag-controls">
-                        <input type="text" id="editTagInput" placeholder="Tag name..." class="edit-tag-input">
-                        <button onclick="loadTagForEdit()" class="edit-tag-btn">Load</button>
+                <div class="panel-section">
+                    <h4 class="panel-section-title">Group 2: Context</h4>
+                    <div class="list-container" style="max-height: none;">
+                        <div class="list-item"><span class="list-item-name">Attire_Main</span><span class="list-item-meta">Main clothing</span></div>
+                        <div class="list-item"><span class="list-item-name">Attire_Inner</span><span class="list-item-meta">Underwear/swimwear</span></div>
+                        <div class="list-item"><span class="list-item-name">Attire_Legwear</span><span class="list-item-meta">Socks & hosiery</span></div>
+                        <div class="list-item"><span class="list-item-name">Attire_Acc</span><span class="list-item-meta">Accessories</span></div>
+                        <div class="list-item"><span class="list-item-name">Status</span><span class="list-item-meta">State of being</span></div>
+                        <div class="list-item"><span class="list-item-name">Action</span><span class="list-item-meta">Active verbs</span></div>
+                        <div class="list-item"><span class="list-item-name">Pose</span><span class="list-item-meta">Body position</span></div>
+                        <div class="list-item"><span class="list-item-name">Expression</span><span class="list-item-meta">Emotion</span></div>
+                        <div class="list-item"><span class="list-item-name">Sexual_Act</span><span class="list-item-meta">NSFW interaction</span></div>
+                        <div class="list-item"><span class="list-item-name">Object</span><span class="list-item-meta">Props</span></div>
+                        <div class="list-item"><span class="list-item-name">Setting</span><span class="list-item-meta">Location</span></div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h4 class="panel-section-title">Group 3: Technical/Meta</h4>
+                    <div class="list-container" style="max-height: none;">
+                        <div class="list-item"><span class="list-item-name">Framing</span><span class="list-item-meta">Camera angle</span></div>
+                        <div class="list-item"><span class="list-item-name">Focus</span><span class="list-item-meta">Part focus</span></div>
+                        <div class="list-item"><span class="list-item-name">Style_Art</span><span class="list-item-meta">Art style</span></div>
+                        <div class="list-item"><span class="list-item-name">Style_Tech</span><span class="list-item-meta">Visual effects</span></div>
+                        <div class="list-item"><span class="list-item-name">Meta_Attributes</span><span class="list-item-meta">Metadata</span></div>
+                        <div class="list-item"><span class="list-item-name">Meta_Text</span><span class="list-item-meta">Text & UI</span></div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center Panel - Tag Display -->
+            <main class="panel panel-center">
+                <div class="tag-display" id="tagDisplay">
+                    <div class="empty-state" id="loadingState">
+                        <div class="empty-state-icon">⏳</div>
+                        <div class="empty-state-text">Loading tags...</div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Panel - Edit & Queue -->
+            <aside class="panel panel-right">
+                <div class="panel-section">
+                    <h3 class="panel-section-title">Edit Tag</h3>
+                    <div class="filter-group">
+                        <input type="text" id="editTagInput" class="filter-input" placeholder="Tag name...">
+                        <button onclick="loadTagForEdit()" class="action-btn action-btn-primary" style="width: 100%; margin-top: var(--spacing-sm);">Load</button>
                     </div>
                     <div id="editTagDisplay" class="edit-tag-display"></div>
                 </div>
 
-                <div class="tag-queue-sidebar">
-                    <div class="queue-header">Next Tags</div>
-                    <div class="queue-list" id="queueList">
-                        <div class="queue-loading">Loading...</div>
+                <div class="panel-section">
+                    <h3 class="panel-section-title">Next Tags</h3>
+                    <div class="list-container" id="queueList">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⏳</div>
+                            <div class="empty-state-text">Loading...</div>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Page Footer -->
+    <div class="page-footer">
+        <div class="page-footer-left">
+            <span class="page-footer-item" id="footerStatus">Ready</span>
+        </div>
+        <div class="page-footer-shortcuts">
+            <span class="shortcut"><span class="shortcut-key">1-9</span> Quick Category</span>
+            <span class="shortcut"><span class="shortcut-key">S</span> Skip</span>
+            <span class="shortcut"><span class="shortcut-key">Z</span> Undo</span>
+            <span class="shortcut"><span class="shortcut-key">Esc</span> Close</span>
         </div>
     </div>
 
     <!-- Export Modal -->
-    <div id="exportModal" class="custom-modal" style="display: none;">
-        <div class="custom-modal-overlay" onclick="closeExportModal()"></div>
-        <div class="custom-modal-content">
-            <div class="custom-modal-header">
-                <h2>Export Tag Categorizations</h2>
-                <button class="custom-modal-close" onclick="closeExportModal()">×</button>
+    <div id="exportModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeExportModal()">&times;</span>
+            <h3>Export Tag Categorizations</h3>
+            <p>Choose which tags to export:</p>
+            <div class="filter-radio-group" style="margin: var(--spacing-lg) 0;">
+                <label class="filter-radio-label">
+                    <input type="radio" name="exportType" value="categorized" checked>
+                    <span><strong>Categorized Tags Only</strong> - Export only tags that have been categorized</span>
+                </label>
+                <label class="filter-radio-label">
+                    <input type="radio" name="exportType" value="all">
+                    <span><strong>All Tags</strong> - Export all tags (including uncategorized)</span>
+                </label>
             </div>
-            <div class="custom-modal-body">
-                <p>Choose which tags to export:</p>
-                <div class="export-options">
-                    <label class="export-option">
-                        <input type="radio" name="exportType" value="categorized" checked>
-                        <div class="option-content">
-                            <strong>Categorized Tags Only</strong>
-                            <span>Export only tags that have been categorized</span>
-                        </div>
-                    </label>
-                    <label class="export-option">
-                        <input type="radio" name="exportType" value="all">
-                        <div class="option-content">
-                            <strong>All Tags</strong>
-                            <span>Export all tags (including uncategorized)</span>
-                        </div>
-                    </label>
-                </div>
-            </div>
-            <div class="custom-modal-footer">
-                <button class="modal-btn modal-btn-secondary" onclick="closeExportModal()">Cancel</button>
-                <button class="modal-btn modal-btn-primary" onclick="confirmExport()">Export</button>
+            <div class="page-actions">
+                <button class="action-btn action-btn-secondary" onclick="closeExportModal()">Cancel</button>
+                <button class="action-btn action-btn-primary" onclick="confirmExport()">Export</button>
             </div>
         </div>
     </div>
 
     <!-- Import Modal -->
-    <div id="importModal" class="custom-modal" style="display: none;">
-        <div class="custom-modal-overlay" onclick="closeImportModal()"></div>
-        <div class="custom-modal-content">
-            <div class="custom-modal-header">
-                <h2>Import Tag Categorizations</h2>
-                <button class="custom-modal-close" onclick="closeImportModal()">×</button>
+    <div id="importModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeImportModal()">&times;</span>
+            <h3>Import Tag Categorizations</h3>
+            <p>Choose how to import the categorizations:</p>
+            <div class="filter-radio-group" style="margin: var(--spacing-lg) 0;">
+                <label class="filter-radio-label">
+                    <input type="radio" name="importMode" value="merge" checked>
+                    <span><strong>Merge (Recommended)</strong> - Keep existing categorizations, only categorize uncategorized tags</span>
+                </label>
+                <label class="filter-radio-label">
+                    <input type="radio" name="importMode" value="update">
+                    <span><strong>Update</strong> - Only update already categorized tags, leave uncategorized tags as-is</span>
+                </label>
+                <label class="filter-radio-label" style="border-color: var(--danger);">
+                    <input type="radio" name="importMode" value="overwrite">
+                    <span><strong>Overwrite (Dangerous)</strong> - Replace ALL categorizations - this will overwrite existing work!</span>
+                </label>
             </div>
-            <div class="custom-modal-body">
-                <p>Choose how to import the categorizations:</p>
-                <div class="import-options">
-                    <label class="import-option">
-                        <input type="radio" name="importMode" value="merge" checked>
-                        <div class="option-content">
-                            <strong>Merge (Recommended)</strong>
-                            <span>Keep existing categorizations, only categorize uncategorized tags</span>
-                        </div>
-                    </label>
-                    <label class="import-option">
-                        <input type="radio" name="importMode" value="update">
-                        <div class="option-content">
-                            <strong>Update</strong>
-                            <span>Only update already categorized tags, leave uncategorized tags as-is</span>
-                        </div>
-                    </label>
-                    <label class="import-option import-option-danger">
-                        <input type="radio" name="importMode" value="overwrite">
-                        <div class="option-content">
-                            <strong>Overwrite (Dangerous)</strong>
-                            <span>Replace ALL categorizations - this will overwrite existing work!</span>
-                        </div>
-                    </label>
-                </div>
-            </div>
-            <div class="custom-modal-footer">
-                <button class="modal-btn modal-btn-secondary" onclick="closeImportModal()">Cancel</button>
-                <button class="modal-btn modal-btn-primary" onclick="confirmImport()">Import</button>
+            <div class="page-actions">
+                <button class="action-btn action-btn-secondary" onclick="closeImportModal()">Cancel</button>
+                <button class="action-btn action-btn-primary" onclick="confirmImport()">Import</button>
             </div>
         </div>
     </div>
@@ -211,11 +206,10 @@
     <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
     <script src="{{ url_for('static', filename='js/header.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/pages/tag-categorize.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/tag-categorize.js') + '?v=2' }}"></script>
     <script type="module">
         import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
         window.showNotification = showNotification;
     </script>
 </body>
-
 </html>

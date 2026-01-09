@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>{{ app_name }} - Tag Implications</title>
+    <title>Tag Implications - {{ app_name }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 </head>
-
 <body>
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
@@ -20,203 +19,233 @@
 
     {% include 'header.html' %}
 
-    <div class="container implications-layout">
-        <!-- Left Sidebar -->
-        <aside class="implications-sidebar implications-sidebar-left">
-            <div class="sidebar-section">
-                <h3 class="sidebar-title">Tag Search</h3>
-                <div class="tag-search-input-wrapper">
-                    <input type="text" id="tagSearchInput" placeholder="Search for a tag..." autocomplete="off">
-                    <div id="tagSearchDropdown" class="autocomplete-dropdown"></div>
+    <div class="page-container page-container-full">
+        <!-- Page Header -->
+        <div class="page-header" style="padding: var(--spacing-lg); margin-bottom: 0; border-bottom: none;">
+            <div class="page-header-left">
+                <h1 class="page-title">
+                    <span class="page-title-icon">🔗</span>
+                    Tag Implications Manager
+                </h1>
+            </div>
+            <div class="page-header-stats">
+                <div class="page-header-stat" id="headerCount">
+                    <span>Showing 0 implications</span>
                 </div>
             </div>
-
-            <div class="sidebar-section selected-tag-info" id="selectedTagInfo" style="display: none;">
-                <div class="tag-info-header">
-                    <span class="tag-badge" id="selectedTagBadge"></span>
-                </div>
-                <div class="tag-stats">
-                    <div class="tag-stat">
-                        <span class="stat-value" id="impliesCount">0</span>
-                        <span class="stat-label">Implies</span>
-                    </div>
-                    <div class="tag-stat">
-                        <span class="stat-value" id="impliedByCount">0</span>
-                        <span class="stat-label">Implied By</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <h3 class="sidebar-title">View Mode</h3>
-                <div class="view-mode-toggle">
-                    <button class="toggle-btn active" data-mode="all">All</button>
-                    <button class="toggle-btn" data-mode="suggestions">Suggestions</button>
-                    <button class="toggle-btn" data-mode="active">Active</button>
-                </div>
-            </div>
-
-            <div class="sidebar-section">
-                <button class="collapsible-header" onclick="toggleSection(this, 'typeFilters', event)">
-                    <span>Type Filters</span>
-                    <span class="collapse-arrow">▼</span>
+            <div class="page-header-right">
+                <button id="createManualBtn" class="action-btn action-btn-primary">
+                    Create Manual Implication
                 </button>
-                <div id="typeFilters" class="collapsible-content">
-                    <label class="filter-checkbox">
-                        <input type="checkbox" name="typeFilter" value="all" checked>
-                        <span>All Types</span>
-                    </label>
-                    <label class="filter-checkbox">
-                        <input type="checkbox" name="typeFilter" value="manual">
-                        <span>Manual</span>
-                    </label>
-                    <label class="filter-checkbox">
-                        <input type="checkbox" name="typeFilter" value="naming_pattern">
-                        <span>Naming Pattern</span>
-                    </label>
-                    <label class="filter-checkbox">
-                        <input type="checkbox" name="typeFilter" value="correlation">
-                        <span>Statistical</span>
-                    </label>
-                </div>
             </div>
+        </div>
 
-            <div class="sidebar-section">
-                <button class="collapsible-header" onclick="toggleSection(this, 'categoryFilters', event)">
-                    <span>Category Filters</span>
-                    <span class="collapse-arrow">▼</span>
-                </button>
-                <div id="categoryFilters" class="collapsible-content">
-                    <div class="filter-subsection">
-                        <span class="filter-subsection-label">Source Category:</span>
-                        <label class="filter-checkbox">
-                            <input type="checkbox" name="sourceCategoryFilter" value="all" checked>
-                            <span>All</span>
-                        </label>
-                        <label class="filter-checkbox">
-                            <input type="checkbox" name="sourceCategoryFilter" value="character">
-                            <span>Character</span>
-                        </label>
-                        <label class="filter-checkbox">
-                            <input type="checkbox" name="sourceCategoryFilter" value="copyright">
-                            <span>Copyright</span>
-                        </label>
-                        <label class="filter-checkbox">
-                            <input type="checkbox" name="sourceCategoryFilter" value="general">
-                            <span>General</span>
-                        </label>
-                    </div>
-                    <div class="filter-subsection">
-                        <span class="filter-subsection-label">Implied Category:</span>
-                        <label class="filter-checkbox">
-                            <input type="checkbox" name="impliedCategoryFilter" value="all" checked>
-                            <span>All</span>
-                        </label>
-                        <label class="filter-checkbox">
-                            <input type="checkbox" name="impliedCategoryFilter" value="character">
-                            <span>Character</span>
-                        </label>
-                        <label class="filter-checkbox">
-                            <input type="checkbox" name="impliedCategoryFilter" value="copyright">
-                            <span>Copyright</span>
-                        </label>
-                        <label class="filter-checkbox exclude-filter">
-                            <input type="checkbox" name="impliedCategoryFilter" value="!general">
-                            <span>Exclude General</span>
-                        </label>
+        <!-- Three Panel Layout -->
+        <div class="panel-layout" style="padding: 0 var(--spacing-lg) var(--spacing-lg);">
+            <!-- Left Panel - Filters -->
+            <aside class="panel panel-left">
+                <div class="panel-section">
+                    <h3 class="panel-section-title">Tag Search</h3>
+                    <div class="tag-search-input-wrapper">
+                        <input type="text" id="tagSearchInput" class="filter-input" placeholder="Search for a tag..." autocomplete="off">
+                        <div id="tagSearchDropdown" class="autocomplete-dropdown"></div>
                     </div>
                 </div>
-            </div>
 
-            <div class="sidebar-section quick-actions">
-                <div class="settings-option">
-                    <label class="filter-checkbox"
-                        title="When enabled, approving a rule will immediately add the implied tag to all images that have the source tag">
-                        <input type="checkbox" id="applyOnApproval" checked>
-                        <span>Apply to existing images on approval</span>
-                    </label>
+                <div class="panel-section selected-tag-info" id="selectedTagInfo" style="display: none;">
+                    <div class="tag-info-header">
+                        <span class="tag-badge" id="selectedTagBadge"></span>
+                    </div>
+                    <div class="mini-stats">
+                        <div class="mini-stat">
+                            <div class="mini-stat-value" id="impliesCount">0</div>
+                            <div class="mini-stat-label">Implies</div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-value" id="impliedByCount">0</div>
+                            <div class="mini-stat-label">Implied By</div>
+                        </div>
+                    </div>
                 </div>
-                <button id="createManualBtn" class="action-btn primary-btn">
-                    <span>➕</span> Create Manual Implication
-                </button>
-                <button id="autoApprovePatternBtn" class="action-btn success-btn"
-                    title="Auto-approve all character_(copyright) → copyright patterns">
-                    <span>⚡</span> Auto-Approve Naming Patterns
-                </button>
-                <button id="autoApproveConfidentBtn" class="action-btn success-btn"
-                    title="Configure and auto-approve correlation suggestions">
-                    <span>🎯</span> Auto-Approve Settings
-                </button>
-                <button id="clearImpliedTagsBtn" class="action-btn danger-btn"
-                    title="Clear all tags added by implications (source='implication')">
-                    <span>🗑️</span> Clear Implied Tags
-                </button>
-            </div>
-        </aside>
 
-        <!-- Main Content -->
-        <main class="implications-main">
-            <div class="main-header">
-                <h2>Tag Implications Manager</h2>
-                <div class="header-count" id="headerCount">Showing 0 implications</div>
-            </div>
+                <div class="panel-section">
+                    <h3 class="panel-section-title">View Mode</h3>
+                    <div class="view-mode-toggle">
+                        <button class="toggle-btn active" data-mode="all">All</button>
+                        <button class="toggle-btn" data-mode="suggestions">Suggestions</button>
+                        <button class="toggle-btn" data-mode="active">Active</button>
+                    </div>
+                </div>
 
-            <div id="bulkActionsBar" class="bulk-actions-bar" style="display: none;">
-                <span class="selection-count" id="selectionCount">0 selected</span>
-                <button id="bulkApproveBtn" class="bulk-btn approve-btn">✓ Approve All</button>
-                <button id="bulkDismissBtn" class="bulk-btn dismiss-btn">✗ Dismiss All</button>
-                <button id="clearSelectionBtn" class="bulk-btn clear-btn">Clear Selection</button>
-            </div>
-
-            <div class="implications-sections">
-                <!-- Suggestions Section -->
-                <div class="collapsible-section suggestions-section">
-                    <button class="section-header" onclick="toggleSection(this, 'suggestionsContent', event)">
-                        <span class="section-icon">⚠️</span>
-                        <span class="section-title">Pending Suggestions</span>
-                        <span class="section-badge" id="suggestionsBadge">0</span>
+                <div class="panel-section">
+                    <button class="collapsible-header" onclick="toggleSection(this, 'typeFilters', event)">
+                        <span>Type Filters</span>
                         <span class="collapse-arrow">▼</span>
                     </button>
-                    <div id="suggestionsContent" class="section-content">
-                        <div class="select-all-row">
-                            <label class="filter-checkbox">
-                                <input type="checkbox" id="selectAllSuggestions">
-                                <span>Select all suggestions</span>
+                    <div id="typeFilters" class="collapsible-content">
+                        <div class="filter-checkbox-group">
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" name="typeFilter" value="all" checked>
+                                <span>All Types</span>
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" name="typeFilter" value="manual">
+                                <span>Manual</span>
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" name="typeFilter" value="naming_pattern">
+                                <span>Naming Pattern</span>
+                            </label>
+                            <label class="filter-checkbox-label">
+                                <input type="checkbox" name="typeFilter" value="correlation">
+                                <span>Statistical</span>
                             </label>
                         </div>
-                        <div id="suggestionsList" class="implications-list">
-                            <div class="loading-message">Loading suggestions...</div>
-                        </div>
                     </div>
                 </div>
 
-                <!-- Active Implications Section -->
-                <div class="collapsible-section active-section">
-                    <button class="section-header" onclick="toggleSection(this, 'activeContent', event)">
-                        <span class="section-icon">✓</span>
-                        <span class="section-title">Active Implications</span>
-                        <span class="section-badge" id="activeBadge">0</span>
+                <div class="panel-section">
+                    <button class="collapsible-header" onclick="toggleSection(this, 'categoryFilters', event)">
+                        <span>Category Filters</span>
                         <span class="collapse-arrow">▼</span>
                     </button>
-                    <div id="activeContent" class="section-content">
-                        <div id="activeList" class="implications-list">
-                            <div class="loading-message">Loading active implications...</div>
+                    <div id="categoryFilters" class="collapsible-content">
+                        <div class="filter-subsection">
+                            <span class="panel-section-title">Source Category:</span>
+                            <div class="filter-checkbox-group">
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" name="sourceCategoryFilter" value="all" checked>
+                                    <span>All</span>
+                                </label>
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" name="sourceCategoryFilter" value="character">
+                                    <span>Character</span>
+                                </label>
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" name="sourceCategoryFilter" value="copyright">
+                                    <span>Copyright</span>
+                                </label>
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" name="sourceCategoryFilter" value="general">
+                                    <span>General</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="filter-subsection">
+                            <span class="panel-section-title">Implied Category:</span>
+                            <div class="filter-checkbox-group">
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" name="impliedCategoryFilter" value="all" checked>
+                                    <span>All</span>
+                                </label>
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" name="impliedCategoryFilter" value="character">
+                                    <span>Character</span>
+                                </label>
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" name="impliedCategoryFilter" value="copyright">
+                                    <span>Copyright</span>
+                                </label>
+                                <label class="filter-checkbox-label exclude-filter">
+                                    <input type="checkbox" name="impliedCategoryFilter" value="!general">
+                                    <span>Exclude General</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </main>
 
-        <!-- Right Sidebar - Detail Panel -->
-        <aside class="implications-sidebar implications-sidebar-right">
-            <div id="detailPanel" class="detail-panel">
-                <div class="detail-placeholder">
-                    <div class="placeholder-icon">📋</div>
-                    <p>No implication selected</p>
-                    <p class="placeholder-hint">Click on an implication to view details</p>
+                <div class="panel-section">
+                    <h3 class="panel-section-title">Quick Actions</h3>
+                    <div class="page-actions" style="flex-direction: column;">
+                        <div class="settings-option" style="margin-bottom: var(--spacing-sm);">
+                            <label class="filter-checkbox-label"
+                                title="When enabled, approving a rule will immediately add the implied tag to all images that have the source tag">
+                                <input type="checkbox" id="applyOnApproval" checked>
+                                <span>Apply on approval</span>
+                            </label>
+                        </div>
+                        <button id="autoApprovePatternBtn" class="action-btn action-btn-success" style="width: 100%;"
+                            title="Auto-approve all character_(copyright) → copyright patterns">
+                            Auto-Approve Patterns
+                        </button>
+                        <button id="autoApproveConfidentBtn" class="action-btn action-btn-success" style="width: 100%;"
+                            title="Configure and auto-approve correlation suggestions">
+                            Auto-Approve Settings
+                        </button>
+                        <button id="clearImpliedTagsBtn" class="action-btn action-btn-danger" style="width: 100%;"
+                            title="Clear all tags added by implications (source='implication')">
+                            Clear Implied Tags
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </aside>
+            </aside>
+
+            <!-- Center Panel - Main Content -->
+            <main class="panel panel-center">
+                <div id="bulkActionsBar" class="bulk-actions-bar" style="display: none;">
+                    <span class="selection-count" id="selectionCount">0 selected</span>
+                    <button id="bulkApproveBtn" class="action-btn action-btn-success">Approve All</button>
+                    <button id="bulkDismissBtn" class="action-btn action-btn-warning">Dismiss All</button>
+                    <button id="clearSelectionBtn" class="action-btn action-btn-secondary">Clear Selection</button>
+                </div>
+
+                <div class="implications-sections">
+                    <!-- Suggestions Section -->
+                    <div class="collapsible-section suggestions-section">
+                        <button class="section-header" onclick="toggleSection(this, 'suggestionsContent', event)">
+                            <span class="section-icon">⚠️</span>
+                            <span class="section-title">Pending Suggestions</span>
+                            <span class="page-status-badge" id="suggestionsBadge">0</span>
+                            <span class="collapse-arrow">▼</span>
+                        </button>
+                        <div id="suggestionsContent" class="section-content">
+                            <div class="select-all-row">
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" id="selectAllSuggestions">
+                                    <span>Select all suggestions</span>
+                                </label>
+                            </div>
+                            <div id="suggestionsList" class="list-container implications-list">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">⏳</div>
+                                    <div class="empty-state-text">Loading suggestions...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Active Implications Section -->
+                    <div class="collapsible-section active-section">
+                        <button class="section-header" onclick="toggleSection(this, 'activeContent', event)">
+                            <span class="section-icon">✓</span>
+                            <span class="section-title">Active Implications</span>
+                            <span class="page-status-badge success" id="activeBadge">0</span>
+                            <span class="collapse-arrow">▼</span>
+                        </button>
+                        <div id="activeContent" class="section-content">
+                            <div id="activeList" class="list-container implications-list">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">⏳</div>
+                                    <div class="empty-state-text">Loading active implications...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Panel - Details -->
+            <aside class="panel panel-right">
+                <div id="detailPanel" class="detail-panel">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <div class="empty-state-text">No implication selected</div>
+                        <div class="empty-state-subtext">Click on an implication to view details</div>
+                    </div>
+                </div>
+            </aside>
+        </div>
     </div>
 
     <!-- Manual Creation Modal -->
@@ -225,20 +254,19 @@
             <span class="close">&times;</span>
             <h3>Create Manual Implication</h3>
             <div class="manual-creation-form">
-                <div class="form-group">
-                    <label for="manualSourceTag">When this tag is added:</label>
-                    <input type="text" id="manualSourceTag" placeholder="e.g., mint_fantome" autocomplete="off">
+                <div class="filter-group">
+                    <label class="filter-label" for="manualSourceTag">When this tag is added:</label>
+                    <input type="text" id="manualSourceTag" class="filter-input" placeholder="e.g., mint_fantome" autocomplete="off">
                 </div>
-                <div class="flow-arrow">→</div>
-                <div class="form-group">
-                    <label for="manualImpliedTag">Also add this tag:</label>
-                    <input type="text" id="manualImpliedTag" placeholder="e.g., indie_virtual_youtuber"
-                        autocomplete="off">
+                <div class="flow-arrow" style="text-align: center; font-size: 1.5em; padding: var(--spacing-sm);">→</div>
+                <div class="filter-group">
+                    <label class="filter-label" for="manualImpliedTag">Also add this tag:</label>
+                    <input type="text" id="manualImpliedTag" class="filter-input" placeholder="e.g., indie_virtual_youtuber" autocomplete="off">
                 </div>
             </div>
-            <div class="modal-actions">
-                <button id="previewManualBtn" class="btn-secondary">Preview</button>
-                <button id="createManualSubmitBtn" class="btn-primary">Create</button>
+            <div class="page-actions" style="margin-top: var(--spacing-lg);">
+                <button id="previewManualBtn" class="action-btn action-btn-secondary">Preview</button>
+                <button id="createManualSubmitBtn" class="action-btn action-btn-primary">Create</button>
             </div>
         </div>
     </div>
@@ -250,39 +278,40 @@
             <h3>Auto-Approve Settings</h3>
 
             <div class="auto-approve-form">
-                <div class="form-group">
-                    <label for="minConfidenceSlider">
+                <div class="filter-group">
+                    <label class="filter-label" for="minConfidenceSlider">
                         Minimum Confidence: <span id="minConfidenceValue">85%</span>
                     </label>
                     <input type="range" id="minConfidenceSlider" min="50" max="100" value="85" class="slider">
-                    <p class="form-hint">How often must the implied tag appear with the source tag?</p>
+                    <p class="empty-state-subtext">How often must the implied tag appear with the source tag?</p>
                 </div>
 
-                <div class="form-group">
-                    <label for="minSamplesSlider">
+                <div class="filter-group">
+                    <label class="filter-label" for="minSamplesSlider">
                         Minimum Samples: <span id="minSamplesValue">5</span>
                     </label>
                     <input type="range" id="minSamplesSlider" min="2" max="50" value="5" class="slider">
-                    <p class="form-hint">How many images must have both tags? Higher = more reliable.</p>
+                    <p class="empty-state-subtext">How many images must have both tags? Higher = more reliable.</p>
                 </div>
 
-                <div class="form-group">
-                    <label class="filter-checkbox">
+                <div class="filter-group">
+                    <label class="filter-checkbox-label">
                         <input type="checkbox" id="autoApproveApplyNow" checked>
                         <span>Apply to existing images immediately</span>
                     </label>
                 </div>
 
                 <div class="auto-approve-preview" id="autoApprovePreview">
-                    <div class="preview-count">
-                        Loading preview...
+                    <div class="stat-card">
+                        <div class="stat-card-value">Loading...</div>
+                        <div class="stat-card-label">preview</div>
                     </div>
                 </div>
             </div>
 
-            <div class="modal-actions">
-                <button id="autoApproveRefreshBtn" class="btn-secondary">Refresh Preview</button>
-                <button id="autoApproveSubmitBtn" class="btn-primary">Approve Matching</button>
+            <div class="page-actions" style="margin-top: var(--spacing-lg);">
+                <button id="autoApproveRefreshBtn" class="action-btn action-btn-secondary">Refresh Preview</button>
+                <button id="autoApproveSubmitBtn" class="action-btn action-btn-primary">Approve Matching</button>
             </div>
         </div>
     </div>
@@ -291,36 +320,45 @@
     <div id="clearImpliedModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
-            <h3>🗑️ Clear Implied Tags</h3>
+            <h3>Clear Implied Tags</h3>
             <p>This will remove all tags that were added via implications (source='implication').</p>
-            <div class="form-group">
-                <label class="filter-checkbox">
+            <div class="filter-group">
+                <label class="filter-checkbox-label">
                     <input type="checkbox" id="clearImpliedReapplyCheckbox">
                     <span>Reapply all active implication rules after clearing</span>
                 </label>
             </div>
-            <div class="modal-actions">
-                <button id="clearImpliedCancelBtn" class="btn-secondary">Cancel</button>
-                <button id="clearImpliedSubmitBtn" class="btn-danger">Clear Tags</button>
+            <div class="page-actions" style="margin-top: var(--spacing-lg);">
+                <button id="clearImpliedCancelBtn" class="action-btn action-btn-secondary">Cancel</button>
+                <button id="clearImpliedSubmitBtn" class="action-btn action-btn-danger">Clear Tags</button>
             </div>
         </div>
     </div>
 
-    <div class="toast-container" id="toastContainer"></div>
+    <!-- Page Footer -->
+    <div class="page-footer">
+        <div class="page-footer-left">
+            <span class="page-footer-item" id="footerStatus">Ready</span>
+        </div>
+        <div class="page-footer-shortcuts">
+            <span class="shortcut"><span class="shortcut-key">/</span> Search</span>
+            <span class="shortcut"><span class="shortcut-key">A</span> Approve Selected</span>
+            <span class="shortcut"><span class="shortcut-key">D</span> Dismiss Selected</span>
+            <span class="shortcut"><span class="shortcut-key">Esc</span> Close</span>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='js/header.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/autocomplete.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/implications.js') + '?v=2' }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/implications.js') + '?v=3' }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/system-panel.js') }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
     <script>
         // Global toggle function for collapsible sections
         function toggleSection(header, contentId, e) {
-            // Prevent event propagation if triggered from inside
             if (e && (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL')) {
                 return;
             }
-
             const content = document.getElementById(contentId);
             if (content) {
                 header.classList.toggle('collapsed');
@@ -329,5 +367,4 @@
         }
     </script>
 </body>
-
 </html>
