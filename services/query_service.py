@@ -159,6 +159,306 @@ def _should_use_fts(general_terms):
     # All terms are exact tags - use fast tag-based search
     return False
 
+def _build_fts_query(conn, general_terms, negative_terms):
+    """
+    Build FTS5 query string and identify freetext terms that need filepath matching.
+    
+    Args:
+        conn: Database connection
+        general_terms: List of positive search terms
+        negative_terms: List of negative search terms (exclusions)
+        
+    Returns:
+        Tuple of (fts_query_string, freetext_filepath_terms)
+    """
+    fts_query_parts = []
+    freetext_filepath_terms = []  # Terms to search as substrings in filepath
+
+    # Add positive terms
+    for term in general_terms:
+        # Remove quotes for FTS query
+        clean_term = term.strip('"').lower()
+
+        # Check if this is an exact tag
+        result = conn.execute(
+            "SELECT 1 FROM tags WHERE LOWER(name) = ? LIMIT 1",
+            (clean_term,)
+        ).fetchone()
+
+        # Escape special FTS5 characters
+        clean_term_escaped = clean_term.replace('"', '""')
+
+        if result:
+            # Exact tag - use prefix match operator to ensure whole word
+            # In FTS5, ^term means "token starts with", but we want exact
+            # So we'll use quotes and rely on tokenization
+            fts_query_parts.append(f'^"{clean_term_escaped}"')
+        else:
+            # Freetext term - check if it contains special characters that FTS5 can't handle well
+            # For terms with hyphens or special chars, skip FTS and rely on filepath LIKE matching
+            if '-' in clean_term or any(c in clean_term for c in [':', '(', ')', '{', '}', '[', ']']):
+                # Don't add to FTS query - will be handled by filepath LIKE matching
+                # Track for filepath substring matching
+                freetext_filepath_terms.append(clean_term)
+            else:
+                # Use wildcard for prefix matching
+                # This allows "fellini" to match "pulchra_fellini"
+                fts_query_parts.append(f'{clean_term_escaped}*')
+                # Don't add to freetext_filepath_terms - FTS will handle it
+
+    # Add negative terms
+    for term in negative_terms:
+        clean_term = term.lower().replace('"', '""')
+        fts_query_parts.append(f'NOT "{clean_term}"')
+
+    fts_query = ' '.join(fts_query_parts)
+    return fts_query, freetext_filepath_terms
+
+
+def _build_base_sql_query(freetext_filepath_terms):
+    """
+    Build the base SQL query with appropriate joins for FTS search.
+    
+    Args:
+        freetext_filepath_terms: List of terms that need filepath matching
+        
+    Returns:
+        List of SQL query parts (will be joined later)
+    """
+    if freetext_filepath_terms:
+        # Use LEFT JOIN so we can include results that only match filepath
+        return ["""
+            SELECT i.id, i.filepath,
+                   COALESCE(i.tags_character, '') || ' ' ||
+                   COALESCE(i.tags_copyright, '') || ' ' ||
+                   COALESCE(i.tags_artist, '') || ' ' ||
+                   COALESCE(i.tags_species, '') || ' ' ||
+                   COALESCE(i.tags_meta, '') || ' ' ||
+                   COALESCE(i.tags_general, '') as tags,
+                   COALESCE(fts.rank, 0) as rank
+            FROM images i
+            LEFT JOIN images_fts fts ON i.filepath = fts.filepath
+        """]
+    else:
+        # Regular FTS search with INNER JOIN
+        return ["""
+            SELECT i.id, i.filepath,
+                   COALESCE(i.tags_character, '') || ' ' ||
+                   COALESCE(i.tags_copyright, '') || ' ' ||
+                   COALESCE(i.tags_artist, '') || ' ' ||
+                   COALESCE(i.tags_species, '') || ' ' ||
+                   COALESCE(i.tags_meta, '') || ' ' ||
+                   COALESCE(i.tags_general, '') as tags,
+                   fts.rank
+            FROM images_fts fts
+            INNER JOIN images i ON i.filepath = fts.filepath
+        """]
+
+
+def _apply_filters(sql_parts, where_clauses, params, fts_query, freetext_filepath_terms,
+                   pool_filter, relationship_filter, source_filters, extension_filter, filename_filter):
+    """
+    Apply filters to the SQL query by adding WHERE clauses and JOINs.
+    
+    Args:
+        sql_parts: List of SQL query parts (modified in place)
+        where_clauses: List of WHERE clause conditions (modified in place)
+        params: List of query parameters (modified in place)
+        fts_query: FTS5 query string
+        freetext_filepath_terms: List of freetext terms for filepath matching
+        pool_filter: Pool name filter
+        relationship_filter: Relationship type filter ('parent', 'child', 'any')
+        source_filters: List of source names to filter by
+        extension_filter: File extension filter
+        filename_filter: Filename substring filter
+        
+    Returns:
+        None (modifies sql_parts, where_clauses, params in place)
+    """
+    # Add FTS match condition
+    if fts_query and not freetext_filepath_terms:
+        where_clauses.append("images_fts MATCH ?")
+        params.append(fts_query)
+    elif fts_query and freetext_filepath_terms:
+        # Build OR condition: FTS match OR filepath substring
+        fts_or_conditions = ["fts.filepath IN (SELECT filepath FROM images_fts WHERE images_fts MATCH ?)"]
+        params.append(fts_query)
+
+        for term in freetext_filepath_terms:
+            fts_or_conditions.append("LOWER(i.filepath) LIKE ?")
+            params.append(f"%{term}%")
+
+        where_clauses.append(f"({' OR '.join(fts_or_conditions)})")
+
+    # Pool filter
+    if pool_filter:
+        sql_parts[0] += """
+            INNER JOIN pool_images pi ON i.id = pi.image_id
+            INNER JOIN pools p ON pi.pool_id = p.id
+        """
+        where_clauses.append("LOWER(p.name) LIKE ?")
+        params.append(f"%{pool_filter}%")
+
+    # Relationship filter
+    if relationship_filter:
+        if relationship_filter == 'parent':
+            where_clauses.append("i.parent_id IS NOT NULL")
+        elif relationship_filter == 'child':
+            where_clauses.append("i.has_children = 1")
+        elif relationship_filter == 'any':
+            where_clauses.append("(i.parent_id IS NOT NULL OR i.has_children = 1)")
+
+    # Source filters
+    if source_filters:
+        placeholders = ','.join(['?'] * len(source_filters))
+        sql_parts[0] += f"""
+            INNER JOIN image_sources isrc ON i.id = isrc.image_id
+            INNER JOIN sources s ON isrc.source_id = s.id
+        """
+        where_clauses.append(f"s.name IN ({placeholders})")
+        params.extend(source_filters)
+
+    # Extension filter
+    if extension_filter:
+        where_clauses.append("LOWER(i.filepath) LIKE ?")
+        params.append(f"%.{extension_filter}")
+
+    # Filename filter
+    if filename_filter:
+        where_clauses.append("LOWER(i.filepath) LIKE ?")
+        params.append(f"%{filename_filter}%")
+
+
+def _post_filter_results(conn, rows, general_terms):
+    """
+    Post-filter results for exact tag matching.
+    
+    Args:
+        conn: Database connection
+        rows: Query result rows
+        general_terms: List of search terms
+        
+    Returns:
+        List of filtered result dictionaries with 'filepath' and 'tags' keys
+    """
+    # Check which search terms are exact tags
+    exact_tag_terms = []
+    freetext_terms = []
+
+    for term in general_terms:
+        clean_term = term.strip('"').lower()
+        result = conn.execute(
+            "SELECT 1 FROM tags WHERE LOWER(name) = ? LIMIT 1",
+            (clean_term,)
+        ).fetchone()
+
+        if result:
+            exact_tag_terms.append(clean_term)
+        else:
+            freetext_terms.append(clean_term)
+
+    results = []
+    for row in rows:
+        tags_str = row['tags'].lower()
+        tag_list = set(tags_str.split())
+        filepath_lower = row['filepath'].lower()
+
+        # Check exact tags first
+        match = True
+        for term in exact_tag_terms:
+            # Must be exact tag match (not substring in filepath)
+            if term not in tag_list:
+                match = False
+                break
+
+        # Check freetext terms (can match as substring in tags or filepath)
+        if match:
+            for term in freetext_terms:
+                # Check for substring match in tags OR filepath
+                if term not in tags_str and term not in filepath_lower:
+                    match = False
+                    break
+
+        if match:
+            results.append({
+                'filepath': row['filepath'],
+                'tags': row['tags']
+            })
+
+    return results
+
+
+def _apply_ordering(conn, results, order_filter):
+    """
+    Apply ordering to search results.
+    
+    Args:
+        conn: Database connection
+        results: List of result dictionaries
+        order_filter: Ordering type ('score_desc', 'fav_desc', 'new', 'old', etc.)
+        
+    Returns:
+        Sorted list of results
+    """
+    if not order_filter:
+        return results
+
+    if order_filter in ['score_desc', 'score', 'score_asc', 'fav_desc', 'fav', 'fav_asc']:
+        # Sort by score or favorites
+        filepath_to_value = {}
+        for img in results:
+            cursor = conn.execute(
+                "SELECT score, fav_count FROM images WHERE filepath = ?",
+                (img['filepath'],)
+            )
+            row = cursor.fetchone()
+            if row:
+                if 'score' in order_filter:
+                    filepath_to_value[img['filepath']] = row['score'] if row['score'] is not None else -999999
+                else:  # fav
+                    filepath_to_value[img['filepath']] = row['fav_count'] if row['fav_count'] is not None else -999999
+            else:
+                filepath_to_value[img['filepath']] = -999999
+
+        # Sort by value (default descending, unless _asc suffix)
+        reverse = not order_filter.endswith('_asc')
+        return sorted(results, key=lambda x: filepath_to_value.get(x['filepath'], -999999), reverse=reverse)
+    
+    elif order_filter in ['new', 'ingested', 'newest', 'recent']:
+        # Sort by ingested_at (newest first)
+        filepath_to_timestamp = {}
+        for img in results:
+            cursor = conn.execute(
+                "SELECT ingested_at FROM images WHERE filepath = ?",
+                (img['filepath'],)
+            )
+            row = cursor.fetchone()
+            if row and row['ingested_at']:
+                filepath_to_timestamp[img['filepath']] = row['ingested_at']
+            else:
+                filepath_to_timestamp[img['filepath']] = '0000-00-00 00:00:00'
+
+        return sorted(results, key=lambda x: filepath_to_timestamp.get(x['filepath'], '0000-00-00 00:00:00'), reverse=True)
+    
+    elif order_filter in ['old', 'oldest']:
+        # Sort by ingested_at (oldest first)
+        filepath_to_timestamp = {}
+        for img in results:
+            cursor = conn.execute(
+                "SELECT ingested_at FROM images WHERE filepath = ?",
+                (img['filepath'],)
+            )
+            row = cursor.fetchone()
+            if row and row['ingested_at']:
+                filepath_to_timestamp[img['filepath']] = row['ingested_at']
+            else:
+                filepath_to_timestamp[img['filepath']] = '9999-12-31 23:59:59'
+
+        return sorted(results, key=lambda x: filepath_to_timestamp.get(x['filepath'], '9999-12-31 23:59:59'))
+    
+    return results
+
+
 def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
                extension_filter, relationship_filter, pool_filter, order_filter=None):
     """
@@ -173,50 +473,47 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
     """
     from database import get_db_connection
 
-    # Build FTS5 query
-    fts_query_parts = []
-    freetext_filepath_terms = []  # Terms to search as substrings in filepath
-
-    # Check which terms are exact tags vs freetext
+    # Build FTS5 query and identify freetext terms
     with get_db_connection() as conn:
-        # Add positive terms
-        for term in general_terms:
-            # Remove quotes for FTS query
-            clean_term = term.strip('"').lower()
+        fts_query, freetext_filepath_terms = _build_fts_query(conn, general_terms, negative_terms)
 
-            # Check if this is an exact tag
-            result = conn.execute(
-                "SELECT 1 FROM tags WHERE LOWER(name) = ? LIMIT 1",
-                (clean_term,)
-            ).fetchone()
+    # Build base SQL query
+    sql_parts = _build_base_sql_query(freetext_filepath_terms)
+    
+    # Apply filters
+    where_clauses = []
+    params = []
+    _apply_filters(sql_parts, where_clauses, params, fts_query, freetext_filepath_terms,
+                  pool_filter, relationship_filter, source_filters, extension_filter, filename_filter)
 
-            # Escape special FTS5 characters
-            clean_term_escaped = clean_term.replace('"', '""')
+    # Add WHERE clause if we have conditions
+    if where_clauses:
+        sql_parts.append("WHERE " + " AND ".join(where_clauses))
 
-            if result:
-                # Exact tag - use prefix match operator to ensure whole word
-                # In FTS5, ^term means "token starts with", but we want exact
-                # So we'll use quotes and rely on tokenization
-                fts_query_parts.append(f'^"{clean_term_escaped}"')
-            else:
-                # Freetext term - check if it contains special characters that FTS5 can't handle well
-                # For terms with hyphens or special chars, skip FTS and rely on filepath LIKE matching
-                if '-' in clean_term or any(c in clean_term for c in [':', '(', ')', '{', '}', '[', ']']):
-                    # Don't add to FTS query - will be handled by filepath LIKE matching
-                    # Track for filepath substring matching
-                    freetext_filepath_terms.append(clean_term)
-                else:
-                    # Use wildcard for prefix matching
-                    # This allows "fellini" to match "pulchra_fellini"
-                    fts_query_parts.append(f'{clean_term_escaped}*')
-                    # Don't add to freetext_filepath_terms - FTS will handle it
+    # Order by FTS5 rank (relevance)
+    sql_parts.append("ORDER BY rank")
 
-        # Add negative terms
-        for term in negative_terms:
-            clean_term = term.lower().replace('"', '""')
-            fts_query_parts.append(f'NOT "{clean_term}"')
+    full_query = '\n'.join(sql_parts)
 
-    fts_query = ' '.join(fts_query_parts)
+    # Execute query and process results
+    with get_db_connection() as conn:
+        try:
+            cursor = conn.execute(full_query, params)
+            rows = cursor.fetchall()
+
+            # Post-filter for exact tag matching
+            results = _post_filter_results(conn, rows, general_terms)
+
+            # Apply ordering if specified
+            results = _apply_ordering(conn, results, order_filter)
+
+            return results
+        except Exception as e:
+            print(f"FTS search error: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to empty results on error
+            return []
 
     with get_db_connection() as conn:
         # For freetext terms, we'll use a simpler approach: LEFT JOIN with FTS
