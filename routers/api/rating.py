@@ -100,6 +100,7 @@ async def api_rating_stats():
 
 
 @api_blueprint.route('/rate/set', methods=['POST'])
+@api_blueprint.route('/rate/rate', methods=['POST'])  # Alias for frontend compatibility
 @api_handler()
 async def api_set_rating():
     """Set rating for an image (user correction)."""
@@ -267,3 +268,112 @@ async def api_get_images_for_rating():
             'images': images,
             'count': len(images)
         }
+
+
+@api_blueprint.route('/rate/next', methods=['GET'])
+@api_handler()
+async def api_get_next_image_for_rating():
+    """Get the next single image for rating review interface."""
+    filter_type = request.args.get('filter', 'unrated')
+
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        if filter_type == 'unrated':
+            # Get next image without any rating tag
+            cur.execute(f"""
+                SELECT i.id, i.filepath
+                FROM images i
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM image_tags it
+                    JOIN tags t ON it.tag_id = t.id
+                    WHERE it.image_id = i.id
+                    AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                )
+                ORDER BY i.id
+                LIMIT 1
+            """, rating_inference.RATINGS)
+
+        elif filter_type == 'ai_predicted':
+            # Get next image with AI-predicted ratings
+            cur.execute(f"""
+                SELECT DISTINCT i.id, i.filepath
+                FROM images i
+                JOIN image_tags it ON i.id = it.image_id
+                JOIN tags t ON it.tag_id = t.id
+                WHERE t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                  AND it.source = 'ai_inference'
+                ORDER BY i.id
+                LIMIT 1
+            """, rating_inference.RATINGS)
+
+        else:  # 'all'
+            # Get next image (any)
+            cur.execute("SELECT id, filepath FROM images ORDER BY id LIMIT 1")
+
+        # Fetch the image
+        row = cur.fetchone()
+        
+        if not row:
+            return {"error": "No more images found matching the current filter."}
+
+        image_id = row['id']
+        filepath = row['filepath']
+
+        # Fetch all tags for this image with categories
+        cur.execute("""
+            SELECT t.name, t.category, it.source
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            WHERE it.image_id = ?
+        """, (image_id,))
+
+        all_tags = cur.fetchall()
+        
+        # Separate rating tags from regular tags
+        rating_tags = [t for t in all_tags if t['name'].startswith('rating:')]
+        regular_tags = [t for t in all_tags if not t['name'].startswith('rating:')]
+        
+        # Get rating info
+        rating = None
+        rating_source = None
+        for rt in rating_tags:
+            rating = rt['name']
+            rating_source = rt['source']
+            break
+
+        # Group tags by category
+        tags_by_category = {
+            'character': [],
+            'copyright': [],
+            'artist': [],
+            'general': [],
+            'meta': []
+        }
+        
+        for tag in regular_tags:
+            category = tag['category'] or 'general'
+            # Map to one of the expected categories
+            if category not in tags_by_category:
+                category = 'general'
+            tags_by_category[category].append(tag['name'])
+
+        from utils.file_utils import get_thumbnail_path
+        
+        # Calculate total tag count
+        total_tag_count = sum(len(tags) for tags in tags_by_category.values())
+        
+        # Build response similar to /api/rate/images but for single image
+        result = {
+            'id': image_id,
+            'filepath': f"images/{filepath}" if not filepath.startswith('images/') else filepath,
+            'thumb': get_thumbnail_path(filepath),
+            'rating': rating,
+            'rating_source': rating_source,
+            'tag_count': total_tag_count,
+            'tags': tags_by_category,
+            'ai_rating': rating if rating_source == 'ai_inference' else None,
+            'ai_confidence': 0.7 if rating_source == 'ai_inference' else None  # Placeholder
+        }
+
+        return result

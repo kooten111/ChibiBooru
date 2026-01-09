@@ -203,21 +203,46 @@ async def api_update_character_config():
 @api_blueprint.route('/character/characters', methods=['GET'])
 @api_handler()
 async def api_get_all_characters():
-    """Get list of all known characters with sample counts."""
-    characters = character_service.get_all_known_characters()
+    """Get list of all known characters with sample counts (with pagination support)."""
+    # Get pagination parameters with safety limits
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 100, type=int), 200)  # Max 200 per page
+    search = request.args.get('search', '').strip()
     
-    # Also get distribution from main DB
-    distribution = character_service.get_character_distribution()
+    # Use paginated query at database level (much more memory efficient!)
+    characters_page, total_count = character_service.get_known_characters_paginated(
+        page=page, 
+        per_page=per_page, 
+        search=search if search else None
+    )
     
-    # Merge the data
-    for char_info in characters:
-        char_name = char_info['name']
-        if char_name in distribution:
-            char_info.update(distribution[char_name])
-        else:
+    # Only get distribution if explicitly requested (it can be slow on large databases)
+    include_distribution = request.args.get('include_distribution', 'false').lower() == 'true'
+    if include_distribution and characters_page:
+        character_names = [c['name'] for c in characters_page]
+        distribution = character_service.get_character_distribution_for_characters(character_names)
+        
+        # Merge the data
+        for char_info in characters_page:
+            char_name = char_info['name']
+            if char_name in distribution:
+                char_info.update(distribution[char_name])
+            else:
+                char_info.update({'total': 0, 'ai': 0, 'user': 0, 'original': 0})
+    else:
+        # Set defaults without querying
+        for char_info in characters_page:
             char_info.update({'total': 0, 'ai': 0, 'user': 0, 'original': 0})
     
-    return {"characters": characters}
+    return {
+        "characters": characters_page,
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total_count,
+            "pages": (total_count + per_page - 1) // per_page
+        }
+    }
 
 
 @api_blueprint.route('/character/top_tags', methods=['GET'])
@@ -237,12 +262,101 @@ async def api_top_weighted_tags_character():
     }
 
 
+@api_blueprint.route('/character/precompute', methods=['POST'])
+@api_handler()
+async def api_precompute_predictions():
+    """Pre-compute and store character predictions for untagged images (without applying them)."""
+    import uuid
+    import asyncio
+    from services.background_tasks import task_manager
+    from services import monitor_service
+    
+    data = await request.get_json() or {}
+    limit = data.get('limit')  # Optional limit
+    batch_size = data.get('batch_size', 500)  # Default batch size: 500 images per batch
+    
+    task_id = f"precompute_char_{uuid.uuid4().hex[:8]}"
+    
+    async def precompute_task(task_id, manager, limit, batch_size):
+        """Background task for precomputing character predictions with progress updates."""
+        from services import monitor_service as mon
+        
+        mon.add_log(f"Starting character prediction precomputation (batch size: {batch_size})...", "info")
+        
+        loop = asyncio.get_running_loop()
+        
+        import time
+        last_update_time = 0
+        
+        def progress_callback(processed, total):
+            nonlocal last_update_time
+            current_time = time.time()
+            
+            # Throttle updates: only update if 0.1s passed OR it's the final update
+            if (current_time - last_update_time > 0.1) or (processed >= total):
+                last_update_time = current_time
+                future = asyncio.run_coroutine_threadsafe(
+                    manager.update_progress(
+                        task_id, 
+                        processed, 
+                        total, 
+                        f"Processing images... ({processed}/{total})"
+                    ), 
+                    loop
+                )
+                # We don't wait for the future
+        
+        try:
+            # Run synchronous service function in thread
+            stats = await asyncio.to_thread(
+                character_service.precompute_predictions_for_untagged_images,
+                limit=limit,
+                progress_callback=progress_callback,
+                batch_size=batch_size
+            )
+            
+            processed = stats.get('processed', 0)
+            total = stats.get('total', processed)  # Get total from stats, fallback to processed
+            predictions_stored = stats.get('predictions_stored', 0)
+            duration = stats.get('duration_seconds', 0)
+            
+            result_msg = f"✓ Precomputation complete: {processed} processed, {predictions_stored} predictions stored"
+            if duration:
+                result_msg += f" in {duration}s"
+            mon.add_log(result_msg, "success")
+            
+            # Update task to 100%
+            await manager.update_progress(task_id, total, total, "Complete")
+            
+            return {
+                'processed': processed,
+                'predictions_stored': predictions_stored,
+                'skipped_no_tags': stats.get('skipped_no_tags', 0),
+                'duration_seconds': duration,
+                'message': f"Precomputed {predictions_stored} predictions for {processed} images"
+            }
+        except Exception as e:
+            mon.add_log(f"Precomputation failed: {str(e)}", "error")
+            raise
+    
+    # Start background task
+    monitor_service.add_log("Character prediction precomputation task started...", "info")
+    await task_manager.start_task(task_id, precompute_task, limit, batch_size)
+    
+    return {
+        'status': 'started',
+        'task_id': task_id,
+        'message': 'Precomputation started in background'
+    }
+
+
 @api_blueprint.route('/character/images', methods=['GET'])
 @api_handler()
 async def api_get_images_for_character():
-    """Get images for character review interface."""
+    """Get images for character review interface with predictions."""
     filter_type = request.args.get('filter', 'untagged')
-    limit = request.args.get('limit', 100, type=int)
+    limit = request.args.get('limit', 50, type=int)
+    include_predictions = request.args.get('include_predictions', 'true').lower() == 'true'
 
     with get_db_connection() as conn:
         cur = conn.cursor()
@@ -317,6 +431,17 @@ async def api_get_images_for_character():
         # Build images list with pre-fetched tags
         from utils.file_utils import get_thumbnail_path
         images = []
+        
+        # Load stored predictions if needed (much faster than computing on-the-fly)
+        stored_predictions = {}
+        if include_predictions and filter_type == 'untagged' and image_ids:
+            try:
+                from repositories.character_predictions_repository import get_predictions_for_images
+                stored_predictions = get_predictions_for_images(image_ids)
+            except Exception as e:
+                logger.warning(f"Could not load stored predictions: {e}")
+                stored_predictions = {}
+        
         for row in image_rows:
             image_id = row['id']
             filepath = row['filepath']
@@ -337,7 +462,7 @@ async def api_get_images_for_character():
                 if ct['source'] == 'ai_inference':
                     ai_characters.append(ct['name'])
 
-            images.append({
+            image_data = {
                 'id': image_id,
                 'filepath': filepath,
                 'thumb': get_thumbnail_path(filepath),
@@ -345,7 +470,25 @@ async def api_get_images_for_character():
                 'ai_characters': ai_characters,
                 'tag_count': len(other_tags),
                 'tags': other_tags
-            })
+            }
+            
+            # Add stored predictions for untagged images (fast!)
+            # DO NOT compute on-the-fly - it's too slow and causes memory issues
+            if include_predictions and filter_type == 'untagged' and not characters:
+                predictions = stored_predictions.get(image_id, [])
+                # Only use stored predictions - never compute on-the-fly
+                # Format predictions
+                image_data['predictions'] = [
+                    {
+                        'character': pred['character'],
+                        'confidence': round(pred['confidence'], 3)
+                    }
+                    for pred in predictions
+                ]
+            else:
+                image_data['predictions'] = []
+
+            images.append(image_data)
 
         return {
             'images': images,

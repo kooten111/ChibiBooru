@@ -8,6 +8,7 @@ booru-tagged images to automatically identify characters in locally-tagged image
 
 import sqlite3
 import math
+import logging
 from collections import defaultdict, Counter
 from itertools import combinations
 from datetime import datetime
@@ -15,6 +16,8 @@ from typing import Optional, Dict, List, Tuple
 
 from database import get_db_connection
 from repositories.character_repository import get_or_create_tag_id, get_or_create_character_id
+
+logger = logging.getLogger(__name__)
 
 # Model database configuration
 USE_SEPARATE_MODEL_DB = True
@@ -234,6 +237,69 @@ def get_untagged_character_images() -> List[Tuple[int, List[Tuple[str, Optional[
             return []
 
         # Get tags with extended categories for these images
+        placeholders = ','.join('?' * len(image_ids))
+        cur.execute(f"""
+            SELECT it.image_id, t.name as tag_name, t.extended_category
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            WHERE it.image_id IN ({placeholders})
+              AND t.category != 'character'
+        """, image_ids)
+
+        image_tags_map = defaultdict(list)
+        for row in cur.fetchall():
+            image_tags_map[row['image_id']].append((row['tag_name'], row['extended_category']))
+
+        result = [(img_id, image_tags_map.get(img_id, [])) for img_id in image_ids]
+        return result
+
+
+def get_untagged_character_images_batched(batch_size: int = 500, offset: int = 0, limit: int = None) -> List[Tuple[int, List[Tuple[str, Optional[str]]]]]:
+    """
+    Get images without character tags in batches to reduce memory usage.
+    
+    Args:
+        batch_size: Number of images to fetch per batch (default: 500)
+        offset: Starting offset for pagination
+        limit: Optional maximum total number of images to fetch
+    
+    Returns:
+        List of (image_id, tags_with_extended) tuples for the current batch
+    """
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # Find images from local_tagger source without character tags with pagination
+        query = """
+            SELECT i.id
+            FROM images i
+            WHERE i.active_source = 'local_tagger'
+              AND NOT EXISTS (
+                  SELECT 1 FROM image_tags it
+                  JOIN tags t ON it.tag_id = t.id
+                  WHERE it.image_id = i.id
+                    AND t.category = 'character'
+              )
+            ORDER BY i.id
+            LIMIT ?
+            OFFSET ?
+        """
+        
+        # Apply limit if specified
+        if limit is not None:
+            effective_limit = min(batch_size, limit - offset)
+            if effective_limit <= 0:
+                return []
+        else:
+            effective_limit = batch_size
+        
+        cur.execute(query, (effective_limit, offset))
+        image_ids = [row['id'] for row in cur.fetchall()]
+
+        if not image_ids:
+            return []
+
+        # Get tags with extended categories for these images (only current batch)
         placeholders = ','.join('?' * len(image_ids))
         cur.execute(f"""
             SELECT it.image_id, t.name as tag_name, t.extended_category
@@ -726,7 +792,9 @@ def scores_to_probabilities(scores: Dict[str, float]) -> Dict[str, float]:
 def predict_characters(image_tags: List[str],
                       tag_weights: Dict = None,
                       pair_weights: Dict = None,
-                      config: Dict = None) -> List[Tuple[str, float]]:
+                      config: Dict = None,
+                      store_predictions: bool = False,
+                      image_id: int = None) -> List[Tuple[str, float]]:
     """
     Predict characters for an image based on its tags.
 
@@ -735,6 +803,8 @@ def predict_characters(image_tags: List[str],
         tag_weights: Preloaded tag weights (optional, will load if not provided)
         pair_weights: Preloaded pair weights (optional, will load if not provided)
         config: Preloaded config (optional, will load if not provided)
+        store_predictions: If True, store predictions in database
+        image_id: Image ID for storing predictions (required if store_predictions=True)
 
     Returns:
         list: [(character, confidence), ...] sorted by confidence descending
@@ -770,8 +840,19 @@ def predict_characters(image_tags: List[str],
     predictions = [(char, prob) for char, prob in probabilities.items()
                    if prob >= min_confidence]
     predictions.sort(key=lambda x: x[1], reverse=True)
+    predictions = predictions[:max_predictions]
+    
+    # Store predictions if requested
+    if store_predictions and image_id is not None and predictions:
+        try:
+            from repositories.character_predictions_repository import store_predictions as store_preds
+            store_preds(image_id, predictions, min_confidence=min_confidence)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to store character predictions for image {image_id}: {e}")
 
-    return predictions[:max_predictions]
+    return predictions
 
 
 def infer_character_for_image(image_id: int) -> Dict:
@@ -800,8 +881,8 @@ def infer_character_for_image(image_id: int) -> Dict:
     if not tags:
         return {'characters': []}
 
-    # Predict characters
-    predictions = predict_characters(tags)
+    # Predict characters and store predictions
+    predictions = predict_characters(tags, store_predictions=True, image_id=image_id)
 
     if predictions:
         # Add character tags with source='ai_inference'
@@ -848,7 +929,9 @@ def infer_all_untagged_images() -> Dict:
 
         # Extract tag names only for prediction
         tag_names = [tag for tag, _ in tags_with_extended]
-        predictions = predict_characters(tag_names, tag_weights, pair_weights, config)
+        # Predict and store predictions
+        predictions = predict_characters(tag_names, tag_weights, pair_weights, config, 
+                                        store_predictions=True, image_id=image_id)
 
         if predictions:
             stats['tagged'] += 1
@@ -869,9 +952,108 @@ def infer_all_untagged_images() -> Dict:
 
     print(f"Inference complete in {duration:.2f}s")
     print(f"  Tagged: {stats['tagged']} images")
-    print(f"  Added: {stats['characters_added']} character tags")
-    print(f"  Skipped (low confidence): {stats['skipped_low_confidence']}")
+    
+    return stats
 
+
+def precompute_predictions_for_untagged_images(limit: int = None, progress_callback=None, batch_size: int = 500) -> Dict:
+    """
+    Pre-compute and store character predictions for untagged images without applying them.
+    This allows the review interface to load quickly.
+    
+    Uses batched processing to reduce memory usage.
+    
+    Args:
+        limit: Optional limit on number of images to process
+        progress_callback: Optional callback function(processed, total)
+        batch_size: Number of images to process per batch (default: 500)
+    
+    Returns:
+        dict: Statistics about precomputation
+    """
+    start_time = datetime.now()
+    
+    # Load weights once for efficiency
+    tag_weights, pair_weights = load_weights()
+    config = get_config()
+    
+    if not tag_weights and not pair_weights:
+        raise ValueError("Model not trained. Run train_model() first.")
+    
+    # Get total count first for progress tracking
+    total_images = get_untagged_character_images_count()
+    if limit:
+        total_images = min(total_images, limit)
+    
+    stats = {
+        'processed': 0,
+        'predictions_stored': 0,
+        'skipped_no_tags': 0,
+        'total': total_images
+    }
+    
+    logger.info(f"Pre-computing predictions for {total_images} untagged images (batch size: {batch_size})...")
+    
+    # Process in batches to reduce memory usage
+    offset = 0
+    remaining = total_images
+    
+    while remaining > 0:
+        # Get current batch
+        current_batch_size = min(batch_size, remaining)
+        untagged_images = get_untagged_character_images_batched(
+            batch_size=current_batch_size,
+            offset=offset,
+            limit=limit
+        )
+        
+        if not untagged_images:
+            # No more images to process
+            break
+        
+        # Process current batch
+        for image_id, tags_with_extended in untagged_images:
+            stats['processed'] += 1
+            
+            if not tags_with_extended:
+                stats['skipped_no_tags'] += 1
+                continue
+            
+            # Extract tag names
+            tag_names = [tag for tag, _ in tags_with_extended]
+            
+            # Predict and store (without applying)
+            predictions = predict_characters(tag_names, tag_weights, pair_weights, config,
+                                            store_predictions=True, image_id=image_id)
+            
+            if predictions:
+                stats['predictions_stored'] += len(predictions)
+            
+            if progress_callback:
+                progress_callback(stats['processed'], total_images)
+        
+        # Update offset and remaining count
+        offset += len(untagged_images)
+        remaining = total_images - offset
+        
+        # Log progress
+        if stats['processed'] % 100 == 0 or len(untagged_images) < current_batch_size:
+            logger.info(f"  Processed {stats['processed']}/{total_images}...")
+        
+        # If we got fewer images than requested, we're done
+        if len(untagged_images) < current_batch_size:
+            break
+        
+        # Check if we've hit the limit
+        if limit and stats['processed'] >= limit:
+            break
+    
+    duration = (datetime.now() - start_time).total_seconds()
+    stats['duration_seconds'] = round(duration, 2)
+    
+    logger.info(f"Pre-computation complete in {duration:.2f}s")
+    logger.info(f"  Stored predictions for {stats['predictions_stored']} character-image pairs")
+    
     return stats
 
 
@@ -994,12 +1176,16 @@ def retrain_and_reapply_all() -> Dict:
 # Statistics & Metadata
 # ============================================================================
 
-def get_model_stats() -> Dict:
+def get_model_stats(include_distribution: bool = False) -> Dict:
     """
     Get comprehensive model statistics.
 
+    Args:
+        include_distribution: If True, include full character distribution (expensive!)
+                             Default False to avoid memory issues
+
     Returns:
-        dict: Model metadata, config, character distribution, etc.
+        dict: Model metadata, config, character distribution (if requested), etc.
     """
     with get_model_connection() as conn:
         cur = conn.cursor()
@@ -1014,19 +1200,25 @@ def get_model_stats() -> Dict:
         # Get config
         config = get_config()
 
-        # Get character distribution
-        distribution = get_character_distribution()
+        # Only get character distribution if explicitly requested (it's expensive!)
+        distribution = None
+        if include_distribution:
+            distribution = get_character_distribution()
 
         # Count untagged images
         untagged = get_untagged_character_images_count()
 
-        return {
+        result = {
             'model_trained': model_trained,
             'metadata': metadata,
             'config': config,
-            'character_distribution': distribution,
             'untagged_images': untagged
         }
+        
+        if distribution is not None:
+            result['character_distribution'] = distribution
+
+        return result
 
 
 def get_character_distribution() -> Dict:
@@ -1047,6 +1239,54 @@ def get_character_distribution() -> Dict:
             WHERE t.category = 'character'
             GROUP BY t.name, it.source
         """)
+
+        distribution = defaultdict(lambda: {'total': 0, 'ai': 0, 'user': 0, 'original': 0, 'local_tagger': 0})
+        
+        for row in cur.fetchall():
+            character = row['character']
+            source = row['source']
+            count = row['cnt']
+            
+            distribution[character]['total'] += count
+            if source == 'ai_inference':
+                distribution[character]['ai'] = count
+            elif source == 'user':
+                distribution[character]['user'] = count
+            elif source == 'original':
+                distribution[character]['original'] = count
+            elif source == 'local_tagger':
+                distribution[character]['local_tagger'] = count
+
+        return dict(distribution)
+
+
+def get_character_distribution_for_characters(character_names: List[str]) -> Dict:
+    """
+    Count images by character and source for specific characters only.
+    Much more efficient than loading all characters.
+
+    Args:
+        character_names: List of character names to get distribution for
+
+    Returns:
+        dict: {character: {'total': int, 'ai': int, 'user': int, 'original': int}}
+    """
+    if not character_names:
+        return {}
+    
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+
+        # Get character tags and their counts by source for specific characters only
+        placeholders = ','.join('?' * len(character_names))
+        cur.execute(f"""
+            SELECT t.name as character, it.source, COUNT(*) as cnt
+            FROM image_tags it
+            JOIN tags t ON it.tag_id = t.id
+            WHERE t.category = 'character'
+              AND t.name IN ({placeholders})
+            GROUP BY t.name, it.source
+        """, character_names)
 
         distribution = defaultdict(lambda: {'total': 0, 'ai': 0, 'user': 0, 'original': 0, 'local_tagger': 0})
         
@@ -1096,6 +1336,62 @@ def get_all_known_characters() -> List[Dict]:
         ]
 
         return characters
+
+
+def get_known_characters_paginated(page: int = 1, per_page: int = 100, search: str = None) -> Tuple[List[Dict], int]:
+    """
+    Get paginated list of known characters with sample counts.
+    Much more memory efficient than loading all characters.
+
+    Args:
+        page: Page number (1-indexed)
+        per_page: Number of characters per page
+        search: Optional search term to filter by name
+
+    Returns:
+        tuple: (characters_list, total_count)
+    """
+    with get_model_connection() as conn:
+        cur = conn.cursor()
+
+        # Build query with optional search
+        base_query = """
+            FROM characters c
+            LEFT JOIN character_tag_weights tw ON c.id = tw.character_id
+        """
+        where_clause = ""
+        params = []
+        
+        if search:
+            where_clause = "WHERE c.name LIKE ?"
+            params.append(f"%{search}%")
+        
+        # Get total count
+        count_query = f"SELECT COUNT(DISTINCT c.name) as total {base_query} {where_clause}"
+        cur.execute(count_query, params)
+        total_count = cur.fetchone()['total']
+        
+        # Get paginated characters
+        offset = (page - 1) * per_page
+        data_query = f"""
+            SELECT c.name, SUM(tw.sample_count) as total_samples
+            {base_query}
+            {where_clause}
+            GROUP BY c.name
+            ORDER BY total_samples DESC
+            LIMIT ? OFFSET ?
+        """
+        cur.execute(data_query, params + [per_page, offset])
+        
+        characters = [
+            {
+                'name': row['name'],
+                'sample_count': row['total_samples'] or 0
+            }
+            for row in cur.fetchall()
+        ]
+
+        return characters, total_count
 
 
 def get_top_weighted_tags(character: str, limit: int = 50) -> Dict:
