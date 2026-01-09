@@ -4,6 +4,7 @@ import random
 import asyncio
 from functools import wraps
 import os
+import secrets
 from werkzeug.utils import secure_filename
 
 import config
@@ -28,7 +29,7 @@ def login_required(f):
 async def login():
     if request.method == 'POST':
         form = await request.form
-        if form.get('password') == config.APP_PASSWORD:
+        if secrets.compare_digest(form.get('password', ''), config.APP_PASSWORD):
             session['logged_in'] = True
             session.permanent = True # Session timeout configured in app.py (4 hours)
             return redirect(url_for('main.home'))

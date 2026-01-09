@@ -37,6 +37,8 @@ async def delete_image():
 async def delete_images_bulk():
     """Delete multiple images in bulk."""
     data = await request.json
+    if not data:
+        raise ValueError("Request body is required")
     return await asyncio.to_thread(image_service.delete_images_bulk_service, data)
 
 @api_blueprint.route('/download_images_bulk', methods=['POST'])

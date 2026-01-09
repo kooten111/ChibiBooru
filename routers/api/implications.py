@@ -49,15 +49,23 @@ async def get_implication_suggestions():
 async def approve_implication():
     """Approve a suggestion and create the implication."""
     from services import implication_service
+    from utils.validation import validate_string, validate_enum, validate_integer
+    
     data = await request.json
-    source_tag = data.get('source_tag')
-    implied_tag = data.get('implied_tag')
-    inference_type = data.get('inference_type', 'manual')
+    if not data:
+        raise ValueError("Request body is required")
+    
+    source_tag = validate_string(data.get('source_tag'), 'source_tag', min_length=1)
+    implied_tag = validate_string(data.get('implied_tag'), 'implied_tag', min_length=1)
+    inference_type = validate_enum(
+        data.get('inference_type', 'manual'), 
+        'inference_type',
+        allowed_values=['manual', 'auto', 'ai']
+    )
     confidence = data.get('confidence', 1.0)
+    if not isinstance(confidence, (int, float)) or confidence < 0 or confidence > 1:
+        raise ValueError("confidence must be a number between 0 and 1")
     apply_now = data.get('apply_now', False)  # Option to apply to existing images
-
-    if not source_tag or not implied_tag:
-        raise ValueError("Missing source_tag or implied_tag")
 
     success = implication_service.approve_suggestion(
         source_tag, implied_tag, inference_type, confidence
@@ -86,12 +94,14 @@ async def approve_implication():
 async def create_implication():
     """Create a manual implication."""
     from services import implication_service
+    from utils.validation import validate_string
+    
     data = await request.json
-    source_tag = data.get('source_tag')
-    implied_tag = data.get('implied_tag')
-
-    if not source_tag or not implied_tag:
-        raise ValueError("Missing source_tag or implied_tag")
+    if not data:
+        raise ValueError("Request body is required")
+    
+    source_tag = validate_string(data.get('source_tag'), 'source_tag', min_length=1)
+    implied_tag = validate_string(data.get('implied_tag'), 'implied_tag', min_length=1)
 
     success = implication_service.create_manual_implication(source_tag, implied_tag)
 
@@ -106,12 +116,14 @@ async def create_implication():
 async def delete_implication():
     """Delete an implication."""
     from services import implication_service
+    from utils.validation import validate_string
+    
     data = await request.json
-    source_tag = data.get('source_tag')
-    implied_tag = data.get('implied_tag')
-
-    if not source_tag or not implied_tag:
-        raise ValueError("Missing source_tag or implied_tag")
+    if not data:
+        raise ValueError("Request body is required")
+    
+    source_tag = validate_string(data.get('source_tag'), 'source_tag', min_length=1)
+    implied_tag = validate_string(data.get('implied_tag'), 'implied_tag', min_length=1)
 
     success = implication_service.delete_implication(source_tag, implied_tag)
 

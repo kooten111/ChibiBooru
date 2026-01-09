@@ -3,17 +3,20 @@ from . import api_blueprint
 from database import models
 from utils import api_handler
 from utils.file_utils import normalize_image_path
+from utils.validation import validate_string
 
 @api_blueprint.route('/pools/create', methods=['POST'])
 @api_handler()
 async def create_pool():
     """Create a new pool."""
     data = await request.json
-    name = data.get('name', '').strip()
-    description = data.get('description', '').strip()
-
-    if not name:
-        raise ValueError("Pool name is required")
+    if not data:
+        raise ValueError("Request body is required")
+    
+    name = validate_string(data.get('name', ''), 'name', min_length=1, max_length=200)
+    description = data.get('description', '').strip() if data.get('description') else ''
+    if description:
+        description = validate_string(description, 'description', max_length=1000, allow_empty=True)
 
     pool_id = models.create_pool(name, description)
     return {
@@ -23,14 +26,26 @@ async def create_pool():
 
 @api_blueprint.route('/pools/<int:pool_id>/update', methods=['POST'])
 @api_handler()
-async def update_pool(pool_id):
+async def update_pool(pool_id: int):
     """Update a pool's name or description."""
+    from utils.validation import validate_integer
+    
+    validate_integer(pool_id, 'pool_id', min_value=1)
+    
     data = await request.json
+    if not data:
+        raise ValueError("Request body is required")
+    
     name = data.get('name')
     description = data.get('description')
 
     if not name and not description:
         raise ValueError("At least one field (name or description) is required")
+    
+    if name:
+        name = validate_string(name, 'name', min_length=1, max_length=200)
+    if description is not None:
+        description = validate_string(description, 'description', max_length=1000, allow_empty=True)
 
     models.update_pool(pool_id, name, description)
     return {"message": "Pool updated successfully."}
@@ -44,10 +59,18 @@ async def delete_pool(pool_id):
 
 @api_blueprint.route('/pools/<int:pool_id>/add_image', methods=['POST'])
 @api_handler()
-async def add_image_to_pool(pool_id):
+async def add_image_to_pool(pool_id: int):
     """Add an image to a pool."""
+    from utils.validation import validate_integer, validate_string
+    
+    validate_integer(pool_id, 'pool_id', min_value=1)
+    
     data = await request.json
-    filepath = normalize_image_path(data.get('filepath', ''))
+    if not data:
+        raise ValueError("Request body is required")
+    
+    filepath = validate_string(data.get('filepath', ''), 'filepath', min_length=1)
+    filepath = normalize_image_path(filepath)
 
     # Get image ID from filepath
     image_data = models.get_image_details(filepath)
