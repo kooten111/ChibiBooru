@@ -1,6 +1,6 @@
 # ChibiBooru Upscaler Architecture & Inventory
 
-**Last Updated**: 2025-12-31
+**Last Updated**: 2024-12-31
 **Status**: Active
 
 ## Executive Summary
@@ -68,8 +68,7 @@ These components run in a separate, isolated process to manage memory and GPU re
 | :--- | :--- | :--- |
 | **`utils/rrdbnet_arch.py`** | **Neural Network** | A standalone PyTorch implementation of the `RRDBNet` architecture (used by RealESRGAN) to avoid heavy external dependencies. |
 | **`utils/gpu_detection.py`** | **Hardware Abstraction** | *Legacy/Utility* - Detects available hardware (Nvidia CUDA, Intel XPU, CPU) and determines the correct PyTorch backend to use. |
-| **`upscaler/model_arch.py`** | **Neural Network (Alt)** | Duplicate/Alternative implementation of `RRDBNet`. Seems to be used by the standalone scripts in the `upscaler/` directory. |
-| **`upscaler/upscale.py`** | **Standalone Script** | A direct-execution script (not part of the web app) to run upscaling manually on a folder of images. Useful for testing or batch processing outside the app. |
+| **`models/Upscaler/`** | **Model Storage** | Directory containing upscaler model files and configurations. |
 
 ### 4. Frontend (User Interface)
 | File Path | Component | Description |
@@ -82,8 +81,6 @@ These components run in a separate, isolated process to manage memory and GPU re
 | File Path | Component | Description |
 | :--- | :--- | :--- |
 | **`config.py`** | **Configuration** | Central registry for settings (Enabled status, Model name, Directories, Timeouts). |
-| **`upscaler/install.py`** | **Installer** | A standalone utility script to help users install the correct PyTorch version for their hardware (CUDA vs XPU). |
-| **`docs/MEMORY_OPTIMIZATION.md`** | **Documentation** | Explains the rationale behind the split-process architecture (Memory savings). |
 
 ---
 
