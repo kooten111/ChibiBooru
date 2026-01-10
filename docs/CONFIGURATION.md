@@ -11,24 +11,27 @@
 
 ## Overview
 
-ChibiBooru uses a centralized configuration system with environment variables and Python constants.
+ChibiBooru uses a centralized configuration system that separates secrets from editable settings.
 
 **Configuration Sources**:
-1. `.env` file (environment variables)
-2. `config.py` (Python constants with defaults)
+1. `.env` file (secrets and server settings only)
+2. `config.yml` file (all editable settings)
+3. `config.py` (Python constants with defaults)
+
+**Key Changes**:
+- Secrets (passwords, API keys) remain in `.env`
+- All other settings are in `config.yml` and can be edited via the web UI at `/system`
+- Settings can be changed without editing files directly
 
 ---
 
-## Environment Variables
+## Configuration Files
+
+### .env File (Secrets Only)
 
 **File**: `.env` (create manually in project root)
 
-### Application Settings
-
-#### `APP_NAME`
-**Type**: String  
-**Default**: `"ChibiBooru"`  
-**Description**: Application name shown in header and page titles
+**Note**: The `.env` file now contains **only secrets and server settings**. All other settings have been moved to `config.yml` and can be edited via the web UI.
 
 ---
 
@@ -96,6 +99,75 @@ ChibiBooru uses a centralized configuration system with environment variables an
 ---
 
 ### Web Server
+
+---
+
+## config.yml File (Editable Settings)
+
+**File**: `config.yml` (created automatically or via migration script)
+
+**Note**: All non-secret settings are stored in `config.yml` and can be edited via the web UI at `/system`. The file uses YAML format for readability.
+
+### Migration from .env
+
+If you have an existing `.env` file with settings, run the migration script:
+
+```bash
+python scripts/migrate_config.py
+```
+
+This will:
+- Move all non-secret settings from `.env` to `config.yml`
+- Keep only secrets and server settings in `.env`
+- Create backups of both files
+
+### Editing Settings
+
+**Via Web UI** (Recommended):
+1. Navigate to `/system` in your browser
+2. Click the "Settings" tab
+3. Edit settings by category
+4. Click "Save All Changes"
+
+**Via File**:
+- Edit `config.yml` directly (YAML format)
+- Restart the application or click "Reload Config" in the web UI
+
+### Setting Categories
+
+Settings in `config.yml` are organized into categories:
+
+- **Application**: APP_NAME, paths, pagination
+- **AI Tagging**: Model paths, thresholds, behavior flags
+- **Database**: Cache size, batch size, WAL settings
+- **Processing**: Workers, batch sizes, timeouts
+- **Similarity**: Methods, weights, thresholds
+- **Monitor**: Enabled, interval
+- **Feature Flags**: ENABLE_* settings
+- **ML Worker**: Backend, timeout, socket path
+- **ML Models**: Character and rating model configuration
+- **Source Priority**: Booru priority order
+
+---
+
+## Legacy: Environment Variables (Deprecated)
+
+The following settings can still be set in `.env` for backward compatibility, but are recommended to be in `config.yml`:
+
+### AI Tagging
+
+#### `LOCAL_TAGGER_NAME`
+**Type**: String  
+**Default**: `"CamieTagger"`  
+**Description**: Display name for local AI tagger  
+**Examples**: `"CamieTagger"`, `"WD14"`, `"Z3D-E621"`  
+**Note**: Now in `config.yml` - edit via web UI
+
+---
+
+### Web Server
+
+**Note**: These settings must remain in `.env` and cannot be changed via the web UI.
 
 #### `FLASK_HOST`
 **Type**: String  

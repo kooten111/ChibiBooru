@@ -22,6 +22,7 @@ See docs/ARCHITECTURE.md for details on the services layer architecture.
 
 __all__ = [
     'background_tasks',
+    'config_service',
     'health_service',
     'image_service',
     'implication_service',

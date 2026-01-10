@@ -173,3 +173,54 @@ async def find_broken_images():
 async def cleanup_broken_images():
     """Cleanup or retry broken images."""
     return await system_service.cleanup_broken_images_service()
+
+@api_blueprint.route('/system/config', methods=['GET'])
+@api_handler()
+async def get_config():
+    """Get all editable settings grouped by category."""
+    from services import config_service
+    return await asyncio.to_thread(config_service.get_editable_settings)
+
+@api_blueprint.route('/system/config/schema', methods=['GET'])
+@api_handler()
+async def get_config_schema():
+    """Get setting metadata/schema."""
+    from services import config_service
+    return await asyncio.to_thread(config_service.get_setting_schema)
+
+@api_blueprint.route('/system/config/update', methods=['POST'])
+@api_handler()
+async def update_config():
+    """Update one or more settings."""
+    from services import config_service
+    data = await request.get_json()
+    if not data:
+        raise ValueError("No data provided")
+    
+    # Validate secret (required for security)
+    secret = request.args.get('secret')
+    if not secret:
+        raise ValueError("System secret required")
+    
+    # Check secret
+    if secret != config.RELOAD_SECRET:
+        raise ValueError("Invalid system secret")
+    
+    # Update settings
+    success, errors = await asyncio.to_thread(config_service.update_settings_batch, data)
+    
+    if success:
+        # Reload config
+        import config
+        config.reload_config()
+        return {"status": "success", "message": "Settings updated successfully"}
+    else:
+        return {"status": "error", "errors": errors}, 400
+
+@api_blueprint.route('/system/config/reload', methods=['POST'])
+@api_handler()
+async def reload_config():
+    """Reload config from files."""
+    import config
+    config.reload_config()
+    return {"status": "success", "message": "Config reloaded"}

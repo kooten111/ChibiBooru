@@ -523,6 +523,17 @@ async def show_raw_data(filepath):
         app_name=config.APP_NAME
     )
 
+@main_blueprint.route('/system')
+@login_required
+async def system_page():
+    """System management page with settings, status, actions, and logs."""
+    stats = query_service.get_enhanced_stats()
+    return await render_template(
+        'system.html',
+        stats=stats,
+        app_name=config.APP_NAME
+    )
+
 @main_blueprint.route('/upload', methods=['GET', 'POST'])
 @login_required
 async def upload_image():

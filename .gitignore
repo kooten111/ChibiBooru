@@ -73,3 +73,5 @@ TODO
 pytest.ini
 requirements-dev.txt
 # docs/ is intentionally tracked
+.env.backup
+config.yml

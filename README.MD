@@ -171,49 +171,84 @@ python app.py
 
 ## Configuration
 
-### Environment Setup
+### Configuration Structure
 
-Create a `.env` file in the project root with the following settings:
+ChibiBooru uses a two-file configuration system:
+- **`.env`**: Secrets and server settings (passwords, API keys, server host/port)
+- **`config.yml`**: All editable settings (AI thresholds, database settings, feature flags, etc.)
 
-### Required Settings
+### Initial Setup
 
-Edit `.env` and set these **required** values:
+#### 1. Create `.env` File
+
+Create a `.env` file in the project root with **required secrets**:
 
 ```env
 # REQUIRED: Change these before first use!
 APP_PASSWORD="your-secure-password"
 SECRET_KEY="your-secret-key-for-sessions"  # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
 RELOAD_SECRET="your-reload-secret"
-```
 
-### Optional Settings
-
-```env
-# Application
-APP_NAME="ChibiBooru"
-
-# API Keys (optional, but recommended)
+# Optional: API Keys
 SAUCENAO_API_KEY="your_saucenao_api_key"  # Get from https://saucenao.com/user.php
 GELBOORU_API_KEY=""
 GELBOORU_USER_ID=""
 
-# AI Tagging
-LOCAL_TAGGER_NAME="CamieTagger"  # Display name for your AI tagger
-
-# Web Server
+# Server Settings (must stay in .env)
 FLASK_HOST="0.0.0.0"  # 0.0.0.0 allows external connections
 FLASK_PORT="5000"
 FLASK_DEBUG="false"
-
-# Similarity
-SIMILARITY_METHOD="weighted"  # Options: 'jaccard' or 'weighted'
-
-# Database Performance (optional, for large collections)
-DB_CACHE_SIZE_MB="128"        # SQLite cache size (default: 64MB)
-DB_MMAP_SIZE_MB="512"         # Memory-mapped I/O (default: 256MB)
-DB_BATCH_SIZE="200"           # Batch size for bulk ops (default: 100)
-DB_WAL_AUTOCHECKPOINT="2000"  # WAL checkpoint interval (default: 1000)
 ```
+
+#### 2. Migrate Existing Settings (If Upgrading)
+
+If you have an existing `.env` file with settings, run the migration script:
+
+```bash
+python scripts/migrate_config.py
+```
+
+This will:
+- Move all non-secret settings from `.env` to `config.yml`
+- Keep only secrets and server settings in `.env`
+- Create backups of both files
+
+#### 3. Edit Settings via Web UI
+
+After starting the application:
+1. Navigate to `/system` in your browser
+2. Click the "Settings" tab
+3. Edit settings by category
+4. Click "Save All Changes"
+
+Settings are saved to `config.yml` and take effect immediately (or after clicking "Reload Config").
+
+### Configuration Files
+
+**`.env`** (Secrets Only):
+- `APP_PASSWORD` - Web UI login password
+- `SECRET_KEY` - Flask session encryption key
+- `RELOAD_SECRET` - System control API secret
+- `SAUCENAO_API_KEY` - SauceNao API key (optional)
+- `GELBOORU_API_KEY` - Gelbooru API key (optional)
+- `GELBOORU_USER_ID` - Gelbooru user ID (optional)
+- `FLASK_HOST` - Server host (default: 0.0.0.0)
+- `FLASK_PORT` - Server port (default: 5000)
+- `FLASK_DEBUG` - Debug mode (default: false)
+
+**`config.yml`** (Editable Settings):
+- Application settings (APP_NAME, paths, pagination)
+- AI Tagging settings (thresholds, model paths, behavior)
+- Database settings (cache size, batch size, WAL settings)
+- Processing settings (workers, timeouts, batch sizes)
+- Similarity settings (methods, weights, thresholds)
+- Monitor settings (enabled, interval)
+- Feature flags (ENABLE_* settings)
+- ML Worker settings (backend, timeout, socket)
+- ML Model configuration (character/rating models)
+- Source priority settings
+
+See `docs/CONFIGURATION.md` for detailed documentation of all settings.
 
 ### AI Tagger Models
 

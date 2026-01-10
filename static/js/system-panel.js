@@ -659,11 +659,19 @@ function systemStopMonitor(event) {
     systemAction('/api/system/monitor/stop', event.target, 'Stop Monitor');
 }
 
-// Auto-refresh status when system panel is open
+// Auto-refresh status when system panel is open (legacy - system panel removed)
+// This code now only runs on the /system page where secretSection exists
 document.addEventListener('DOMContentLoaded', () => {
+    // Only run if we're on the system page (has secretSection element)
+    const secretSection = document.getElementById('secretSection');
+    if (!secretSection) {
+        return; // Not on system page, don't run
+    }
+
     const observer = new MutationObserver(async () => {
-        const systemPanel = document.getElementById('system-panel');
-        if (systemPanel && systemPanel.classList.contains('active')) {
+        // Check if we're on system page and actions section exists
+        const actionsSection = document.getElementById('systemActionsSection');
+        if (actionsSection) {
             // Validate stored secret first
             await validateStoredSecret();
 
