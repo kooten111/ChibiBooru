@@ -21,7 +21,7 @@ ChibiBooru uses a centralized configuration system with environment variables an
 
 ## Environment Variables
 
-**File**: `.env` (create from `.env.example`)
+**File**: `.env` (create manually in project root)
 
 ### Application Settings
 
