@@ -193,6 +193,8 @@ async def get_config_schema():
 async def update_config():
     """Update one or more settings."""
     from services import config_service
+    import config as config_module  # Import at the top to avoid UnboundLocalError
+    
     data = await request.get_json()
     if not data:
         raise ValueError("No data provided")
@@ -203,7 +205,7 @@ async def update_config():
         raise ValueError("System secret required")
     
     # Check secret
-    if secret != config.RELOAD_SECRET:
+    if secret != config_module.RELOAD_SECRET:
         raise ValueError("Invalid system secret")
     
     # Update settings
@@ -211,8 +213,7 @@ async def update_config():
     
     if success:
         # Reload config
-        import config
-        config.reload_config()
+        config_module.reload_config()
         return {"status": "success", "message": "Settings updated successfully"}
     else:
         return {"status": "error", "errors": errors}, 400

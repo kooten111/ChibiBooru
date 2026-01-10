@@ -108,19 +108,6 @@ ChibiBooru uses a centralized configuration system that separates secrets from e
 
 **Note**: All non-secret settings are stored in `config.yml` and can be edited via the web UI at `/system`. The file uses YAML format for readability.
 
-### Migration from .env
-
-If you have an existing `.env` file with settings, run the migration script:
-
-```bash
-python scripts/migrate_config.py
-```
-
-This will:
-- Move all non-secret settings from `.env` to `config.yml`
-- Keep only secrets and server settings in `.env`
-- Create backups of both files
-
 ### Editing Settings
 
 **Via Web UI** (Recommended):

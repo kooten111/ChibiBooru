@@ -36,3 +36,6 @@ function showConfirm(message, onConfirm, onCancel) {
         }
     };
 }
+
+// Make available on window for ES modules
+window.showConfirm = showConfirm;

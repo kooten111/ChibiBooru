@@ -200,20 +200,7 @@ FLASK_PORT="5000"
 FLASK_DEBUG="false"
 ```
 
-#### 2. Migrate Existing Settings (If Upgrading)
-
-If you have an existing `.env` file with settings, run the migration script:
-
-```bash
-python scripts/migrate_config.py
-```
-
-This will:
-- Move all non-secret settings from `.env` to `config.yml`
-- Keep only secrets and server settings in `.env`
-- Create backups of both files
-
-#### 3. Edit Settings via Web UI
+#### 2. Edit Settings via Web UI
 
 After starting the application:
 1. Navigate to `/system` in your browser
@@ -310,7 +297,7 @@ Images dropped here will be automatically detected, processed, and moved to the 
 
 3. **Log in** with your `APP_PASSWORD` from `.env`
 
-4. **Open the System panel** (gear icon in header) and enter your `RELOAD_SECRET`
+4. **Navigate to System page** (`/system` in the navigation bar) and enter your `RELOAD_SECRET`
 
 5. **Scan & Process Images:**
    - Click **"Scan & Process New Images"** to begin indexing

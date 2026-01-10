@@ -547,10 +547,68 @@ def get_editable_settings() -> Dict[str, Any]:
             categorized[category] = []
         
         # Get current value: first from config.yml, then from config.py (which has defaults)
-        value = config_yml.get(key)
-        if value is None:
-            # Get from config.py module (has defaults)
+        # Use 'in' check to distinguish between missing key (use default) and key with None value (use default)
+        if key not in config_yml:
+            # Key doesn't exist in config.yml, use default from config.py
             value = getattr(config_module, key, None)
+            if value is None:
+                # For ML Model settings, extract from CHARACTER_MODEL_CONFIG or RATING_MODEL_CONFIG
+                if key.startswith('CHAR_'):
+                    config_dict = getattr(config_module, 'CHARACTER_MODEL_CONFIG', {})
+                    key_map = {
+                        'CHAR_MIN_CONFIDENCE': 'min_confidence',
+                        'CHAR_MAX_PREDICTIONS': 'max_predictions',
+                        'CHAR_PAIR_WEIGHT_MULTIPLIER': 'pair_weight_multiplier',
+                        'CHAR_MIN_PAIR_COOCCURRENCE': 'min_pair_cooccurrence',
+                        'CHAR_MIN_TAG_FREQUENCY': 'min_tag_frequency',
+                        'CHAR_MAX_PAIR_COUNT': 'max_pair_count',
+                        'CHAR_PRUNING_THRESHOLD': 'pruning_threshold',
+                    }
+                    if key in key_map:
+                        value = config_dict.get(key_map[key])
+                elif key.startswith('RATING_'):
+                    config_dict = getattr(config_module, 'RATING_MODEL_CONFIG', {})
+                    key_map = {
+                        'RATING_MIN_CONFIDENCE': 'min_confidence',
+                        'RATING_PAIR_WEIGHT_MULTIPLIER': 'pair_weight_multiplier',
+                        'RATING_MIN_TAG_FREQUENCY': 'min_tag_frequency',
+                        'RATING_MIN_PAIR_COOCCURRENCE': 'min_pair_cooccurrence',
+                        'RATING_MAX_PAIR_COUNT': 'max_pair_count',
+                    }
+                    if key in key_map:
+                        value = config_dict.get(key_map[key])
+        else:
+            # Key exists in config.yml
+            value = config_yml.get(key)
+            # If value is explicitly None, also use default from config.py
+            if value is None:
+                value = getattr(config_module, key, None)
+                if value is None:
+                    # For ML Model settings, extract from dictionaries
+                    if key.startswith('CHAR_'):
+                        config_dict = getattr(config_module, 'CHARACTER_MODEL_CONFIG', {})
+                        key_map = {
+                            'CHAR_MIN_CONFIDENCE': 'min_confidence',
+                            'CHAR_MAX_PREDICTIONS': 'max_predictions',
+                            'CHAR_PAIR_WEIGHT_MULTIPLIER': 'pair_weight_multiplier',
+                            'CHAR_MIN_PAIR_COOCCURRENCE': 'min_pair_cooccurrence',
+                            'CHAR_MIN_TAG_FREQUENCY': 'min_tag_frequency',
+                            'CHAR_MAX_PAIR_COUNT': 'max_pair_count',
+                            'CHAR_PRUNING_THRESHOLD': 'pruning_threshold',
+                        }
+                        if key in key_map:
+                            value = config_dict.get(key_map[key])
+                    elif key.startswith('RATING_'):
+                        config_dict = getattr(config_module, 'RATING_MODEL_CONFIG', {})
+                        key_map = {
+                            'RATING_MIN_CONFIDENCE': 'min_confidence',
+                            'RATING_PAIR_WEIGHT_MULTIPLIER': 'pair_weight_multiplier',
+                            'RATING_MIN_TAG_FREQUENCY': 'min_tag_frequency',
+                            'RATING_MIN_PAIR_COOCCURRENCE': 'min_pair_cooccurrence',
+                            'RATING_MAX_PAIR_COUNT': 'max_pair_count',
+                        }
+                        if key in key_map:
+                            value = config_dict.get(key_map[key])
         
         categorized[category].append({
             'key': key,
@@ -667,26 +725,3 @@ def update_settings_batch(settings: Dict[str, Any]) -> Tuple[bool, Dict[str, str
 def get_setting_schema() -> Dict[str, Any]:
     """Get setting metadata/schema for API"""
     return SETTING_METADATA
-
-
-def migrate_from_env() -> Dict[str, Any]:
-    """Migrate settings from .env to config.yml (returns migrated settings)"""
-    from dotenv import dotenv_values
-    
-    env_file = Path('.env')
-    if not env_file.exists():
-        return {}
-    
-    env_vars = dotenv_values('.env')
-    migrated = {}
-    
-    for key, value in env_vars.items():
-        # Skip secrets and server settings
-        if key in ENV_ONLY_SETTINGS:
-            continue
-        
-        # Skip if already in metadata (means it should be in config.yml)
-        if key in SETTING_METADATA:
-            migrated[key] = value
-    
-    return migrated
