@@ -16,10 +16,10 @@ A self-hosted booru type app for organizing and browsing your local image collec
 
 ## Screenshots
 
-![Main gallery interface showing the image grid layout with search and filtering options](screenshots/gallery_view.webp)
+![Main gallery interface showing the image grid layout with search and filtering options](screenshots/gallery_view.png)
 *Gallery view with rating:general filter showing safe content*
 
-![Image detail page displaying the full image, metadata, tags, and related information](screenshots/image_detail_view.webp)
+![Image detail page displaying the full image, metadata, tags, and related information](screenshots/image_detail_view.png)
 *Image detail page with tag editor and metadata viewer*
 
 ---
@@ -114,8 +114,7 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Configure
-cp .env.example .env
-# Edit .env with your settings (set APP_PASSWORD, SECRET_KEY, RELOAD_SECRET)
+# Create .env file and set required values (see Configuration section below)
 
 # Run (production mode with multiple workers and monitor service)
 ./start_booru.sh
@@ -154,12 +153,7 @@ python app.py
    pip install -r requirements.txt
    ```
 
-4. **Optional: Install AI tagging dependencies:**
-   ```bash
-   pip install -r requirements-ai.txt
-   ```
-
-5. **Optional: Download tagger model:**
+4. **Optional: Download tagger model:**
 
    If you need an ONNX tagger model, [Camie Tagger v2](https://huggingface.co/Camais03/camie-tagger-v2) is a good option.
 
@@ -173,22 +167,13 @@ python app.py
    - [camie-tagger-v2.onnx](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2.onnx) → rename to `model.onnx`
    - [camie-tagger-v2-metadata.json](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2-metadata.json) → rename to `metadata.json`
 
-6. **Optional: Install development dependencies:**
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
-
 ---
 
 ## Configuration
 
 ### Environment Setup
 
-Copy the example configuration file:
-
-```bash
-cp .env.example .env
-```
+Create a `.env` file in the project root with the following settings:
 
 ### Required Settings
 
@@ -392,11 +377,12 @@ For detailed technical documentation, see the [`docs/`](docs/) directory:
 - **[Configuration](docs/CONFIGURATION.md)** - All configuration options and environment variables
 - **[Data Flow](docs/DATA_FLOW.md)** - End-to-end data flow diagrams
 - **[Extended Categories](docs/EXTENDED_CATEGORIES.md)** - 22-category Platinum Schema for advanced tag organization
-- **[Future Enhancements](docs/FUTURE_ENHANCEMENTS.md)** - Planned improvements and future work
+- **[Monitor Architecture](docs/MONITOR_ARCHITECTURE.md)** - Monitor service architecture and deployment
+- **[Upscaler Overview](docs/UPSCALER_OVERVIEW.md)** - AI upscaling feature documentation
 
 ### Code Quality & Architecture
 
-ChibiBooru has undergone comprehensive refactoring (Phases 1-6A) to establish consistent patterns and eliminate technical debt:
+ChibiBooru follows consistent patterns and best practices:
 
 - **Consistent API Error Handling:** All API endpoints use the `@api_handler()` decorator for standardized error responses and logging
 - **Centralized Utilities:** Common operations consolidated in the `utils/` package (tag database, file handling, path normalization)
@@ -414,21 +400,11 @@ Contributions are welcome! Please read the documentation in [`docs/`](docs/) to 
 
 ### Development Setup
 
-1. Install development dependencies:
-   ```bash
-   pip install -r requirements-dev.txt
-   ```
-
-2. Run tests:
-   ```bash
-   pytest
-   ```
-
-3. Review the architecture documentation:
+1. Review the architecture documentation:
    - [Architecture Overview](docs/ARCHITECTURE.md) for system design
    - [Services Documentation](docs/SERVICES.md) for business logic
    - [Database Schema](docs/DATABASE.md) for data models
-   - [Future Enhancements](docs/FUTURE_ENHANCEMENTS.md) for planned improvements
+   - [Data Flow](docs/DATA_FLOW.md) for understanding system workflows
 
 ### Project Structure
 
