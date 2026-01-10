@@ -548,8 +548,8 @@ function systemCleanOrphans(event) {
 
 function systemApplyMergedSources(event) {
     if (event) event.preventDefault();
-    showConfirm('This will merge tags from all available sources for images with multiple sources. Continue?', () => {
-        systemAction('/api/system/apply_merged_sources', event.target, 'Apply Merged Sources');
+    showConfirm('This will apply the current merge setting to all images with multiple sources. If merging is enabled, tags will be merged. If disabled, images will revert to their primary source. Continue?', () => {
+        systemAction('/api/system/apply_merged_sources', event.target, 'Apply Source Merge Setting');
     });
 }
 
@@ -693,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleDebugOptions(event) {
     // Try to get the button from event, or fall back to querySelector
     const toggleButton = event?.target?.closest('.debug-toggle') || document.querySelector('.debug-toggle');
-    
+
     // Find the debug options container - could be sibling or in the same section
     const debugSection = toggleButton?.closest('.debug-section');
     const debugOptions = debugSection?.querySelector('#debugOptions') || document.getElementById('debugOptions');

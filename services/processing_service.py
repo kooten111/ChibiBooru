@@ -1187,10 +1187,26 @@ def process_image_file(filepath, move_from_ingest=True):
                 source_name = src
                 break
         
-        extracted_tags = extract_tags_from_source(primary_source_data, source_name)
+        # Check if we should merge multiple booru sources
+        # Count how many "real" booru sources we have (excluding local_tagger which is AI-generated)
+        booru_sources = [s for s in all_results.keys() if s not in ('local_tagger', 'camie_tagger')]
+        should_merge_sources = (
+            config.USE_MERGED_SOURCES_BY_DEFAULT and
+            len(booru_sources) > 1
+        )
         
-        # Merge Pixiv + Local Tagger if needed
-        if source_name == 'pixiv' and 'local_tagger' in all_results:
+        if should_merge_sources:
+            # Merge tags from all booru sources
+            from utils.tag_extraction import merge_multiple_tag_sources, deduplicate_categorized_tags
+            # Build a dict of only booru sources for merging
+            booru_results = {k: v for k, v in all_results.items() if k in booru_sources}
+            extracted_tags = merge_multiple_tag_sources(booru_results)
+            extracted_tags = deduplicate_categorized_tags(extracted_tags)
+            source_name = 'merged'
+            logger.info(f"Merged tags from sources: {list(booru_results.keys())}")
+        elif source_name == 'pixiv' and 'local_tagger' in all_results:
+            # Merge Pixiv + Local Tagger if needed
+            extracted_tags = extract_tags_from_source(primary_source_data, source_name)
             from utils.tag_extraction import merge_tag_sources, deduplicate_categorized_tags
             local_tagger_tags = extract_tags_from_source(all_results['local_tagger'], 'local_tagger')
             extracted_tags = merge_tag_sources(
@@ -1200,6 +1216,7 @@ def process_image_file(filepath, move_from_ingest=True):
             )
             extracted_tags = deduplicate_categorized_tags(extracted_tags)
         else:
+            extracted_tags = extract_tags_from_source(primary_source_data, source_name)
             from utils.tag_extraction import deduplicate_categorized_tags
             extracted_tags = deduplicate_categorized_tags(extracted_tags)
         

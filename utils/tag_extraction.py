@@ -197,6 +197,76 @@ def merge_tag_sources(primary_tags: dict, secondary_tags: dict,
     return merged
 
 
+def merge_multiple_tag_sources(source_results: Dict[str, dict]) -> dict:
+    """
+    Merge tags from multiple booru sources into a single set of categorized tags.
+
+    Uses category priority to determine the best category for each tag when
+    multiple sources categorize the same tag differently. Higher priority
+    categories are more specific (e.g., 'character' > 'general').
+
+    Args:
+        source_results: Dict mapping source_name -> raw source data
+                       (e.g., {'danbooru': {...}, 'e621': {...}})
+
+    Returns:
+        Dict with keys: tags_character, tags_copyright, tags_artist,
+                       tags_species, tags_meta, tags_general
+        All values are space-separated strings.
+    """
+    # Category priority: more specific categories take precedence
+    category_priority = {
+        "character": 6,
+        "species": 5,
+        "copyright": 4,
+        "artist": 3,
+        "meta": 2,
+        "general": 1
+    }
+
+    # Collect all tags from all sources with their best category
+    # tag_name -> best_category
+    merged_tags: Dict[str, str] = {}
+
+    for source_name, source_data in source_results.items():
+        if not source_data:
+            continue
+
+        # Extract tags from this source
+        extracted = extract_tags_from_source(source_data, source_name)
+
+        # Process each category
+        for category in TAG_CATEGORIES:
+            key = f'tags_{category}'
+            tags_str = extracted.get(key, '')
+            if not tags_str:
+                continue
+
+            for tag_name in tags_str.split():
+                if not tag_name:
+                    continue
+
+                if tag_name not in merged_tags:
+                    merged_tags[tag_name] = category
+                else:
+                    # Tag exists from another source - use higher priority category
+                    existing_priority = category_priority.get(merged_tags[tag_name], 0)
+                    new_priority = category_priority.get(category, 0)
+                    if new_priority > existing_priority:
+                        merged_tags[tag_name] = category
+
+    # Build the result dict
+    categorized: Dict[str, List[str]] = {cat: [] for cat in TAG_CATEGORIES}
+    for tag_name, category in merged_tags.items():
+        categorized[category].append(tag_name)
+
+    # Convert to space-separated strings
+    return {
+        f'tags_{cat}': ' '.join(sorted(tags))
+        for cat, tags in categorized.items()
+    }
+
+
 def deduplicate_categorized_tags(categorized_tags: dict) -> dict:
     """
     Remove duplicate tags across categories.

@@ -143,21 +143,28 @@ def rebuild_categorized_service():
 
 @require_secret_sync
 def apply_merged_sources_service():
-    """Service to apply merged sources to all images with multiple sources."""
+    """
+    Service to apply the merged sources setting to all images with multiple sources.
+    
+    When USE_MERGED_SOURCES_BY_DEFAULT is True: merges tags from all sources.
+    When USE_MERGED_SOURCES_BY_DEFAULT is False: reverts to primary source tags.
+    """
     try:
         import config
         from database import get_db_connection
-        from services.switch_source_db import merge_all_sources
+        from services.switch_source_db import merge_all_sources, switch_metadata_source_db
 
+        use_merged = config.USE_MERGED_SOURCES_BY_DEFAULT
+        action = "merge" if use_merged else "un-merge"
+        
         # Get all images with multiple sources
-        merged_count = 0
-        skipped_count = 0
+        processed_count = 0
         error_count = 0
 
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT i.filepath, COUNT(DISTINCT s.id) as source_count
+                SELECT i.filepath, i.active_source, COUNT(DISTINCT s.id) as source_count
                 FROM images i
                 JOIN image_sources isrc ON i.id = isrc.image_id
                 JOIN sources s ON isrc.source_id = s.id
@@ -173,31 +180,60 @@ def apply_merged_sources_service():
                 return jsonify({
                     "status": "success",
                     "message": "No images with multiple sources found.",
-                    "merged": 0,
-                    "skipped": 0,
+                    "processed": 0,
                     "errors": 0
                 })
 
-            monitor_service.add_log(f"Starting merge for {total} images with multiple sources", "info")
+            monitor_service.add_log(f"Starting {action} for {total} images with multiple sources", "info")
 
             for idx, row in enumerate(multi_source_images, 1):
                 filepath = row['filepath']
+                current_source = row['active_source']
 
                 # Log progress every 10% or for small batches, every item
                 if total <= 10 or idx % max(1, total // 10) == 0:
                     progress_pct = int((idx / total) * 100)
-                    monitor_service.add_log(f"Progress: {idx}/{total} ({progress_pct}%) - {merged_count} merged, {error_count} errors", "info")
+                    monitor_service.add_log(f"Progress: {idx}/{total} ({progress_pct}%) - {processed_count} processed, {error_count} errors", "info")
 
-                # Check if we should use merged based on config
-                if config.USE_MERGED_SOURCES_BY_DEFAULT:
-                    result = merge_all_sources(filepath)
-                    if result.get("status") == "success":
-                        merged_count += 1
-                    else:
-                        error_count += 1
-                        monitor_service.add_log(f"Error merging {filepath}: {result.get('error', 'Unknown')}", "error")
+                if use_merged:
+                    # Merge all sources
+                    if current_source != 'merged':
+                        result = merge_all_sources(filepath)
+                        if result.get("status") == "success":
+                            processed_count += 1
+                        else:
+                            error_count += 1
+                            monitor_service.add_log(f"Error merging {filepath}: {result.get('error', 'Unknown')}", "error")
+                    # Already merged, skip
                 else:
-                    skipped_count += 1
+                    # Revert to primary source
+                    if current_source == 'merged':
+                        # Find the primary source based on priority
+                        cursor.execute("""
+                            SELECT s.name FROM sources s
+                            JOIN image_sources isrc ON s.id = isrc.source_id
+                            JOIN images i ON isrc.image_id = i.id
+                            WHERE i.filepath = ?
+                        """, (filepath,))
+                        available_sources = [r['name'] for r in cursor.fetchall()]
+                        
+                        primary_source = None
+                        for src in config.BOORU_PRIORITY:
+                            if src in available_sources:
+                                primary_source = src
+                                break
+                        
+                        if primary_source:
+                            result = switch_metadata_source_db(filepath, primary_source)
+                            if result.get("status") == "success":
+                                processed_count += 1
+                            else:
+                                error_count += 1
+                                monitor_service.add_log(f"Error reverting {filepath}: {result.get('error', 'Unknown')}", "error")
+                        else:
+                            error_count += 1
+                            monitor_service.add_log(f"No primary source found for {filepath}", "error")
+                    # Already using single source, skip
 
         # Refresh cache and recount tags
         monitor_service.add_log("Refreshing cache...", "info")
@@ -206,9 +242,8 @@ def apply_merged_sources_service():
         monitor_service.add_log("Recounting tags...", "info")
         models.reload_tag_counts()
 
-        message = f"✓ Processed {total} images: {merged_count} merged"
-        if skipped_count > 0:
-            message += f", {skipped_count} skipped (config disabled)"
+        action_past = "merged" if use_merged else "reverted to primary source"
+        message = f"✓ Processed {total} images: {processed_count} {action_past}"
         if error_count > 0:
             message += f", {error_count} errors"
 
@@ -217,15 +252,15 @@ def apply_merged_sources_service():
         return jsonify({
             "status": "success",
             "message": message,
-            "merged": merged_count,
-            "skipped": skipped_count,
+            "action": action,
+            "processed": processed_count,
             "errors": error_count,
             "total": total
         })
     except Exception as e:
         import traceback
         traceback.print_exc()
-        monitor_service.add_log(f"Fatal error during merge: {str(e)}", "error")
+        monitor_service.add_log(f"Fatal error during {action}: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500
         
 @require_secret_sync
@@ -783,7 +818,6 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
         from database import get_db_connection
         from services import similarity_service
         import shutil
-        import config
         
         # If no specific IDs provided, find all broken images
         if not image_ids:
@@ -941,8 +975,9 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
                             
                             # Regenerate embedding if missing and available
                             if similarity_service.SEMANTIC_AVAILABLE:
-                                cursor.execute("SELECT image_id FROM image_embeddings WHERE image_id = ?", (image_id,))
-                                if not cursor.fetchone():
+                                from services import similarity_db
+                                existing_embedding = similarity_db.get_embedding(image_id)
+                                if existing_embedding is None:
                                     engine = similarity_service.get_semantic_engine()
                                     if engine.load_model():
                                         embedding = engine.get_embedding(full_path)
