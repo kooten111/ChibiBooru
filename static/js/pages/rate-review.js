@@ -84,8 +84,14 @@ window.changeFilter = function () {
             break;
         }
     }
-    // Reset history when filter changes
+    // Reset state when filter changes
     imageHistory = [];
+    preloadedImage = null;
+    currentImage = null;
+    // Clear current display
+    const display = document.getElementById('imageDisplay');
+    display.innerHTML = '';
+    // Load next image with new filter
     loadNextImage();
 };
 

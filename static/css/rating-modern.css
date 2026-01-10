@@ -724,3 +724,168 @@
         flex-direction: column;
     }
 }
+
+/* ============================================
+   Rate Review Page Styles (Standardized)
+   ============================================ */
+
+/* Page Header for Rate Review */
+.rate-review-header {
+    flex-wrap: wrap;
+}
+
+.rate-progress-wrapper {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    min-width: 300px;
+}
+
+.rate-progress-text {
+    color: var(--primary-blue);
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+}
+
+/* Filter Pills */
+.rate-filter-pills {
+    display: flex;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.rate-filter-pill {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: var(--gradient-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-size: var(--font-size-sm);
+}
+
+.rate-filter-pill:hover {
+    background: var(--gradient-secondary-hover);
+    border-color: var(--border-color-hover);
+}
+
+.rate-filter-pill input[type="radio"] {
+    accent-color: var(--primary-blue);
+    margin: 0;
+    cursor: pointer;
+}
+
+.rate-filter-pill input[type="radio"]:checked + span {
+    color: var(--primary-blue);
+    font-weight: var(--font-weight-medium);
+}
+
+/* Image Display Wrapper */
+.rate-image-display-wrapper {
+    position: relative;
+    margin-bottom: var(--spacing-xl);
+}
+
+.rate-loading-state {
+    padding: var(--spacing-2xl);
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Confidence Bar */
+.confidence-bar-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-primary);
+}
+
+.confidence-value {
+    color: var(--primary-blue);
+    font-weight: var(--font-weight-medium);
+}
+
+.confidence-bar-bg {
+    background: rgba(255, 255, 255, 0.1);
+    height: 4px;
+    border-radius: var(--radius-sm);
+}
+
+.confidence-bar-fill {
+    height: 100%;
+    background: var(--primary-blue);
+    width: 0%;
+    border-radius: var(--radius-sm);
+    transition: width var(--transition-normal);
+}
+
+/* Rating Controls Wrapper */
+.rate-controls-wrapper {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.rating-btn-label {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+}
+
+.nav-shortcut {
+    margin-left: var(--spacing-sm);
+}
+
+/* Tags Panel */
+.rate-tags-panel {
+    margin-top: var(--spacing-2xl);
+}
+
+.rate-tags-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding: var(--spacing-sm) 0;
+}
+
+.rate-tags-title {
+    margin: 0;
+    color: var(--primary-blue);
+    font-size: var(--font-size-lg);
+}
+
+.rate-tags-count {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    margin-left: var(--spacing-sm);
+    font-weight: var(--font-weight-normal);
+}
+
+.rate-tags-toggle-icon {
+    font-size: var(--font-size-xl);
+    transition: transform var(--transition-smooth);
+    color: var(--text-muted);
+}
+
+.rate-tags-toggle-icon.rotated {
+    transform: rotate(180deg);
+}
+
+.rate-tags-content {
+    margin-top: var(--spacing-md);
+    display: none;
+}
+
+.rate-tags-content.visible {
+    display: block;
+}
+
+/* Footer */
+.rate-review-footer {
+    margin-top: var(--spacing-2xl);
+}

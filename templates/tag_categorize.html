@@ -16,7 +16,7 @@
 
     <div class="page-container page-container-full">
         <!-- Page Header -->
-        <div class="page-header" style="padding: var(--spacing-lg); margin-bottom: 0;">
+        <div class="page-header tag-categorize-header">
             <div class="page-header-left">
                 <h1 class="page-title">
                     <span class="page-title-icon">🏷️</span>
@@ -52,12 +52,12 @@
         </div>
 
         <!-- Progress Bar -->
-        <div class="progress-bar-container" style="margin: 0 var(--spacing-lg);">
+        <div class="progress-bar-container progress-bar-container-centered">
             <div class="progress-bar-fill" id="categorizeProgress" style="width: 0%;"></div>
         </div>
 
         <!-- Three-panel layout -->
-        <div class="panel-layout" style="padding: var(--spacing-lg);">
+        <div class="panel-layout panel-layout-padded">
             <!-- Left Panel - Category Guide -->
             <aside class="panel panel-left">
                 <div class="panel-header">
@@ -66,7 +66,7 @@
 
                 <div class="panel-section">
                     <h4 class="panel-section-title">Group 1: Identity</h4>
-                    <div class="list-container" style="max-height: none;">
+                    <div class="list-container list-container-unlimited">
                         <div class="list-item"><span class="list-item-name">Subject_Count</span><span class="list-item-meta">Count & gender</span></div>
                         <div class="list-item"><span class="list-item-name">Body_Physique</span><span class="list-item-meta">Permanent body traits</span></div>
                         <div class="list-item"><span class="list-item-name">Body_Hair</span><span class="list-item-meta">Head hair only</span></div>
@@ -77,7 +77,7 @@
 
                 <div class="panel-section">
                     <h4 class="panel-section-title">Group 2: Context</h4>
-                    <div class="list-container" style="max-height: none;">
+                    <div class="list-container list-container-unlimited">
                         <div class="list-item"><span class="list-item-name">Attire_Main</span><span class="list-item-meta">Main clothing</span></div>
                         <div class="list-item"><span class="list-item-name">Attire_Inner</span><span class="list-item-meta">Underwear/swimwear</span></div>
                         <div class="list-item"><span class="list-item-name">Attire_Legwear</span><span class="list-item-meta">Socks & hosiery</span></div>
@@ -94,7 +94,7 @@
 
                 <div class="panel-section">
                     <h4 class="panel-section-title">Group 3: Technical/Meta</h4>
-                    <div class="list-container" style="max-height: none;">
+                    <div class="list-container list-container-unlimited">
                         <div class="list-item"><span class="list-item-name">Framing</span><span class="list-item-meta">Camera angle</span></div>
                         <div class="list-item"><span class="list-item-name">Focus</span><span class="list-item-meta">Part focus</span></div>
                         <div class="list-item"><span class="list-item-name">Style_Art</span><span class="list-item-meta">Art style</span></div>
@@ -121,7 +121,7 @@
                     <h3 class="panel-section-title">Edit Tag</h3>
                     <div class="filter-group">
                         <input type="text" id="editTagInput" class="filter-input" placeholder="Tag name...">
-                        <button onclick="loadTagForEdit()" class="action-btn action-btn-primary" style="width: 100%; margin-top: var(--spacing-sm);">Load</button>
+                        <button onclick="loadTagForEdit()" class="action-btn action-btn-primary action-btn-full-width action-btn-spaced">Load</button>
                     </div>
                     <div id="editTagDisplay" class="edit-tag-display"></div>
                 </div>
@@ -158,7 +158,7 @@
             <span class="close" onclick="closeExportModal()">&times;</span>
             <h3>Export Tag Categorizations</h3>
             <p>Choose which tags to export:</p>
-            <div class="filter-radio-group" style="margin: var(--spacing-lg) 0;">
+            <div class="filter-radio-group filter-radio-group-spaced">
                 <label class="filter-radio-label">
                     <input type="radio" name="exportType" value="categorized" checked>
                     <span><strong>Categorized Tags Only</strong> - Export only tags that have been categorized</span>
@@ -181,7 +181,7 @@
             <span class="close" onclick="closeImportModal()">&times;</span>
             <h3>Import Tag Categorizations</h3>
             <p>Choose how to import the categorizations:</p>
-            <div class="filter-radio-group" style="margin: var(--spacing-lg) 0;">
+            <div class="filter-radio-group filter-radio-group-spaced">
                 <label class="filter-radio-label">
                     <input type="radio" name="importMode" value="merge" checked>
                     <span><strong>Merge (Recommended)</strong> - Keep existing categorizations, only categorize uncategorized tags</span>
@@ -190,7 +190,7 @@
                     <input type="radio" name="importMode" value="update">
                     <span><strong>Update</strong> - Only update already categorized tags, leave uncategorized tags as-is</span>
                 </label>
-                <label class="filter-radio-label" style="border-color: var(--danger);">
+                <label class="filter-radio-label filter-radio-label-danger">
                     <input type="radio" name="importMode" value="overwrite">
                     <span><strong>Overwrite (Dangerous)</strong> - Replace ALL categorizations - this will overwrite existing work!</span>
                 </label>

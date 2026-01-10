@@ -198,7 +198,11 @@ async def api_set_rating():
     from core.cache_manager import load_data_from_db_async
     load_data_from_db_async()
 
-    return result
+    return {
+        'status': 'success',
+        'old_rating': result.get('old_rating'),
+        'new_rating': result.get('new_rating')
+    }
 
 
 @api_blueprint.route('/rate/top_tags', methods=['GET'])

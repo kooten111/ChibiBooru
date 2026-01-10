@@ -21,7 +21,7 @@
 
     <div class="page-container page-container-full">
         <!-- Page Header -->
-        <div class="page-header" style="padding: var(--spacing-lg); margin-bottom: 0; border-bottom: none;">
+        <div class="page-header implications-header">
             <div class="page-header-left">
                 <h1 class="page-title">
                     <span class="page-title-icon">🔗</span>
@@ -41,7 +41,7 @@
         </div>
 
         <!-- Three Panel Layout -->
-        <div class="panel-layout" style="padding: 0 var(--spacing-lg) var(--spacing-lg);">
+        <div class="panel-layout">
             <!-- Left Panel - Filters -->
             <aside class="panel panel-left">
                 <div class="panel-section">
@@ -157,15 +157,15 @@
 
                 <div class="panel-section">
                     <h3 class="panel-section-title">Quick Actions</h3>
-                    <div class="page-actions" style="flex-direction: column;">
-                        <div class="settings-option" style="margin-bottom: var(--spacing-sm);">
+                    <div class="page-actions page-actions-column">
+                        <div class="settings-option settings-option-spaced">
                             <label class="filter-checkbox-label"
                                 title="When enabled, approving a rule will immediately add the implied tag to all images that have the source tag">
                                 <input type="checkbox" id="applyOnApproval" checked>
                                 <span>Apply on approval</span>
                             </label>
                         </div>
-                        <button id="autoApprovePatternBtn" class="action-btn action-btn-success" style="width: 100%;"
+                        <button id="autoApprovePatternBtn" class="action-btn action-btn-success action-btn-full-width"
                             title="Auto-approve all character_(copyright) → copyright patterns">
                             Auto-Approve Patterns
                         </button>
@@ -258,13 +258,13 @@
                     <label class="filter-label" for="manualSourceTag">When this tag is added:</label>
                     <input type="text" id="manualSourceTag" class="filter-input" placeholder="e.g., mint_fantome" autocomplete="off">
                 </div>
-                <div class="flow-arrow" style="text-align: center; font-size: 1.5em; padding: var(--spacing-sm);">→</div>
+                <div class="flow-arrow">→</div>
                 <div class="filter-group">
                     <label class="filter-label" for="manualImpliedTag">Also add this tag:</label>
                     <input type="text" id="manualImpliedTag" class="filter-input" placeholder="e.g., indie_virtual_youtuber" autocomplete="off">
                 </div>
             </div>
-            <div class="page-actions" style="margin-top: var(--spacing-lg);">
+            <div class="page-actions page-actions-spaced">
                 <button id="previewManualBtn" class="action-btn action-btn-secondary">Preview</button>
                 <button id="createManualSubmitBtn" class="action-btn action-btn-primary">Create</button>
             </div>
@@ -309,7 +309,7 @@
                 </div>
             </div>
 
-            <div class="page-actions" style="margin-top: var(--spacing-lg);">
+            <div class="page-actions page-actions-spaced">
                 <button id="autoApproveRefreshBtn" class="action-btn action-btn-secondary">Refresh Preview</button>
                 <button id="autoApproveSubmitBtn" class="action-btn action-btn-primary">Approve Matching</button>
             </div>
@@ -328,7 +328,7 @@
                     <span>Reapply all active implication rules after clearing</span>
                 </label>
             </div>
-            <div class="page-actions" style="margin-top: var(--spacing-lg);">
+            <div class="page-actions page-actions-spaced">
                 <button id="clearImpliedCancelBtn" class="action-btn action-btn-secondary">Cancel</button>
                 <button id="clearImpliedSubmitBtn" class="action-btn action-btn-danger">Clear Tags</button>
             </div>

@@ -772,6 +772,156 @@
 }
 
 /* ============================================
+   Page Header Variants
+   ============================================ */
+.rate-manage-header,
+.tag-categorize-header,
+.implications-header {
+    padding: var(--spacing-lg);
+    margin-bottom: 0;
+}
+
+.implications-header {
+    border-bottom: none;
+}
+
+/* ============================================
+   Panel Layout Padding
+   ============================================ */
+.panel-layout {
+    padding: 0 var(--spacing-lg) var(--spacing-lg);
+}
+
+/* ============================================
+   Stats Grid Variants
+   ============================================ */
+.stats-grid-single {
+    grid-template-columns: 1fr;
+}
+
+/* ============================================
+   Review Controls
+   ============================================ */
+.review-header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.review-header-controls .panel-section-title {
+    margin: 0;
+}
+
+.review-filter-controls {
+    display: flex;
+    gap: var(--spacing-sm);
+    align-items: center;
+}
+
+.review-filter-controls .filter-select {
+    width: auto;
+}
+
+/* ============================================
+   Insights Grid
+   ============================================ */
+.insights-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-lg);
+}
+
+/* ============================================
+   Action Button Full Width
+   ============================================ */
+.action-btn-full-width {
+    width: 100%;
+}
+
+.action-btn-spaced {
+    margin-top: var(--spacing-sm);
+}
+
+/* ============================================
+   Panel Section Spacing
+   ============================================ */
+.panel-section-spaced {
+    margin-top: var(--spacing-lg);
+}
+
+/* ============================================
+   Filter Group Spacing
+   ============================================ */
+.filter-group-spaced {
+    margin-bottom: var(--spacing-lg);
+}
+
+/* ============================================
+   Threshold Value Display
+   ============================================ */
+.threshold-value {
+    text-align: right;
+    color: var(--primary-blue);
+}
+
+/* ============================================
+   Panel Layout Padding Variant
+   ============================================ */
+.panel-layout-padded {
+    padding: var(--spacing-lg);
+}
+
+/* ============================================
+   List Container Unlimited Height
+   ============================================ */
+.list-container-unlimited {
+    max-height: none;
+}
+
+/* ============================================
+   Progress Bar Container Centered
+   ============================================ */
+.progress-bar-container-centered {
+    margin: 0 var(--spacing-lg);
+}
+
+/* ============================================
+   Filter Radio Group Spacing
+   ============================================ */
+.filter-radio-group-spaced {
+    margin: var(--spacing-lg) 0;
+}
+
+.filter-radio-label-danger {
+    border-color: var(--danger);
+}
+
+/* ============================================
+   Page Actions Variants
+   ============================================ */
+.page-actions-column {
+    flex-direction: column;
+}
+
+.page-actions-spaced {
+    margin-top: var(--spacing-lg);
+}
+
+.settings-option-spaced {
+    margin-bottom: var(--spacing-sm);
+}
+
+/* ============================================
+   Flow Arrow
+   ============================================ */
+.flow-arrow {
+    text-align: center;
+    font-size: 1.5em;
+    padding: var(--spacing-sm);
+}
+
+/* ============================================
    Responsive Adjustments
    ============================================ */
 @media (max-width: 1400px) {

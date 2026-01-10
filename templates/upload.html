@@ -6,14 +6,24 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
 </head>
 <body>
     {% include 'header.html' %}
-    <div class="container">
+    <div class="page-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-left">
+                <h1 class="page-title">
+                    <span class="page-title-icon">📤</span>
+                    Upload Image
+                </h1>
+            </div>
+        </div>
+
         <div class="upload-container panel">
-            <h2>Upload Image</h2>
             <form id="upload-form" action="{{ url_for('main.upload_image') }}" method="post" enctype="multipart/form-data">
                 <div id="drop-zone">
                     <p>Drag & Drop files here or click to select</p>

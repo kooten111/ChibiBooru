@@ -2,8 +2,8 @@
 
 .upload-container {
     max-width: 800px;
-    margin: 40px auto;
-    padding: 40px;
+    margin: 0 auto;
+    padding: var(--spacing-xl);
 }
 
 #drop-zone {

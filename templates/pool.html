@@ -6,6 +6,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 </head>
 <body>
@@ -18,18 +19,27 @@
 
     {% include 'header.html' %}
 
-    <div class="container">
-        <div class="pool-detail-header">
-            <div class="pool-title-section">
-                <h2>{{ pool.name }}</h2>
+    <div class="page-container">
+        <!-- Page Header -->
+        <div class="page-header">
+            <div class="page-header-left">
+                <h1 class="page-title">
+                    <span class="page-title-icon">📚</span>
+                    {{ pool.name }}
+                </h1>
                 {% if pool.description %}
-                <p class="pool-description">{{ pool.description }}</p>
+                <p class="page-subtitle">{{ pool.description }}</p>
                 {% endif %}
-                <span class="pool-image-count">{{ images|length }} image{{ 's' if images|length != 1 else '' }}</span>
             </div>
-            <div class="pool-header-actions">
-                <button class="btn-edit" onclick="editPool({{ pool.id }}, '{{ pool.name }}', '{{ pool.description or '' }}')">Edit Pool</button>
-                <a href="{{ url_for('main.pools_list') }}" class="btn-secondary">Back to Pools</a>
+            <div class="page-header-stats">
+                <div class="page-header-stat">
+                    <span class="page-header-stat-value">{{ images|length }}</span>
+                    <span>image{{ 's' if images|length != 1 else '' }}</span>
+                </div>
+            </div>
+            <div class="page-header-right">
+                <button class="action-btn action-btn-secondary" onclick="editPool({{ pool.id }}, '{{ pool.name }}', '{{ pool.description or '' }}')">Edit Pool</button>
+                <a href="{{ url_for('main.pools_list') }}" class="action-btn action-btn-secondary">Back to Pools</a>
             </div>
         </div>
 

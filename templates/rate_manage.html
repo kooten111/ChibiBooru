@@ -87,7 +87,7 @@
 
     <div class="page-container page-container-full">
         <!-- Page Header -->
-        <div class="page-header" style="padding: var(--spacing-lg); margin-bottom: 0;">
+        <div class="page-header rate-manage-header">
             <div class="page-header-left">
                 <h1 class="page-title">
                     <span class="page-title-icon">🧠</span>
@@ -113,14 +113,14 @@
         </div>
 
         <!-- Three-panel layout -->
-        <div class="panel-layout" id="rateLayout" style="padding: 0 var(--spacing-lg) var(--spacing-lg);">
+        <div class="panel-layout" id="rateLayout">
             <!-- Left Panel - Stats -->
             <aside class="panel panel-left">
                 <div class="panel-header">
                     <h3 class="panel-title">Quick Stats</h3>
                 </div>
 
-                <div class="stats-grid" style="grid-template-columns: 1fr;">
+                <div class="stats-grid stats-grid-single">
                     <div class="stat-card">
                         <div class="stat-card-value" id="trainingSamples">-</div>
                         <div class="stat-card-label">Training Samples</div>
@@ -142,7 +142,7 @@
                     </div>
                 </div>
 
-                <div class="panel-section" style="margin-top: var(--spacing-lg);">
+                <div class="panel-section panel-section-spaced">
                     <h3 class="panel-section-title">Distribution</h3>
                     <div id="ratingDistribution">
                         <!-- Will be populated by JavaScript -->
@@ -174,8 +174,7 @@
                             <div class="stat-card">
                                 <div class="stat-card-value" id="modelStatus">Not Trained</div>
                                 <div class="stat-card-label">Model Status</div>
-                                <div class="empty-state-subtext" id="lastTrained"
-                                    style="margin-top: var(--spacing-xs);">
+                                <div class="empty-state-subtext" id="lastTrained">
                                     Never trained
                                 </div>
                             </div>
@@ -183,7 +182,7 @@
                             <div class="stat-card">
                                 <div class="stat-card-value" id="pendingCorrections">0</div>
                                 <div class="stat-card-label">Pending Corrections</div>
-                                <div class="empty-state-subtext" style="margin-top: var(--spacing-xs);">
+                                <div class="empty-state-subtext">
                                     User corrections since last training
                                 </div>
                             </div>
@@ -191,8 +190,7 @@
                             <div class="stat-card">
                                 <div class="stat-card-value" id="modelHealth">Unknown</div>
                                 <div class="stat-card-label">Model Health</div>
-                                <div class="empty-state-subtext" id="modelHealthDesc"
-                                    style="margin-top: var(--spacing-xs);">
+                                <div class="empty-state-subtext" id="modelHealthDesc">
                                     Checking...
                                 </div>
                             </div>
@@ -210,12 +208,10 @@
                 <!-- Review Queue Tab -->
                 <div class="tab-pane" id="tab-review">
                     <div class="panel-section">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);">
-                            <h3 class="panel-section-title" style="margin: 0;">AI-Inferred Images</h3>
-                            <div style="display: flex; gap: var(--spacing-sm); align-items: center;">
-                                <select id="reviewFilter" onchange="loadReviewImages()" class="filter-select"
-                                    style="width: auto;">
+                        <div class="review-header-controls">
+                            <h3 class="panel-section-title">AI-Inferred Images</h3>
+                            <div class="review-filter-controls">
+                                <select id="reviewFilter" onchange="loadReviewImages()" class="filter-select">
                                     <option value="ai_predicted">AI-Inferred</option>
                                     <option value="unrated">Unrated</option>
                                     <option value="all">All</option>
@@ -237,7 +233,7 @@
                     <div class="panel-section">
                         <h3 class="panel-section-title">Model Insights</h3>
 
-                        <div class="filter-group" style="margin-bottom: var(--spacing-lg);">
+                        <div class="filter-group filter-group-spaced">
                             <label class="filter-label">Select Rating:</label>
                             <select id="insightRating" onchange="loadInsights()" class="filter-select"
                                 style="max-width: 300px;">
@@ -248,7 +244,7 @@
                             </select>
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-lg);">
+                        <div class="insights-grid">
                             <div>
                                 <h4 class="panel-section-title">Top Weighted Tags</h4>
                                 <div id="topTags" class="list-container">
@@ -351,8 +347,7 @@
                             </label>
                             <input type="range" id="threshold_general" min="0" max="1" step="0.05" value="0.5"
                                 oninput="updateConfigValue('threshold_general', this.value)">
-                            <div style="text-align: right; color: var(--primary-blue);" id="threshold_general_value">0.5
-                            </div>
+                            <div class="threshold-value" id="threshold_general_value">0.5</div>
                         </div>
 
                         <div class="filter-group">
@@ -369,8 +364,7 @@
                             </label>
                             <input type="range" id="threshold_sensitive" min="0" max="1" step="0.05" value="0.6"
                                 oninput="updateConfigValue('threshold_sensitive', this.value)">
-                            <div style="text-align: right; color: var(--primary-blue);" id="threshold_sensitive_value">
-                                0.6</div>
+                            <div class="threshold-value" id="threshold_sensitive_value">0.6</div>
                         </div>
 
                         <div class="filter-group">
@@ -387,8 +381,7 @@
                             </label>
                             <input type="range" id="threshold_questionable" min="0" max="1" step="0.05" value="0.7"
                                 oninput="updateConfigValue('threshold_questionable', this.value)">
-                            <div style="text-align: right; color: var(--primary-blue);"
-                                id="threshold_questionable_value">0.7</div>
+                            <div class="threshold-value" id="threshold_questionable_value">0.7</div>
                         </div>
 
                         <div class="filter-group">
@@ -405,12 +398,11 @@
                             </label>
                             <input type="range" id="threshold_explicit" min="0" max="1" step="0.05" value="0.8"
                                 oninput="updateConfigValue('threshold_explicit', this.value)">
-                            <div style="text-align: right; color: var(--primary-blue);" id="threshold_explicit_value">
-                                0.8</div>
+                            <div class="threshold-value" id="threshold_explicit_value">0.8</div>
                         </div>
                     </div>
 
-                    <button class="action-btn action-btn-primary" onclick="saveConfig()" style="width: 100%;">
+                    <button class="action-btn action-btn-primary action-btn-full-width" onclick="saveConfig()">
                         Save Configuration
                     </button>
                 </div>
