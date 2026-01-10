@@ -583,7 +583,16 @@
                             <a href="/view/{{ related.path | urlencode_path }}" class="related-thumb">
                                 <img src="/static/{% if not (related.thumb.startswith('thumbnails/') or related.thumb.startswith('images/')) %}images/{% endif %}{{ related.thumb | urlencode_path }}"
                                     alt="Related">
+                                {% set source = related.get('primary_source', 'unknown') %}
+                                {% if source == 'tag' %}
+                                <span class="label similar similar-tag">Tag</span>
+                                {% elif source == 'semantic' %}
+                                <span class="label similar similar-semantic">FAISS</span>
+                                {% elif source == 'visual' %}
+                                <span class="label similar similar-visual">Visual</span>
+                                {% else %}
                                 <span class="label similar">Similar</span>
+                                {% endif %}
                             </a>
                             {% endfor %}
                         </div>
@@ -786,6 +795,7 @@
     <script src="{{ url_for('static', filename='js/family-badge.js', v='3.0') }}"></script>
     <script src="{{ url_for('static', filename='js/favourites.js', v='1.0') }}"></script>
     <script src="{{ url_for('static', filename='js/upscaler.js', v='1.0') }}"></script>
+    <script src="{{ url_for('static', filename='js/related-images-loader.js', v='1.0') }}"></script>
 </body>
 
 </html>

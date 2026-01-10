@@ -653,6 +653,19 @@ body.image-page {
     background: var(--gradient-primary);
 }
 
+/* Similarity source indicators */
+.image-page .related-thumb .label.similar-tag {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.95) 0%, rgba(37, 99, 235, 0.95) 100%);
+}
+
+.image-page .related-thumb .label.similar-semantic {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(22, 163, 74, 0.95) 100%);
+}
+
+.image-page .related-thumb .label.similar-visual {
+    background: linear-gradient(135deg, rgba(251, 146, 60, 0.95) 0%, rgba(234, 88, 12, 0.95) 100%);
+}
+
 /* Tag Editor positioning within main content */
 .image-page .tag-editor {
     width: fit-content;
@@ -785,4 +798,38 @@ body:is(.ui-hidden, .focus-mode)::after {
     max-height: none;
     display: flex;
     flex-direction: column;
+}
+
+/* FAISS Loading Indicator */
+.faiss-loading-indicator {
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--text-muted);
+}
+
+.faiss-loading-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.faiss-loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--border-color);
+    border-top-color: var(--cyan-accent, #00d4ff);
+    border-radius: 50%;
+    animation: faiss-spin 0.8s linear infinite;
+}
+
+@keyframes faiss-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.faiss-loading-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
 }

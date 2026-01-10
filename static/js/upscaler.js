@@ -285,7 +285,20 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Upscaling failed');
+                // Provide more helpful error messages
+                let errorMessage = data.error || 'Upscaling failed';
+                
+                // Check for common error patterns
+                if (errorMessage.includes('ML Worker is not available') || 
+                    errorMessage.includes('Connection failed')) {
+                    errorMessage = 'ML Worker is not available. Please check if the ML Worker process is running and try again.';
+                } else if (errorMessage.includes('ML Worker error')) {
+                    errorMessage = `ML Worker error: ${errorMessage}`;
+                } else if (errorMessage.includes('disabled')) {
+                    errorMessage = 'Upscaler is disabled. Enable UPSCALER_ENABLED in config to use this feature.';
+                }
+                
+                throw new Error(errorMessage);
             }
 
             hasUpscaled = true;
@@ -301,7 +314,16 @@
 
         } catch (error) {
             console.error('Upscaling error:', error);
-            showToast(error.message || 'Upscaling failed', 'error');
+            
+            // Show user-friendly error message
+            let userMessage = error.message || 'Upscaling failed';
+            
+            // Handle network errors
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                userMessage = 'Network error: Could not connect to server. Please check your connection and try again.';
+            }
+            
+            showToast(userMessage, 'error');
         } finally {
             isUpscaling = false;
             updateButtonState();

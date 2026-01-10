@@ -93,6 +93,56 @@ async def get_blended_similar(filepath):
     }
 
 
+@api_blueprint.route('/similar-semantic/<path:filepath>')
+@api_handler()
+async def get_semantic_similar(filepath):
+    """
+    Find semantically similar images using FAISS index only.
+    
+    GET /api/similar-semantic/<filepath>?limit=40&exclude_family=true
+    """
+    if filepath.startswith('images/'):
+        filepath = filepath[7:]
+    
+    limit = request.args.get('limit', 40, type=int)
+    exclude_family = request.args.get('exclude_family', 'false').lower() in ('true', '1', 'yes')
+    
+    # Run in thread to not block
+    similar = await asyncio.to_thread(
+        similarity_service.find_semantic_similar,
+        filepath,
+        limit=limit
+    )
+    
+    # Normalize current filepath for comparison (ensure it has 'images/' prefix)
+    current_path_normalized = f"images/{filepath}" if not filepath.startswith('images/') else filepath
+    
+    # Filter out self-match (current image)
+    similar = [r for r in similar if r['path'] != current_path_normalized]
+    
+    # Apply family exclusion if requested
+    if exclude_family and similar:
+        # Get family filepaths using the private method (it's accessible)
+        family_filepaths = await asyncio.to_thread(
+            similarity_service._get_family_filepaths,
+            filepath
+        )
+        family_paths = {f"images/{fp}" for fp in family_filepaths}
+        similar = [r for r in similar if r['path'] not in family_paths]
+    
+    # Ensure primary_source is set correctly
+    for img in similar:
+        img['primary_source'] = 'semantic'
+    
+    return {
+        'similar': similar,
+        'count': len(similar),
+        'limit': limit,
+        'exclude_family': exclude_family,
+        'reference': filepath
+    }
+
+
 @api_blueprint.route('/duplicates')
 @api_handler()
 async def get_duplicate_groups():

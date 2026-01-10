@@ -135,13 +135,24 @@ class TagEditor {
         const sidebarLeft = document.getElementById('sidebarLeft');
         if (sidebarLeft) {
             sidebarLeft.classList.add('editing-mode');
-            // Hide all other sections in sidebar
+            // Hide all other sections in sidebar (including information/metadata)
             const sections = sidebarLeft.querySelectorAll('.section-content');
             sections.forEach(section => {
                 if (section.id !== 'tags-content') {
                     section.style.display = 'none';
                 }
             });
+            // Also hide metadata panel specifically
+            const metadataPanel = sidebarLeft.querySelector('#metadata-content');
+            if (metadataPanel) {
+                metadataPanel.style.display = 'none';
+            }
+        }
+
+        // Add class to container to adjust grid layout
+        const container = document.querySelector('.image-page .container');
+        if (container) {
+            container.classList.add('tag-editor-expanded');
         }
 
         // Hide right sidebar completely
@@ -502,6 +513,12 @@ class TagEditor {
             sections.forEach(section => {
                 section.style.display = '';
             });
+        }
+
+        // Remove container class to restore grid layout
+        const container = document.querySelector('.image-page .container');
+        if (container) {
+            container.classList.remove('tag-editor-expanded');
         }
 
         // Restore right sidebar

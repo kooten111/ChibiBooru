@@ -110,10 +110,16 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
     
     start_time = time.time()
     
+    # Import ML Worker client and exceptions
     try:
-        # Use ML Worker for upscaling
-        from ml_worker.client import get_ml_worker_client
-        
+        from ml_worker.client import get_ml_worker_client, MLWorkerConnectionError, MLWorkerError
+    except ImportError as e:
+        result['error'] = "ML Worker module not available. Please ensure the ML Worker is properly installed."
+        result['processing_time'] = time.time() - start_time
+        logger.error(f"ML Worker import failed: {e}")
+        return result
+    
+    try:
         # Ensure output directory exists
         os.makedirs(os.path.dirname(upscaled_path), exist_ok=True)
         
@@ -140,10 +146,22 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
         
         logger.info(f"Upscaled {filepath}: {result['original_size']} -> {result['upscaled_size']} in {result['processing_time']:.2f}s")
         
-    except Exception as e:
-        result['error'] = str(e)
+    except MLWorkerConnectionError as e:
+        # ML Worker connection failed
+        result['error'] = "ML Worker is not available. The ML Worker process may not be running. Please check the server logs and try again."
         result['processing_time'] = time.time() - start_time
-        logger.error(f"Upscale failed for {filepath}: {e}")
+        logger.error(f"Upscale failed for {filepath}: ML Worker connection error: {e}", exc_info=True)
+    except MLWorkerError as e:
+        # Other ML Worker errors
+        result['error'] = f"ML Worker error: {str(e)}"
+        result['processing_time'] = time.time() - start_time
+        logger.error(f"Upscale failed for {filepath}: ML Worker error: {e}", exc_info=True)
+    except Exception as e:
+        # Generic error handling
+        error_msg = str(e)
+        result['error'] = error_msg
+        result['processing_time'] = time.time() - start_time
+        logger.error(f"Upscale failed for {filepath}: {e}", exc_info=True)
     
     return result
 

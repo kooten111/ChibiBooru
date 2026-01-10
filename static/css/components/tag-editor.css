@@ -14,6 +14,7 @@
     margin: 0 0 15px 0;
     color: var(--primary-blue);
     font-size: var(--font-size-lg);
+    flex-shrink: 0;
 }
 
 /* Editable categories list */
@@ -22,7 +23,12 @@
     flex-direction: column;
     gap: var(--spacing-lg);
     overflow-y: auto;
-    flex: 1;
+    overflow-x: hidden;
+    flex: 1 1 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    height: 0; /* Force flex child to respect parent constraints for scrolling */
 }
 
 /* Category section */
@@ -31,6 +37,11 @@
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    width: 100%;
+    min-width: 0;
 }
 
 .edit-category-header {
@@ -40,10 +51,12 @@
     margin-bottom: var(--spacing-md);
     padding-bottom: var(--spacing-sm);
     border-bottom: var(--border-width) solid var(--border-color-hover);
+    flex-shrink: 0;
 }
 
 .edit-category-header .category-icon {
     font-size: var(--font-size-lg);
+    flex-shrink: 0;
 }
 
 .edit-category-header .category-title {
@@ -52,14 +65,19 @@
     color: var(--primary-blue);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
 }
 
 /* Tag rows */
 .edit-category-tags {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: var(--spacing-sm);
     margin-bottom: var(--spacing-sm);
+    flex: 0 0 auto;
+    overflow: visible;
 }
 
 .edit-tag-row {
@@ -71,6 +89,7 @@
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-md);
     transition: all var(--transition-normal);
+    flex-shrink: 0;
 }
 
 .edit-tag-row:hover {
@@ -87,6 +106,7 @@
     padding: 2px 6px;
     transition: all var(--transition-normal);
     flex-shrink: 0;
+    line-height: 1;
 }
 
 .edit-tag-row .remove-tag-btn:hover {
@@ -98,6 +118,10 @@
     flex: 1;
     color: var(--text-secondary);
     font-size: var(--font-size-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
 
 .edit-tag-row .tag-count {
@@ -119,6 +143,8 @@
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-bold);
     transition: all var(--transition-normal);
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .add-tag-btn:hover {
@@ -189,11 +215,25 @@
     font-weight: var(--font-weight-medium);
 }
 
-/* Editing mode - expand tag editor to full height */
+/* Editing mode - expand tag editor horizontally and push image aside */
+.image-page .container.tag-editor-expanded {
+    grid-template-columns: 800px 1fr 300px;
+    transition: grid-template-columns var(--transition-smooth);
+}
+
+/* Hide information section when editing */
+.sidebar-left.editing-mode #metadata-content {
+    display: none !important;
+}
+
 .sidebar-left.editing-mode {
     display: flex;
     flex-direction: column;
     height: 100%;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    min-height: 0;
 }
 
 .sidebar-left.editing-mode #tags-content {
@@ -201,6 +241,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    min-height: 0;
 }
 
 .sidebar-left.editing-mode .inline-tag-editor {
@@ -209,16 +250,31 @@
     flex-direction: column;
     margin-bottom: 0;
     overflow: hidden;
+    padding: var(--spacing-xl);
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
 }
 
 .sidebar-left.editing-mode .editable-categories-list {
-    flex: 1;
+    flex: 1 1 0;
     overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    height: 0; /* Force flex child to respect parent constraints */
 }
 
-/* Custom scrollbar for categories list */
-.editable-categories-list::-webkit-scrollbar {
-    width: 8px;
+/* Custom scrollbar for categories list - ensure it's visible */
+/* Override the image-page.css rule that hides all sidebar scrollbars */
+.sidebar-left.editing-mode .editable-categories-list {
+    scrollbar-width: thin !important;
+    scrollbar-color: var(--primary-blue-medium) rgba(0, 0, 0, 0.2) !important;
+    -ms-overflow-style: auto !important;
+}
+
+.sidebar-left.editing-mode .editable-categories-list::-webkit-scrollbar {
+    width: 8px !important;
+    display: block !important;
 }
 
 .editable-categories-list::-webkit-scrollbar-track {
@@ -233,6 +289,43 @@
 
 .editable-categories-list::-webkit-scrollbar-thumb:hover {
     background: var(--primary-blue-strong);
+}
+
+/* Custom scrollbar for category tags */
+.edit-category-tags::-webkit-scrollbar {
+    width: 4px;
+}
+
+.edit-category-tags::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.edit-category-tags::-webkit-scrollbar-thumb {
+    background: var(--primary-blue-medium);
+    border-radius: var(--radius-xs);
+}
+
+.edit-category-tags::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-blue-strong);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1800px) {
+    .image-page .container.tag-editor-expanded {
+        grid-template-columns: 700px 1fr 300px;
+    }
+}
+
+@media (max-width: 1600px) {
+    .image-page .container.tag-editor-expanded {
+        grid-template-columns: 600px 1fr 300px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .image-page .container.tag-editor-expanded {
+        grid-template-columns: 500px 1fr 300px;
+    }
 }
 
 

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List
 
 from ml_worker.protocol import Message, Request, Response, RequestType, ResponseStatus
+import config  # Import config for ML_WORKER_BACKEND
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,11 @@ class MLWorkerClient:
 
         # Set environment variables for worker
         env = os.environ.copy()
+        
+        # Ensure ML_WORKER_BACKEND is set from config (may come from config.yml, not .env)
+        env['ML_WORKER_BACKEND'] = config.ML_WORKER_BACKEND
+        env['ML_WORKER_SOCKET'] = config.ML_WORKER_SOCKET
+        env['ML_WORKER_IDLE_TIMEOUT'] = str(config.ML_WORKER_IDLE_TIMEOUT)
 
         # Start worker process
         try:
