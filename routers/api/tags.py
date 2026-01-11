@@ -29,4 +29,5 @@ async def fetch_tags():
 @api_handler()
 async def autocomplete():
     """Get autocomplete suggestions for tags."""
-    return await asyncio.to_thread(tag_service.autocomplete)
+    query = request.args.get('q', '').strip()
+    return await asyncio.to_thread(tag_service.autocomplete, query)

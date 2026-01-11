@@ -1,32 +1,18 @@
 /* SEARCH & AUTOCOMPLETE - Enhanced Search Styles */
 
-/* Compact Header Styles - consistent across all pages */
-.header {
-    padding: 8px var(--spacing-lg) !important;
-    min-height: auto !important;
-}
+/* Note: Header styles have been moved to components/header.css */
 
-.header-content {
-    gap: var(--spacing-md) !important;
-}
-
-.header h1 {
-    flex-shrink: 0;
-    font-size: 1.25rem !important;
-}
-
-.header-mascot {
-    flex-shrink: 0;
-    height: 40px !important;
-    left: 100px !important;
-    top: -2px !important;
-}
-
+/* Search bar base styles */
 .search-bar {
-    width: 100% !important;
-    max-width: 600px !important;
-    justify-self: end !important;
-    /* Align to right within grid column */
+    display: flex;
+    gap: var(--spacing-md);
+    position: relative;
+    max-width: 600px;
+    width: 100%;
+    justify-self: center;
+    margin: 0 auto;
+    /* Center within grid column */
+    overflow: visible;
 }
 
 /* Header controls and spacer for consistent grid layout */
@@ -40,6 +26,74 @@
 .header-controls-spacer {
     width: 180px;
     /* Approximate width of header-controls */
+}
+
+/* Search bar form */
+.search-bar form {
+    display: flex;
+    gap: var(--spacing-md);
+    width: 100%;
+}
+
+.autocomplete-container {
+    position: relative;
+    flex: 1;
+    z-index: calc(var(--z-header) + 10);
+}
+
+/* Search bar input styles */
+.search-bar input {
+    padding: 12px 18px;
+    width: 100%;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-xl);
+    font-size: var(--font-size-base);
+    transition: all var(--transition-smooth);
+}
+
+.search-bar input:focus {
+    outline: none;
+    border-color: var(--border-color-focus);
+    background: rgba(30, 30, 40, 0.8);
+    box-shadow: 0 0 20px var(--primary-blue-light);
+}
+
+.search-bar select {
+    padding: 12px 18px;
+    background: var(--bg-input);
+    border: var(--border-width-thick) solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-xl);
+    cursor: pointer;
+    transition: all var(--transition-smooth);
+}
+
+.search-bar select:hover {
+    border-color: var(--border-color-hover);
+    background: rgba(30, 30, 40, 0.8);
+}
+
+.search-bar button {
+    padding: 12px 28px;
+    background: var(--gradient-primary);
+    border: none;
+    color: #fff;
+    border-radius: var(--radius-xl);
+    cursor: pointer;
+    font-weight: var(--font-weight-medium);
+    transition: all var(--transition-smooth);
+    box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
+}
+
+.search-bar button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-blue-hover);
+}
+
+.search-bar button:active {
+    transform: translateY(0);
 }
 
 /* Compact input styles - consistent across all pages */
@@ -70,8 +124,8 @@
     border-radius: var(--radius-sm);
 }
 
-/* Override form layout to prevent header expansion */
-.search-bar form {
+/* Override form layout to prevent header expansion (for chip input) */
+.search-bar form.chip-form {
     display: flex !important;
     flex-direction: column !important;
     gap: 0 !important;
@@ -85,6 +139,7 @@
     gap: var(--spacing-md);
     width: 100%;
     align-items: stretch;
+    overflow: visible;
 }
 
 /* Ensure autocomplete container doesn't break layout */
@@ -92,6 +147,7 @@
     flex: 1;
     min-width: 0;
     position: relative;
+    overflow: visible;
 }
 
 /* Chip Input Wrapper - main container that looks like an input */
@@ -419,6 +475,88 @@
 .chip-remove:hover {
     background: rgba(255, 100, 100, 0.4);
     transform: scale(1.15);
+}
+
+/* Autocomplete suggestions */
+.autocomplete-suggestions {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    background: rgba(20, 20, 30, 0.98);
+    backdrop-filter: var(--blur-md);
+    border: var(--border-width) solid var(--border-color-hover);
+    border-radius: var(--radius-xl);
+    max-height: 350px;
+    overflow-y: auto;
+    z-index: calc(var(--z-header) + 20);
+    display: none;
+    box-shadow: var(--shadow-xl);
+    animation: fadeIn var(--anim-fast) ease-out;
+}
+
+.autocomplete-suggestions.active {
+    display: block;
+}
+
+.autocomplete-item {
+    padding: 12px 18px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: var(--border-width) solid var(--primary-blue-light);
+    transition: all var(--transition-normal);
+}
+
+.autocomplete-item:last-child {
+    border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+    background: var(--blue-accent-light);
+    transform: translateX(5px);
+}
+
+.autocomplete-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.autocomplete-icon {
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+.autocomplete-tag {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-normal);
+}
+
+.autocomplete-count {
+    color: var(--primary-blue);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.autocomplete-item.extension {
+    background: rgba(255, 193, 7, 0.05);
+}
+
+.autocomplete-item.extension:hover,
+.autocomplete-item.extension.selected {
+    background: rgba(255, 193, 7, 0.15);
+}
+
+.autocomplete-item.source {
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.autocomplete-item.source:hover,
+.autocomplete-item.source.selected {
+    background: rgba(76, 175, 80, 0.15);
 }
 
 /* Autocomplete group headers */

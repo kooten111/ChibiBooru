@@ -1,187 +1,92 @@
-/* ============================================================================
-   Rating Tag Styling
-   ============================================================================ */
+/* UTILITIES - Utility classes */
 
-/* Rating tag icons and colors */
-.tag-item a[href*="rating:general"]::before {
-    content: "✓ ";
-    color: var(--green-accent-40);
-    font-weight: bold;
+/* Badges */
+.similarity-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: var(--primary-blue);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-bold);
 }
 
-.tag-item a[href*="rating:sensitive"]::before {
-    content: "⚠ ";
-    color: var(--blue-accent-40);
-    font-weight: bold;
+.video-badge {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
 }
 
-.tag-item a[href*="rating:questionable"]::before {
-    content: "⚠ ";
-    color: var(--orange-accent-40);
-    font-weight: bold;
+/* Text utilities */
+.text-success {
+    color: var(--success);
 }
 
-.tag-item a[href*="rating:explicit"]::before {
-    content: "✖ ";
-    color: var(--red-accent-40);
-    font-weight: bold;
+.text-danger {
+    color: var(--danger);
 }
 
-/* Rating tag backgrounds */
-.tag-item a[href*="rating:"] {
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 4px;
-    display: inline-block;
+.text-muted-small {
+    font-size: 0.8em;
+    opacity: 0.7;
 }
 
-.tag-item a[href*="rating:general"] {
-    background: rgba(74, 222, 128, 0.15);
-    color: var(--green-accent-30);
+.link-unstyled {
+    text-decoration: none;
+    color: inherit;
 }
 
-.tag-item a[href*="rating:sensitive"] {
-    background: rgba(96, 165, 250, 0.15);
-    color: var(--blue-accent-30);
+.link-primary {
+    color: var(--primary-blue-dark);
 }
 
-.tag-item a[href*="rating:questionable"] {
-    background: rgba(251, 146, 60, 0.15);
-    color: var(--orange-accent-30);
+.link-danger {
+    color: var(--danger);
+    text-decoration: line-through;
 }
 
-.tag-item a[href*="rating:explicit"] {
-    background: rgba(248, 113, 113, 0.15);
-    color: var(--red-accent-30);
+/* Spacing utilities */
+.mt-10 {
+    margin-top: 10px;
 }
 
-/* Pool Manager Styles */
-.pool-error-message {
-    color: #ff6b6b;
-    padding: 10px;
+.mt-15 {
+    margin-top: 15px;
 }
 
-.pool-empty-message {
-    padding: var(--spacing-lg);
-    text-align: center;
-    color: #888;
-}
-
-.pool-list-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    border-bottom: var(--border-width) solid var(--border-color);
-}
-
-.pool-list-item:last-child {
+.border-bottom-none {
     border-bottom: none;
 }
 
-.pool-selector-list {
-    max-height: 400px;
-    overflow-y: auto;
+.pb-0 {
+    padding-bottom: 0;
 }
 
-.pool-selector-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 15px;
-    margin-bottom: 10px;
-    background: rgba(40, 40, 60, 0.5);
-    border: var(--border-width) solid var(--border-color);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all var(--transition-smooth);
+/* Display utilities */
+.hidden {
+    display: none;
 }
 
-.pool-selector-item:hover {
-    background: rgba(50, 50, 70, 0.6);
-    transform: translateY(-2px);
-}
-
-.pool-selector-item.in-pool {
-    border-color: var(--success);
-    background: rgba(74, 158, 111, 0.2);
-}
-
-.pool-selector-name {
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-primary);
-}
-
-.pool-selector-desc {
-    font-size: var(--font-size-xs);
-    color: #888;
-    margin-top: 2px;
-}
-
-.pool-selector-badge {
-    padding: 5px 10px;
-    border-radius: var(--radius-sm);
-    font-size: var(--font-size-xs);
-    font-weight: var(--font-weight-semibold);
-}
-
-.pool-selector-item.in-pool .pool-selector-badge {
-    background: var(--success);
-    color: white;
-}
-
-.pool-selector-item:not(.in-pool) .pool-selector-badge {
-    background: var(--primary-blue);
-    color: white;
-}
-
-/* Image Page - Loading Overlay */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--bg-primary, #0a0a0f);
-    z-index: 10000;
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.loading-overlay-content {
-    color: var(--primary-blue);
-    font-size: 1.2em;
-}
-
-/* Image Page - Crossfade Overlay */
-.crossfade-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
+/* Loading and empty states */
+.loading-spinner {
+    text-align: center;
     padding: var(--spacing-lg);
+    color: var(--text-disabled);
 }
 
-.crossfade-media {
-    max-width: 100%;
-    max-height: 100%;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    display: block;
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-2xl);
-    border: var(--border-width) solid var(--border-color);
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
+.no-pools-message,
+.no-images-message,
+.no-tags-message {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-disabled);
+    font-size: var(--font-size-lg);
 }

@@ -1,0 +1,198 @@
+/* SYSTEM PAGE - Settings Section */
+
+.settings-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.settings-search-input {
+    padding: 10px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    width: 300px;
+    outline: none;
+    font-family: var(--font-family);
+}
+
+.settings-search-input:focus {
+    border-color: var(--primary-blue-dark);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.settings-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 20px;
+}
+
+.settings-category {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-color);
+    padding: 20px;
+}
+
+.settings-category-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.settings-category-header h3 {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.category-icon {
+    font-size: 18px;
+}
+
+.settings-category-items {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    gap: 12px;
+    transition: all var(--transition-fast);
+}
+
+.setting-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.setting-label {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin: 0;
+}
+
+.setting-item-row {
+    display: none;
+}
+
+.setting-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+}
+
+.setting-input {
+    padding: 10px 14px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 14px;
+    width: 100%;
+    outline: none;
+    font-family: var(--font-family);
+    transition: all var(--transition-fast);
+}
+
+.setting-input:focus {
+    border-color: var(--primary-blue-dark);
+    background: rgba(0, 0, 0, 0.4);
+    box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.1);
+}
+
+.setting-input-wrapper.changed .setting-input {
+    border-color: var(--primary-blue-dark);
+    box-shadow: 0 0 0 2px var(--primary-blue-light);
+}
+
+.setting-input-wrapper.invalid .setting-input {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2);
+}
+
+.setting-input[type="number"] {
+    width: 150px;
+    text-align: left;
+}
+
+.setting-input-wrapper textarea {
+    width: 100%;
+    min-height: 60px;
+    resize: vertical;
+    font-family: var(--font-family);
+    line-height: 1.5;
+}
+
+.setting-input-wrapper input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    cursor: pointer;
+    accent-color: var(--primary-blue-dark);
+    margin: 0;
+}
+
+.setting-description {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin: 0;
+    width: 100%;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .settings-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .settings-search-input {
+        width: 100%;
+    }
+
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .setting-input {
+        width: 100%;
+    }
+    
+    .setting-input[type="number"] {
+        width: 100%;
+    }
+}

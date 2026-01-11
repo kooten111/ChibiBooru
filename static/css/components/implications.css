@@ -886,46 +886,7 @@
 }
 
 /* Manual Creation Modal */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: var(--z-modal);
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
-    align-items: center;
-    justify-content: center;
-}
-
-.modal.active {
-    display: flex;
-}
-
-.modal-content {
-    background: var(--bg-panel);
-    padding: var(--spacing-xl);
-    border-radius: var(--radius-lg);
-    max-width: 600px;
-    width: 90%;
-    position: relative;
-}
-
-.modal .close {
-    position: absolute;
-    top: 15px;
-    right: var(--spacing-lg);
-    font-size: var(--font-size-3xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: color var(--transition-normal);
-}
-
-.modal .close:hover {
-    color: var(--text-primary);
-}
+/* Modal styles are now in components/modals.css - using base modal styles */
 
 .manual-creation-form {
     display: grid;
@@ -957,42 +918,7 @@
     border-color: var(--border-color-focus);
 }
 
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-sm);
-}
-
-.btn-primary,
-.btn-secondary {
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    cursor: pointer;
-    transition: all var(--transition-normal);
-}
-
-.btn-primary {
-    background: var(--gradient-primary);
-    color: white;
-    border: none;
-}
-
-.btn-primary:hover {
-    background: var(--gradient-primary-hover);
-}
-
-.btn-secondary {
-    background: transparent;
-    border: var(--border-width) solid var(--border-color);
-    color: var(--text-primary);
-}
-
-.btn-secondary:hover {
-    background: var(--bg-hover);
-    border-color: var(--primary-blue);
-}
+/* Modal actions and button styles are now in components/modals.css and components/buttons.css */
 
 /* Load More Button */
 .load-more-container {

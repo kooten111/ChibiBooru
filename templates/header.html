@@ -1,8 +1,10 @@
 <div class="header-container">
     <div class="header">
         <div class="header-content">
-            <img src="{{ url_for('static', filename='mascot/mascot.webp') }}" alt="Mascot" class="header-mascot">
-            <h1><a href="{{ url_for('main.home') }}">{{ app_name }}</a></h1>
+            <div class="header-logo-group">
+                <h1><a href="{{ url_for('main.home') }}">{{ app_name }}</a></h1>
+                <img src="{{ url_for('static', filename='mascot/mascot.webp') }}" alt="Mascot" class="header-mascot">
+            </div>
             <div class="search-bar">
                 <form action="{{ url_for('main.home') }}" method="get" id="searchForm">
                     <div class="search-wrapper">
@@ -19,28 +21,26 @@
                     </div>
                 </form>
             </div>
-            {% if request.endpoint == 'main.home' %}
-            <div class="header-controls">
-                <div class="grid-size-toggle">
-                    <button class="grid-size-btn" data-size="small" title="Small thumbnails">S</button>
-                    <button class="grid-size-btn active" data-size="medium" title="Medium thumbnails">M</button>
-                    <button class="grid-size-btn" data-size="large" title="Large thumbnails">L</button>
+            <div class="header-right">
+                {% if request.endpoint == 'main.home' %}
+                <div class="header-controls">
+                    <div class="grid-size-toggle">
+                        <button class="grid-size-btn" data-size="small" title="Small thumbnails">S</button>
+                        <button class="grid-size-btn active" data-size="medium" title="Medium thumbnails">M</button>
+                        <button class="grid-size-btn" data-size="large" title="Large thumbnails">L</button>
+                    </div>
+                    {% if query %}
+                    <button class="header-btn selection-mode-btn" id="selection-toggle" title="Toggle selection mode">
+                        <span class="selection-icon">☐</span>
+                    </button>
+                    {% endif %}
+                    <button class="header-btn" id="sidebarToggle" title="Toggle filters">◧</button>
                 </div>
-                {% if query %}
-                <button class="header-btn selection-mode-btn" id="selection-toggle" title="Toggle selection mode">
-                    <span class="selection-icon">☐</span>
-                </button>
                 {% endif %}
-                <button class="header-btn" id="sidebarToggle" title="Toggle filters">◧</button>
+                <button id="tabs-toggle-button" class="tabs-toggle-button">
+                    <span class="arrow"></span>
+                </button>
             </div>
-            {% else %}
-            <!-- Empty spacer to maintain consistent header grid layout -->
-            <div class="header-controls-spacer"></div>
-            {% endif %}
-
-            <button id="tabs-toggle-button" class="tabs-toggle-button">
-                <span class="arrow"></span>
-            </button>
         </div>
     </div>
 

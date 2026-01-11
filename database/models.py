@@ -1,7 +1,22 @@
 # models.py
-import os
+"""
+Database models facade module.
+
+This module serves as a compatibility layer/facade that re-exports functions
+from the repositories layer. Most database operations have been moved to focused
+repository modules for better organization and maintainability.
+
+The module contains:
+- repopulate_from_database(): Legacy function for rebuilding database from metadata
+- get_related_images(): Cached wrapper for related image queries
+- load_data_from_db(): Load data from database into in-memory caches
+- Re-exports from repositories: All pool, tag, and data access functions
+
+Note: This facade pattern maintains backward compatibility with existing code
+that imports from database.models. New code should import directly from the
+appropriate repository modules for better clarity.
+"""
 import json
-import sqlite3
 from tqdm import tqdm
 from .core import get_db_connection
 from functools import lru_cache
@@ -10,19 +25,10 @@ from utils.tag_extraction import (
     extract_rating_from_source
 )
 
-from core.cache_manager import (
-    tag_counts,
-    image_data,
-    post_id_to_md5,
-    data_lock,
-    load_data_from_db,
-    reload_single_image,
-    remove_image_from_cache,
-    get_image_data,
-    get_tag_counts,
-)
+from core.cache_manager import post_id_to_md5, load_data_from_db
 
 from repositories.tag_repository import (
+    get_tag_counts,
     reload_tag_counts,
     get_all_tags_sorted,
     recategorize_misplaced_tags,

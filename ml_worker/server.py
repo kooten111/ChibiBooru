@@ -791,17 +791,6 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     if _upscaler_device != 'cpu' and img_tensor.device.type == 'cpu':
          raise RuntimeError(f"FATAL: Input tensor is on CPU despite requested device {_upscaler_device}! Aborting to prevent CPU fallback.")
 
-    # Attempt to clear memory before upscaling - REMOVED to match standalone speed
-    # import gc
-    # gc.collect()
-    # if backend == 'xpu' and hasattr(torch, 'xpu'):
-    #    torch.xpu.empty_cache()
-    # elif backend == 'cuda' and torch.cuda.is_available():
-    #    torch.cuda.empty_cache()
-    # elif backend == 'mps':
-    #    if hasattr(torch.mps, 'empty_cache'):
-    #        torch.mps.empty_cache()
-
     # Use tiled inference matching reference implementation
     try:
         output = tiled_inference(_upscaler_model, img_tensor, tile_size=400, tile_pad=32, device=_upscaler_device)

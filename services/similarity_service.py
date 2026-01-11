@@ -965,11 +965,6 @@ def _process_single_image_threaded(row: dict) -> dict:
     return result
 
 
-# Remove old ProcessPoolExecutor worker function
-# def _process_single_image(row: dict) -> dict:
-#     """Old ProcessPool version - no longer used"""
-#     pass
-
 def _bulk_save_hashes(results: List[Dict]):
     """
     Save a batch of computed hashes to the database in a single transaction.

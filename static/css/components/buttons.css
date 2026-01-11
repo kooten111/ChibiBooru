@@ -1,0 +1,161 @@
+/* BUTTONS - Consolidated button component styles */
+
+/* Base button styles */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    font-weight: var(--font-weight-medium);
+    transition: all var(--transition-bezier);
+    box-shadow: var(--shadow-md);
+    color: var(--text-primary);
+}
+
+.btn:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-blue);
+}
+
+.btn:active {
+    transform: translateY(-1px);
+}
+
+/* Primary button */
+.btn.btn-primary,
+.btn-primary {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.btn.btn-primary:hover,
+.btn-primary:hover {
+    background: var(--gradient-primary-hover);
+    box-shadow: var(--shadow-blue-hover);
+}
+
+/* Success button */
+.btn.btn-success {
+    background: var(--gradient-success);
+}
+
+.btn.btn-success:hover {
+    background: var(--gradient-success-hover);
+    box-shadow: 0 8px 25px rgba(74, 158, 111, 0.4);
+}
+
+/* Danger button */
+.btn.btn-danger,
+.btn-danger {
+    background: var(--gradient-danger);
+}
+
+.btn.btn-danger:hover,
+.btn-danger:hover {
+    background: var(--gradient-danger-hover);
+    box-shadow: 0 8px 25px rgba(158, 74, 74, 0.4);
+}
+
+/* Secondary button */
+.btn.btn-secondary,
+.btn-secondary {
+    background: var(--gradient-secondary);
+}
+
+.btn.btn-secondary:hover,
+.btn-secondary:hover {
+    background: var(--gradient-secondary-hover);
+}
+
+/* Info button */
+.btn.btn-info,
+.btn-info {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    color: white;
+}
+
+.btn.btn-info:hover,
+.btn-info:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+}
+
+/* Warning button */
+.btn.btn-warning,
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: white;
+}
+
+.btn.btn-warning:hover,
+.btn-warning:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);
+}
+
+/* Small button */
+.btn-small {
+    padding: 5px 10px;
+    font-size: var(--font-size-sm);
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+/* Edit button */
+.btn-edit {
+    padding: 8px 16px;
+    background: var(--primary-blue-medium);
+    color: var(--primary-blue);
+    border: var(--border-width) solid var(--primary-blue-strong);
+    border-radius: var(--radius-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.btn-edit:hover {
+    background: var(--primary-blue-strong);
+    transform: scale(1.05);
+}
+
+/* Delete button */
+.btn-delete {
+    padding: 8px 16px;
+    background: rgba(255, 107, 107, 0.3);
+    color: var(--danger);
+    border: var(--border-width) solid rgba(255, 107, 107, 0.5);
+    border-radius: var(--radius-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.btn-delete:hover {
+    background: rgba(255, 107, 107, 0.5);
+    transform: scale(1.05);
+}
+
+/* Remove button */
+.btn-remove {
+    background: rgba(255, 107, 107, 0.9);
+    color: #fff;
+    font-weight: var(--font-weight-medium);
+}
+
+.btn-remove:hover {
+    background: rgba(255, 107, 107, 1);
+    transform: scale(1.05);
+}
+
+/* Full width button */
+.btn-full-width {
+    width: 100%;
+}

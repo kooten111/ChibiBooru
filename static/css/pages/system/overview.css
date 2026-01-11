@@ -1,0 +1,313 @@
+/* SYSTEM PAGE - Overview Section */
+
+/* Overview Grid */
+.overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+/* System Cards */
+.system-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--border-color);
+    padding: 20px;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary-blue-dark);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.danger-title {
+    color: var(--danger);
+}
+
+/* Quick Actions */
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 12px;
+    background: var(--primary-blue-light);
+    border: 1px solid var(--primary-blue-medium);
+    border-radius: var(--radius-lg);
+    color: var(--primary-blue-dark);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all var(--transition-fast);
+    font-family: var(--font-family);
+}
+
+.quick-action:hover {
+    background: var(--primary-blue-medium);
+    transform: translateY(-2px);
+}
+
+.quick-action-blue {
+    background: var(--primary-blue-light);
+    border-color: var(--primary-blue-medium);
+    color: var(--primary-blue-dark);
+}
+
+.quick-action-green {
+    background: rgba(144, 238, 144, 0.1);
+    border-color: rgba(144, 238, 144, 0.3);
+    color: var(--success);
+}
+
+.quick-action-green:hover {
+    background: rgba(144, 238, 144, 0.2);
+}
+
+.quick-action-purple {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.3);
+    color: #a855f7;
+}
+
+.quick-action-purple:hover {
+    background: rgba(168, 85, 247, 0.2);
+}
+
+.quick-action-icon {
+    font-size: 24px;
+}
+
+/* Monitor Card */
+.monitor-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.monitor-stat {
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-md);
+}
+
+.monitor-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+}
+
+.monitor-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.monitor-btn {
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid;
+    transition: all var(--transition-fast);
+    font-family: var(--font-family);
+}
+
+.monitor-btn-start {
+    background: rgba(144, 238, 144, 0.2);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.monitor-btn-start:hover {
+    background: rgba(144, 238, 144, 0.3);
+}
+
+.monitor-btn-stop {
+    background: rgba(255, 107, 107, 0.2);
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.monitor-btn-stop:hover {
+    background: rgba(255, 107, 107, 0.3);
+}
+
+/* Collection Stats */
+.collection-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.collection-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-lg);
+    border: 1px solid transparent;
+}
+
+.collection-stat.collection-warning {
+    border-color: var(--warning);
+    background: rgba(255, 153, 102, 0.1);
+}
+
+.collection-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.collection-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-top: 4px;
+}
+
+/* Logs Card */
+.logs-card {
+    grid-column: 1 / -1;
+}
+
+.logs-container-overview {
+    overflow: hidden;
+    transition: max-height var(--transition-smooth);
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    max-height: 120px;
+}
+
+.logs-container-overview.expanded {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.log-entry {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    gap: 12px;
+}
+
+.log-entry.info {
+    color: var(--text-muted);
+}
+
+.log-entry.success {
+    color: var(--success);
+}
+
+.log-entry.warning {
+    color: var(--warning);
+}
+
+.log-entry.error {
+    color: var(--danger);
+}
+
+.expand-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+.expand-btn:hover {
+    color: var(--text-primary);
+}
+
+/* Legacy support for old status/logs tabs */
+.system-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.status-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+}
+
+.status-item .status-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.status-item .status-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.status-item.active .status-value {
+    color: var(--success);
+}
+
+.status-item.inactive .status-value {
+    color: var(--text-muted);
+}
+
+.status-item.warning .status-value {
+    color: var(--warning);
+}
+
+.system-logs {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 1rem;
+    max-height: 600px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .quick-actions-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .monitor-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .collection-grid {
+        grid-template-columns: 1fr;
+    }
+}

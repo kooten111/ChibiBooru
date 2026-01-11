@@ -1,0 +1,143 @@
+/* MODALS - Consolidated modal component styles */
+
+/* Base modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: var(--z-modal);
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-overlay);
+    animation: fadeIn var(--anim-smooth) ease;
+}
+
+.modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Modal content */
+.modal-content {
+    background: var(--gradient-panel-solid);
+    padding: var(--spacing-xl);
+    border: var(--border-width-thick) solid var(--border-color-hover);
+    border-radius: var(--radius-2xl);
+    max-width: 500px;
+    width: 90%;
+    box-shadow: var(--shadow-xl);
+    animation: slideInUp var(--anim-smooth) ease;
+    position: relative;
+}
+
+.modal-content h3 {
+    margin-top: 0;
+    color: var(--primary-blue);
+    font-size: var(--font-size-2xl);
+}
+
+/* Close button */
+.close {
+    color: var(--text-muted);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color var(--transition-normal);
+}
+
+.close:hover,
+.close:focus {
+    color: var(--primary-blue);
+}
+
+/* Modal close button (alternative positioning) */
+.modal .close {
+    position: absolute;
+    top: 15px;
+    right: var(--spacing-lg);
+    font-size: var(--font-size-3xl);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color var(--transition-normal);
+    float: none;
+}
+
+.modal .close:hover {
+    color: var(--text-primary);
+}
+
+/* Modal actions */
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+}
+
+/* Custom confirm modal */
+.custom-confirm-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal);
+    animation: fadeIn var(--transition-normal) ease-out;
+}
+
+.custom-confirm-modal {
+    background: var(--gradient-panel-solid);
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-2xl);
+    min-width: 300px;
+    max-width: 500px;
+    box-shadow: var(--shadow-xl);
+    animation: slideInUp var(--anim-smooth) ease-out;
+}
+
+.custom-confirm-modal p {
+    color: var(--text-primary);
+    margin: 0 0 25px 0;
+    font-size: var(--font-size-lg);
+}
+
+.custom-confirm-modal .button-group {
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+}
+
+.custom-confirm-modal .btn-cancel,
+.custom-confirm-modal .btn-confirm {
+    padding: 10px 24px;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    font-weight: var(--font-weight-medium);
+    transition: all var(--transition-normal);
+}
+
+.custom-confirm-modal .btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.custom-confirm-modal .btn-confirm {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.custom-confirm-modal .btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.custom-confirm-modal .btn-confirm:hover {
+    transform: translateY(-2px);
+}

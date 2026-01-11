@@ -1,25 +1,99 @@
-/* Header Component - Stats Tabs & Panels */
+/* HEADER - Consolidated header component styles */
 
+/* Header container */
 .header-container {
     position: sticky;
     top: 0;
     z-index: calc(var(--z-header) - 1);
 }
 
+/* Base header styles */
 .header {
+    background: var(--gradient-panel-solid);
+    backdrop-filter: var(--blur-md);
+    padding: var(--spacing-lg) var(--spacing-xl);
+    padding-left: var(--spacing-sm);
+    border-bottom: var(--border-width) solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    position: sticky;
+    top: 0;
+    z-index: var(--z-header);
+    overflow: visible;
     position: relative;
     min-height: auto !important;
 }
 
-/* Use CSS Grid for consistent header layout across all pages */
+/* Header content - Use CSS Grid for consistent layout across all pages */
 .header-content {
-    position: relative;
-    min-height: auto !important;
+    max-width: 1600px;
+    margin: 0 auto;
     display: grid !important;
-    grid-template-columns: auto 1fr auto auto !important;
-    /* logo | search fills space | controls | toggle */
+    grid-template-columns: auto 1fr auto !important;
+    /* logo group | search centered | controls */
     align-items: center !important;
     gap: var(--spacing-md) !important;
+    position: relative;
+    min-height: auto !important;
+    overflow: visible;
+}
+
+/* Logo group - title and mascot side by side */
+.header-logo-group {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+/* Header title/logo */
+.header h1 {
+    margin: 0;
+    padding: 0;
+    font-size: 1.8em;
+    font-weight: var(--font-weight-bold);
+    background: var(--gradient-text);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+    position: relative;
+    display: inline-block;
+}
+
+.header h1 a {
+    text-decoration: none;
+    background: var(--gradient-text);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    transition: all var(--transition-smooth);
+}
+
+.header h1 a:hover {
+    filter: brightness(1.2);
+    transform: translateY(-2px);
+    display: inline-block;
+}
+
+/* Header mascot */
+.header-logo-group .header-mascot {
+    position: relative;
+    height: 50px;
+    width: auto;
+    z-index: var(--z-base);
+    pointer-events: none;
+    flex-shrink: 0;
+    display: block;
+    margin: 0;
+}
+
+/* Header right - groups controls and tabs toggle */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-shrink: 0;
 }
 
 .stats-tabs-bar {
@@ -53,6 +127,7 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: calc(var(--z-header) + 1);
+    flex-shrink: 0;
 }
 
 .tabs-toggle-button:hover {
@@ -399,6 +474,27 @@ body.image-page .header-container.tabs-expanded .stats-tabs-bar {
 }
 
 @media (max-width: 768px) {
+    .header-content {
+        grid-template-columns: auto 1fr auto !important;
+        gap: var(--spacing-sm) !important;
+    }
+
+    .header-logo-group h1 {
+        font-size: 1.4em;
+    }
+
+    .header-logo-group .header-mascot {
+        height: 40px;
+    }
+
+    .search-bar {
+        max-width: 100%;
+    }
+
+    .header-right {
+        gap: var(--spacing-sm);
+    }
+
     .stats-tabs-bar {
         padding: 0 15px;
         overflow-x: auto;

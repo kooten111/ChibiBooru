@@ -1,0 +1,20 @@
+/* SCROLLBAR - Custom scrollbar styles */
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-black-trans);
+    border-radius: var(--radius-xs);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--gradient-scrollbar);
+    border-radius: var(--radius-xs);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--gradient-scrollbar-hover);
+}

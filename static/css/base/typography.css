@@ -1,0 +1,9 @@
+/* TYPOGRAPHY - Base typography and body styles */
+
+body {
+    font-family: var(--font-family);
+    background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+    color: var(--text-primary);
+    margin: 0;
+    min-height: 100vh;
+}

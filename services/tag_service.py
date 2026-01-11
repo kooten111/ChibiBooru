@@ -1,4 +1,4 @@
-from quart import request, jsonify
+from quart import jsonify
 from database import models
 from database import get_db_connection
 from utils.file_utils import normalize_image_path
@@ -46,9 +46,9 @@ def edit_tags_service(data):
         traceback.print_exc()
         return {"error": str(e)}, 500
 
-def autocomplete():
+def autocomplete(query: str = ''):
     """Enhanced autocomplete with grouped suggestions by type and category."""
-    query = request.args.get('q', '').strip().lower()
+    query = query.strip().lower() if query else ''
     if not query or len(query) < 2:
         return jsonify({"groups": []})
 

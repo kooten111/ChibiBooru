@@ -1,0 +1,23 @@
+/* PANELS - Panel component styles */
+
+.panel {
+    background: var(--gradient-panel);
+    backdrop-filter: var(--blur-md);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-2xl);
+    border: var(--border-width) solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+    transition: all var(--transition-smooth);
+}
+
+.panel:hover {
+    border-color: var(--border-color-hover);
+}
+
+.panel h3 {
+    margin: 0 0 15px 0;
+    font-size: var(--font-size-lg);
+    color: var(--primary-blue);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.5px;
+}

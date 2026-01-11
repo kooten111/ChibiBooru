@@ -1,32 +1,34 @@
 """
-Rating service facade.
+Rating service package.
 
-This module provides backward compatibility by re-exporting all functions
-from the new rating package structure.
-
-The rating functionality has been split into focused modules:
-- rating/config.py: Configuration management
-- rating/data.py: Data retrieval functions
-- rating/training.py: Model training logic
-- rating/inference.py: Rating prediction and inference
-- rating/stats.py: Statistics and analysis
+This package contains rating inference functionality split into focused modules:
+- config: Configuration management
+- data: Data retrieval functions
+- training: Model training logic
+- inference: Rating prediction and inference
+- stats: Statistics and analysis
 """
 
-# Re-export everything from the rating package for backward compatibility
-from .rating import (
+from .config import (
     RATINGS,
     get_model_connection,
     get_config,
     update_config,
-    reset_config_to_defaults,
+    reset_config_to_defaults
+)
+from .data import (
     get_rated_images,
     get_unrated_images,
     get_unrated_images_count,
-    get_unrated_images_batched,
+    get_unrated_images_batched
+)
+from .training import (
     calculate_tag_weights,
     find_frequent_tag_pairs,
     calculate_tag_pair_weights,
-    train_model,
+    train_model
+)
+from .inference import (
     load_weights,
     calculate_rating_scores,
     scores_to_probabilities,
@@ -34,7 +36,9 @@ from .rating import (
     infer_rating_for_image,
     infer_all_unrated_images,
     precompute_ratings_for_unrated_images,
-    set_image_rating,
+    set_image_rating
+)
+from .stats import (
     get_model_stats,
     get_rating_distribution,
     get_top_weighted_tags,
@@ -42,7 +46,7 @@ from .rating import (
     get_pending_corrections_count,
     is_model_stale,
     clear_ai_inferred_ratings,
-    retrain_and_reapply_all,
+    retrain_and_reapply_all
 )
 
 __all__ = [

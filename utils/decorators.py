@@ -7,7 +7,7 @@ authentication, and async/sync function wrapping.
 
 from functools import wraps
 import traceback
-from quart import jsonify, request
+from quart import jsonify, request, session, redirect, url_for
 from typing import Callable, Any
 import asyncio
 
@@ -118,3 +118,22 @@ def require_secret_sync(func: Callable) -> Callable:
             return jsonify({"error": "Unauthorized"}), 401
         return func(*args, **kwargs)
     return sync_wrapper
+
+
+def login_required(f: Callable) -> Callable:
+    """
+    Decorator that requires user to be logged in for web routes.
+    Redirects to login page if not authenticated.
+    
+    Usage:
+        @main_blueprint.route('/protected')
+        @login_required
+        async def protected_route():
+            return await render_template('page.html')
+    """
+    @wraps(f)
+    async def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('main.login'))
+        return await f(*args, **kwargs)
+    return decorated_function
