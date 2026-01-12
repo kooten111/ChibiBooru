@@ -113,43 +113,54 @@
     max-height: 100px;
 }
 
+/* Integrated Header Control Style */
 .tabs-toggle-button {
     display: none;
-    background: rgba(40, 40, 60, 0.7);
-    border: var(--border-width) solid var(--border-color);
-    width: 60px;
-    height: 24px;
-    border-radius: var(--radius-xs);
-    cursor: pointer;
+    /* Hidden by default */
+    /* Inherit header-btn styles */
     transition: all var(--transition-smooth);
-    position: absolute;
-    bottom: -30px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: calc(var(--z-header) + 1);
-    flex-shrink: 0;
+}
+
+/* On image page, show in the header controls */
+body.image-page .tabs-toggle-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .tabs-toggle-button:hover {
-    background: rgba(50, 50, 70, 0.9);
-    border-color: var(--border-color-hover);
+    transform: translateY(-2px);
+    color: var(--primary-blue);
 }
 
-.tabs-toggle-button .arrow {
-    display: inline-block;
-    border: solid var(--primary-blue);
-    border-width: 0 3px 3px 0;
-    padding: 3px;
-    transform: rotate(45deg);
-    transition: transform var(--transition-smooth);
+.header-container.tabs-expanded .tabs-toggle-button {
+    color: var(--primary-blue);
+    background: rgba(135, 206, 235, 0.1);
+    border-radius: var(--radius-sm);
+}
+
+.header-container.tabs-expanded .tabs-toggle-button {
+    background: var(--primary-blue-dark);
+    border-color: var(--primary-blue);
+    height: 24px;
+    bottom: -24px;
+}
+
+.header-container.tabs-expanded .tabs-toggle-button:hover {
+    background: var(--primary-blue);
 }
 
 .header-container.tabs-expanded .tabs-toggle-button .arrow {
     transform: rotate(-135deg);
+    margin-top: 4px;
+    border-color: #fff;
 }
 
 body.image-page .tabs-toggle-button {
-    display: block;
+    display: flex;
+    /* Changed from block to flex for centering */
+    opacity: 1;
+    pointer-events: auto;
 }
 
 body.image-page .stats-tabs-bar {

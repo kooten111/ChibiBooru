@@ -22,8 +22,8 @@
                 </form>
             </div>
             <div class="header-right">
-                {% if request.endpoint == 'main.home' %}
                 <div class="header-controls">
+                    {% if request.endpoint == 'main.home' %}
                     <div class="grid-size-toggle">
                         <button class="grid-size-btn" data-size="small" title="Small thumbnails">S</button>
                         <button class="grid-size-btn active" data-size="medium" title="Medium thumbnails">M</button>
@@ -35,11 +35,12 @@
                     </button>
                     {% endif %}
                     <button class="header-btn" id="sidebarToggle" title="Toggle filters">◧</button>
+                    {% endif %}
+
+                    <button id="tabs-toggle-button" class="header-btn tabs-toggle-button" title="Toggle stats panel">
+                        📊
+                    </button>
                 </div>
-                {% endif %}
-                <button id="tabs-toggle-button" class="tabs-toggle-button">
-                    <span class="arrow"></span>
-                </button>
             </div>
         </div>
     </div>
