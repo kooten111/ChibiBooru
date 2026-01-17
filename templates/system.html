@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>System Settings - {{ app_name }}</title>
@@ -10,6 +11,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/system.css') + '?v=1' }}">
 </head>
+
 <body>
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
@@ -33,10 +35,6 @@
                     <button class="system-nav-btn" data-section="settings">
                         <span class="nav-icon">⚙️</span>
                         Settings
-                    </button>
-                    <button class="system-nav-btn" data-section="actions">
-                        <span class="nav-icon">🔧</span>
-                        Actions
                     </button>
                 </nav>
             </div>
@@ -140,6 +138,112 @@
                             <div class="log-entry info">No recent activity</div>
                         </div>
                     </section>
+
+                    <!-- Maintenance Actions -->
+                    <section class="system-card actions-card">
+                        <h2 class="card-title">🛠️ Maintenance</h2>
+                        <div class="actions-list">
+                            <button class="action-btn" onclick="systemReindexDatabase(event)">
+                                <span class="action-icon">⚡</span>
+                                <div class="action-text">
+                                    <span class="action-label">Optimize DB</span>
+                                    <span class="action-desc">VACUUM & REINDEX</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemDatabaseHealthCheck(event)">
+                                <span class="action-icon">🏥</span>
+                                <div class="action-text">
+                                    <span class="action-label">Health Check</span>
+                                    <span class="action-desc">Find inconsistencies</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemCleanOrphans(event)">
+                                <span class="action-icon">🧹</span>
+                                <div class="action-text">
+                                    <span class="action-label">Clean Orphans</span>
+                                    <span class="action-desc">Remove dead entries</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemDeduplicate(event)">
+                                <span class="action-icon">🔄</span>
+                                <div class="action-text">
+                                    <span class="action-label">Deduplicate</span>
+                                    <span class="action-desc">Find duplicates</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemGenerateHashes(event)">
+                                <span class="action-icon">🔑</span>
+                                <div class="action-text">
+                                    <span class="action-label">Gen Hashes</span>
+                                    <span class="action-desc">Compute perceptual hashes</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemRecountTags(event)">
+                                <span class="action-icon">📊</span>
+                                <div class="action-text">
+                                    <span class="action-label">Recount Tags</span>
+                                    <span class="action-desc">Update tag counts</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemRecategorizeTags(event)">
+                                <span class="action-icon">🏷️</span>
+                                <div class="action-text">
+                                    <span class="action-label">Recategorize Tags</span>
+                                    <span class="action-desc">Move to correct categories</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemRebuildCategorized(event)">
+                                <span class="action-icon">🔨</span>
+                                <div class="action-text">
+                                    <span class="action-label">Rebuild Categorized</span>
+                                    <span class="action-desc">Refresh cache</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemApplyMergedSources(event)">
+                                <span class="action-icon">🔗</span>
+                                <div class="action-text">
+                                    <span class="action-label">Apply Source Merge</span>
+                                    <span class="action-desc">Apply merge setting</span>
+                                </div>
+                            </button>
+                            <button class="action-btn" onclick="systemFindBrokenImages(event)">
+                                <span class="action-icon">🔍</span>
+                                <div class="action-text">
+                                    <span class="action-label">Find Broken Images</span>
+                                    <span class="action-desc">Find missing data</span>
+                                </div>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Dangerous Actions -->
+                    <section class="system-card danger-card">
+                        <h2 class="card-title danger-title">⚠️ Dangerous</h2>
+                        <p class="warning-text">These actions can take a long time and may be irreversible</p>
+                        <div class="actions-list">
+                            <button class="action-btn danger-btn" onclick="systemRebuildTags(event)">
+                                <span class="action-icon">🔨</span>
+                                <div class="action-text">
+                                    <span class="action-label">Rebuild Tags</span>
+                                    <span class="action-desc">Recreate from metadata</span>
+                                </div>
+                            </button>
+                            <button class="action-btn danger-btn" onclick="systemBulkRetagLocal(event)">
+                                <span class="action-icon">🏷️</span>
+                                <div class="action-text">
+                                    <span class="action-label">Retag All</span>
+                                    <span class="action-desc">Re-run AI tagger</span>
+                                </div>
+                            </button>
+                            <button class="action-btn danger-btn" onclick="systemClearImpliedTags(event)">
+                                <span class="action-icon">🗑️</span>
+                                <div class="action-text">
+                                    <span class="action-label">Clear Implied</span>
+                                    <span class="action-desc">Remove implied tags</span>
+                                </div>
+                            </button>
+                        </div>
+                    </section>
                 </div>
             </div>
 
@@ -147,12 +251,8 @@
             <div class="system-section" id="settings-section">
                 <div class="settings-container">
                     <div class="settings-header">
-                        <input
-                            type="text"
-                            id="settingsSearch"
-                            class="settings-search-input"
-                            placeholder="Search settings..."
-                        />
+                        <input type="text" id="settingsSearch" class="settings-search-input"
+                            placeholder="Search settings..." />
                         <div class="settings-actions">
                             <button id="reloadConfigBtn" class="btn-secondary">Reload Config</button>
                             <button id="saveSettingsBtn" class="btn-primary">Save Changes</button>
@@ -164,141 +264,7 @@
                 </div>
             </div>
 
-            <!-- Actions Section -->
-            <div class="system-section" id="actions-section">
-                <div class="actions-container">
-                    <div class="secret-section" id="secretSection">
-                        <!-- Fallback content - will be replaced by JavaScript -->
-                        <div class="secret-input-section">
-                            <h3>System Secret Required</h3>
-                            <p>Enter the system secret (RELOAD_SECRET from your .env file) to access system actions and logs.</p>
-                            <form onsubmit="event.preventDefault(); if(window.saveSystemSecret) window.saveSystemSecret(); else alert('Please wait for page to load'); return false;">
-                                <div class="secret-input-group">
-                                    <input type="password" id="secretInput" class="filter-input" placeholder="Enter system secret..." autocomplete="off">
-                                    <button type="submit" class="btn btn-primary">Save</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
 
-                    <div class="actions-section" id="systemActionsSection" style="display: none;">
-                        <div class="actions-grid">
-                            <!-- Maintenance Actions -->
-                            <section class="system-card">
-                                <h2 class="card-title">🛠️ Maintenance</h2>
-                                <div class="actions-list">
-                                    <button class="action-btn" onclick="systemReindexDatabase(event)">
-                                        <span class="action-icon">⚡</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Optimize DB</span>
-                                            <span class="action-desc">VACUUM & REINDEX</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemDatabaseHealthCheck(event)">
-                                        <span class="action-icon">🏥</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Health Check</span>
-                                            <span class="action-desc">Find inconsistencies</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemCleanOrphans(event)">
-                                        <span class="action-icon">🧹</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Clean Orphans</span>
-                                            <span class="action-desc">Remove dead entries</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemDeduplicate(event)">
-                                        <span class="action-icon">🔄</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Deduplicate</span>
-                                            <span class="action-desc">Find duplicates</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemGenerateThumbnails(event)">
-                                        <span class="action-icon">🖼️</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Gen Thumbnails</span>
-                                            <span class="action-desc">Create missing thumbnails</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemGenerateHashes(event)">
-                                        <span class="action-icon">🔑</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Gen Hashes</span>
-                                            <span class="action-desc">Compute perceptual hashes</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemRecountTags(event)">
-                                        <span class="action-icon">📊</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Recount Tags</span>
-                                            <span class="action-desc">Update tag counts</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemRecategorizeTags(event)">
-                                        <span class="action-icon">🏷️</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Recategorize Tags</span>
-                                            <span class="action-desc">Move to correct categories</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemRebuildCategorized(event)">
-                                        <span class="action-icon">🔨</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Rebuild Categorized</span>
-                                            <span class="action-desc">Refresh cache</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemApplyMergedSources(event)">
-                                        <span class="action-icon">🔗</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Apply Source Merge</span>
-                                            <span class="action-desc">Apply merge setting</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn" onclick="systemFindBrokenImages(event)">
-                                        <span class="action-icon">🔍</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Find Broken Images</span>
-                                            <span class="action-desc">Find missing data</span>
-                                        </div>
-                                    </button>
-                                </div>
-                            </section>
-
-                            <!-- Dangerous Actions -->
-                            <section class="system-card danger-card">
-                                <h2 class="card-title danger-title">⚠️ Dangerous</h2>
-                                <p class="warning-text">These actions can take a long time and may be irreversible</p>
-                                <div class="actions-list">
-                                    <button class="action-btn danger-btn" onclick="systemRebuildTags(event)">
-                                        <span class="action-icon">🔨</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Rebuild Tags</span>
-                                            <span class="action-desc">Recreate from metadata</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn danger-btn" onclick="systemBulkRetagLocal(event)">
-                                        <span class="action-icon">🏷️</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Retag All</span>
-                                            <span class="action-desc">Re-run AI tagger</span>
-                                        </div>
-                                    </button>
-                                    <button class="action-btn danger-btn" onclick="systemClearImpliedTags(event)">
-                                        <span class="action-icon">🗑️</span>
-                                        <div class="action-text">
-                                            <span class="action-label">Clear Implied</span>
-                                            <span class="action-desc">Remove implied tags</span>
-                                        </div>
-                                    </button>
-                                </div>
-                            </section>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </main>
     </div>
 
@@ -313,7 +279,8 @@
             <p>Enter the system secret to access system actions and logs.</p>
             <form onsubmit="event.preventDefault(); saveSystemSecret(); return false;">
                 <div class="secret-input-group">
-                    <input type="password" id="secretInput" class="filter-input" placeholder="Enter system secret..." autocomplete="off">
+                    <input type="password" id="secretInput" class="filter-input" placeholder="Enter system secret..."
+                        autocomplete="off">
                     <button type="submit" class="btn btn-primary">Save</button>
                 </div>
             </form>
@@ -332,4 +299,5 @@
     <script type="module" src="{{ url_for('static', filename='js/pages/system.js') + '?v=2' }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
 </body>
+
 </html>

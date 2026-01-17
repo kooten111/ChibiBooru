@@ -28,7 +28,6 @@ __all__ = [
     'implication_service',
     'monitor_service',
     'priority_service',
-    'processing_service',
     'query_service',
     'rating_service',
     'saucenao_service',

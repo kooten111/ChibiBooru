@@ -184,7 +184,7 @@ def check_missing_thumbnails(auto_fix=False):
         result.add_message(f"Found {result.issues_found} images without thumbnails")
 
         if auto_fix:
-            from services.processing_service import ensure_thumbnail
+            from services.processing.thumbnail_generator import ensure_thumbnail
             for item in missing:
                 filepath = item['filepath']
                 md5 = item['md5']

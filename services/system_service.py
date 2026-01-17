@@ -4,7 +4,7 @@ from quart import request, jsonify
 from typing import Dict, Any, List, Optional
 import config
 from database import models
-from services import processing_service as processing
+from services import processing
 from utils.deduplication import scan_and_remove_duplicates
 from utils.decorators import require_secret_sync, require_secret
 from utils.logging_config import get_logger

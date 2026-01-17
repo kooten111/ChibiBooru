@@ -20,10 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeNavigation();
     initializeSettings();
     initializeStatus();
-    initializeActions();
     initializeLogs();
     initializeOverview();
-    
+
     // Initialize secret UI immediately
     setTimeout(() => {
         validateStoredSecret().then(() => {
@@ -47,28 +46,26 @@ document.addEventListener('DOMContentLoaded', () => {
 function initializeNavigation() {
     const navButtons = document.querySelectorAll('.system-nav-btn');
     const sections = document.querySelectorAll('.system-section');
-    
+
     navButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             const targetSection = btn.dataset.section;
-            
+
             // Update active states
             navButtons.forEach(b => b.classList.remove('active'));
             sections.forEach(s => s.classList.remove('active'));
-            
+
             btn.classList.add('active');
             const section = document.getElementById(`${targetSection}-section`);
             if (section) {
                 section.classList.add('active');
             }
-            
+
             // Load content if needed
             const secret = localStorage.getItem('system_secret');
             if (targetSection === 'overview' && secret) {
                 loadSystemStatus();
                 loadLogs();
-            } else if (targetSection === 'actions') {
-                updateSecretUI();
             }
         });
     });
@@ -78,7 +75,7 @@ function initializeOverview() {
     // Setup logs expand/collapse
     const expandBtn = document.getElementById('logsExpandBtn');
     const logsContainer = document.querySelector('.logs-container-overview');
-    
+
     if (expandBtn && logsContainer) {
         let isExpanded = false;
         expandBtn.addEventListener('click', () => {
@@ -87,7 +84,7 @@ function initializeOverview() {
             expandBtn.textContent = isExpanded ? '▼' : '▲';
         });
     }
-    
+
     // Load initial data if Overview is active
     const secret = localStorage.getItem('system_secret');
     if (secret) {
@@ -99,13 +96,13 @@ function initializeOverview() {
 }
 
 // Function to update status pills in header
-window.updateStatusPills = function(monitor, collection) {
+window.updateStatusPills = function (monitor, collection) {
     const statusBar = document.getElementById('systemStatusBar');
     if (!statusBar) return;
-    
+
     const pills = statusBar.querySelectorAll('.status-pill');
     if (pills.length < 4) return;
-    
+
     // Monitor status
     const monitorPill = pills[0];
     const monitorValue = monitorPill.querySelector('.status-value');
@@ -113,14 +110,14 @@ window.updateStatusPills = function(monitor, collection) {
         monitorValue.textContent = monitor.running ? 'Running' : 'Stopped';
         monitorPill.className = 'status-pill ' + (monitor.running ? 'active' : 'inactive');
     }
-    
+
     // Images count
     const imagesPill = pills[1];
     const imagesValue = imagesPill.querySelector('.status-value');
     if (imagesValue) {
         imagesValue.textContent = collection.total_images ? collection.total_images.toLocaleString() : '-';
     }
-    
+
     // Unprocessed count
     const unprocessedPill = pills[2];
     const unprocessedValue = unprocessedPill.querySelector('.status-value');
@@ -128,7 +125,7 @@ window.updateStatusPills = function(monitor, collection) {
         unprocessedValue.textContent = collection.unprocessed || 0;
         unprocessedPill.className = 'status-pill ' + (collection.unprocessed > 0 ? 'warning' : '');
     }
-    
+
     // Tagged percentage
     const taggedPill = pills[3];
     const taggedValue = taggedPill.querySelector('.status-value');
@@ -310,7 +307,7 @@ function updateOverviewStatus(monitor, collection) {
             const intervalValue = stats[0].querySelector('.monitor-value');
             const lastCheckValue = stats[1].querySelector('.monitor-value');
             const processedValue = stats[2].querySelector('.monitor-value');
-            
+
             if (intervalValue) intervalValue.textContent = `${monitor.interval_seconds || 0}s`;
             if (lastCheckValue) lastCheckValue.textContent = monitor.last_check || 'Never';
             if (processedValue) processedValue.textContent = (monitor.total_processed || 0).toLocaleString();
@@ -327,12 +324,12 @@ function updateOverviewStatus(monitor, collection) {
             const ratedValue = stats[2].querySelector('.collection-value');
             const pendingValue = stats[3].querySelector('.collection-value');
             const pendingStat = stats[3];
-            
+
             if (totalValue) totalValue.textContent = (collection.total_images || 0).toLocaleString();
             if (taggedValue) taggedValue.textContent = (collection.tagged || 0).toLocaleString();
             if (ratedValue) ratedValue.textContent = (collection.rated || 0).toLocaleString();
             if (pendingValue) pendingValue.textContent = (collection.unprocessed || 0).toLocaleString();
-            
+
             // Update warning state for pending
             if (pendingStat) {
                 if (collection.unprocessed > 0) {
@@ -927,7 +924,7 @@ async function initializeSettings() {
 async function loadSettings() {
     try {
         const response = await fetch('/api/system/config');
-        
+
         if (!response.ok) {
             const errorText = await response.text();
             let errorMessage = `HTTP error! status: ${response.status}`;
@@ -939,39 +936,39 @@ async function loadSettings() {
             }
             throw new Error(errorMessage);
         }
-        
+
         const data = await response.json();
-        
+
         // Check if response contains error field
         if (data.error) {
             throw new Error(data.error || 'Failed to load settings');
         }
-        
+
         // Check if response is an error response (has status field that's not success)
         if (data.status === 'error') {
             throw new Error(data.message || data.error || 'Failed to load settings');
         }
-        
+
         // Validate data structure - should be an object with category keys mapping to arrays
         if (!data || typeof data !== 'object') {
             throw new Error('Invalid response format');
         }
-        
+
         // Additional validation: check if it looks like settings data (has at least one array value)
         // vs error response (has status/error/message fields but no array values)
         const hasArrayValues = Object.values(data).some(v => Array.isArray(v));
         const hasErrorFields = ('status' in data && data.status !== 'success') || 'error' in data || ('message' in data && !hasArrayValues);
-        
+
         if (hasErrorFields && !hasArrayValues) {
             // This looks like an error response, not settings
             throw new Error(data.error || data.message || 'Failed to load settings');
         }
-        
+
         // Final check: if no array values at all, this is probably not settings data
         if (!hasArrayValues) {
             throw new Error('Response does not contain valid settings data');
         }
-        
+
         // Filter out API metadata fields (success, status, error, message) that might be added by api_handler
         const metadataFields = ['success', 'status', 'error', 'message'];
         const filteredData = {};
@@ -980,13 +977,13 @@ async function loadSettings() {
                 filteredData[key] = value;
             }
         }
-        
+
         settingsData = filteredData;
         renderSettings(filteredData);
     } catch (err) {
         console.error('Error loading settings:', err);
         showNotification(`Failed to load settings: ${err.message}`, 'error');
-        
+
         // Show error in settings container
         const container = document.getElementById('settingsCategories');
         if (container) {
@@ -1001,16 +998,16 @@ function renderSettings(categorizedSettings) {
         console.error('Settings container not found');
         return;
     }
-    
+
     container.innerHTML = '';
-    
+
     // Validate input
     if (!categorizedSettings || typeof categorizedSettings !== 'object') {
         console.error('Invalid settings data:', categorizedSettings);
         container.innerHTML = '<div class="error-message">Failed to load settings: Invalid data structure</div>';
         return;
     }
-    
+
     // Category icons mapping
     const categoryIcons = {
         'Application': '🏠',
@@ -1024,37 +1021,37 @@ function renderSettings(categorizedSettings) {
         'UI': '🎨',
         'Other': '📦'
     };
-    
+
     // Sort categories
     const categories = Object.keys(categorizedSettings).sort();
-    
+
     categories.forEach(category => {
         const categoryData = categorizedSettings[category];
-        
+
         // Ensure category data is an array
         if (!Array.isArray(categoryData)) {
             console.warn(`Category "${category}" is not an array:`, categoryData);
             return; // Skip this category
         }
-        
+
         // Skip empty categories
         if (categoryData.length === 0) {
             return;
         }
-        
+
         const categoryDiv = document.createElement('div');
         categoryDiv.className = 'settings-category';
         categoryDiv.dataset.category = category;
-        
+
         const icon = categoryIcons[category] || '📦';
         const header = document.createElement('div');
         header.className = 'settings-category-header';
         header.innerHTML = `<h3><span class="category-icon">${icon}</span>${category}</h3>`;
         categoryDiv.appendChild(header);
-        
+
         const itemsDiv = document.createElement('div');
         itemsDiv.className = 'settings-category-items';
-        
+
         categoryData.forEach(setting => {
             if (!setting || typeof setting !== 'object') {
                 console.warn('Invalid setting object:', setting);
@@ -1063,7 +1060,7 @@ function renderSettings(categorizedSettings) {
             const item = createSettingItem(setting);
             itemsDiv.appendChild(item);
         });
-        
+
         categoryDiv.appendChild(itemsDiv);
         container.appendChild(categoryDiv);
     });
@@ -1073,33 +1070,33 @@ function createSettingItem(setting) {
     const item = document.createElement('div');
     item.className = 'setting-item';
     item.dataset.key = setting.key;
-    
+
     const label = document.createElement('label');
     label.className = 'setting-label';
     label.textContent = setting.key;
     if (setting.description) {
         label.title = setting.description;
     }
-    
+
     const input = createSettingInput(setting);
     const desc = document.createElement('div');
     desc.className = 'setting-description';
     desc.textContent = setting.description || '';
-    
+
     // Vertical layout: label on top, input in middle, description at bottom
     item.appendChild(label);
     item.appendChild(input);
     item.appendChild(desc);
-    
+
     return item;
 }
 
 function createSettingInput(setting) {
     const wrapper = document.createElement('div');
     wrapper.className = 'setting-input-wrapper';
-    
+
     let input;
-    
+
     if (setting.type === 'bool') {
         input = document.createElement('input');
         input.type = 'checkbox';
@@ -1136,21 +1133,21 @@ function createSettingInput(setting) {
     } else {
         input = document.createElement('input');
         input.type = setting.type === 'int' || setting.type === 'float' ? 'number' : 'text';
-        
+
         // Always show the actual value - backend should provide defaults
         if (setting.value !== null && setting.value !== undefined) {
             input.value = setting.value;
         } else {
             input.value = '';
         }
-        
+
         if (setting.min !== undefined) {
             input.min = setting.min;
         }
         if (setting.max !== undefined) {
             input.max = setting.max;
         }
-        
+
         input.addEventListener('input', () => {
             let value = input.value;
             if (setting.type === 'int') {
@@ -1162,10 +1159,10 @@ function createSettingInput(setting) {
             markChanged(wrapper, true);
         });
     }
-    
+
     input.className = 'setting-input';
     wrapper.appendChild(input);
-    
+
     return wrapper;
 }
 
@@ -1179,20 +1176,20 @@ function setupSettingsSearch() {
     searchInput.addEventListener('input', (e) => {
         const query = e.target.value.toLowerCase();
         const categories = document.querySelectorAll('.settings-category');
-        
+
         categories.forEach(category => {
             const items = category.querySelectorAll('.setting-item');
             let hasVisible = false;
-            
+
             items.forEach(item => {
                 const key = item.dataset.key.toLowerCase();
                 const desc = item.querySelector('.setting-description').textContent.toLowerCase();
                 const matches = key.includes(query) || desc.includes(query);
-                
+
                 item.style.display = matches ? '' : 'none';
                 if (matches) hasVisible = true;
             });
-            
+
             category.style.display = hasVisible ? '' : 'none';
         });
     });
@@ -1205,10 +1202,10 @@ function setupSaveButton() {
             showNotification('No changes to save', 'info');
             return;
         }
-        
+
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
-        
+
         try {
             const secret = localStorage.getItem('system_secret');
             const response = await fetch(`/api/system/config/update?secret=${encodeURIComponent(secret || '')}`, {
@@ -1216,9 +1213,9 @@ function setupSaveButton() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(settingsChanged)
             });
-            
+
             const data = await response.json();
-            
+
             if (data.status === 'success') {
                 showNotification('Settings saved successfully', 'success');
                 settingsChanged = {};
@@ -1266,17 +1263,6 @@ function initializeStatus() {
             loadSystemStatus();
         }
     }, 100);
-}
-
-function initializeActions() {
-    // Auto-refresh status when overview is active
-    setInterval(() => {
-        const secret = localStorage.getItem('system_secret');
-        const overviewSection = document.getElementById('overview-section');
-        if (secret && overviewSection && overviewSection.classList.contains('active')) {
-            loadSystemStatus();
-        }
-    }, 5000);
 }
 
 function initializeLogs() {

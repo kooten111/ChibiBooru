@@ -529,7 +529,7 @@ def process_image_file(filepath, move_from_ingest=True):
         
         if should_merge_sources:
             # Merge tags from all booru sources
-            from utils.tag_extraction import merge_multiple_tag_sources, deduplicate_categorized_tags
+            from utils.tag_extraction import merge_multiple_tag_sources
             # Build a dict of only booru sources for merging
             booru_results = {k: v for k, v in all_results.items() if k in booru_sources}
             extracted_tags = merge_multiple_tag_sources(booru_results)

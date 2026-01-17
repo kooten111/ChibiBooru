@@ -1,6 +1,6 @@
 from quart import request, jsonify, url_for
 from database import models
-from services import processing_service as processing
+from services import processing
 from utils import get_thumbnail_path
 from utils.file_utils import normalize_image_path
 import os

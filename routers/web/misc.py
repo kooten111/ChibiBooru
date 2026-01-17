@@ -6,7 +6,7 @@ from quart import render_template, request, jsonify, url_for
 import os
 import config
 from database import models
-from services import processing_service as processing
+from services import processing
 from services import query_service
 from utils.decorators import login_required
 from werkzeug.utils import secure_filename

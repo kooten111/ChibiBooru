@@ -4,7 +4,7 @@ import time
 import os
 from concurrent.futures import ThreadPoolExecutor
 from database import models
-from services import processing_service as processing
+from services import processing
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 

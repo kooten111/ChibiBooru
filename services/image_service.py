@@ -1,7 +1,7 @@
 from quart import request, jsonify, url_for
 from database import models
 from database import get_db_connection
-from services import processing_service as processing
+from services import processing
 from utils import get_thumbnail_path
 from utils.file_utils import normalize_image_path, get_bucketed_thumbnail_path_on_disk
 from utils.tag_extraction import (

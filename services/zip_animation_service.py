@@ -244,5 +244,5 @@ def tag_animation_with_first_frame(md5: str) -> Optional[Dict]:
     if not first_frame or not os.path.exists(first_frame):
         return None
     
-    from services.processing_service import tag_with_local_tagger
+    from services.processing import tag_with_local_tagger
     return tag_with_local_tagger(first_frame)
