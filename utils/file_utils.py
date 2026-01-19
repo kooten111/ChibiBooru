@@ -171,8 +171,8 @@ def get_file_md5(filepath):
         MD5 hash as hex string, or None if file not found/error
     """
     try:
-        # If filepath doesn't start with ./ or /, assume it's relative to static/
-        if not filepath.startswith('./') and not filepath.startswith('/'):
+        # If filepath doesn't start with ./, /, or static/, assume it's relative to static/
+        if not filepath.startswith('./') and not filepath.startswith('/') and not filepath.startswith('static/'):
             filepath = f"static/{filepath}"
         
         hash_md5 = hashlib.md5()

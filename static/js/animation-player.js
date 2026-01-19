@@ -288,7 +288,6 @@ class AnimationPlayer {
 
         // For animated GIFs, we need to extract each frame
         // This simplified version just shows it as a single frame
-        // TODO: Implement full GIF frame extraction or use gifuct-js
         frames.push({
             imageData: imageData,
             width: width,

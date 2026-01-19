@@ -84,7 +84,7 @@ GELBOORU_USER_ID = os.environ.get('GELBOORU_USER_ID', '')
 # System control secret
 RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
 
-# ==================== NEW: APP SECURITY ====================
+# ==================== APP SECURITY ====================
 
 # Password for simple web UI login
 APP_PASSWORD = os.environ.get('APP_PASSWORD', 'default-password')
@@ -348,7 +348,7 @@ ML_WORKER_BACKEND = str(_get_setting('ML_WORKER_BACKEND', 'auto'))
 # ML worker socket path (Unix domain socket for IPC)
 ML_WORKER_SOCKET = str(_get_setting('ML_WORKER_SOCKET', '/tmp/chibibooru_ml_worker.sock'))
 
-# Note: Tag ID optimization is now always enabled
+# Tag ID optimization is always enabled
 # All tag storage uses int32 IDs for memory efficiency (~200-500 MB savings)
 
 

@@ -70,7 +70,6 @@ def check_and_fix_null_active_source(auto_fix=True):
             if not auto_fix:
                 return result
 
-            # Fix each image
             for image in null_images:
                 image_id = image['id']
                 sources = image['sources'].split(',')
@@ -403,7 +402,6 @@ def check_merged_images_missing_tags(auto_fix=True):
             if not auto_fix:
                 return result
 
-            # Fix each image by re-running merge_all_sources
             from services.switch_source_db import merge_all_sources
 
             for image in affected_images:

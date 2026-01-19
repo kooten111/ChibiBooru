@@ -525,7 +525,6 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
                 cursor.execute("INSERT INTO image_sources (image_id, source_id) VALUES (?, ?)", (image_id, source_id))
 
             # 3. Insert and link tags
-            # TODO: Refactor to use utils.tag_db.bulk_insert_tags for better efficiency and cleaner code
             for category, tags_list in categorized_tags.items():
                 for tag_name in tags_list:
                     if not tag_name: continue

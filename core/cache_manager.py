@@ -30,7 +30,7 @@ logger = logging.getLogger('chibibooru.CacheManager')
 tag_counts = {}
 image_data = []
 post_id_to_md5 = {}
-data_lock = threading.RLock()  # Changed to RLock to allow reentrant locking
+data_lock = threading.RLock()  # Use RLock to allow reentrant locking
 _loading_in_progress = False
 _load_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1, thread_name_prefix="cache_loader")
 
