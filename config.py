@@ -237,7 +237,7 @@ APPLY_IMPLICATIONS_ON_INGEST = apply_impl if isinstance(apply_impl, bool) else s
 # Extended categories allowed for implication detection
 # Only tags in these categories will be considered as implied tags
 # This prevents contextual tags (pose, action, expression) from being suggested as implications
-# Categories are from the Platinum Schema - Group 1 (Identity) contains permanent traits
+# Categories are from the extended category system - Group 1 (Identity) contains permanent traits
 IMPLICATION_ALLOWED_EXTENDED_CATEGORIES = _get_setting('IMPLICATION_ALLOWED_EXTENDED_CATEGORIES', [
     #'00_Subject_Count',    # 1girl, solo, 1boy
     '01_Body_Physique',    # breasts, tail, animal_ears

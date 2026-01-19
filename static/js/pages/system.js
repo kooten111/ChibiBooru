@@ -161,9 +161,8 @@ async function validateStoredSecret() {
 
 function updateSecretUI() {
     const secretSection = document.getElementById('secretSection');
-    const actionsSection = document.getElementById('systemActionsSection');
 
-    if (!secretSection || !actionsSection) return;
+    if (!secretSection) return;
 
     // Clear existing content
     secretSection.innerHTML = '';
@@ -172,7 +171,6 @@ function updateSecretUI() {
         const template = document.getElementById('secret-configured-template');
         const clone = template.content.cloneNode(true);
         secretSection.appendChild(clone);
-        actionsSection.style.display = 'block';
     } else {
         const template = document.getElementById('secret-required-template');
         const clone = template.content.cloneNode(true);
@@ -185,8 +183,6 @@ function updateSecretUI() {
                 if (e.key === 'Enter') saveSystemSecret();
             });
         }
-
-        actionsSection.style.display = 'none';
     }
 }
 

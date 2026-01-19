@@ -14,7 +14,7 @@
 
 ## Overview
 
-The Extended Categories feature provides a **22-category "Platinum Schema"** for granular tag organization beyond ChibiBooru's standard 6-category system (character, copyright, artist, species, general, meta).
+The Extended Categories feature provides a **22-category extended system** for granular tag organization beyond ChibiBooru's standard 6-category system (character, copyright, artist, species, general, meta).
 
 ### Purpose
 
@@ -316,7 +316,7 @@ CREATE INDEX idx_tags_extended_category ON tags(extended_category);
 | Column | Type | Description |
 |--------|------|-------------|
 | `category` | TEXT | Basic 6-category system (character, copyright, artist, species, general, meta) |
-| `extended_category` | TEXT | Extended 22-category Platinum Schema |
+| `extended_category` | TEXT | Extended 22-category system |
 
 ### Relationship to Basic Categories
 
@@ -387,7 +387,7 @@ ORDER BY usage DESC;
 
 ### Image Detail Page
 
-On image detail pages (`/image/{filepath}`), tags are automatically grouped and displayed by their extended categories in the order defined in the Platinum Schema.
+On image detail pages (`/image/{filepath}`), tags are automatically grouped and displayed by their extended categories in the order defined in the extended category system.
 
 ### Tag Grouping
 

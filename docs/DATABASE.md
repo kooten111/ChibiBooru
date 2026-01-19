@@ -172,7 +172,7 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 | `id` | INTEGER | PRIMARY KEY | Auto-incrementing unique identifier |
 | `name` | TEXT | NOT NULL, UNIQUE | Tag name (normalized, lowercase with underscores) |
 | `category` | TEXT | | Primary category (character, copyright, artist, species, general, meta) |
-| `extended_category` | TEXT | | Platinum Schema categorization (finer-grained) |
+| `extended_category` | TEXT | | Extended category categorization (finer-grained) |
 
 **Indexes**:
 - `idx_tags_name ON tags(name)`
@@ -188,7 +188,7 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 - `general`: Descriptive tags (e.g., `1girl`, `blue_hair`)
 - `meta`: Metadata tags (e.g., `rating:safe`, `highres`)
 
-**Extended Categories** (Platinum Schema):
+**Extended Categories**:
 - More fine-grained categorization for specialized tagging systems
 - Optional, used by advanced tagging models
 

@@ -9,7 +9,7 @@ from database import get_db_connection
 from typing import List, Dict, Optional, Tuple
 
 
-# Extended tag categories based on Platinum Schema (22 categories)
+# Extended tag categories based on extended category system (22 categories)
 # Format: (key, display_name, keyboard_shortcut, description)
 EXTENDED_CATEGORIES = [
     ('00_Subject_Count', 'Subject Count', '0', 'Count & Gender (1girl, solo, 1boy)'),

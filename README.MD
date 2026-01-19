@@ -1,6 +1,6 @@
 # ChibiBooru
 
-A self-hosted booru type app for organizing and browsing your local image collection with automated metadata fetching and tagging. ChibiBooru combines a user-friendly interface with powerful backend tools to create a rich, searchable media library similar to popular image boorus.
+A self-hosted booru application for organizing and browsing your local image collection with automated metadata fetching and tagging.
 
 ## Table of Contents
 
@@ -61,7 +61,7 @@ A self-hosted booru type app for organizing and browsing your local image collec
   - Chain preview to see full impact before applying
 
 - **Extended Categories:**
-  - 22-category "Platinum Schema" for granular tag organization
+  - 22-category extended system for granular tag organization
   - Manual categorization interface with keyboard shortcuts
   - LLM-powered auto-categorization for bulk processing
   - Visual grouping by category on image pages
@@ -80,26 +80,6 @@ A self-hosted booru type app for organizing and browsing your local image collec
 - **Background Monitor:** Optional service that watches for new files and processes them automatically
 - **Debug Panel:** Comprehensive tools for database maintenance, optimization, and bulk operations
 - **Health Checks:** Automatic startup health checks with self-repair capabilities
-
-### 🚀 Performance Optimizations
-
-- **Database Performance:**
-  - Configurable SQLite cache (64-256MB) and memory-mapped I/O (256MB-1GB)
-  - Batched database operations for 5-10x faster bulk processing
-  - Optimized tag search with two-step query approach and case-insensitive indexes
-  - WAL mode with tunable checkpointing for better concurrency
-
-- **Async Cache Loading:**
-  - Background cache reloads prevent UI blocking
-  - Non-blocking API responses during data refresh
-  - Progress tracking for large collections
-  - Automatic concurrency protection
-
-- **Query Optimizations:**
-  - Eliminated expensive random ordering for faster results
-  - Batched fetches to avoid SQL parameter limits
-  - Index-based filtering before joining large tables
-  - Optimized for collections up to 100k+ images
 
 ---
 
@@ -398,7 +378,7 @@ For detailed technical documentation, see the [`docs/`](docs/) directory:
 - **[Core](docs/CORE.md)** - Cache management, events, and utilities
 - **[Configuration](docs/CONFIGURATION.md)** - All configuration options and environment variables
 - **[Data Flow](docs/DATA_FLOW.md)** - End-to-end data flow diagrams
-- **[Extended Categories](docs/EXTENDED_CATEGORIES.md)** - 22-category Platinum Schema for advanced tag organization
+- **[Extended Categories](docs/EXTENDED_CATEGORIES.md)** - 22-category extended system for advanced tag organization
 - **[Monitor Architecture](docs/MONITOR_ARCHITECTURE.md)** - Monitor service architecture and deployment
 - **[Upscaler Overview](docs/UPSCALER_OVERVIEW.md)** - AI upscaling feature documentation
 

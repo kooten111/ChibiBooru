@@ -7,6 +7,16 @@
     'use strict';
 
     /**
+     * URL-encode a path while preserving forward slashes
+     * @param {string} path - Path to encode
+     * @returns {string} Encoded path with slashes preserved
+     */
+    function encodePathForUrl(path) {
+        if (!path) return '';
+        return path.split('/').map(part => encodeURIComponent(part)).join('/');
+    }
+
+    /**
      * Normalize filepath for comparison (ensure consistent format)
      * @param {string} path - Filepath to normalize
      * @returns {string} Normalized filepath
@@ -72,14 +82,14 @@
      */
     function createRelatedThumb(image) {
         const a = document.createElement('a');
-        a.href = `/view/${encodeURIComponent(image.path)}`;
+        a.href = `/view/${encodePathForUrl(image.path)}`;
         a.className = 'related-thumb';
         
         const img = document.createElement('img');
         const thumbPath = image.thumb.startsWith('thumbnails/') || image.thumb.startsWith('images/') 
             ? image.thumb 
             : `images/${image.thumb}`;
-        img.src = `/static/${encodeURIComponent(thumbPath)}`;
+        img.src = `/static/${encodePathForUrl(thumbPath)}`;
         img.alt = 'Related';
         a.appendChild(img);
         
@@ -185,7 +195,7 @@
         try {
             // Clean filepath (remove images/ prefix if present)
             const cleanPath = filepath.startsWith('images/') ? filepath.substring(7) : filepath;
-            const encodedPath = encodeURIComponent(cleanPath);
+            const encodedPath = encodePathForUrl(cleanPath);
             
             // Fetch FAISS results
             const response = await fetch(`/api/similar-semantic/${encodedPath}?limit=40&exclude_family=true`);

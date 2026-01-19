@@ -24,11 +24,11 @@
     gap: var(--spacing-lg);
     overflow-y: auto;
     overflow-x: hidden;
-    flex: 1 1 0;
+    flex: 1 1 auto;
     width: 100%;
     max-width: 100%;
     min-height: 0;
-    height: 0; /* Force flex child to respect parent constraints for scrolling */
+    /* height: auto by default - flex will handle sizing when in editing mode */
 }
 
 /* Category section */
@@ -238,7 +238,7 @@
 
 .sidebar-left.editing-mode #tags-content {
     flex: 1;
-    display: flex;
+    display: flex !important; /* Override display: block !important from implications.css */
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
@@ -261,7 +261,7 @@
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
-    height: 0; /* Force flex child to respect parent constraints */
+    height: auto; /* Let flex handle sizing - height: 0 doesn't work with this flex chain */
 }
 
 /* Custom scrollbar for categories list - ensure it's visible */

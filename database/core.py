@@ -228,7 +228,7 @@ def initialize_database():
         )
         """)
 
-        # Add extended_category column to tags if it doesn't exist (for Platinum Schema categorization)
+        # Add extended_category column to tags if it doesn't exist (for extended category categorization)
         cur.execute("PRAGMA table_info(tags);")
         tag_columns = [row['name'] for row in cur.fetchall()]
 

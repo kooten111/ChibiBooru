@@ -50,7 +50,7 @@ The Services layer contains the business logic for ChibiBooru. Services orchestr
 | Switch Source | `switch_source_db.py` | Metadata source switching |
 | System | `system_service.py` | System operations (scan, rebuild, etc.) |
 | Tag | `tag_service.py` | Tag operations and autocomplete |
-| Tag Categorization | `tag_categorization_service.py` | Platinum Schema tag categorization |
+| Tag Categorization | `tag_categorization_service.py` | Extended categories tag categorization |
 
 ---
 
@@ -1554,7 +1554,7 @@ Enhanced autocomplete with grouped suggestions.
 **File**: `services/tag_categorization_service.py`
 
 ### Purpose
-Advanced tag categorization using the Extended Categories system (22-category "Platinum Schema") for granular tag organization.
+Advanced tag categorization using the Extended Categories system (22-category extended system) for granular tag organization.
 
 > **📘 For complete documentation**, see [**Extended Categories Documentation**](EXTENDED_CATEGORIES.md)
 
