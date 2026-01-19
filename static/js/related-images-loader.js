@@ -3,7 +3,7 @@
  * with tag-based results to prevent page blocking.
  */
 
-(function() {
+(function () {
     'use strict';
 
     /**
@@ -44,7 +44,7 @@
         const interleaved = [];
         const maxLength = Math.max(tagResults.length, faissResults.length);
         const currentPathNormalized = normalizePath(currentPath);
-        
+
         // Interleave results, alternating between tag and FAISS
         for (let i = 0; i < maxLength && interleaved.length < limit; i++) {
             // Add FAISS result first (if available) to prioritize accurate results
@@ -58,7 +58,7 @@
                     if (interleaved.length >= limit) break;
                 }
             }
-            
+
             // Then add tag result
             if (i < tagResults.length) {
                 const tag = tagResults[i];
@@ -71,7 +71,7 @@
                 }
             }
         }
-        
+
         return interleaved;
     }
 
@@ -84,20 +84,20 @@
         const a = document.createElement('a');
         a.href = `/view/${encodePathForUrl(image.path)}`;
         a.className = 'related-thumb';
-        
+
         const img = document.createElement('img');
-        const thumbPath = image.thumb.startsWith('thumbnails/') || image.thumb.startsWith('images/') 
-            ? image.thumb 
+        const thumbPath = image.thumb.startsWith('thumbnails/') || image.thumb.startsWith('images/')
+            ? image.thumb
             : `images/${image.thumb}`;
         img.src = `/static/${encodePathForUrl(thumbPath)}`;
         img.alt = 'Related';
         a.appendChild(img);
-        
+
         // Add source label
         const source = image.primary_source || 'unknown';
         const label = document.createElement('span');
         label.className = 'label similar';
-        
+
         if (source === 'tag') {
             label.classList.add('similar-tag');
             label.textContent = 'Tag';
@@ -110,7 +110,7 @@
         } else {
             label.textContent = 'Similar';
         }
-        
+
         a.appendChild(label);
         return a;
     }
@@ -122,19 +122,19 @@
     function updateRelatedImagesDisplay(results) {
         const container = document.getElementById('related-images-content');
         if (!container) return;
-        
+
         const grid = container.querySelector('.related-grid-vertical');
         if (!grid) return;
-        
+
         // Clear existing content
         grid.innerHTML = '';
-        
+
         // Add all results
         results.forEach(image => {
             const thumb = createRelatedThumb(image);
             grid.appendChild(thumb);
         });
-        
+
         // Update count in header
         const countElements = document.querySelectorAll('.related-images-vertical .text-muted-tiny');
         countElements.forEach(el => {
@@ -148,11 +148,11 @@
     function showLoadingIndicator() {
         const container = document.getElementById('related-images-content');
         if (!container) return;
-        
+
         // Check if loading indicator already exists
         let loadingDiv = container.querySelector('.faiss-loading-indicator');
         if (loadingDiv) return;
-        
+
         loadingDiv = document.createElement('div');
         loadingDiv.className = 'faiss-loading-indicator';
         loadingDiv.innerHTML = `
@@ -161,7 +161,7 @@
                 <span class="faiss-loading-text">Loading FAISS results...</span>
             </div>
         `;
-        
+
         const grid = container.querySelector('.related-grid-vertical');
         if (grid && grid.parentNode) {
             grid.parentNode.insertBefore(loadingDiv, grid.nextSibling);
@@ -176,7 +176,7 @@
     function hideLoadingIndicator() {
         const container = document.getElementById('related-images-content');
         if (!container) return;
-        
+
         const loadingDiv = container.querySelector('.faiss-loading-indicator');
         if (loadingDiv) {
             loadingDiv.remove();
@@ -191,28 +191,28 @@
     async function loadFaissResults(filepath, tagResults) {
         // Show loading indicator
         showLoadingIndicator();
-        
+
         try {
             // Clean filepath (remove images/ prefix if present)
             const cleanPath = filepath.startsWith('images/') ? filepath.substring(7) : filepath;
             const encodedPath = encodePathForUrl(cleanPath);
-            
+
             // Fetch FAISS results
             const response = await fetch(`/api/similar-semantic/${encodedPath}?limit=40&exclude_family=true`);
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
+
             const data = await response.json();
             const faissResults = data.similar || [];
-            
+
             // Interleave tag and FAISS results, excluding current image
             const interleaved = interleaveResults(tagResults, faissResults, filepath, 40);
-            
+
             // Update display
             updateRelatedImagesDisplay(interleaved);
-            
+
         } catch (error) {
             console.error('Failed to load FAISS results:', error);
             // Keep tag results, just hide loading indicator
@@ -241,11 +241,11 @@
     function initializeLoader() {
         const container = document.getElementById('related-images-content');
         if (!container) return;
-        
+
         // Get current filepath from the page
         // Try data-filepath attribute first, then URL
         let filepath = null;
-        
+
         // Try data-filepath on image view container
         const imageViewContainer = document.getElementById('imageViewContainer');
         if (imageViewContainer && imageViewContainer.dataset.filepath) {
@@ -257,15 +257,15 @@
                 filepath = decodeURIComponent(pathMatch[1]);
             }
         }
-        
+
         if (!filepath) {
             console.warn('Could not determine filepath for FAISS loading');
             return;
         }
-        
+
         // Normalize current filepath for comparison
         const currentPathNormalized = normalizePath(filepath);
-        
+
         // Get existing tag results from the DOM, excluding current image
         const existingThumbs = container.querySelectorAll('.related-thumb');
         const tagResults = Array.from(existingThumbs)
@@ -273,10 +273,13 @@
                 const link = thumb.getAttribute('href');
                 const path = link ? decodeURIComponent(link.replace('/view/', '')) : '';
                 const img = thumb.querySelector('img');
-                const thumbSrc = img ? img.src.replace(/^.*\/static\//, '') : '';
+                // Decode the src since browser returns URL-encoded version
+                // We need the raw path to avoid double-encoding when re-creating elements
+                const rawThumbSrc = img ? img.src.replace(/^.*\/static\//, '') : '';
+                const thumbSrc = rawThumbSrc ? decodeURIComponent(rawThumbSrc) : '';
                 const label = thumb.querySelector('.label');
                 const source = label && label.classList.contains('similar-tag') ? 'tag' : 'unknown';
-                
+
                 return {
                     path: path,
                     thumb: thumbSrc,
@@ -288,7 +291,7 @@
                 const resultPathNormalized = normalizePath(result.path);
                 return resultPathNormalized !== currentPathNormalized;
             });
-        
+
         // Only load FAISS if we have tag results
         if (tagResults.length > 0) {
             loadFaissResults(filepath, tagResults);
