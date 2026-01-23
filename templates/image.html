@@ -558,31 +558,36 @@
 
         <div class="sidebar-right" id="sidebarRight">
             <div class="section-content" id="sidebar-right-content">
-                {% if related_images %}
-                <div class="related-images-vertical panel">
+                {% if related_images or similar_sidebar_sources == 'faiss' %}
+                <script type="application/json"
+                    id="similarConfig">{"sources": "{{ similar_sidebar_sources }}", "showChips": {{ similar_sidebar_show_chips|tojson }}}</script>
+                <div class="related-images-vertical panel" {% if not similar_sidebar_show_chips %}data-hide-chips="true"
+                    {% endif %}>
                     <button class="panel-header mobile-toggle" data-section="related-images-content">
-                        <span class="section-icon">�</span>
+                        <span class="section-icon">🔗</span>
                         <span class="section-title">
                             Similar
                             <span class="text-muted-tiny">
-                                ({{ related_images|length }} images)
+                                ({{ related_images|length if similar_sidebar_sources != 'faiss' else 0 }} images)
                             </span>
                         </span>
                         <span class="section-arrow">▼</span>
                     </button>
                     <h3 class="desktop-only">
-                        <span>�</span>
+                        <span>🔗</span>
                         Similar
                         <span class="text-muted-tiny">
-                            ({{ related_images|length }} images)
+                            ({{ related_images|length if similar_sidebar_sources != 'faiss' else 0 }} images)
                         </span>
                     </h3>
                     <div class="panel-collapsible-content" id="related-images-content">
                         <div class="related-grid-vertical">
+                            {% if similar_sidebar_sources != 'faiss' %}
                             {% for related in related_images %}
                             <a href="/view/{{ related.path | urlencode_path }}" class="related-thumb">
                                 <img src="/static/{% if not (related.thumb.startswith('thumbnails/') or related.thumb.startswith('images/')) %}images/{% endif %}{{ related.thumb | urlencode_path }}"
                                     alt="Related">
+                                {% if similar_sidebar_show_chips %}
                                 {% set source = related.get('primary_source', 'unknown') %}
                                 {% if source == 'tag' %}
                                 <span class="label similar similar-tag">Tag</span>
@@ -593,8 +598,10 @@
                                 {% else %}
                                 <span class="label similar">Similar</span>
                                 {% endif %}
+                                {% endif %}
                             </a>
                             {% endfor %}
+                            {% endif %}
                         </div>
                     </div>
                 </div>

@@ -78,6 +78,14 @@ def register_routes(blueprint):
         # Get thumbnail path for progressive loading
         thumbnail_path = get_thumbnail_path(filepath)
 
+        # Get sidebar config fresh (not cached module-level values) so changes take effect without restart
+        from services.config_service import load_config
+        config_yml = load_config()
+        sidebar_sources = str(config_yml.get('SIMILAR_SIDEBAR_SOURCES', 'both')).lower()
+        sidebar_show_chips = config_yml.get('SIMILAR_SIDEBAR_SHOW_CHIPS', True)
+        if isinstance(sidebar_show_chips, str):
+            sidebar_show_chips = sidebar_show_chips.lower() in ('true', '1', 'yes')
+
         return await render_template(
             'image.html',
             filepath=filepath,
@@ -96,7 +104,9 @@ def register_routes(blueprint):
             merged_general_tags=tag_data['merged_general_tags'],  # Pass to template for potential styling
             upscaled_image_url=upscaled_image_url,
             image_pools=models.get_pools_for_image(data['id']) if data and data.get('id') else [],
-            implied_tag_names=tag_data['implied_tag_names']  # Tags implied by implication rules
+            implied_tag_names=tag_data['implied_tag_names'],  # Tags implied by implication rules
+            similar_sidebar_sources=sidebar_sources,
+            similar_sidebar_show_chips=sidebar_show_chips
         )
 
     @blueprint.route('/similar-visual/<path:filepath>')

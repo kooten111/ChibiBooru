@@ -6,6 +6,19 @@
 (function () {
     'use strict';
 
+    // Read config from page
+    function getSimilarConfig() {
+        const configEl = document.getElementById('similarConfig');
+        if (!configEl) {
+            return { sources: 'both', showChips: true };
+        }
+        try {
+            return JSON.parse(configEl.textContent);
+        } catch (e) {
+            return { sources: 'both', showChips: true };
+        }
+    }
+
     /**
      * URL-encode a path while preserving forward slashes
      * @param {string} path - Path to encode
@@ -78,9 +91,10 @@
     /**
      * Create a related image thumbnail element
      * @param {Object} image - Image data with path, thumb, primary_source
+     * @param {boolean} showChips - Whether to show source chips
      * @returns {HTMLElement} Thumbnail anchor element
      */
-    function createRelatedThumb(image) {
+    function createRelatedThumb(image, showChips = true) {
         const a = document.createElement('a');
         a.href = `/view/${encodePathForUrl(image.path)}`;
         a.className = 'related-thumb';
@@ -93,33 +107,36 @@
         img.alt = 'Related';
         a.appendChild(img);
 
-        // Add source label
-        const source = image.primary_source || 'unknown';
-        const label = document.createElement('span');
-        label.className = 'label similar';
+        // Add source label only if showChips is enabled
+        if (showChips) {
+            const source = image.primary_source || 'unknown';
+            const label = document.createElement('span');
+            label.className = 'label similar';
 
-        if (source === 'tag') {
-            label.classList.add('similar-tag');
-            label.textContent = 'Tag';
-        } else if (source === 'semantic') {
-            label.classList.add('similar-semantic');
-            label.textContent = 'FAISS';
-        } else if (source === 'visual') {
-            label.classList.add('similar-visual');
-            label.textContent = 'Visual';
-        } else {
-            label.textContent = 'Similar';
+            if (source === 'tag') {
+                label.classList.add('similar-tag');
+                label.textContent = 'Tag';
+            } else if (source === 'semantic') {
+                label.classList.add('similar-semantic');
+                label.textContent = 'FAISS';
+            } else if (source === 'visual') {
+                label.classList.add('similar-visual');
+                label.textContent = 'Visual';
+            } else {
+                label.textContent = 'Similar';
+            }
+
+            a.appendChild(label);
         }
-
-        a.appendChild(label);
         return a;
     }
 
     /**
      * Update the related images display
      * @param {Array} results - Combined results to display
+     * @param {boolean} showChips - Whether to show source chips
      */
-    function updateRelatedImagesDisplay(results) {
+    function updateRelatedImagesDisplay(results, showChips = true) {
         const container = document.getElementById('related-images-content');
         if (!container) return;
 
@@ -131,7 +148,7 @@
 
         // Add all results
         results.forEach(image => {
-            const thumb = createRelatedThumb(image);
+            const thumb = createRelatedThumb(image, showChips);
             grid.appendChild(thumb);
         });
 
@@ -187,8 +204,9 @@
      * Load FAISS results asynchronously
      * @param {string} filepath - Path to the current image
      * @param {Array} tagResults - Existing tag-based results
+     * @param {Object} config - Similar sidebar config
      */
-    async function loadFaissResults(filepath, tagResults) {
+    async function loadFaissResults(filepath, tagResults, config) {
         // Show loading indicator
         showLoadingIndicator();
 
@@ -207,15 +225,21 @@
             const data = await response.json();
             const faissResults = data.similar || [];
 
-            // Interleave tag and FAISS results, excluding current image
-            const interleaved = interleaveResults(tagResults, faissResults, filepath, 40);
+            let resultsToShow;
+            if (config.sources === 'faiss') {
+                // FAISS only mode
+                resultsToShow = faissResults.slice(0, 40);
+            } else {
+                // Both mode - interleave tag and FAISS results
+                resultsToShow = interleaveResults(tagResults, faissResults, filepath, 40);
+            }
 
             // Update display
-            updateRelatedImagesDisplay(interleaved);
+            updateRelatedImagesDisplay(resultsToShow, config.showChips);
 
         } catch (error) {
             console.error('Failed to load FAISS results:', error);
-            // Keep tag results, just hide loading indicator
+            // Keep tag results if we have them, just hide loading indicator
         } finally {
             hideLoadingIndicator();
         }
@@ -241,6 +265,14 @@
     function initializeLoader() {
         const container = document.getElementById('related-images-content');
         if (!container) return;
+
+        // Read config
+        const config = getSimilarConfig();
+
+        // If tag-only mode, don't load FAISS at all
+        if (config.sources === 'tag') {
+            return;
+        }
 
         // Get current filepath from the page
         // Try data-filepath attribute first, then URL
@@ -292,9 +324,9 @@
                 return resultPathNormalized !== currentPathNormalized;
             });
 
-        // Only load FAISS if we have tag results
-        if (tagResults.length > 0) {
-            loadFaissResults(filepath, tagResults);
+        // Load FAISS results (in 'both' mode we need tag results, in 'faiss' mode we don't)
+        if (config.sources === 'faiss' || tagResults.length > 0) {
+            loadFaissResults(filepath, tagResults, config);
         }
     }
 

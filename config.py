@@ -302,6 +302,13 @@ SIMILARITY_CACHE_SIZE = int(_get_setting('SIMILARITY_CACHE_SIZE', 50))
 # Only used when cache is enabled - FAISS loaded on-demand for computation
 FAISS_IDLE_TIMEOUT = int(_get_setting('FAISS_IDLE_TIMEOUT', 300))
 
+# Similar sidebar configuration
+# Sources: 'both' (tag + faiss), 'tag' (tag only), 'faiss' (faiss only)
+SIMILAR_SIDEBAR_SOURCES = str(_get_setting('SIMILAR_SIDEBAR_SOURCES', 'both')).lower()
+# Show Tag/FAISS chips on similar images
+_show_chips = _get_setting('SIMILAR_SIDEBAR_SHOW_CHIPS', True)
+SIMILAR_SIDEBAR_SHOW_CHIPS = _show_chips if isinstance(_show_chips, bool) else str(_show_chips).lower() in ('true', '1', 'yes')
+
 # ==================== FILE TYPES ====================
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')

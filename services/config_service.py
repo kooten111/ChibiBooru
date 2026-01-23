@@ -310,6 +310,18 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Seconds before unloading idle FAISS index',
         'editable': True,
     },
+    'SIMILAR_SIDEBAR_SOURCES': {
+        'category': 'Similarity',
+        'type': 'string',
+        'description': 'Which similar sources to show: both, tag, or faiss',
+        'editable': True,
+    },
+    'SIMILAR_SIDEBAR_SHOW_CHIPS': {
+        'category': 'Similarity',
+        'type': 'bool',
+        'description': 'Show Tag/FAISS source chips on similar images',
+        'editable': True,
+    },
     
     # Feature Flags
     'ENABLE_SAUCENAO': {

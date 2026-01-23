@@ -117,10 +117,10 @@ function constrainActivityLogHeight() {
                 const cardRects = cards.map(card => card.getBoundingClientRect());
                 const firstCardTop = Math.min(...cardRects.map(rect => rect.top));
                 const lastCardBottom = Math.max(...cardRects.map(rect => rect.bottom));
-                
+
                 // Calculate actual content height (from top of first card to bottom of last card)
                 const actualContentHeight = lastCardBottom - firstCardTop;
-                
+
                 if (actualContentHeight > 0) {
                     // Set max-height on the right column container to match actual card content height
                     rightColumn.style.maxHeight = actualContentHeight + 'px';
@@ -1282,11 +1282,16 @@ function setupSaveButton() {
             return;
         }
 
+        const secret = localStorage.getItem('system_secret');
+        if (!secret) {
+            showNotification('Please set the System Secret first (click the 🔐 button in the header)', 'error');
+            return;
+        }
+
         saveBtn.disabled = true;
         saveBtn.textContent = 'Saving...';
 
         try {
-            const secret = localStorage.getItem('system_secret');
             const response = await fetch(`/api/system/config/update?secret=${encodeURIComponent(secret || '')}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1300,12 +1305,14 @@ function setupSaveButton() {
                 settingsChanged = {};
                 // Reload settings to get updated values
                 await loadSettings();
+            } else if (data.error && data.error.includes('secret')) {
+                showNotification('Invalid system secret. Please re-enter your secret.', 'error');
             } else {
-                showNotification(`Error: ${data.errors ? Object.values(data.errors).join(', ') : 'Failed to save'}`, 'error');
+                showNotification(`Error: ${data.errors ? Object.values(data.errors).join(', ') : (data.error || 'Failed to save')}`, 'error');
             }
         } catch (err) {
             console.error('Error saving settings:', err);
-            showNotification('Failed to save settings', 'error');
+            showNotification('Failed to save settings: ' + err.message, 'error');
         } finally {
             saveBtn.disabled = false;
             saveBtn.textContent = 'Save Changes';
