@@ -1378,7 +1378,7 @@ System-wide operations: scanning, rebuilding, thumbnails, deduplication.
 
 Find and process new, untracked images.
 
-**Authorization**: Requires `RELOAD_SECRET`
+**Authorization**: Requires `SYSTEM_API_SECRET`
 
 **Process**:
 1. Run scan for new images
@@ -1404,7 +1404,7 @@ Find and process new, untracked images.
 
 Re-process all tags from raw_metadata.
 
-**Authorization**: Requires `RELOAD_SECRET`
+**Authorization**: Requires `SYSTEM_API_SECRET`
 
 **Process**:
 1. Stop monitor service

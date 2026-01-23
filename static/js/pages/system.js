@@ -85,6 +85,10 @@ function initializeOverview() {
         });
     }
 
+    // Constrain activity log height to match left column
+    constrainActivityLogHeight();
+    window.addEventListener('resize', constrainActivityLogHeight);
+
     // Load initial data if Overview is active
     const secret = localStorage.getItem('system_secret');
     if (secret) {
@@ -92,6 +96,46 @@ function initializeOverview() {
             loadSystemStatus();
             loadLogs();
         }, 500);
+    }
+}
+
+function constrainActivityLogHeight() {
+    const leftColumn = document.querySelector('.overview-left-column');
+    const rightColumn = document.querySelector('.overview-right-column');
+    const logsCard = document.querySelector('.overview-right-column .logs-card');
+
+    if (leftColumn && rightColumn && logsCard) {
+        // Reset any previously set heights to recalculate
+        rightColumn.style.maxHeight = '';
+        logsCard.style.maxHeight = '';
+
+        // Get the actual content height of the cards in the left column
+        requestAnimationFrame(() => {
+            const cards = Array.from(leftColumn.querySelectorAll('.system-card'));
+            if (cards.length > 0) {
+                // Get bounding rects for all cards
+                const cardRects = cards.map(card => card.getBoundingClientRect());
+                const firstCardTop = Math.min(...cardRects.map(rect => rect.top));
+                const lastCardBottom = Math.max(...cardRects.map(rect => rect.bottom));
+                
+                // Calculate actual content height (from top of first card to bottom of last card)
+                const actualContentHeight = lastCardBottom - firstCardTop;
+                
+                if (actualContentHeight > 0) {
+                    // Set max-height on the right column container to match actual card content height
+                    rightColumn.style.maxHeight = actualContentHeight + 'px';
+                    // Also ensure the logs card respects this constraint
+                    logsCard.style.maxHeight = '100%';
+                }
+            } else {
+                // Fallback: use column height if no cards found
+                const leftHeight = leftColumn.offsetHeight;
+                if (leftHeight > 0) {
+                    rightColumn.style.maxHeight = leftHeight + 'px';
+                    logsCard.style.maxHeight = '100%';
+                }
+            }
+        });
     }
 }
 
@@ -174,15 +218,34 @@ function updateSecretUI() {
     } else {
         const template = document.getElementById('secret-required-template');
         const clone = template.content.cloneNode(true);
-
-        // Add enter key listener to the input after appending
         secretSection.appendChild(clone);
-        const input = secretSection.querySelector('#secretInput');
+    }
+}
+
+// Modal functions for secret input
+function showSecretModal() {
+    const modal = document.getElementById('secretModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        const input = modal.querySelector('#secretInput');
         if (input) {
+            input.focus();
             input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') saveSystemSecret();
+                if (e.key === 'Enter') {
+                    saveSystemSecret();
+                    closeSecretModal();
+                }
             });
         }
+    }
+}
+
+function closeSecretModal() {
+    const modal = document.getElementById('secretModal');
+    if (modal) {
+        modal.style.display = 'none';
+        const input = modal.querySelector('#secretInput');
+        if (input) input.value = '';
     }
 }
 
@@ -321,9 +384,26 @@ function updateOverviewStatus(monitor, collection) {
             const pendingValue = stats[3].querySelector('.collection-value');
             const pendingStat = stats[3];
 
-            if (totalValue) totalValue.textContent = (collection.total_images || 0).toLocaleString();
-            if (taggedValue) taggedValue.textContent = (collection.tagged || 0).toLocaleString();
-            if (ratedValue) ratedValue.textContent = (collection.rated || 0).toLocaleString();
+            const total = collection.total_images || 0;
+            if (totalValue) totalValue.textContent = total.toLocaleString();
+
+            // Show Tagged and Rated as percentages
+            if (taggedValue) {
+                if (total > 0) {
+                    const taggedPct = Math.round(((collection.tagged || 0) / total) * 100);
+                    taggedValue.textContent = `${taggedPct}%`;
+                } else {
+                    taggedValue.textContent = '-';
+                }
+            }
+            if (ratedValue) {
+                if (total > 0) {
+                    const ratedPct = Math.round(((collection.rated || 0) / total) * 100);
+                    ratedValue.textContent = `${ratedPct}%`;
+                } else {
+                    ratedValue.textContent = '-';
+                }
+            }
             if (pendingValue) pendingValue.textContent = (collection.unprocessed || 0).toLocaleString();
 
             // Update warning state for pending
@@ -391,6 +471,9 @@ function loadLogs() {
                         overviewLogsDiv.appendChild(entry);
                     });
                 }
+
+                // Recalculate log container height after populating
+                constrainActivityLogHeight();
             }
 
             // Update legacy logs container for backwards compatibility
@@ -1293,8 +1376,11 @@ window.systemStopMonitor = systemStopMonitor;
 window.systemClearImpliedTags = systemClearImpliedTags;
 window.saveSystemSecret = saveSystemSecret;
 window.clearSystemSecret = clearSystemSecret;
+window.showSecretModal = showSecretModal;
+window.closeSecretModal = closeSecretModal;
 window.systemFindBrokenImages = systemFindBrokenImages;
 window.loadSystemStatus = loadSystemStatus;
 window.loadLogs = loadLogs;
 window.updateSecretUI = updateSecretUI;
 window.validateStoredSecret = validateStoredSecret;
+

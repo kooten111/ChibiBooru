@@ -167,7 +167,7 @@ Create a `.env` file in the project root with **required secrets**:
 # REQUIRED: Change these before first use!
 APP_PASSWORD="your-secure-password"
 SECRET_KEY="your-secret-key-for-sessions"  # Generate with: python -c "import secrets; print(secrets.token_hex(32))"
-RELOAD_SECRET="your-reload-secret"
+SYSTEM_API_SECRET="your-system-api-secret"
 
 # Optional: API Keys
 SAUCENAO_API_KEY="your_saucenao_api_key"  # Get from https://saucenao.com/user.php
@@ -195,7 +195,7 @@ Settings are saved to `config.yml` and take effect immediately (or after clickin
 **`.env`** (Secrets Only):
 - `APP_PASSWORD` - Web UI login password
 - `SECRET_KEY` - Flask session encryption key
-- `RELOAD_SECRET` - System control API secret
+- `SYSTEM_API_SECRET` - System control API secret (for administrative operations)
 - `SAUCENAO_API_KEY` - SauceNao API key (optional)
 - `GELBOORU_API_KEY` - Gelbooru API key (optional)
 - `GELBOORU_USER_ID` - Gelbooru user ID (optional)
@@ -235,7 +235,7 @@ Compatible models include:
 ### Security Best Practices
 
 > [!CAUTION]
-> - **Always change** `APP_PASSWORD`, `SECRET_KEY`, and `RELOAD_SECRET` before deployment
+> - **Always change** `APP_PASSWORD`, `SECRET_KEY`, and `SYSTEM_API_SECRET` before deployment
 > - **Never commit** your `.env` file to version control (already in `.gitignore`)
 > - Use strong, random values for all secrets
 > - Keep API keys private and secure
@@ -277,7 +277,7 @@ Images dropped here will be automatically detected, processed, and moved to the 
 
 3. **Log in** with your `APP_PASSWORD` from `.env`
 
-4. **Navigate to System page** (`/system` in the navigation bar) and enter your `RELOAD_SECRET`
+4. **Navigate to System page** (`/system` in the navigation bar) and enter your `SYSTEM_API_SECRET`
 
 5. **Scan & Process Images:**
    - Click **"Scan & Process New Images"** to begin indexing

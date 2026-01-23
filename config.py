@@ -81,8 +81,8 @@ SAUCENAO_API_KEY = os.environ.get('SAUCENAO_API_KEY', '')
 GELBOORU_API_KEY = os.environ.get('GELBOORU_API_KEY', '')
 GELBOORU_USER_ID = os.environ.get('GELBOORU_USER_ID', '')
 
-# System control secret
-RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
+# System control API secret (for administrative operations)
+SYSTEM_API_SECRET = os.environ.get('SYSTEM_API_SECRET', 'change-this-secret')
 
 # ==================== APP SECURITY ====================
 
@@ -423,8 +423,8 @@ def validate_config():
         if not os.path.exists(LOCAL_TAGGER_METADATA_PATH):
             warnings.append(f"Local tagger metadata not found: {LOCAL_TAGGER_METADATA_PATH}")
 
-    if RELOAD_SECRET == 'change-this-secret':
-        warnings.append("RELOAD_SECRET is set to default value - change this for production!")
+    if SYSTEM_API_SECRET == 'change-this-secret':
+        warnings.append("SYSTEM_API_SECRET is set to default value - change this for production!")
 
     if APP_PASSWORD == 'default-password':
         warnings.append("APP_PASSWORD is set to default value - change this for security!")

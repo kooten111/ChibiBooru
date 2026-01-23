@@ -398,7 +398,7 @@ Base processing logic with customizable steps for different metadata sources.
 ### Authentication
 - Session-based login with `APP_PASSWORD`
 - `SECRET_KEY` for session encryption
-- `RELOAD_SECRET` for system operations
+- `SYSTEM_API_SECRET` for system operations
 
 ### Database
 - Parameterized queries (SQL injection prevention)

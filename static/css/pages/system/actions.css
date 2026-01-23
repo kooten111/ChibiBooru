@@ -6,41 +6,101 @@
     gap: 20px;
 }
 
-.secret-section {
-    margin-bottom: 2rem;
-    min-height: 120px;
+/* Secret Header Button (in status bar) */
+.secret-header-section {
+    display: flex;
+    align-items: center;
 }
 
-.secret-section:empty {
+.secret-header-section:empty {
     display: none;
 }
 
-.secret-input-section,
-.secret-configured-section {
-    background: rgba(255, 255, 255, 0.03);
+.secret-header-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 60px 20px;
-    text-align: center;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-family);
+    transition: all var(--transition-fast);
 }
 
-.secret-input-section h3,
-.secret-configured-section h3 {
+.secret-header-btn.secret-required {
+    background: rgba(255, 153, 102, 0.15);
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.secret-header-btn.secret-required:hover {
+    background: rgba(255, 153, 102, 0.25);
+}
+
+.secret-header-btn.secret-configured {
+    background: rgba(144, 238, 144, 0.1);
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.secret-header-btn.secret-configured:hover {
+    background: rgba(144, 238, 144, 0.2);
+}
+
+.secret-icon {
+    font-size: 14px;
+}
+
+.secret-text {
+    white-space: nowrap;
+}
+
+/* Secret Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal);
+    animation: fadeIn var(--transition-normal) ease-out;
+}
+
+/* Secret Modal */
+.secret-modal {
+    max-width: 400px;
+    text-align: center;
+    background: var(--gradient-panel-solid);
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-2xl);
+    box-shadow: var(--shadow-xl);
+    animation: slideInUp var(--anim-smooth) ease-out;
+}
+
+.secret-modal h3 {
     margin-top: 0;
     margin-bottom: 0.5rem;
     color: var(--text-primary);
 }
 
-.secret-input-section p {
-    margin-bottom: 1rem;
+.secret-modal p {
+    margin-bottom: 1.5rem;
     color: var(--text-muted);
+    font-size: 14px;
 }
 
 .secret-input-group {
     display: flex;
     gap: 12px;
     justify-content: center;
-    margin-top: 20px;
+    flex-wrap: wrap;
 }
 
 .secret-input-group input {
@@ -50,7 +110,7 @@
     border-radius: var(--radius-md);
     color: var(--text-primary);
     font-size: 14px;
-    width: 260px;
+    width: 220px;
     outline: none;
     font-family: var(--font-family);
 }

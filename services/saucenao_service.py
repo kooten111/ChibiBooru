@@ -8,12 +8,12 @@ import requests
 from urllib.parse import urlparse
 import traceback
 
-RELOAD_SECRET = os.environ.get('RELOAD_SECRET', 'change-this-secret')
+SYSTEM_API_SECRET = os.environ.get('SYSTEM_API_SECRET', 'change-this-secret')
 
 async def saucenao_search_service():
     """Service to search SauceNao for an image."""
     data = await request.json
-    if data.get('secret', '') != RELOAD_SECRET:
+    if data.get('secret', '') != SYSTEM_API_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
     filepath = data.get('filepath', '')
@@ -64,7 +64,7 @@ async def saucenao_search_service():
 async def saucenao_fetch_metadata_service():
     """Service to fetch full metadata from a booru source."""
     data = await request.json
-    if data.get('secret', '') != RELOAD_SECRET:
+    if data.get('secret', '') != SYSTEM_API_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
     source, post_id = data.get('source'), data.get('post_id')
@@ -97,7 +97,7 @@ async def saucenao_fetch_metadata_service():
 async def saucenao_apply_service():
     """Service to apply selected metadata and download the new image."""
     data = await request.json
-    if data.get('secret', '') != RELOAD_SECRET:
+    if data.get('secret', '') != SYSTEM_API_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
 
     original_filepath = normalize_image_path(data.get('filepath', ''))

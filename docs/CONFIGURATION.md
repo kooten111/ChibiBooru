@@ -54,10 +54,10 @@ ChibiBooru uses a centralized configuration system that separates secrets from e
 
 ---
 
-#### `RELOAD_SECRET` ⚠️ REQUIRED
+#### `SYSTEM_API_SECRET` ⚠️ REQUIRED
 **Type**: String  
 **Default**: `"change-this-secret"`  
-**Description**: Secret for system control API operations  
+**Description**: Secret for system control API operations (administrative endpoints)  
 **Security**: Change this before deployment!
 
 ---
@@ -387,7 +387,7 @@ Validates configuration and warns about issues.
 **Output**:
 ```
 ⚠️  Configuration Warnings:
-  - RELOAD_SECRET is set to default value - change this for production!
+  - SYSTEM_API_SECRET is set to default value - change this for production!
   - APP_PASSWORD is set to default value - change this for security!
   - SECRET_KEY is set to default value - change this for production!
 ```
@@ -446,7 +446,7 @@ Get configured booru API settings.
    ```env
    APP_PASSWORD=your-strong-password-here
    SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
-   RELOAD_SECRET=another-strong-secret
+   SYSTEM_API_SECRET=another-strong-secret
    ```
 
 2. **Never Commit `.env`**:
@@ -573,10 +573,10 @@ MONITOR_INTERVAL = 60  # Check more frequently
 ENABLE_LOCAL_TAGGER = False
 ```
 
-### "RELOAD_SECRET is set to default value"
+### "SYSTEM_API_SECRET is set to default value"
 **Solution**: Change in `.env`:
 ```env
-RELOAD_SECRET=your-unique-secret-here
+SYSTEM_API_SECRET=your-unique-secret-here
 ```
 
 ### Slow image loading

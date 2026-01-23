@@ -386,28 +386,28 @@ Delete pool.
 #### `POST /api/system/scan`
 Scan and process new images.
 
-**Requires**: `RELOAD_SECRET`
+**Requires**: `SYSTEM_API_SECRET`
 
 ---
 
 #### `POST /api/system/rebuild`
 Rebuild database from metadata.
 
-**Requires**: `RELOAD_SECRET`
+**Requires**: `SYSTEM_API_SECRET`
 
 ---
 
 #### `POST /api/system/monitor/start`
 Start background monitor.
 
-**Requires**: `RELOAD_SECRET`
+**Requires**: `SYSTEM_API_SECRET`
 
 ---
 
 #### `POST /api/system/monitor/stop`
 Stop background monitor.
 
-**Requires**: `RELOAD_SECRET`
+**Requires**: `SYSTEM_API_SECRET`
 
 ---
 

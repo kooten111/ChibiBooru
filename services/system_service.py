@@ -299,7 +299,7 @@ def recategorize_service():
 
 def validate_secret_service() -> Dict[str, Any]:
     """
-    Service to validate if the provided secret matches config.RELOAD_SECRET.
+    Service to validate if the provided secret matches config.SYSTEM_API_SECRET.
     
     This endpoint does not require authentication (it's used to validate secrets).
     
@@ -308,7 +308,7 @@ def validate_secret_service() -> Dict[str, Any]:
     """
     secret = request.args.get('secret', '') or request.form.get('secret', '')
 
-    if secret and secret == config.RELOAD_SECRET:
+    if secret and secret == config.SYSTEM_API_SECRET:
         return jsonify({"success": True, "valid": True})
     else:
         return jsonify({"success": True, "valid": False})
@@ -320,12 +320,38 @@ def get_system_status() -> Dict[str, Any]:
     Returns:
         JSON response containing:
         - monitor: Current monitor service status
-        - collection: Total images and unprocessed count
+        - collection: Total images, unprocessed, tagged, and rated counts
     """
+    from database import get_db_connection
+    
     monitor_status = monitor_service.get_status()
     unprocessed_count = 0
+    tagged_count = 0
+    rated_count = 0
+    
     try:
         unprocessed_count = len(monitor_service.find_unprocessed_images())
+    except Exception:
+        pass
+    
+    # Count images with at least one tag
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            # Count images that have at least one tag
+            cursor.execute("""
+                SELECT COUNT(DISTINCT image_id) FROM image_tags
+            """)
+            tagged_count = cursor.fetchone()[0] or 0
+            
+            # Count images that have a rating tag (rating:general, rating:questionable, etc.)
+            cursor.execute("""
+                SELECT COUNT(DISTINCT it.image_id)
+                FROM image_tags it
+                JOIN tags t ON it.tag_id = t.id
+                WHERE t.name LIKE 'rating:%'
+            """)
+            rated_count = cursor.fetchone()[0] or 0
     except Exception:
         pass
 
@@ -334,6 +360,8 @@ def get_system_status() -> Dict[str, Any]:
         "collection": {
             "total_images": models.get_image_count(),
             "unprocessed": unprocessed_count,
+            "tagged": tagged_count,
+            "rated": rated_count,
         },
     })
     
@@ -811,7 +839,7 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
     )
     
     secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != config.RELOAD_SECRET:
+    if secret != config.SYSTEM_API_SECRET:
         return jsonify({"error": "Unauthorized"}), 401
     
     try:

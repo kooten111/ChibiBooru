@@ -205,7 +205,7 @@ async def update_config():
         raise ValueError("System secret required")
     
     # Check secret
-    if secret != config_module.RELOAD_SECRET:
+    if secret != config_module.SYSTEM_API_SECRET:
         raise ValueError("Invalid system secret")
     
     # Update settings

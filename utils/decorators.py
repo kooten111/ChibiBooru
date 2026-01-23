@@ -36,9 +36,9 @@ def api_handler(require_auth: bool = False, log_errors: bool = True):
             try:
                 # Optional auth check
                 if require_auth:
-                    from config import RELOAD_SECRET
+                    from config import SYSTEM_API_SECRET
                     secret = request.args.get('secret', '') or request.form.get('secret', '')
-                    if secret != RELOAD_SECRET:
+                    if secret != SYSTEM_API_SECRET:
                         return jsonify({"success": False, "error": "Unauthorized"}), 401
 
                 # Call the actual function
@@ -94,9 +94,9 @@ def require_secret(func: Callable) -> Callable:
     """
     @wraps(func)
     async def async_wrapper(*args, **kwargs):
-        from config import RELOAD_SECRET
+        from config import SYSTEM_API_SECRET
         secret = request.args.get('secret', '') or request.form.get('secret', '')
-        if secret != RELOAD_SECRET:
+        if secret != SYSTEM_API_SECRET:
             return jsonify({"success": False, "error": "Unauthorized"}), 401
         if asyncio.iscoroutinefunction(func):
             return await func(*args, **kwargs)
@@ -112,9 +112,9 @@ def require_secret_sync(func: Callable) -> Callable:
     """
     @wraps(func)
     def sync_wrapper(*args, **kwargs):
-        from config import RELOAD_SECRET
+        from config import SYSTEM_API_SECRET
         secret = request.args.get('secret', '') or request.form.get('secret', '')
-        if secret != RELOAD_SECRET:
+        if secret != SYSTEM_API_SECRET:
             return jsonify({"error": "Unauthorized"}), 401
         return func(*args, **kwargs)
     return sync_wrapper

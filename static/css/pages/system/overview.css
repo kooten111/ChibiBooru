@@ -1,11 +1,48 @@
 /* SYSTEM PAGE - Overview Section */
 
-/* Overview Grid */
+/* Overview Grid - Two Column Layout */
 .overview-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: 1fr 400px;
     gap: 20px;
+    align-items: stretch;
 }
+
+/* Left Column: Contains action cards */
+.overview-left-column {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    align-content: start;
+}
+
+/* Make actions and danger cards span half of left column each */
+.overview-left-column .actions-card {
+    grid-column: span 2;
+}
+
+.overview-left-column .danger-card {
+    grid-column: span 1;
+}
+
+/* Right Column: Activity Log - Match Left Column Height */
+.overview-right-column {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    height: 100%;
+}
+
+.overview-right-column .system-card.logs-card {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
 
 /* System Cards */
 .system-card {
@@ -191,21 +228,12 @@
 }
 
 /* Logs Card */
-.logs-card {
-    grid-column: 1 / -1;
-}
-
 .logs-container-overview {
-    overflow: hidden;
-    transition: max-height var(--transition-smooth);
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     font-family: 'Courier New', monospace;
     font-size: 12px;
-    max-height: 120px;
-}
-
-.logs-container-overview.expanded {
-    max-height: 300px;
-    overflow-y: auto;
 }
 
 .log-entry {
@@ -294,8 +322,33 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
+    .overview-left-column {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
     .overview-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .overview-left-column {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    .overview-right-column {
+        display: block;
+    }
+
+    .overview-right-column .logs-card {
+        max-height: 400px;
+        min-height: 250px;
+    }
+}
+
+@media (max-width: 768px) {
+    .overview-left-column {
         grid-template-columns: 1fr;
     }
 
