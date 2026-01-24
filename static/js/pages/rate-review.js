@@ -96,7 +96,7 @@ window.changeFilter = function () {
 };
 
 // Load next image
-window.loadNextImage = async function () {
+window.loadNextImage = async function (excludeId = null) {
     if (isLoading) return;
     isLoading = true;
 
@@ -114,12 +114,19 @@ window.loadNextImage = async function () {
     try {
         let data;
 
-        // Use preloaded image if available
-        if (preloadedImage) {
+        // Use preloaded image if available and it's not the excluded image
+        if (preloadedImage && preloadedImage.id !== excludeId) {
             data = preloadedImage;
             preloadedImage = null;
         } else {
-            const response = await fetch(`/api/rate/next?filter=${currentFilter}`);
+            // Clear invalid preloaded image
+            preloadedImage = null;
+            // Build URL with optional exclude parameter
+            let url = `/api/rate/next?filter=${currentFilter}`;
+            if (excludeId) {
+                url += `&exclude=${excludeId}`;
+            }
+            const response = await fetch(url);
             data = await response.json();
         }
 
@@ -165,7 +172,7 @@ async function preloadNext() {
 function renderImage(data) {
     const container = document.getElementById('imageDisplay');
     const isVideo = data.filepath.match(/\.(mp4|webm|mov)$/i);
-    
+
     // Normalize filepath to remove 'images/' prefix if present, then use getImageUrl
     const normalizedPath = normalizeImagePath(data.filepath);
     const imageUrl = getImageUrl(normalizedPath);
@@ -174,13 +181,13 @@ function renderImage(data) {
     if (isVideo) {
         content = `
             <video src="${imageUrl}" controls autoplay loop muted 
-                   style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                   style="max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
             </video>
         `;
     } else {
         content = `
             <img src="${imageUrl}" alt="Image to rate" 
-                 style="max-width: 100%; max-height: 80vh; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); object-fit: contain;">
+                 style="max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); object-fit: contain;">
         `;
     }
 
@@ -257,31 +264,35 @@ window.setRating = async function (rating, keyIndex) {
     btn.classList.add('active');
     setTimeout(() => btn.classList.remove('active'), 200);
 
-    // Optimistic UI: Immediately load next
-    const previous = currentImage; // Save for history
+    // Save current image for history
+    const previous = currentImage;
 
     try {
-        // Send request in background
-        fetch('/api/rate/rate', {
+        // Wait for rating to be saved before loading next image
+        const response = await fetch('/api/rate/rate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 image_id: currentImage.id,
                 rating: rating
             })
-        }).then(res => res.json()).then(data => {
-            if (data.status !== 'success') {
-                showNotification('Failed to save rating', 'error');
-            } else {
-                showNotification(`Rated as ${rating.replace('rating:', '')}`, 'success');
-            }
         });
+        
+        const data = await response.json();
+        
+        if (data.status !== 'success') {
+            showNotification('Failed to save rating', 'error');
+            return; // Don't proceed if rating failed
+        }
+
+        // Show success notification
+        showNotification(`Rated as ${rating.replace('rating:', '')}`, 'success');
 
         // Add to history
         imageHistory.push(previous);
 
-        // Move next
-        loadNextImage();
+        // Move to next image - exclude the image we just rated
+        await loadNextImage(previous.id);
 
     } catch (error) {
         console.error('Rating error:', error);
@@ -361,10 +372,13 @@ function showEmptyState(message) {
     document.getElementById('confidenceBar').style.display = 'none';
 }
 
-// Update progress bar
+// Update progress bar (progress elements removed, function kept for compatibility)
 function updateProgress(text, percent) {
-    document.getElementById('progressText').textContent = text;
-    document.getElementById('progressBar').style.width = `${percent}%`;
+    // Progress elements removed - no longer displayed
+    const progressText = document.getElementById('progressText');
+    const progressBar = document.getElementById('progressBar');
+    if (progressText) progressText.textContent = text;
+    if (progressBar) progressBar.style.width = `${percent}%`;
 }
 
 // Shuffle images (client side effective reload with shuffle)

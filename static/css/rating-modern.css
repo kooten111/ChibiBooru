@@ -729,9 +729,39 @@
    Rate Review Page Styles (Standardized)
    ============================================ */
 
+/* Rate Review Page Specific Layout */
+.gallery-page .page-container {
+    height: calc(100vh - 200px);
+    padding: 0 var(--spacing-lg);
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
 /* Page Header for Rate Review */
 .rate-review-header {
     flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 0;
+    padding: var(--spacing-xs) 0;
+    flex-shrink: 0;
+}
+
+.rate-review-header .page-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--text-primary);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
 }
 
 .rate-progress-wrapper {
@@ -750,24 +780,28 @@
 /* Filter Pills */
 .rate-filter-pills {
     display: flex;
-    gap: var(--spacing-md);
+    gap: var(--spacing-xs);
     flex-wrap: wrap;
-    margin-bottom: var(--spacing-xl);
-    padding-bottom: var(--spacing-lg);
-    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0;
+    padding: var(--spacing-xs) 0;
+    border-bottom: none;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .rate-filter-pill {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-xs) var(--spacing-md);
+    gap: var(--spacing-xs);
+    padding: 2px var(--spacing-sm);
     background: var(--gradient-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-fast);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-xs);
 }
 
 .rate-filter-pill:hover {
@@ -789,7 +823,17 @@
 /* Image Display Wrapper */
 .rate-image-display-wrapper {
     position: relative;
-    margin-bottom: var(--spacing-xl);
+    margin-bottom: var(--spacing-sm);
+    margin-top: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: visible;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .rate-loading-state {
@@ -829,6 +873,11 @@
 .rate-controls-wrapper {
     max-width: 1000px;
     margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0 var(--spacing-md);
+    margin-top: var(--spacing-sm);
+    flex-shrink: 0;
 }
 
 .rating-btn-label {
