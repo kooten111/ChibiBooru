@@ -250,41 +250,73 @@ async def api_get_images_for_rating():
     """Get images for rating review interface."""
     filter_type = request.args.get('filter', 'unrated')
     limit = request.args.get('limit', 100, type=int)
+    after_id = request.args.get('after_id', type=int)
 
     with get_db_connection() as conn:
         cur = conn.cursor()
 
         if filter_type == 'unrated':
             # Get images without any rating tag
-            cur.execute(f"""
-                SELECT i.id, i.filepath
-                FROM images i
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM image_tags it
-                    JOIN tags t ON it.tag_id = t.id
-                    WHERE it.image_id = i.id
-                    AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
-                )
-                ORDER BY i.id
-                LIMIT ?
-            """, rating_inference.RATINGS + [limit])
+            if after_id:
+                cur.execute(f"""
+                    SELECT i.id, i.filepath
+                    FROM images i
+                    WHERE i.id > ?
+                    AND NOT EXISTS (
+                        SELECT 1 FROM image_tags it
+                        JOIN tags t ON it.tag_id = t.id
+                        WHERE it.image_id = i.id
+                        AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                    )
+                    ORDER BY i.id
+                    LIMIT ?
+                """, [after_id] + list(rating_inference.RATINGS) + [limit])
+            else:
+                cur.execute(f"""
+                    SELECT i.id, i.filepath
+                    FROM images i
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM image_tags it
+                        JOIN tags t ON it.tag_id = t.id
+                        WHERE it.image_id = i.id
+                        AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                    )
+                    ORDER BY i.id
+                    LIMIT ?
+                """, rating_inference.RATINGS + [limit])
 
         elif filter_type == 'ai_predicted':
             # Get images with AI-predicted ratings
-            cur.execute(f"""
-                SELECT DISTINCT i.id, i.filepath
-                FROM images i
-                JOIN image_tags it ON i.id = it.image_id
-                JOIN tags t ON it.tag_id = t.id
-                WHERE t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
-                  AND it.source = 'ai_inference'
-                ORDER BY i.id
-                LIMIT ?
-            """, rating_inference.RATINGS + [limit])
+            if after_id:
+                cur.execute(f"""
+                    SELECT DISTINCT i.id, i.filepath
+                    FROM images i
+                    JOIN image_tags it ON i.id = it.image_id
+                    JOIN tags t ON it.tag_id = t.id
+                    WHERE i.id > ?
+                    AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                      AND it.source = 'ai_inference'
+                    ORDER BY i.id
+                    LIMIT ?
+                """, [after_id] + list(rating_inference.RATINGS) + [limit])
+            else:
+                cur.execute(f"""
+                    SELECT DISTINCT i.id, i.filepath
+                    FROM images i
+                    JOIN image_tags it ON i.id = it.image_id
+                    JOIN tags t ON it.tag_id = t.id
+                    WHERE t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                      AND it.source = 'ai_inference'
+                    ORDER BY i.id
+                    LIMIT ?
+                """, rating_inference.RATINGS + [limit])
 
         else:  # 'all'
             # Get all images
-            cur.execute("SELECT id, filepath FROM images ORDER BY id LIMIT ?", (limit,))
+            if after_id:
+                cur.execute("SELECT id, filepath FROM images WHERE id > ? ORDER BY id LIMIT ?", (after_id, limit))
+            else:
+                cur.execute("SELECT id, filepath FROM images ORDER BY id LIMIT ?", (limit,))
 
         # Fetch all images first
         image_rows = cur.fetchall()
@@ -356,18 +388,20 @@ async def api_get_images_for_rating():
 async def api_get_next_image_for_rating():
     """Get the next single image for rating review interface."""
     filter_type = request.args.get('filter', 'unrated')
-    exclude_id = request.args.get('exclude', type=int)
+    # Support multiple exclude parameters
+    exclude_ids = [int(id) for id in request.args.getlist('exclude') if id.isdigit()]
 
     with get_db_connection() as conn:
         cur = conn.cursor()
 
         if filter_type == 'unrated':
             # Get next image without any rating tag
-            if exclude_id:
+            if exclude_ids:
+                placeholders = ','.join('?' * len(exclude_ids))
                 cur.execute(f"""
                     SELECT i.id, i.filepath
                     FROM images i
-                    WHERE i.id != ?
+                    WHERE i.id NOT IN ({placeholders})
                     AND NOT EXISTS (
                         SELECT 1 FROM image_tags it
                         JOIN tags t ON it.tag_id = t.id
@@ -376,7 +410,7 @@ async def api_get_next_image_for_rating():
                     )
                     ORDER BY i.id
                     LIMIT 1
-                """, [exclude_id] + list(rating_inference.RATINGS))
+                """, tuple(exclude_ids) + tuple(rating_inference.RATINGS))
             else:
                 cur.execute(f"""
                     SELECT i.id, i.filepath
@@ -393,18 +427,19 @@ async def api_get_next_image_for_rating():
 
         elif filter_type == 'ai_predicted':
             # Get next image with AI-predicted ratings
-            if exclude_id:
+            if exclude_ids:
+                placeholders = ','.join('?' * len(exclude_ids))
                 cur.execute(f"""
                     SELECT DISTINCT i.id, i.filepath
                     FROM images i
                     JOIN image_tags it ON i.id = it.image_id
                     JOIN tags t ON it.tag_id = t.id
-                    WHERE i.id != ?
+                    WHERE i.id NOT IN ({placeholders})
                     AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
                       AND it.source = 'ai_inference'
                     ORDER BY i.id
                     LIMIT 1
-                """, [exclude_id] + list(rating_inference.RATINGS))
+                """, tuple(exclude_ids) + tuple(rating_inference.RATINGS))
             else:
                 cur.execute(f"""
                     SELECT DISTINCT i.id, i.filepath
@@ -419,8 +454,9 @@ async def api_get_next_image_for_rating():
 
         else:  # 'all'
             # Get next image (any)
-            if exclude_id:
-                cur.execute("SELECT id, filepath FROM images WHERE id != ? ORDER BY id LIMIT 1", (exclude_id,))
+            if exclude_ids:
+                placeholders = ','.join('?' * len(exclude_ids))
+                cur.execute(f"SELECT id, filepath FROM images WHERE id NOT IN ({placeholders}) ORDER BY id LIMIT 1", tuple(exclude_ids))
             else:
                 cur.execute("SELECT id, filepath FROM images ORDER BY id LIMIT 1")
 

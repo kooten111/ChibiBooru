@@ -22,7 +22,12 @@ let currentImage = null;
 let currentFilter = 'unrated';
 let isLoading = false;
 let imageHistory = []; // Stack for previous images
-let preloadedImage = null; // For preloading next image
+let imagePool = []; // Pool of images to cycle through
+let currentPoolIndex = 0; // Current index in the pool
+let seenImageIds = new Set(); // Track all image IDs we've seen to avoid duplicates
+let lastSeenImageId = 0; // Track the highest ID we've seen to fetch next batch
+const POOL_SIZE = 100; // Number of images to fetch at once
+const REFETCH_THRESHOLD = 80; // Refetch when we reach this index (80th image, 0-indexed)
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -86,7 +91,10 @@ window.changeFilter = function () {
     }
     // Reset state when filter changes
     imageHistory = [];
-    preloadedImage = null;
+    imagePool = [];
+    currentPoolIndex = 0;
+    seenImageIds = new Set();
+    lastSeenImageId = 0;
     currentImage = null;
     // Clear current display
     const display = document.getElementById('imageDisplay');
@@ -95,8 +103,41 @@ window.changeFilter = function () {
     loadNextImage();
 };
 
-// Load next image
-window.loadNextImage = async function (excludeId = null) {
+// Fetch a batch of images for the pool, starting after the last seen image ID
+async function fetchImagePool() {
+    try {
+        let url = `/api/rate/images?filter=${currentFilter}&limit=${POOL_SIZE}`;
+        if (lastSeenImageId > 0) {
+            url += `&after_id=${lastSeenImageId}`;
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.error || !data.images || data.images.length === 0) {
+            return [];
+        }
+        
+        // Filter out images we've already seen (safety check)
+        const newImages = data.images.filter(img => !seenImageIds.has(img.id));
+        
+        // If we got new images, update lastSeenImageId to the highest ID in the batch
+        if (newImages.length > 0) {
+            const maxId = Math.max(...newImages.map(img => img.id));
+            if (maxId > lastSeenImageId) {
+                lastSeenImageId = maxId;
+            }
+        }
+        
+        return newImages;
+    } catch (error) {
+        console.error('Error fetching image pool:', error);
+        return [];
+    }
+}
+
+// Load next image from pool
+window.loadNextImage = async function () {
     if (isLoading) return;
     isLoading = true;
 
@@ -112,29 +153,56 @@ window.loadNextImage = async function (excludeId = null) {
     }, 200);
 
     try {
-        let data;
-
-        // Use preloaded image if available and it's not the excluded image
-        if (preloadedImage && preloadedImage.id !== excludeId) {
-            data = preloadedImage;
-            preloadedImage = null;
-        } else {
-            // Clear invalid preloaded image
-            preloadedImage = null;
-            // Build URL with optional exclude parameter
-            let url = `/api/rate/next?filter=${currentFilter}`;
-            if (excludeId) {
-                url += `&exclude=${excludeId}`;
+        // If pool is empty or we're at the threshold, fetch more
+        if (imagePool.length === 0 || currentPoolIndex >= REFETCH_THRESHOLD) {
+            const newImages = await fetchImagePool();
+            if (newImages.length > 0) {
+                // If we're at threshold, append to existing pool, otherwise replace
+                if (currentPoolIndex >= REFETCH_THRESHOLD && imagePool.length > 0) {
+                    // Add new images to pool (they're already filtered by fetchImagePool)
+                    imagePool = imagePool.concat(newImages);
+                } else {
+                    imagePool = newImages;
+                    currentPoolIndex = 0;
+                }
             }
-            const response = await fetch(url);
-            data = await response.json();
         }
+
+        // If still no images, show empty state
+        if (imagePool.length === 0) {
+            clearTimeout(loadingTimeout);
+            showEmptyState('No more images found matching the current filter.');
+            return;
+        }
+
+        // Get next image from pool
+        if (currentPoolIndex >= imagePool.length) {
+            // Pool exhausted, fetch more
+            const newImages = await fetchImagePool();
+            if (newImages.length > 0) {
+                imagePool = imagePool.concat(newImages);
+            }
+        }
+
+        if (currentPoolIndex >= imagePool.length) {
+            clearTimeout(loadingTimeout);
+            showEmptyState('No more images found matching the current filter.');
+            return;
+        }
+
+        const data = imagePool[currentPoolIndex];
+        currentPoolIndex++;
 
         clearTimeout(loadingTimeout);
 
         if (data.error) {
             showEmptyState(data.error);
         } else {
+            // Mark this image as seen and update last seen ID
+            seenImageIds.add(data.id);
+            if (data.id > lastSeenImageId) {
+                lastSeenImageId = data.id;
+            }
             currentImage = data;
             renderImage(data);
             // Preload next one
@@ -151,17 +219,31 @@ window.loadNextImage = async function (excludeId = null) {
     }
 };
 
-// Preload next image data
+// Preload next image from pool (if available)
 async function preloadNext() {
     try {
-        const response = await fetch(`/api/rate/next?filter=${currentFilter}`);
-        const data = await response.json();
-        if (!data.error) {
-            preloadedImage = data;
+        // Check if we have a next image in the pool
+        if (currentPoolIndex < imagePool.length) {
+            const nextData = imagePool[currentPoolIndex];
             // Preload actual image asset
             const img = new Image();
-            const normalizedPath = normalizeImagePath(data.filepath);
+            const normalizedPath = normalizeImagePath(nextData.filepath);
             img.src = getImageUrl(normalizedPath);
+        } else if (currentPoolIndex >= REFETCH_THRESHOLD) {
+            // Prefetch next batch in background
+            fetchImagePool().then(newImages => {
+                if (newImages.length > 0) {
+                    const seenIds = new Set();
+                    imagePool.forEach(img => seenIds.add(img.id));
+                    if (currentImage?.id) seenIds.add(currentImage.id);
+                    imageHistory.forEach(img => seenIds.add(img.id));
+                    
+                    const filtered = newImages.filter(img => !seenIds.has(img.id));
+                    if (filtered.length > 0) {
+                        imagePool = imagePool.concat(filtered);
+                    }
+                }
+            });
         }
     } catch (e) {
         // Ignore preload errors
@@ -180,14 +262,12 @@ function renderImage(data) {
     let content = '';
     if (isVideo) {
         content = `
-            <video src="${imageUrl}" controls autoplay loop muted 
-                   style="max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+            <video src="${imageUrl}" controls autoplay loop muted>
             </video>
         `;
     } else {
         content = `
-            <img src="${imageUrl}" alt="Image to rate" 
-                 style="max-width: 100%; max-height: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); object-fit: contain;">
+            <img src="${imageUrl}" alt="Image to rate">
         `;
     }
 
@@ -291,8 +371,8 @@ window.setRating = async function (rating, keyIndex) {
         // Add to history
         imageHistory.push(previous);
 
-        // Move to next image - exclude the image we just rated
-        await loadNextImage(previous.id);
+        // Move to next image from pool
+        await loadNextImage();
 
     } catch (error) {
         console.error('Rating error:', error);
@@ -301,12 +381,22 @@ window.setRating = async function (rating, keyIndex) {
 };
 
 // Skip image
-window.skipImage = function () {
-    if (!currentImage) return;
-
+window.skipImage = async function () {
+    if (!currentImage) {
+        // No current image, just load next
+        await loadNextImage();
+        return;
+    }
+    
+    // Save current image for history
+    const previous = currentImage;
+    
+    // Add to history
+    imageHistory.push(previous);
     showNotification('Skipped image', 'info');
-    imageHistory.push(currentImage);
-    loadNextImage();
+    
+    // Load next image from pool
+    await loadNextImage();
 };
 
 // Previous image
@@ -319,19 +409,29 @@ window.previousImage = function () {
     const prev = imageHistory.pop();
     currentImage = prev;
     renderImage(prev);
-
-    // Put back preloaded if any
-    if (preloadedImage) {
-        // We lose the preloaded one if we go back, effectively
-        // Or we could create a forward stack, but simplest is just re-fetch if needed
-        preloadedImage = null;
+    
+    // Decrement pool index when going back
+    if (currentPoolIndex > 0) {
+        currentPoolIndex--;
     }
 };
 
 // Next image
-window.nextImage = function () {
-    // Just alias to skip for now, effectively skipping without rating
-    skipImage();
+window.nextImage = async function () {
+    if (!currentImage) {
+        // No current image, just load next
+        await loadNextImage();
+        return;
+    }
+    
+    // Save current image for history
+    const previous = currentImage;
+    
+    // Add to history
+    imageHistory.push(previous);
+    
+    // Load next image from pool
+    await loadNextImage();
 };
 
 // Toggle tags visibility
@@ -384,8 +484,11 @@ function updateProgress(text, percent) {
 // Shuffle images (client side effective reload with shuffle)
 window.shuffleImages = async function () {
     showNotification('Shuffling queue...', 'info');
-    // Clear preload
-    preloadedImage = null;
-    // Reload
+    // Reset pool and reload
+    imagePool = [];
+    currentPoolIndex = 0;
+    imageHistory = [];
+    seenImageIds = new Set();
+    lastSeenImageId = 0;
     loadNextImage();
 };
