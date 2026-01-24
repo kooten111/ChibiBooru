@@ -356,41 +356,73 @@ async def api_get_images_for_rating():
 async def api_get_next_image_for_rating():
     """Get the next single image for rating review interface."""
     filter_type = request.args.get('filter', 'unrated')
+    exclude_id = request.args.get('exclude', type=int)
 
     with get_db_connection() as conn:
         cur = conn.cursor()
 
         if filter_type == 'unrated':
             # Get next image without any rating tag
-            cur.execute(f"""
-                SELECT i.id, i.filepath
-                FROM images i
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM image_tags it
-                    JOIN tags t ON it.tag_id = t.id
-                    WHERE it.image_id = i.id
-                    AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
-                )
-                ORDER BY i.id
-                LIMIT 1
-            """, rating_inference.RATINGS)
+            if exclude_id:
+                cur.execute(f"""
+                    SELECT i.id, i.filepath
+                    FROM images i
+                    WHERE i.id != ?
+                    AND NOT EXISTS (
+                        SELECT 1 FROM image_tags it
+                        JOIN tags t ON it.tag_id = t.id
+                        WHERE it.image_id = i.id
+                        AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                    )
+                    ORDER BY i.id
+                    LIMIT 1
+                """, [exclude_id] + list(rating_inference.RATINGS))
+            else:
+                cur.execute(f"""
+                    SELECT i.id, i.filepath
+                    FROM images i
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM image_tags it
+                        JOIN tags t ON it.tag_id = t.id
+                        WHERE it.image_id = i.id
+                        AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                    )
+                    ORDER BY i.id
+                    LIMIT 1
+                """, rating_inference.RATINGS)
 
         elif filter_type == 'ai_predicted':
             # Get next image with AI-predicted ratings
-            cur.execute(f"""
-                SELECT DISTINCT i.id, i.filepath
-                FROM images i
-                JOIN image_tags it ON i.id = it.image_id
-                JOIN tags t ON it.tag_id = t.id
-                WHERE t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
-                  AND it.source = 'ai_inference'
-                ORDER BY i.id
-                LIMIT 1
-            """, rating_inference.RATINGS)
+            if exclude_id:
+                cur.execute(f"""
+                    SELECT DISTINCT i.id, i.filepath
+                    FROM images i
+                    JOIN image_tags it ON i.id = it.image_id
+                    JOIN tags t ON it.tag_id = t.id
+                    WHERE i.id != ?
+                    AND t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                      AND it.source = 'ai_inference'
+                    ORDER BY i.id
+                    LIMIT 1
+                """, [exclude_id] + list(rating_inference.RATINGS))
+            else:
+                cur.execute(f"""
+                    SELECT DISTINCT i.id, i.filepath
+                    FROM images i
+                    JOIN image_tags it ON i.id = it.image_id
+                    JOIN tags t ON it.tag_id = t.id
+                    WHERE t.name IN ({','.join('?' * len(rating_inference.RATINGS))})
+                      AND it.source = 'ai_inference'
+                    ORDER BY i.id
+                    LIMIT 1
+                """, rating_inference.RATINGS)
 
         else:  # 'all'
             # Get next image (any)
-            cur.execute("SELECT id, filepath FROM images ORDER BY id LIMIT 1")
+            if exclude_id:
+                cur.execute("SELECT id, filepath FROM images WHERE id != ? ORDER BY id LIMIT 1", (exclude_id,))
+            else:
+                cur.execute("SELECT id, filepath FROM images ORDER BY id LIMIT 1")
 
         # Fetch the image
         row = cur.fetchone()
