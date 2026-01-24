@@ -9,3 +9,10 @@ html, body {
     width: 100%;
     max-width: 100vw;
 }
+
+body.gallery-page {
+    overflow-y: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
