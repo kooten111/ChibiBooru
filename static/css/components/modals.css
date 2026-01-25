@@ -141,3 +141,68 @@
 .custom-confirm-modal .btn-confirm:hover {
     transform: translateY(-2px);
 }
+
+/* Retry/Reprocess option styles */
+.retry-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.option-section-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.option-section-label.danger-label {
+    color: var(--danger-red, #e74c3c);
+    border-bottom-color: rgba(231, 76, 60, 0.3);
+}
+
+.retry-option-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    text-align: left;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.retry-option-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary-blue);
+}
+
+.retry-option-btn.danger-option {
+    border-color: rgba(231, 76, 60, 0.3);
+}
+
+.retry-option-btn.danger-option:hover {
+    border-color: var(--danger-red, #e74c3c);
+    background: rgba(231, 76, 60, 0.1);
+}
+
+.retry-option-title {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.danger-option .retry-option-title {
+    color: var(--danger-red, #e74c3c);
+}
+
+.retry-option-desc {
+    font-size: var(--font-size-sm);
+    color: var(--text-muted);
+    line-height: 1.4;
+}

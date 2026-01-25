@@ -733,17 +733,10 @@ function systemReindexDatabase(event) {
     });
 }
 
-function systemBulkRetagLocal(event) {
-    if (event) event.preventDefault();
-    window.showConfirm('This will run the local AI tagger on EVERY image and save all predictions with confidence scores. This takes a while. Continue?', () => {
-        systemAction('/api/system/bulk_retag_local', event.target, 'Rescan All Images');
-    });
-}
-
-function systemBulkRetryTagging(event) {
+function systemReprocessImages(event) {
     if (event) event.preventDefault();
 
-    const template = document.getElementById('retry-tagging-modal-template');
+    const template = document.getElementById('reprocess-images-modal-template');
     const clone = template.content.cloneNode(true);
     const overlay = clone.querySelector('.custom-confirm-overlay');
 
@@ -765,14 +758,33 @@ function systemBulkRetryTagging(event) {
             const option = this.dataset.option;
             document.body.removeChild(overlay);
 
-            const params = {};
-            if (option === 'online-only') {
-                params.skip_local_fallback = true;
-            } else if (option === 'pixiv-only') {
-                params.pixiv_only = true;
+            // Route to appropriate endpoint based on option
+            switch (option) {
+                case 'find-online':
+                    // Try online sources for locally-tagged images, keep current if nothing found
+                    systemAction('/api/bulk_retry_tagging', event.target, 'Find Online Sources', { skip_local_fallback: true });
+                    break;
+                case 'refresh-local':
+                    // Re-run local AI on locally-tagged images only
+                    systemAction('/api/system/bulk_retag_local', event.target, 'Refresh Local AI', { local_only: true });
+                    break;
+                case 'complement-pixiv':
+                    // Try online for Pixiv, fall back to local AI
+                    systemAction('/api/bulk_retry_tagging', event.target, 'Complement Pixiv', { complement_pixiv: true });
+                    break;
+                case 'retag-all':
+                    // Confirm dangerous action
+                    window.showConfirm('This will re-run the AI tagger on EVERY image, including those with good online data. This takes a long time. Continue?', () => {
+                        systemAction('/api/system/bulk_retag_local', event.target, 'Retag Everything');
+                    });
+                    break;
+                case 'reprocess-all':
+                    // Confirm dangerous action
+                    window.showConfirm('This will run the full reprocessing pipeline on EVERY image. This overwrites existing data and takes a very long time. Continue?', () => {
+                        systemAction('/api/bulk_retry_tagging', event.target, 'Reprocess All', { reprocess_all: true });
+                    });
+                    break;
             }
-
-            systemAction('/api/bulk_retry_tagging', event.target, 'Bulk Retry Tagging', params);
         });
     });
 
@@ -782,6 +794,15 @@ function systemBulkRetryTagging(event) {
     };
 
     document.body.appendChild(overlay);
+}
+
+// Keep for backwards compatibility
+function systemBulkRetagLocal(event) {
+    systemReprocessImages(event);
+}
+
+function systemBulkRetryTagging(event) {
+    systemReprocessImages(event);
 }
 
 function systemDatabaseHealthCheck(event) {

@@ -594,24 +594,48 @@ async def database_health_check_service():
 @require_secret_sync
 def bulk_retag_local_service():
     """
-    Service to wipe all local tagger predictions and re-run local tagger for all images.
-    This populates the local_tagger_predictions table with fresh data.
+    Service to re-run local tagger for images.
+    
+    Request Body (JSON):
+        local_only: If True, only process images with active_source='local_tagger' or 'camie_tagger'
+                   If False/not provided, process ALL images
     """
     try:
         from database import get_db_connection
         from repositories import tagger_predictions_repository
         import config
+        from quart import request as quart_request
+        import json
+        
+        # Get request body if available
+        local_only = False
+        try:
+            # For sync context, we need to get the raw data differently
+            import flask
+            if hasattr(flask, 'request'):
+                data = flask.request.get_json(silent=True) or {}
+                local_only = data.get('local_only', False)
+        except:
+            pass
 
-        monitor_service.add_log("Starting bulk local tagger re-run...", "info")
+        mode_desc = "locally-tagged images only" if local_only else "ALL images"
+        monitor_service.add_log(f"Starting bulk local tagger re-run ({mode_desc})...", "info")
 
-        # Step 1: Clear all existing local tagger predictions
-        deleted = tagger_predictions_repository.clear_all_predictions()
-        monitor_service.add_log(f"Cleared {deleted} existing predictions", "info")
+        # Step 1: Clear existing local tagger predictions (only for targeted images if local_only)
+        if not local_only:
+            deleted = tagger_predictions_repository.clear_all_predictions()
+            monitor_service.add_log(f"Cleared {deleted} existing predictions", "info")
 
-        # Step 2: Get all images that need tagging
+        # Step 2: Get images to process based on mode
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, filepath FROM images")
+            if local_only:
+                cursor.execute("""
+                    SELECT id, filepath FROM images 
+                    WHERE active_source IN ('local_tagger', 'camie_tagger')
+                """)
+            else:
+                cursor.execute("SELECT id, filepath FROM images")
             all_images = cursor.fetchall()
 
         total = len(all_images)

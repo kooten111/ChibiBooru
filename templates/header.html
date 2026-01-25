@@ -115,6 +115,28 @@
         </div>
     </template>
 
+    <template id="bulk-retag-modal-template">
+        <div class="custom-confirm-overlay">
+            <div class="custom-confirm-modal" style="max-width: 550px;">
+                <h3>🏷️ Re-run AI Tagger</h3>
+                <p>Choose which images to re-tag with the local AI tagger:</p>
+                <div class="retry-options">
+                    <button class="retry-option-btn local-only" data-option="local-only">
+                        <div class="retry-option-title">🎯 Locally Tagged Only</div>
+                        <div class="retry-option-desc">Only re-scan images currently tagged by local AI. Much faster - skips images with online source tags.</div>
+                    </button>
+                    <button class="retry-option-btn all-images" data-option="all-images">
+                        <div class="retry-option-title">📦 All Images</div>
+                        <div class="retry-option-desc">Re-run AI tagger on every image. Takes a long time but ensures all images have fresh predictions.</div>
+                    </button>
+                </div>
+                <div class="button-group">
+                    <button class="btn-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <template id="health-check-modal-template">
         <div class="custom-confirm-overlay">
             <div class="custom-confirm-modal" style="max-width: 550px;">
