@@ -25,8 +25,6 @@
 
 /* Header content - Use CSS Grid for consistent layout across all pages */
 .header-content {
-    max-width: 1600px;
-    margin: 0 auto;
     display: grid !important;
     grid-template-columns: auto 1fr auto !important;
     /* logo group | search centered | controls */
@@ -43,6 +41,8 @@
     align-items: center;
     gap: var(--spacing-xs);
     flex-shrink: 0;
+    justify-self: start;
+    margin-left: 24px;
 }
 
 /* Header title/logo */
@@ -94,6 +94,8 @@
     align-items: center;
     gap: var(--spacing-md);
     flex-shrink: 0;
+    justify-self: end;
+    margin-right: 24px;
 }
 
 .stats-tabs-bar {
