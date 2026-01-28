@@ -518,7 +518,7 @@ class MLWorkerClient:
         )
         return self._send_request(request)
 
-    def generate_thumbnail(self, filepath: str, output_path: str, size: int = 512) -> Dict[str, Any]:
+    def generate_thumbnail(self, filepath: str, output_path: str, size: int = 512, quality: int = 85) -> Dict[str, Any]:
         """
         Generate a thumbnail for an image or video via ML Worker.
 
@@ -526,12 +526,13 @@ class MLWorkerClient:
             filepath: Path to source file
             output_path: Path to save thumbnail
             size: Thumbnail size (default 512)
+            quality: WebP quality (1-100, default 85)
 
         Returns:
             Dict with status
         """
         request_id = str(uuid.uuid4())
-        request = Request.generate_thumbnail(request_id, filepath, output_path, size)
+        request = Request.generate_thumbnail(request_id, filepath, output_path, size, quality)
         return self._send_request(request)
 
 

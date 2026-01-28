@@ -12,6 +12,7 @@ import config
 # Load from config
 THUMB_DIR = config.THUMB_DIR
 THUMB_SIZE = config.THUMB_SIZE
+THUMB_QUALITY = config.THUMB_QUALITY
 
 # ML Worker client - always import (no fallback to local loading)
 try:
@@ -58,7 +59,8 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                 result = client.generate_thumbnail(
                     filepath=os.path.abspath(filepath),
                     output_path=os.path.abspath(thumb_path),
-                    size=THUMB_SIZE
+                    size=THUMB_SIZE,
+                    quality=THUMB_QUALITY
                 )
                 
                 if result and result.get('success'):
@@ -83,7 +85,7 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                                 background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
                                 img = background
                             img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
-                            img.save(thumb_path, 'WEBP', quality=85, method=6)
+                            img.save(thumb_path, 'WEBP', quality=THUMB_QUALITY, method=6)
                         print(f"[Thumbnail] Created thumbnail for zip animation: {os.path.basename(filepath)}")
                     else:
                         print(f"[Thumbnail] ERROR: Could not find first frame for zip animation: {os.path.basename(filepath)}")
@@ -110,7 +112,7 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                     # Now process the extracted frame as an image
                     with Image.open(temp_frame_path) as img:
                         img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
-                        img.save(thumb_path, 'WEBP', quality=85, method=6)
+                        img.save(thumb_path, 'WEBP', quality=THUMB_QUALITY, method=6)
                 finally:
                     if os.path.exists(temp_frame_path):
                         os.unlink(temp_frame_path)
@@ -123,6 +125,6 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                         background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
                         img = background
                     img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
-                    img.save(thumb_path, 'WEBP', quality=85, method=6)
+                    img.save(thumb_path, 'WEBP', quality=THUMB_QUALITY, method=6)
         except Exception as e:
             print(f"Thumbnail error for {filepath}: {e}")

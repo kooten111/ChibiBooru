@@ -260,7 +260,7 @@ class Request:
         )
 
     @staticmethod
-    def generate_thumbnail(request_id: str, filepath: str, output_path: str, size: int = 512) -> Dict[str, Any]:
+    def generate_thumbnail(request_id: str, filepath: str, output_path: str, size: int = 512, quality: int = 85) -> Dict[str, Any]:
         """Create a generate_thumbnail request"""
         return Request.create(
             RequestType.GENERATE_THUMBNAIL,
@@ -268,7 +268,8 @@ class Request:
             {
                 "filepath": filepath,
                 "output_path": output_path,
-                "size": size
+                "size": size,
+                "quality": quality
             }
         )
 

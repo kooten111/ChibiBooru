@@ -72,7 +72,7 @@ async def delete_upscale():
     if not filepath:
         raise ValueError("Missing filepath")
     
-    result = await delete_upscaled_image(filepath)
+    result = delete_upscaled_image(filepath)
     
     if not result['success']:
         raise ValueError(result['error'])

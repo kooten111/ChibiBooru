@@ -54,6 +54,14 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Max dimension for thumbnails in pixels',
         'editable': True,
     },
+    'THUMB_QUALITY': {
+        'category': 'Application',
+        'type': 'int',
+        'description': 'WebP quality for thumbnails (1-100)',
+        'editable': True,
+        'min': 1,
+        'max': 100,
+    },
     'INGEST_DIRECTORY': {
         'category': 'Application',
         'type': 'string',

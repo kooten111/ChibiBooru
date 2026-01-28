@@ -336,6 +336,7 @@ def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
     filepath = request_data['filepath']
     output_path = request_data['output_path']
     size = request_data.get('size', 512)
+    quality = request_data.get('quality', 85)
     
     logger.info(f"Generating thumbnail for: {os.path.basename(filepath)}")
     
@@ -365,7 +366,7 @@ def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
                             background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
                             img = background
                         img.thumbnail((size, size), Image.Resampling.LANCZOS)
-                        img.save(output_path, 'WEBP', quality=85, method=6)
+                        img.save(output_path, 'WEBP', quality=quality, method=6)
                         
         # Handle Video
         elif filepath.lower().endswith(('.mp4', '.webm')):
@@ -384,7 +385,7 @@ def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
                 
                 with Image.open(temp_frame_path) as img:
                     img.thumbnail((size, size), Image.Resampling.LANCZOS)
-                    img.save(output_path, 'WEBP', quality=85, method=6)
+                    img.save(output_path, 'WEBP', quality=quality, method=6)
             finally:
                 if os.path.exists(temp_frame_path):
                     os.unlink(temp_frame_path)
@@ -398,7 +399,7 @@ def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
                     background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
                     img = background
                 img.thumbnail((size, size), Image.Resampling.LANCZOS)
-                img.save(output_path, 'WEBP', quality=85, method=6)
+                img.save(output_path, 'WEBP', quality=quality, method=6)
                 
         return {"success": True, "output_path": output_path}
         

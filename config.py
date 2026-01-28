@@ -63,6 +63,7 @@ APP_NAME = _get_setting('APP_NAME', 'ChibiBooru')
 IMAGE_DIRECTORY = _get_setting('IMAGE_DIRECTORY', "./static/images")
 THUMB_DIR = _get_setting('THUMB_DIR', "./static/thumbnails")
 THUMB_SIZE = _get_setting('THUMB_SIZE', 1000)  # Max dimension for thumbnails
+THUMB_QUALITY = int(_get_setting('THUMB_QUALITY', 85))  # WebP quality for thumbnails (1-100)
 
 # Ingest folder - drop images here and they'll be processed automatically
 INGEST_DIRECTORY = _get_setting('INGEST_DIRECTORY', "./ingest")
