@@ -75,3 +75,4 @@ requirements-dev.txt
 # docs/ is intentionally tracked
 .env.backup
 config.yml
+config.yml.backup
