@@ -69,12 +69,10 @@ function updateStatsDisplay(data) {
         const statTotal = document.getElementById('statTotal');
         const statCategorized = document.getElementById('statCategorized');
         const statUncategorized = document.getElementById('statUncategorized');
-        const statsSummary = document.getElementById('statsSummary');
 
         if (statTotal) statTotal.textContent = total;
         if (statCategorized) statCategorized.textContent = categorized || 0;
         if (statUncategorized) statUncategorized.textContent = uncategorized || 0;
-        if (statsSummary) statsSummary.style.display = 'grid';
     } catch (error) {
         console.error('Error updating stats display:', error);
     }
