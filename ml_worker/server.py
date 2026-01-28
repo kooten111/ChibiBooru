@@ -456,6 +456,31 @@ def get_onnx_providers() -> list:
     return providers
 
 
+def get_onnx_session_options():
+    """
+    Get ONNX Runtime SessionOptions configured for CPU parallelism.
+    Uses intra_op_num_threads for parallel execution of operations within inference.
+    """
+    import onnxruntime as ort
+    
+    sess_options = ort.SessionOptions()
+    
+    # Get number of CPU cores, cap at 16 to avoid excessive threading overhead
+    num_cores = min(os.cpu_count() or 4, 16)
+    
+    # intra_op_num_threads: parallelizes operations within a single inference run
+    # (matrix ops, convolutions, etc.) - this is what we want for single-job multithreading
+    sess_options.intra_op_num_threads = num_cores
+    
+    # inter_op_num_threads: parallelizes independent graph nodes
+    # Set to 1 for single job inference (no parallel graphs)
+    sess_options.inter_op_num_threads = 1
+    
+    logger.info(f"ONNX Session configured with {num_cores} intra-op threads")
+    
+    return sess_options
+
+
 def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle tag_image request.
@@ -501,7 +526,8 @@ def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
             
         # Dynamic providers based on backend
         providers = get_onnx_providers()
-        _tagger_session = ort.InferenceSession(model_path, providers=providers)
+        sess_options = get_onnx_session_options()
+        _tagger_session = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
 
         dataset_info = _tagger_metadata['dataset_info']
         logger.info(f"Tagger model loaded. Found {dataset_info['total_tags']} tags.")
@@ -845,7 +871,8 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
     if _similarity_model is None:
         logger.info(f"Loading similarity model from {model_path}")
         providers = get_onnx_providers()
-        _similarity_model = ort.InferenceSession(model_path, providers=providers)
+        sess_options = get_onnx_session_options()
+        _similarity_model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         logger.info("Similarity model loaded")
 
     # Preprocess image - model expects 448x448 in NHWC format (TensorFlow-style)
