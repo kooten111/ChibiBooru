@@ -120,100 +120,13 @@
     display: none;
 }
 
-.filters-label {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    font-weight: var(--font-weight-semibold);
-    letter-spacing: 0.5px;
-}
-
-.active-filter-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 12px;
-    background: var(--primary-blue-light);
-    border: var(--border-width) solid var(--primary-blue);
-    border-radius: var(--radius-lg);
-    font-size: var(--font-size-sm);
-    color: var(--primary-blue);
-    cursor: pointer;
-    transition: all var(--transition-normal);
-}
-
-.active-filter-chip:hover {
-    background: var(--primary-blue-medium);
-}
-
-.active-filter-chip .chip-text {
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.active-filter-chip .chip-remove {
-    font-size: 14px;
-    opacity: 0.7;
-    cursor: pointer;
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    transition: all var(--transition-normal);
-}
-
-.active-filter-chip .chip-remove:hover {
-    opacity: 1;
-    background: rgba(255, 100, 100, 0.3);
-}
-
-/* Editable chip state */
-.active-filter-chip.editing {
-    padding: 2px 4px;
-    background: var(--bg-input);
-    border-color: var(--border-color-focus);
-}
-
-.active-filter-chip.editing .chip-edit-input {
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--text-primary);
-    font-size: var(--font-size-sm);
-    font-family: inherit;
-    min-width: 80px;
-    width: auto;
-}
-
-.clear-filters {
-    font-size: var(--font-size-xs);
-    color: var(--text-muted);
-    background: none;
-    border: none;
-    cursor: pointer;
-    text-decoration: underline;
-    margin-left: var(--spacing-sm);
-}
-
-.clear-filters:hover {
-    color: var(--danger);
-}
-
-.results-count {
-    margin-left: auto;
-    font-size: var(--font-size-sm);
-    color: var(--text-muted);
-}
 
 /* ============================================================================
    GALLERY LAYOUT - Sidebar + Content
    ============================================================================ */
 
 .gallery-layout {
+
     flex: 1;
     display: flex;
     overflow: hidden;

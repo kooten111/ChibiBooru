@@ -58,10 +58,6 @@
     margin-top: 10px;
 }
 
-.mt-15 {
-    margin-top: 15px;
-}
-
 .border-bottom-none {
     border-bottom: none;
 }
@@ -82,9 +78,7 @@
     color: var(--text-disabled);
 }
 
-.no-pools-message,
-.no-images-message,
-.no-tags-message {
+.no-images-message {
     text-align: center;
     padding: 60px 20px;
     color: var(--text-disabled);

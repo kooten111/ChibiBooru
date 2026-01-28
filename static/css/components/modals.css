@@ -150,22 +150,6 @@
     margin-bottom: 20px;
 }
 
-.option-section-label {
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 8px;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.option-section-label.danger-label {
-    color: var(--danger-red, #e74c3c);
-    border-bottom-color: rgba(231, 76, 60, 0.3);
-}
-
 .retry-option-btn {
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -181,16 +165,8 @@
     border-color: var(--primary-blue);
 }
 
-.retry-option-btn.danger-option {
-    border-color: rgba(231, 76, 60, 0.3);
-}
-
-.retry-option-btn.danger-option:hover {
-    border-color: var(--danger-red, #e74c3c);
-    background: rgba(231, 76, 60, 0.1);
-}
-
 .retry-option-title {
+
     font-size: var(--font-size-md);
     font-weight: var(--font-weight-semibold);
     color: var(--text-primary);

@@ -1,67 +1,10 @@
-/* SETTINGS MENU OVERHAUL */
-.settings-group {
-    background: rgba(30, 30, 45, 0.4);
-    border: var(--border-width) solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-md);
-    margin-bottom: var(--spacing-lg);
-}
-
-.settings-group h5 {
-    margin: 0 0 var(--spacing-md) 0;
-    font-size: var(--font-size-lg);
-    color: var(--text-primary);
-    border-bottom: var(--border-width) solid var(--border-color);
-    padding-bottom: var(--spacing-xs);
-}
-
-.settings-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--spacing-sm) 0;
-    border-bottom: var(--border-width) solid rgba(255, 255, 255, 0.05);
-}
-
-.settings-item:last-child {
-    border-bottom: none;
-}
-
-.settings-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-    margin-right: var(--spacing-md);
-}
-
-.settings-label {
-    font-weight: var(--font-weight-medium);
-    color: var(--text-secondary);
-    font-size: var(--font-size-base);
-}
-
-.settings-desc {
-    font-size: var(--font-size-sm);
-    color: var(--text-muted);
-}
-
-.settings-group.danger-zone {
-    border-color: rgba(255, 100, 100, 0.3);
-    background: rgba(40, 20, 20, 0.3);
-}
-
-.settings-group.danger-zone h5 {
-    color: var(--danger);
-    border-bottom-color: rgba(255, 100, 100, 0.3);
-}
-
 /* ============================================================================
    FAMILY FILMSTRIP - Compact filmstrip-style Parent/Child Indicator
    ============================================================================ */
 
 /* Main container - positioned beside action bar */
 .family-filmstrip {
+
     display: flex;
     align-items: center;
     gap: 0;
