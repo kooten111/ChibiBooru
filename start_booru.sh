@@ -18,11 +18,16 @@ source venv/bin/activate
 if [ "$FRESH_INSTALL" = true ] || ! python -c "import torch" 2>/dev/null; then
     echo "Running initial setup..."
     
-    # Upgrade pip
+    # Upgrade pip first
     pip install --upgrade pip -q
     
     # Install base requirements (excludes torch)
     pip install -r requirements.txt -q
+    
+    # Run first-time setup wizard on fresh install
+    if [ "$FRESH_INSTALL" = true ]; then
+        python setup_wizard.py
+    fi
     
     # Run ML setup (backend selection + torch install)
     # On fresh install, run interactively to let user choose backend

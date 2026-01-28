@@ -408,6 +408,22 @@ def is_zip_animation(filepath: str) -> bool:
     return filepath.lower().endswith(SUPPORTED_ZIP_EXTENSIONS)
 
 
+# ==================== FIRST-RUN DETECTION ====================
+
+def is_first_run() -> bool:
+    """Check if this is a fresh installation needing setup.
+    
+    Returns True if any security secrets are still set to default values,
+    indicating the setup wizard should be run.
+    """
+    defaults = [
+        (SYSTEM_API_SECRET, 'change-this-secret'),
+        (APP_PASSWORD, 'default-password'),
+        (SECRET_KEY, 'dev-secret-key-change-for-production'),
+    ]
+    return any(current == default for current, default in defaults)
+
+
 # ==================== VALIDATION ====================
 
 def validate_config():
