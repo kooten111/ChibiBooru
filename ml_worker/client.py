@@ -66,7 +66,8 @@ class MLWorkerClient:
 
         self._worker_process: Optional[subprocess.Popen] = None
         self._socket: Optional[socket.socket] = None
-        self._lock = threading.Lock()
+        self._spawn_lock = threading.Lock()  # Lock only for worker spawning
+        self._connection_semaphore = threading.Semaphore(10)  # Limit concurrent connections
         
         # Register cleanup handlers
         atexit.register(self._cleanup_worker)
@@ -167,13 +168,17 @@ class MLWorkerClient:
         Raises:
             MLWorkerConnectionError: If connection fails
         """
-        # Check if worker is running
+        # Check if worker is running (outside lock for performance)
         if not self._is_worker_running():
-            logger.info("ML worker not running, spawning...")
-            if not self._spawn_worker():
-                raise MLWorkerConnectionError("Failed to spawn ML worker")
+            # Only one thread should spawn the worker
+            with self._spawn_lock:
+                # Double-check after acquiring lock
+                if not self._is_worker_running():
+                    logger.info("ML worker not running, spawning...")
+                    if not self._spawn_worker():
+                        raise MLWorkerConnectionError("Failed to spawn ML worker")
 
-        # Connect to socket
+        # Connect to socket (no lock needed - server handles concurrent connections)
         try:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(self.timeout)
@@ -197,8 +202,9 @@ class MLWorkerClient:
         """
         for attempt in range(self.max_retries):
             try:
-                with self._lock:
-                    # Connect (or reconnect)
+                # Use semaphore to limit concurrent connections (prevents overwhelming server)
+                with self._connection_semaphore:
+                    # Connect (or reconnect) - spawning is protected by separate lock
                     sock = self._connect()
 
                     try:
