@@ -735,11 +735,14 @@ async def find_broken_images_service() -> Dict[str, Any]:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             
-            # Find images with missing phash
-            cursor.execute("""
+            # Find images with missing phash (exclude videos; they may lack phash without being broken)
+            video_excl = " AND ".join(
+                f"LOWER(filepath) NOT LIKE '%{ext}'" for ext in config.SUPPORTED_VIDEO_EXTENSIONS
+            )
+            cursor.execute(f"""
                 SELECT id, filepath, phash, colorhash, md5
-                FROM images 
-                WHERE phash IS NULL OR phash = ''
+                FROM images
+                WHERE (phash IS NULL OR phash = '') AND {video_excl}
             """)
             missing_phash = cursor.fetchall()
             
@@ -881,13 +884,15 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
             with get_db_connection() as conn:
                 cursor = conn.cursor()
                 
-                # Get all images with phash or tag issues
-                cursor.execute("""
+                # Get all images with phash or tag issues (videos not broken solely for missing phash)
+                video_excl = " AND ".join(
+                    f"LOWER(i.filepath) NOT LIKE '%{ext}'" for ext in config.SUPPORTED_VIDEO_EXTENSIONS
+                )
+                cursor.execute(f"""
                     SELECT DISTINCT i.id
                     FROM images i
                     LEFT JOIN image_tags it ON i.id = it.image_id
-                    WHERE i.phash IS NULL 
-                       OR i.phash = ''
+                    WHERE ( (i.phash IS NULL OR i.phash = '') AND {video_excl} )
                        OR it.tag_id IS NULL
                     GROUP BY i.id
                 """)

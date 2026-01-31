@@ -3,19 +3,23 @@
 
 cd "$(dirname "$0")"
 
-# Check if this is a fresh install (no venv)
-FRESH_INSTALL=false
+# Check if venv exists, create if not
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
     python3 -m venv venv
-    FRESH_INSTALL=true
 fi
 
 # Activate virtual environment
 source venv/bin/activate
 
-# On fresh install OR if torch is missing, run full setup
-if [ "$FRESH_INSTALL" = true ] || ! python -c "import torch" 2>/dev/null; then
+# Check if this is a first-run (no .env file = needs setup)
+NEEDS_SETUP=false
+if [ ! -f ".env" ]; then
+    NEEDS_SETUP=true
+fi
+
+# Install dependencies if torch is missing
+if ! python -c "import torch" 2>/dev/null; then
     echo "Running initial setup..."
     
     # Upgrade pip first
@@ -24,15 +28,13 @@ if [ "$FRESH_INSTALL" = true ] || ! python -c "import torch" 2>/dev/null; then
     # Install base requirements (excludes torch)
     pip install -r requirements.txt -q
     
-    # Run first-time setup wizard on fresh install
-    if [ "$FRESH_INSTALL" = true ]; then
+    # Run first-time setup wizard if .env doesn't exist
+    if [ "$NEEDS_SETUP" = true ]; then
         python setup_wizard.py
     fi
     
     # Run ML setup (backend selection + torch install)
-    # On fresh install, run interactively to let user choose backend
-    # Otherwise, use NON_INTERACTIVE to use existing .env setting
-    if [ "$FRESH_INSTALL" = true ]; then
+    if [ "$NEEDS_SETUP" = true ]; then
         python setup_ml.py
     else
         NON_INTERACTIVE=1 python setup_ml.py
