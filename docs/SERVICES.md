@@ -980,7 +980,7 @@ Generate thumbnail for an image.
 
 **Thumbnail Settings**:
 - Format: WebP
-- Max dimension: `config.THUMB_SIZE` (default 1000px)
+- Max dimension: `config.THUMB_SIZE` (default 600px)
 - Preserves aspect ratio
 - Quality: 85
 

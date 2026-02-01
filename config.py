@@ -62,7 +62,7 @@ APP_NAME = _get_setting('APP_NAME', 'ChibiBooru')
 # Image storage
 IMAGE_DIRECTORY = _get_setting('IMAGE_DIRECTORY', "./static/images")
 THUMB_DIR = _get_setting('THUMB_DIR', "./static/thumbnails")
-THUMB_SIZE = _get_setting('THUMB_SIZE', 1000)  # Max dimension for thumbnails
+THUMB_SIZE = _get_setting('THUMB_SIZE', 600)  # Max dimension for thumbnails (2x large grid for retina)
 THUMB_QUALITY = int(_get_setting('THUMB_QUALITY', 85))  # WebP quality for thumbnails (1-100)
 
 # Ingest folder - drop images here and they'll be processed automatically
@@ -309,6 +309,10 @@ SIMILAR_SIDEBAR_SOURCES = str(_get_setting('SIMILAR_SIDEBAR_SOURCES', 'both')).l
 # Show Tag/FAISS chips on similar images
 _show_chips = _get_setting('SIMILAR_SIDEBAR_SHOW_CHIPS', True)
 SIMILAR_SIDEBAR_SHOW_CHIPS = _show_chips if isinstance(_show_chips, bool) else str(_show_chips).lower() in ('true', '1', 'yes')
+
+# Image page: Information panel expanded by default (False = collapsed by default)
+_ip_visible = _get_setting('INFORMATION_PANEL_DEFAULT_VISIBLE', False)
+INFORMATION_PANEL_DEFAULT_VISIBLE = _ip_visible if isinstance(_ip_visible, bool) else str(_ip_visible).lower() in ('true', '1', 'yes')
 
 # ==================== FILE TYPES ====================
 

@@ -204,7 +204,7 @@ The following settings can still be set in `.env` for backward compatibility, bu
 ```python
 IMAGE_DIRECTORY = "./static/images"      # Main image storage
 THUMB_DIR = "./static/thumbnails"        # Thumbnail storage
-THUMB_SIZE = 1000                        # Max thumbnail dimension (px)
+THUMB_SIZE = 600                         # Max thumbnail dimension (px; 2x large grid for retina)
 ```
 
 ---
