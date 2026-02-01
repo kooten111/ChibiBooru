@@ -35,9 +35,10 @@ def run_command(command, check=True):
             print(e.stderr)
         return False
 
-def get_pip():
-    """Get pip executable path"""
-    # Use the same Python that's running this script
+def get_installer():
+    """Get installer command: prefer uv pip when available, else python -m pip"""
+    if shutil.which("uv"):
+        return "uv pip"
     return f"{sys.executable} -m pip"
 
 def detect_hardware():
@@ -112,32 +113,32 @@ def save_backend(backend):
 def uninstall_torch():
     """Uninstall existing PyTorch packages"""
     print("\n🗑️  Removing existing PyTorch installation...")
-    pip = get_pip()
+    installer = get_installer()
     # Ignore errors if not installed
-    subprocess.run(f"{pip} uninstall -y torch torchvision torchaudio intel-extension-for-pytorch 2>/dev/null", 
+    subprocess.run(f"{installer} uninstall -y torch torchvision torchaudio intel-extension-for-pytorch 2>/dev/null",
                    shell=True, capture_output=True)
     return True
 
 def install_torch(backend):
     """Install PyTorch for the specified backend"""
-    pip = get_pip()
+    installer = get_installer()
     
     print(f"\n📦 Installing PyTorch for {backend.upper()}...")
     
     if backend == "xpu":
         # Intel XPU requires PyTorch nightly
         print("  Using PyTorch nightly for Intel XPU support")
-        cmd = f"{pip} install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/xpu"
+        cmd = f"{installer} install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/xpu"
         
     elif backend == "cuda":
         # CUDA uses stable PyTorch with CUDA support
         print("  Using PyTorch stable with CUDA 12.4")
-        cmd = f"{pip} install torch torchvision --index-url https://download.pytorch.org/whl/cu124"
+        cmd = f"{installer} install torch torchvision --index-url https://download.pytorch.org/whl/cu124"
         
     elif backend == "cpu":
         # CPU-only version
         print("  Using PyTorch stable (CPU only)")
-        cmd = f"{pip} install torch torchvision --index-url https://download.pytorch.org/whl/cpu"
+        cmd = f"{installer} install torch torchvision --index-url https://download.pytorch.org/whl/cpu"
         
     else:
         print(f"  ❌ Unknown backend: {backend}")

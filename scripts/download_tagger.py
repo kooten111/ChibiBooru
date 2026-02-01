@@ -91,7 +91,7 @@ def main():
         print("You can now use AI tagging for images without online metadata.")
         print()
         print("To use the tagger:")
-        print("  1. Ensure you have installed: pip install -r requirements-ai.txt")
+        print("  1. Ensure you have installed: uv pip install -r requirements.txt")
         print("  2. Start the application: python app.py")
         print("  3. Images without online metadata will be tagged automatically")
     else:

@@ -86,12 +86,11 @@ A self-hosted booru application for organizing and browsing your local image col
 ## Quick Start
 
 ```bash
-# Clone and install
+# Clone and install (uv is faster; pip works too)
 git clone <repository-url>
 cd Booru
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+uv venv venv && source venv/bin/activate  # or: python -m venv venv && source venv/bin/activate
+uv pip install -r requirements.txt        # or: pip install -r requirements.txt
 
 # Configure
 # Create .env file and set required values (see Configuration section below)
@@ -111,8 +110,9 @@ python app.py
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.10–3.12 (required by onnxruntime)
 - Git (for cloning the repository)
+- Optional: [uv](https://docs.astral.sh/uv/) for faster venv and dependency installs
 
 ### Step-by-Step Installation
 
@@ -122,15 +122,16 @@ python app.py
    cd Booru
    ```
 
-2. **Create a virtual environment** (highly recommended):
+2. **Create a virtual environment** (highly recommended). Use [uv](https://docs.astral.sh/uv/) for faster installs:
    ```bash
-   python -m venv venv
+   uv venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
+   Or with pip: `python -m venv venv` then activate.
 
 3. **Install dependencies:**
    ```bash
-   pip install -r requirements.txt
+   uv pip install -r requirements.txt   # or: pip install -r requirements.txt
    ```
 
 4. **Optional: Download tagger model:**

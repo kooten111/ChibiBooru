@@ -271,8 +271,8 @@ pkill -f monitor_runner.py
 
 **Solution:**
 ```bash
-# Install psutil
-pip install psutil
+# Install psutil (from project root with venv activated)
+uv pip install psutil   # or: pip install psutil
 
 # Verify psutil is installed
 python -c "import psutil; print(psutil.__version__)"
@@ -319,8 +319,7 @@ If upgrading from a version where monitors ran per-worker:
 
 3. **Install dependencies:**
    ```bash
-   pip install psutil
-   # Or: pip install -r requirements.txt
+   uv pip install psutil   # or: pip install -r requirements.txt
    ```
 
 4. **Start with new script:**

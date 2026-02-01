@@ -32,7 +32,11 @@ if [ ! -d "venv" ]; then
         exit 1
     fi
     echo "Creating virtual environment..."
-    python3 -m venv venv
+    if command -v uv >/dev/null 2>&1; then
+        uv venv venv --python python3
+    else
+        python3 -m venv venv
+    fi
 fi
 
 # Activate virtual environment
@@ -45,7 +49,13 @@ if ! check_python_version; then
     exit 1
 fi
 
-# Setup flags: run wizard and/or pip+ML setup when .env or torch is missing
+# Prefer uv when available (faster installs)
+USE_UV=false
+if command -v uv >/dev/null 2>&1; then
+    USE_UV=true
+fi
+
+# Setup flags: run wizard and/or install+ML setup when .env or torch is missing
 NEEDS_ENV=false
 NEEDS_TORCH=false
 [ ! -f ".env" ] && NEEDS_ENV=true
@@ -56,11 +66,19 @@ fi
 # Install base dependencies only when torch is missing (venv assumed correct otherwise)
 if [ "$NEEDS_TORCH" = true ]; then
     echo "Running initial setup (torch missing)..."
-    pip install --upgrade pip -q
-    if ! pip install -r requirements.txt; then
-        echo ""
-        echo "Dependency installation failed. Fix the error above (e.g. use Python 3.10–3.12 if onnxruntime fails) and run ./start_booru.sh again."
-        exit 1
+    if [ "$USE_UV" = true ]; then
+        if ! uv pip install -r requirements.txt; then
+            echo ""
+            echo "Dependency installation failed. Fix the error above (e.g. use Python 3.10–3.12 if onnxruntime fails) and run ./start_booru.sh again."
+            exit 1
+        fi
+    else
+        pip install --upgrade pip -q
+        if ! pip install -r requirements.txt; then
+            echo ""
+            echo "Dependency installation failed. Fix the error above (e.g. use Python 3.10–3.12 if onnxruntime fails) and run ./start_booru.sh again."
+            exit 1
+        fi
     fi
 fi
 

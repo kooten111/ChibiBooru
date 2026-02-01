@@ -94,7 +94,7 @@ def check_dependencies() -> bool:
         logger.error("=" * 60)
         logger.error("FATAL: Missing required dependencies!")
         logger.error(f"Please install: {', '.join(missing)}")
-        logger.error("Run: source ./venv/bin/activate && pip install -r requirements.txt")
+        logger.error("Run: source ./venv/bin/activate && uv pip install -r requirements.txt")
         logger.error("=" * 60)
         return False
     

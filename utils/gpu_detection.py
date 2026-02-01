@@ -7,10 +7,18 @@ import subprocess
 import platform
 import sys
 import os
+import shutil
 from typing import Dict, Optional, Tuple
 
 # Cache GPU info to avoid repeated detection
 _gpu_info_cache: Optional[Dict] = None
+
+
+def _installer_cmd() -> str:
+    """Prefer uv pip when available, else python -m pip."""
+    if shutil.which("uv"):
+        return "uv pip"
+    return f"{sys.executable} -m pip"
 
 
 def run_command(cmd: str, capture: bool = True) -> Tuple[int, str, str]:
@@ -167,20 +175,21 @@ def check_upscaler_dependencies() -> Dict:
 
 def get_pytorch_install_command(variant: str = 'auto') -> str:
     """
-    Get the pip install command for PyTorch based on GPU type.
+    Get the install command for PyTorch based on GPU type (uses uv pip when available).
     """
+    installer = _installer_cmd()
     if variant == 'auto':
         gpu_info = detect_gpu_hardware()
         variant = gpu_info['recommended_pytorch']
     
     if variant == 'cuda':
-        return "pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124"
+        return f"{installer} install torch torchvision --index-url https://download.pytorch.org/whl/cu124"
     elif variant == 'rocm':
-        return "pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.2"
+        return f"{installer} install torch torchvision --index-url https://download.pytorch.org/whl/rocm6.2"
     elif variant == 'xpu':
-        return "pip install torch torchvision intel-extension-for-pytorch"
+        return f"{installer} install torch torchvision intel-extension-for-pytorch"
     else:
-        return "pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu"
+        return f"{installer} install torch torchvision --index-url https://download.pytorch.org/whl/cpu"
 
 
 def install_upscaler_dependencies(variant: str = 'auto') -> Dict:
@@ -217,7 +226,7 @@ def install_upscaler_dependencies(variant: str = 'auto') -> Dict:
     result['messages'].append("Installing image processing dependencies...")
     
     packages = ["numpy", "Pillow"]
-    code, _, stderr = run_command(f"pip install {' '.join(packages)}", capture=False)
+    code, _, stderr = run_command(f"{_installer_cmd()} install {' '.join(packages)}", capture=False)
     
     if code != 0:
         result['errors'].append(f"Dependency installation failed: {stderr}")
