@@ -6,6 +6,7 @@ Interactive CLI wizard for configuring ChibiBooru on first installation.
 Handles secret generation, directory creation, and optional model downloads.
 """
 
+import getpass
 import os
 import sys
 import secrets
@@ -65,6 +66,15 @@ def prompt_yes_no(message: str, default: bool = True) -> bool:
         if not value:
             return default
         return value in ('y', 'yes')
+    except (EOFError, KeyboardInterrupt):
+        print("\n  Cancelled.")
+        sys.exit(1)
+
+
+def prompt_password(message: str) -> str:
+    """Prompt for input without echoing (for passwords)."""
+    try:
+        return getpass.getpass(f"  {message}: ").strip()
     except (EOFError, KeyboardInterrupt):
         print("\n  Cancelled.")
         sys.exit(1)
@@ -138,13 +148,8 @@ def setup_secrets() -> dict:
     current = env_vars.get('SECRET_KEY', '')
     if not current or is_default_secret(current, 'SECRET_KEY'):
         generated = generate_secret()
-        print("  SECRET_KEY is used for Flask session encryption.")
-        if prompt_yes_no("Generate a new SECRET_KEY?", default=True):
-            changes['SECRET_KEY'] = generated
-            print(f"  ✓ Generated SECRET_KEY")
-        else:
-            value = prompt("Enter SECRET_KEY", generated)
-            changes['SECRET_KEY'] = value
+        changes['SECRET_KEY'] = generated
+        print(f"  ✓ Generated SECRET_KEY: {generated}")
     else:
         print("  ✓ SECRET_KEY already configured")
     
@@ -152,13 +157,8 @@ def setup_secrets() -> dict:
     current = env_vars.get('SYSTEM_API_SECRET', '')
     if not current or is_default_secret(current, 'SYSTEM_API_SECRET'):
         generated = generate_secret()
-        print("\n  SYSTEM_API_SECRET is used for system API authentication.")
-        if prompt_yes_no("Generate a new SYSTEM_API_SECRET?", default=True):
-            changes['SYSTEM_API_SECRET'] = generated
-            print(f"  ✓ Generated SYSTEM_API_SECRET")
-        else:
-            value = prompt("Enter SYSTEM_API_SECRET", generated)
-            changes['SYSTEM_API_SECRET'] = value
+        changes['SYSTEM_API_SECRET'] = generated
+        print(f"  ✓ Generated SYSTEM_API_SECRET: {generated}")
     else:
         print("  ✓ SYSTEM_API_SECRET already configured")
     
@@ -166,7 +166,7 @@ def setup_secrets() -> dict:
     current = env_vars.get('APP_PASSWORD', '')
     if not current or is_default_secret(current, 'APP_PASSWORD'):
         print("\n  APP_PASSWORD is used for web UI login.")
-        value = prompt("Enter APP_PASSWORD (web UI login)", "")
+        value = prompt_password("Enter APP_PASSWORD (web UI login)")
         if value:
             changes['APP_PASSWORD'] = value
             print("  ✓ Set APP_PASSWORD")
