@@ -285,59 +285,69 @@ def find_unprocessed_images():
 def run_scan():
     """
     Finds and processes all new images using parallel workers.
-    Returns the number of images processed.
+    Returns (processed_count, attempted_count) so callers can distinguish
+    "no files found" from "files found but none processed".
     """
     import config
-    
+
     unprocessed_files = find_unprocessed_images()
     if not unprocessed_files:
         add_log("No new images found.")
-        return 0
+        return 0, 0
 
     add_log(f"Found {len(unprocessed_files)} new images. Starting parallel processing...", 'info')
-    
-    # Store futures to track batch completion
-    futures = {}
-    
-    if not ingest_executor:
-        add_log("Executor died? Restarting...", 'warning')
-        start_monitor()
-        if not ingest_executor:
-            add_log("Failed to restart executor.", 'error')
-            return 0
+
+    # Use global executor if available; otherwise create a one-off executor for this scan.
+    # This allows "Run scan" from the UI to work when the monitor is external or not started.
+    executor = ingest_executor
+    one_off_executor = None
+    if not executor:
+        try:
+            max_workers = getattr(config, 'MAX_WORKERS', 4)
+            if max_workers <= 0:
+                import multiprocessing
+                max_workers = max(1, multiprocessing.cpu_count() - 1)
+            one_off_executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="IngestWorker")
+            executor = one_off_executor
+            add_log("Using temporary executor for this scan.", 'info')
+        except Exception as e:
+            add_log(f"Failed to create executor for scan: {e}", 'error')
+            return 0, len(unprocessed_files)
 
     # Submit all files for processing
+    futures = {}
     for filepath in unprocessed_files:
-        # Determine if from ingest folder
         abs_filepath = os.path.abspath(filepath)
         abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
         is_from_ingest = abs_filepath.startswith(abs_ingest)
-        
-        future = ingest_executor.submit(processing.process_image_file, filepath, is_from_ingest)
+        future = executor.submit(processing.process_image_file, filepath, is_from_ingest)
         futures[future] = filepath
 
     processed_count = 0
     from concurrent.futures import as_completed
-    
     for future in as_completed(futures):
         filepath = futures[future]
         try:
             success, msg = future.result()
-            
             if success:
                 processed_count += 1
                 add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
             else:
                 add_log(f"Failed to process {os.path.basename(filepath)}: {msg}", 'error')
-                
         except Exception as e:
             add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
+
+    if one_off_executor:
+        try:
+            one_off_executor.shutdown(wait=True)
+        except Exception:
+            pass
 
     # Note: We don't reload the cache here because the monitor runs in a
     # separate process from the web server. The web server handles its own
     # cache invalidation when images are added via API.
 
-    return processed_count
+    return processed_count, len(unprocessed_files)
 
 def monitor_loop():
     """The main loop for the background thread."""
@@ -346,7 +356,7 @@ def monitor_loop():
         monitor_status["last_check"] = time.strftime("%Y-%m-%d %H:%M:%S")
         
         try:
-            processed_count = run_scan()
+            processed_count, _ = run_scan()
             monitor_status["last_scan_found"] = processed_count
             monitor_status["total_processed"] += processed_count
         except Exception as e:
@@ -422,7 +432,7 @@ def initial_scan_then_idle():
     """Do an initial scan for existing files, then idle."""
     add_log("Running initial scan...")
     try:
-        processed_count = run_scan()
+        processed_count, _ = run_scan()
         monitor_status["last_scan_found"] = processed_count
         monitor_status["total_processed"] += processed_count
         add_log(f"Initial scan complete. Processed {processed_count} images.")

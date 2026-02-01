@@ -501,7 +501,7 @@
                 <div class="image-view skeleton" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
                     data.image_width and data.image_height %}data-width="{{ data.image_width }}"
                     data-height="{{ data.image_height }}" {% endif %} {% if filepath.endswith('.zip')
-                    %}data-animation-type="zip" data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="10" {% endif
+                    %}data-animation-type="zip" data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="24" {% endif
                     %}>
                     {% if filepath.endswith('.mp4') %}
                     <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"

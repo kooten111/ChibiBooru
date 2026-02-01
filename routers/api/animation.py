@@ -57,7 +57,7 @@ async def get_animation_metadata(filepath):
         "frames": metadata.get("frames", []),
         "width": metadata.get("width"),
         "height": metadata.get("height"),
-        "default_fps": metadata.get("default_fps", 10),
+        "default_fps": metadata.get("default_fps", 24),
         "is_animated": True
     }
 
@@ -124,5 +124,5 @@ async def get_all_frame_urls(md5):
         "frame_urls": frame_urls,
         "width": metadata.get("width"),
         "height": metadata.get("height"),
-        "default_fps": metadata.get("default_fps", 10)
+        "default_fps": metadata.get("default_fps", 24)
     }

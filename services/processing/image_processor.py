@@ -369,6 +369,15 @@ def process_image_file(filepath, move_from_ingest=True):
                     logger.error(msg)
                     return False, msg
         
+        # Extract zip animation before hash computation (phash/colorhash/dimensions need frames)
+        if is_zip_animation:
+            from services import zip_animation_service
+            extract_result = zip_animation_service.extract_zip_animation(filepath, md5)
+            if not extract_result:
+                msg = f"[Processing] ERROR: Failed to extract zip animation for {filename}. File NOT ingested."
+                logger.error(msg)
+                return False, msg
+        
         # ========== STAGE 3: HASH COMPUTATION (ALL IN ONE PASS) ==========
         hashes = {}
         from services import similarity_service
@@ -396,8 +405,13 @@ def process_image_file(filepath, move_from_ingest=True):
                 # FAIL-FAST: Similarity is enabled but model failed to load
                 print(f"[Processing] ERROR: Failed to load similarity model for {filename}. File NOT ingested.")
                 return False, "Failed to load similarity model"
-            
-            embedding = engine.get_embedding(filepath)
+            # For zip animations use first frame path (ML Worker expects an image file)
+            embedding_path = filepath
+            if is_zip_animation:
+                first_frame = zip_animation_service.get_frame_path(md5, 0)
+                if first_frame and os.path.exists(first_frame):
+                    embedding_path = first_frame
+            embedding = engine.get_embedding(embedding_path)
             if embedding is not None:
                 hashes['embedding'] = embedding
             else:

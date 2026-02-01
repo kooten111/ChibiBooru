@@ -197,7 +197,7 @@ def handle_extract_animation(request_data: Dict[str, Any]) -> Dict[str, Any]:
                 "frames": frames,
                 "width": width,
                 "height": height,
-                "default_fps": 10,
+                "default_fps": 24,
                 "original_files": image_files
             }
             

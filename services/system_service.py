@@ -18,7 +18,7 @@ def scan_and_process_service() -> Any:
 
     try:
         # First, process new images
-        processed_count = monitor_service.run_scan()
+        processed_count, attempted_count = monitor_service.run_scan()
 
         # Then, clean orphaned image_tags entries (broken foreign keys)
         logger.info("Checking for orphaned image_tags entries...")
@@ -86,6 +86,8 @@ def scan_and_process_service() -> Any:
         messages = []
         if processed_count > 0:
             messages.append(f"Processed {processed_count} new images")
+        elif attempted_count > 0:
+            messages.append(f"Found {attempted_count} image(s) but none could be processed (see activity log)")
         else:
             messages.append("No new images found")
 

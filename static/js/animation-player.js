@@ -8,7 +8,7 @@ class AnimationPlayer {
         this.container = container;
         this.options = {
             type: options.type || 'gif',      // 'gif', 'zip', 'webp'
-            fps: options.fps || 10,
+            fps: options.fps || 24,
             autoplay: options.autoplay !== false,
             loop: options.loop !== false,
             md5: options.md5 || null,
@@ -461,7 +461,7 @@ function initAnimationPlayers() {
     containers.forEach(container => {
         const type = container.dataset.animationType;
         const md5 = container.dataset.md5;
-        const fps = parseInt(container.dataset.fps) || 10;
+        const fps = parseInt(container.dataset.fps) || 24;
         const filepath = container.dataset.filepath;
 
         // Skip if already initialized
@@ -472,7 +472,8 @@ function initAnimationPlayers() {
             md5,
             fps,
             filepath,
-            autoplay: false  // Don't autoplay by default
+            autoplay: true,
+            loop: true
         });
     });
 }
