@@ -3,6 +3,50 @@ import { showNotification } from './utils/notifications.js';
 
 // Expose to global scope for onclick handlers
 window.confirmRetryTagging = confirmRetryTagging;
+window.copyImageTags = copyImageTags;
+
+/**
+ * Copy all image tags to clipboard
+ */
+function copyImageTags(button) {
+    // Gather all tags from the page
+    const tagElements = document.querySelectorAll('.tag-item a');
+    const tags = Array.from(tagElements)
+        .map(el => el.textContent.trim())
+        .filter(tag => tag.length > 0 && !tag.startsWith('+') && !tag.startsWith('-'));
+
+    if (tags.length === 0) {
+        console.warn('No tags found to copy');
+        showNotification('No tags found to copy', 'warning');
+        return;
+    }
+
+    // Create comma-separated string
+    const tagsText = tags.join(', ');
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(tagsText).then(() => {
+        // Visual feedback
+        const icon = button.querySelector('.utility-icon');
+        const text = button.querySelector('.utility-text');
+        const originalIcon = icon.textContent;
+        const originalText = text.textContent;
+
+        icon.textContent = '✓';
+        text.textContent = `Copied ${tags.length} tags!`;
+        button.classList.add('success');
+
+        // Reset after 2 seconds
+        setTimeout(() => {
+            icon.textContent = originalIcon;
+            text.textContent = originalText;
+            button.classList.remove('success');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy tags:', err);
+        showNotification('Failed to copy tags to clipboard', 'error');
+    });
+}
 
 function findNextImageUrl() {
     const carouselImages = document.querySelectorAll('.carousel-track a[href^="/view/"]');

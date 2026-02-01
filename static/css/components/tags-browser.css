@@ -168,20 +168,20 @@
 }
 
 /* Panel Header for integrated collapse functionality
-   Styled to match .filter-section-header from gallery page */
+   Base styles - image-page.css overrides for specific panel styling */
 .panel-header {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--spacing-sm);
-    padding: var(--spacing-sm) 0;
+    padding: var(--spacing-sm) var(--spacing-md);
     background: transparent;
     border: none;
     border-radius: 0;
     color: var(--text-muted);
     cursor: pointer;
-    transition: color var(--transition-normal);
+    transition: color var(--transition-normal), background var(--transition-normal);
     margin: 0;
     text-align: left;
     font-size: var(--font-size-xs);
@@ -217,15 +217,10 @@
     display: none !important;
 }
 
-/* Desktop: Make panels collapsible - cleaner styling to match filter sidebar */
+/* Desktop: Make panels collapsible - let image-page.css handle styling */
 .panel:has(.panel-header) {
-    padding: 0;
     margin-bottom: var(--spacing-lg);
     transition: all var(--transition-smooth);
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
 }
 
 .panel:has(.panel-header) .panel-collapsible-content {
@@ -246,32 +241,49 @@
     transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out, opacity 0.2s ease-in-out;
 }
 
-/* Section content - transparent wrapper on desktop, functional on mobile */
-.section-content {
-    display: contents;
-    /* Makes the wrapper transparent on desktop */
+/* Section content wrappers - must participate in flex layout */
+.image-page .section-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    /* Critical: constrain content to flex size */
 }
 
-/* When section-content contains a collapsed panel, change to flex column and collapse */
-.section-content:has(.panel-header.collapsed) {
-    display: flex !important;
-    flex-direction: column !important;
-    flex: 0 0 auto !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    transition: flex 0.3s ease-in-out;
+/* Tags section gets most space */
+.image-page #tags-content {
+    flex: 3 1 0;
+    min-height: 80px;
 }
 
-/* Ensure the child panel inside section-content also gets flex behavior */
-.section-content:has(.panel-header.collapsed)>.panel {
+/* Pools section - fixed height, auto-shrink */
+.image-page #pools-content {
     flex: 0 0 auto;
-    width: 100%;
+    max-height: 150px;
 }
 
-/* Related images should extend fully without scrollbar */
-.panel:has(.panel-header) #related-images-content {
-    max-height: none;
-    overflow-y: visible;
+/* Metadata section gets remaining space */
+.image-page #metadata-content {
+    flex: 2 1 0;
+    min-height: 100px;
+}
+
+/* Panels inside section-content fill their container */
+.image-page .section-content>.panel {
+    flex: 1;
+    min-height: 0;
+}
+
+/* Right sidebar - Similar panel fills space */
+.image-page #sidebar-right-content {
+    flex: 1;
+    min-height: 0;
+}
+
+/* When section-content contains a collapsed panel, shrink to fit */
+.image-page .section-content:has(.panel-header.collapsed) {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
 }
 
 /* Mobile-only adjustments */

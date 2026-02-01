@@ -298,172 +298,197 @@
                     </button>
                     <h3 class="desktop-only">Information</h3>
                     <div class="panel-collapsible-content" id="metadata-panel-content">
-                        <div class="metadata-item border-bottom-none pb-0">
-                            <button onclick="showSauceNaoFetcher()" class="btn-saucenao">
-                                <span class="icon">🔍</span>
-                                <span>Fetch from SauceNao</span>
-                            </button>
+                        <!-- File Info Section -->
+                        <div class="info-section">
+                            {% if filepath %}
+                            <div class="info-row">
+                                <div class="info-label">Filename</div>
+                                <div class="info-value">{{ filepath.split('/')[-1] }}</div>
+                            </div>
+                            {% endif %}
                         </div>
-                        <div class="metadata-item border-bottom-none pb-0">
-                            <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}"
-                                class="btn btn-primary btn-full-width">
-                                📄 View Raw Data
-                            </a>
-                        </div>
-                        {% if filepath %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Filename</div>
-                            <div class="metadata-value">{{ filepath.split('/')[-1] }}</div>
-                        </div>
-                        {% endif %}
 
-                        {% if metadata.sources %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Found On</div>
-                            <div class="metadata-value">
-                                {% for source_name, source_data in metadata.sources.items() %}
-                                {% if source_name == 'danbooru' %}
-                                <a href="https://danbooru.donmai.us/posts/{{ source_data.id }}" target="_blank"
-                                    rel="noopener">Danbooru</a>
-                                {% elif source_name == 'e621' %}
-                                <a href="https://e621.net/posts/{{ source_data.id }}" target="_blank"
-                                    rel="noopener">e621</a>
-                                {% elif source_name == 'gelbooru' %}
-                                <a href="https://gelbooru.com/index.php?page=post&s=view&id={{ source_data.id }}"
-                                    target="_blank" rel="noopener">Gelbooru</a>
-                                {% elif source_name == 'yandere' %}
-                                <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank"
-                                    rel="noopener">Yandere</a>
-                                {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
-                                <a href="javascript:void(0)" onclick="confirmRetryTagging()" class="ai-tagged-link"
-                                    title="Click to retry tagging from online sources">
-                                    <span class="text-success">AI Tagged ({{ source_data.tagger_name or 'CamieTagger'
-                                        }})</span>
-                                    <span class="retry-icon">🔄</span>
-                                </a>
+                        <!-- Quick Stats Grid -->
+                        <div class="info-section">
+                            <div class="stats-grid">
+                                {% if metadata.sources %}
+                                {% set first_source = metadata.sources.values()|list|first %}
+                                {% set width = first_source.image_width or (first_source.file.width if first_source.file
+                                else none) %}
+                                {% set height = first_source.image_height or (first_source.file.height if
+                                first_source.file else none) %}
+                                {% if width and height %}
+                                <div class="stat-item">
+                                    <div class="stat-label">Dimensions</div>
+                                    <div class="stat-value">{{ width }} × {{ height }}</div>
+                                </div>
                                 {% endif %}
-                                {% if not loop.last %} • {% endif %}
-                                {% endfor %}
+                                {% endif %}
+
+                                {% if metadata.sources %}
+                                {% set first_source = metadata.sources.values()|list|first %}
+                                {% set file_size = first_source.file_size or (first_source.file.size if
+                                first_source.file else none) %}
+                                {% if file_size %}
+                                <div class="stat-item">
+                                    <div class="stat-label">File Size</div>
+                                    <div class="stat-value">
+                                        {% if file_size >= 1048576 %}
+                                        {{ "%.2f"|format(file_size / 1048576.0) }} MB
+                                        {% elif file_size >= 1024 %}
+                                        {{ "%.2f"|format(file_size / 1024.0) }} KB
+                                        {% else %}
+                                        {{ file_size }} bytes
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endif %}
+
+                                {% if metadata.sources %}
+                                {% set first_source = metadata.sources.values()|list|first %}
+                                {% if first_source.rating %}
+                                <div class="stat-item">
+                                    <div class="stat-label">Rating</div>
+                                    <div class="stat-value">
+                                        {% if first_source.rating == 'g' %}General
+                                        {% elif first_source.rating == 's' %}Sensitive
+                                        {% elif first_source.rating == 'q' %}Questionable
+                                        {% elif first_source.rating == 'e' %}Explicit
+                                        {% else %}{{ first_source.rating }}{% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endif %}
+
+                                {% if data.ingested_at %}
+                                <div class="stat-item">
+                                    <div class="stat-label">Added</div>
+                                    <div class="stat-value">{{ data.ingested_at[:10] if data.ingested_at else 'Unknown'
+                                        }}</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Sources Section -->
+                        {% if metadata.sources %}
+                        <div class="info-section">
+                            <div class="info-row">
+                                <div class="info-label">Found On</div>
+                                <div class="source-links">
+                                    {% for source_name, source_data in metadata.sources.items() %}
+                                    {% if source_name == 'danbooru' %}
+                                    <a href="https://danbooru.donmai.us/posts/{{ source_data.id }}" target="_blank"
+                                        rel="noopener" class="source-link">
+                                        <svg fill="currentColor" viewBox="0 0 20 20">
+                                            <path
+                                                d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                            <path
+                                                d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                        </svg>
+                                        <span>Danbooru #{{ source_data.id }}</span>
+                                    </a>
+                                    {% elif source_name == 'e621' %}
+                                    <a href="https://e621.net/posts/{{ source_data.id }}" target="_blank" rel="noopener"
+                                        class="source-link">
+                                        <svg fill="currentColor" viewBox="0 0 20 20">
+                                            <path
+                                                d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                            <path
+                                                d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                        </svg>
+                                        <span>e621 #{{ source_data.id }}</span>
+                                    </a>
+                                    {% elif source_name == 'gelbooru' %}
+                                    <a href="https://gelbooru.com/index.php?page=post&s=view&id={{ source_data.id }}"
+                                        target="_blank" rel="noopener" class="source-link">
+                                        <svg fill="currentColor" viewBox="0 0 20 20">
+                                            <path
+                                                d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                            <path
+                                                d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                        </svg>
+                                        <span>Gelbooru #{{ source_data.id }}</span>
+                                    </a>
+                                    {% elif source_name == 'yandere' %}
+                                    <a href="https://yande.re/post/show/{{ source_data.id }}" target="_blank"
+                                        rel="noopener" class="source-link">
+                                        <svg fill="currentColor" viewBox="0 0 20 20">
+                                            <path
+                                                d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                            <path
+                                                d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                        </svg>
+                                        <span>Yande.re #{{ source_data.id }}</span>
+                                    </a>
+                                    {% elif source_name == 'local_tagger' or source_name == 'camie_tagger' %}
+                                    <a href="javascript:void(0)" onclick="confirmRetryTagging()"
+                                        class="source-link ai-tagged-link"
+                                        title="Click to retry tagging from online sources">
+                                        <span>🤖</span>
+                                        <span>{{ source_data.tagger_name or 'CamieTagger' }}</span>
+                                        <span class="retry-icon">🔄</span>
+                                    </a>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
                         {% endif %}
 
                         {% if metadata.sources and metadata.sources|length > 1 %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Metadata Source</div>
-                            <div class="metadata-value">
-                                <button class="source-toggle-btn" onclick="openSourceModal()">
-                                    <span class="current-source-indicator">
-                                        {% set active = data.active_source or (metadata.sources.keys()|list|first) %}
-                                        {% if active == 'merged' %}🔀 Merged ({{ metadata.sources|length }} sources)
-                                        {% elif active == 'danbooru' %}🔵 Danbooru
-                                        {% elif active == 'e621' %}🟢 e621
-                                        {% elif active == 'gelbooru' %}🟡 Gelbooru
-                                        {% elif active == 'yandere' %}🔴 Yande.re
-                                        {% elif active == 'local_tagger' or active == 'camie_tagger' %}🤖 {{
-                                        metadata.sources.get(active, {}).get('tagger_name', 'AI Tagger') }}
-                                        {% else %}{{ active|title }}{% endif %}
-                                    </span>
-                                    <span class="toggle-text">Switch Source</span>
-                                </button>
+                        <div class="info-section">
+                            <div class="info-row">
+                                <div class="info-label">Source</div>
+                                <div class="info-value">
+                                    <button class="source-toggle-btn" onclick="openSourceModal()">
+                                        <span class="current-source-indicator">
+                                            {% set active = data.active_source or (metadata.sources.keys()|list|first)
+                                            %}
+                                            {% if active == 'merged' %}🔀 Merged ({{ metadata.sources|length }})
+                                            {% elif active == 'danbooru' %}🔵 Danbooru
+                                            {% elif active == 'e621' %}🟢 e621
+                                            {% elif active == 'gelbooru' %}🟡 Gelbooru
+                                            {% elif active == 'yandere' %}🔴 Yande.re
+                                            {% elif active == 'local_tagger' or active == 'camie_tagger' %}🤖 {{
+                                            metadata.sources.get(active, {}).get('tagger_name', 'AI Tagger') }}
+                                            {% else %}{{ active|title }}{% endif %}
+                                        </span>
+                                        <span class="toggle-text">Switch</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-
                         <script type="application/json" id="currentSource">{{ data.active_source or '' }}</script>
                         <script type="application/json" id="sourceData">{{ metadata.sources|tojson }}</script>
                         {% endif %}
 
-                        {% if metadata.sources %}
-                        {% set first_source = metadata.sources.values()|list|first %}
-                        {% if first_source.source %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Original Source</div>
-                            <div class="metadata-value">
-                                <a href="{{ first_source.source }}" target="_blank" rel="noopener">{{
-                                    first_source.source }}</a>
-                            </div>
-                        </div>
-                        {% elif first_source.sources and first_source.sources|length > 0 %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Original Source</div>
-                            <div class="metadata-value">
-                                <a href="{{ first_source.sources[0] }}" target="_blank" rel="noopener">{{
-                                    first_source.sources[0] }}</a>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% endif %}
-
-                        {% if metadata.sources %}
-                        {% set first_source = metadata.sources.values()|list|first %}
-                        {% set width = first_source.image_width or (first_source.file.width if first_source.file else
-                        none) %}
-                        {% set height = first_source.image_height or (first_source.file.height if first_source.file else
-                        none) %}
-                        {% if width and height %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Dimensions</div>
-                            <div class="metadata-value">{{ width }} × {{ height }}</div>
-                        </div>
-                        {% endif %}
-                        {% endif %}
-
-                        {% if metadata.sources %}
-                        {% set first_source = metadata.sources.values()|list|first %}
-                        {% set file_size = first_source.file_size or (first_source.file.size if first_source.file else
-                        none) %}
-                        {% if file_size %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">File Size</div>
-                            <div class="metadata-value">
-                                {% if file_size >= 1048576 %}
-                                {{ "%.2f"|format(file_size / 1048576.0) }} MB
-                                {% elif file_size >= 1024 %}
-                                {{ "%.2f"|format(file_size / 1024.0) }} KB
-                                {% else %}
-                                {{ file_size }} bytes
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% endif %}
-
+                        <!-- MD5 Section -->
                         {% if metadata.md5 %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">MD5</div>
-                            <div class="metadata-value">{{ metadata.md5 }}</div>
-                        </div>
-                        {% endif %}
-
-                        {% if metadata.sources %}
-                        {% set first_source = metadata.sources.values()|list|first %}
-                        {% if first_source.rating %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Rating</div>
-                            <div class="metadata-value">
-                                {% if first_source.rating == 'g' %}General{% elif first_source.rating == 's'
-                                %}Sensitive{% elif first_source.rating == 'q' %}Questionable{% elif first_source.rating
-                                == 'e' %}Explicit{% else %}{{ first_source.rating }}{% endif %}
+                        <div class="info-section">
+                            <div class="info-row">
+                                <div class="info-label">MD5</div>
+                                <div class="info-value mono">{{ metadata.md5 }}</div>
                             </div>
                         </div>
                         {% endif %}
 
-                        {% set score = first_source.score.total if first_source.score and first_source.score.total is
-                        defined else (first_source.score if first_source.score is defined else none) %}
-                        {% if score is not none %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Score</div>
-                            <div class="metadata-value">{{ score }}</div>
+                        <!-- Utility Actions -->
+                        <div class="utility-actions">
+                            <button class="utility-link" onclick="copyImageTags(this)">
+                                <span class="utility-icon">📋</span>
+                                <span class="utility-text">Copy all tags</span>
+                            </button>
+                            <a href="{{ url_for('main.show_raw_data', filepath=filepath) }}" class="utility-link">
+                                <span class="utility-icon">📄</span>
+                                <span class="utility-text">View raw data</span>
+                            </a>
+                            <button onclick="showSauceNaoFetcher()" class="utility-link">
+                                <span class="utility-icon">🔍</span>
+                                <span class="utility-text">Fetch from SauceNao</span>
+                            </button>
                         </div>
-                        {% endif %}
-
-                        {% if first_source.fav_count %}
-                        <div class="metadata-item">
-                            <div class="metadata-label">Favorites</div>
-                            <div class="metadata-value">{{ first_source.fav_count }}</div>
-                        </div>
-                        {% endif %}
-                        {% endif %}
                     </div>
                 </div>
             </div>

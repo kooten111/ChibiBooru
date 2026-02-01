@@ -217,7 +217,7 @@
 
 /* Editing mode - expand tag editor horizontally and push image aside */
 .image-page .container.tag-editor-expanded {
-    grid-template-columns: 800px 1fr 300px;
+    grid-template-columns: 800px 1fr 350px;
     transition: grid-template-columns var(--transition-smooth);
 }
 
@@ -238,7 +238,8 @@
 
 .sidebar-left.editing-mode #tags-content {
     flex: 1;
-    display: flex !important; /* Override display: block !important from implications.css */
+    display: flex !important;
+    /* Override display: block !important from implications.css */
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
@@ -261,7 +262,8 @@
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
-    height: auto; /* Let flex handle sizing - height: 0 doesn't work with this flex chain */
+    height: auto;
+    /* Let flex handle sizing - height: 0 doesn't work with this flex chain */
 }
 
 /* Custom scrollbar for categories list - ensure it's visible */
@@ -312,20 +314,18 @@
 /* Responsive adjustments */
 @media (max-width: 1800px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 700px 1fr 300px;
+        grid-template-columns: 700px 1fr 350px;
     }
 }
 
 @media (max-width: 1600px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 600px 1fr 300px;
+        grid-template-columns: 600px 1fr 350px;
     }
 }
 
 @media (max-width: 1200px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 500px 1fr 300px;
+        grid-template-columns: 500px 1fr 350px;
     }
 }
-
-
