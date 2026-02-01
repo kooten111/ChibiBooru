@@ -10,9 +10,14 @@ import getpass
 import os
 import sys
 import secrets
+import threading
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
+
+# Lock for thread-safe progress output when downloading in parallel
+_print_lock = threading.Lock()
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent
@@ -202,10 +207,17 @@ def setup_directories():
             print(f"  ✓ {path} exists")
 
 
-def download_file(url: str, destination: Path, description: str) -> bool:
-    """Download a file with progress reporting."""
-    print(f"\n  Downloading {description}...")
-    print(f"    From: {url}")
+def download_file(
+    url: str,
+    destination: Path,
+    description: str,
+    label: Optional[str] = None,
+) -> bool:
+    """Download a file with progress reporting. Optional label for parallel downloads."""
+    prefix = f"  [{label}] " if label else "  "
+    with _print_lock:
+        print(f"\n{prefix}Downloading {description}...")
+        print(f"{prefix}  From: {url}")
     
     try:
         def progress_hook(block_num, block_size, total_size):
@@ -214,76 +226,124 @@ def download_file(url: str, destination: Path, description: str) -> bool:
                 percent = min(100, downloaded * 100 / total_size)
                 mb_downloaded = downloaded / (1024 * 1024)
                 mb_total = total_size / (1024 * 1024)
-                print(f"\r    Progress: {percent:.1f}% ({mb_downloaded:.1f} MB / {mb_total:.1f} MB)", end='')
+                with _print_lock:
+                    print(f"\r{prefix}Progress: {percent:.1f}% ({mb_downloaded:.1f} MB / {mb_total:.1f} MB)", end="")
         
         urllib.request.urlretrieve(url, destination, progress_hook)
-        print()
-        print(f"  ✓ Downloaded {description}")
+        with _print_lock:
+            print()
+            print(f"{prefix}✓ Downloaded {description}")
         return True
     
     except Exception as e:
-        print(f"\n  ✗ Failed to download: {e}")
+        with _print_lock:
+            print(f"\n{prefix}✗ Failed to download: {e}")
         return False
 
 
+def _download_task(args: Tuple[str, Path, str, Optional[str]]) -> bool:
+    """Run a single download (for use with ThreadPoolExecutor)."""
+    url, destination, description, label = args
+    return download_file(url, destination, description, label=label)
+
+
 def setup_models():
-    """Offer to download AI models."""
+    """Offer to download AI models. Asks all questions first, then runs downloads in parallel."""
     print_section("🤖 AI Model Downloads (Optional)")
     
     print("  ChibiBooru can use AI models for tagging, similarity, and upscaling.")
     print("  These are optional but recommended for full functionality.")
     print()
     
-    # Tagger Model
+    # Collect choices first (no downloads yet)
+    tasks: List[Tuple[str, Path, str, Optional[str]]] = []  # (url, destination, description, label)
+    
+    # Tagger
     tagger_path = PROJECT_ROOT / "models" / "Tagger" / "model.onnx"
+    tagger_dir = tagger_path.parent
     if not tagger_path.exists():
         print("  📌 Tagger Model (Camie Tagger v2) - ~800 MB")
         print("     Used for automatic AI tagging of images")
-        if prompt_yes_no("Download tagger model?", default=True):
-            model_url = "https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2.onnx"
-            metadata_url = "https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2-metadata.json"
-            
-            download_file(model_url, tagger_path, "tagger model")
-            download_file(metadata_url, tagger_path.parent / "metadata.json", "tagger metadata")
+        download_tagger = prompt_yes_no("Download tagger model?", default=True)
+        if download_tagger:
+            tasks.append((
+                "https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2.onnx",
+                tagger_path,
+                "tagger model",
+                "Tagger",
+            ))
+            tasks.append((
+                "https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2-metadata.json",
+                tagger_dir / "metadata.json",
+                "tagger metadata",
+                "Tagger",
+            ))
     else:
         print("  ✓ Tagger model already installed")
     
     print()
     
-    # Similarity Model
+    # Similarity
     similarity_path = PROJECT_ROOT / "models" / "Similarity" / "model.onnx"
+    similarity_dir = similarity_path.parent
     if not similarity_path.exists():
         print("  📌 Similarity Model (WD14-ConvNext) - ~400 MB")
         print("     Used for finding visually similar images")
-        if prompt_yes_no("Download similarity model?", default=True):
-            model_url = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/model.onnx"
-            tags_url = "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/selected_tags.csv"
-            
-            download_file(model_url, similarity_path, "similarity model")
-            download_file(tags_url, similarity_path.parent / "selected_tags.csv", "tags mapping")
+        download_similarity = prompt_yes_no("Download similarity model?", default=True)
+        if download_similarity:
+            tasks.append((
+                "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/model.onnx",
+                similarity_path,
+                "similarity model",
+                "Similarity",
+            ))
+            tasks.append((
+                "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/selected_tags.csv",
+                similarity_dir / "selected_tags.csv",
+                "tags mapping",
+                "Similarity",
+            ))
     else:
         print("  ✓ Similarity model already installed")
     
     print()
     
-    # Upscaler Models
+    # Upscaler
     upscaler_dir = PROJECT_ROOT / "models" / "Upscaler"
     upscaler_general = upscaler_dir / "RealESRGAN_x4plus.pth"
     upscaler_anime = upscaler_dir / "RealESRGAN_x4plus_anime.pth"
-    
     if not upscaler_general.exists() or not upscaler_anime.exists():
         print("  📌 Upscaler Models (RealESRGAN) - ~17-67 MB each")
         print("     Used for AI-powered image upscaling")
-        if prompt_yes_no("Download upscaler models?", default=False):
+        download_upscaler = prompt_yes_no("Download upscaler models?", default=False)
+        if download_upscaler:
             if not upscaler_general.exists():
-                url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth"
-                download_file(url, upscaler_general, "RealESRGAN_x4plus (general)")
-            
+                tasks.append((
+                    "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+                    upscaler_general,
+                    "RealESRGAN_x4plus (general)",
+                    "Upscaler",
+                ))
             if not upscaler_anime.exists():
-                url = "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth"
-                download_file(url, upscaler_anime, "RealESRGAN_x4plus_anime")
+                tasks.append((
+                    "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.2.4/RealESRGAN_x4plus_anime_6B.pth",
+                    upscaler_anime,
+                    "RealESRGAN_x4plus_anime",
+                    "Upscaler",
+                ))
     else:
         print("  ✓ Upscaler models already installed")
+    
+    # Run all chosen downloads (in parallel)
+    if tasks:
+        print()
+        print("  Downloading selected models...")
+        with ThreadPoolExecutor(max_workers=min(len(tasks), 4)) as executor:
+            futures = {executor.submit(_download_task, t): t for t in tasks}
+            for future in as_completed(futures):
+                future.result()  # raise any exception
+        print()
+        print("  ✓ All downloads finished")
 
 
 def is_first_run() -> bool:
