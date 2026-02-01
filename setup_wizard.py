@@ -178,6 +178,31 @@ def setup_secrets() -> dict:
     return changes
 
 
+def setup_optional_api_keys() -> dict:
+    """Ask for optional API keys (e.g. SauceNao)."""
+    print_section("🔑 Optional API Keys")
+    
+    env_vars = read_env_file()
+    changes = {}
+    
+    saucenao_key = env_vars.get("SAUCENAO_API_KEY", "").strip()
+    if saucenao_key:
+        print("  ✓ SAUCENAO_API_KEY already configured")
+    else:
+        print("  SauceNao API key enables reverse image search (find source of an image).")
+        print("  Get a key at: https://saucenao.com/user.php")
+        print()
+        if prompt_yes_no("Do you have a SauceNao API key to add now?", default=False):
+            value = prompt("Paste your SAUCENAO_API_KEY")
+            if value:
+                changes["SAUCENAO_API_KEY"] = value.strip()
+                print("  ✓ SAUCENAO_API_KEY will be saved to .env")
+        else:
+            print("  You can add SAUCENAO_API_KEY to your .env file later for reverse image search.")
+    
+    return changes
+
+
 def setup_directories():
     """Create required directories."""
     print_section("📁 Directory Setup")
@@ -393,6 +418,10 @@ def main():
     
     # Security configuration
     env_changes = setup_secrets()
+    
+    # Optional API keys (e.g. SauceNao)
+    optional_changes = setup_optional_api_keys()
+    env_changes.update(optional_changes)
     
     # Apply env changes
     if env_changes:
