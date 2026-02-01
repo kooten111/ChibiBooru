@@ -10,14 +10,9 @@ import getpass
 import os
 import sys
 import secrets
-import threading
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Optional, Tuple, List
-
-# Lock for thread-safe progress output when downloading in parallel
-_print_lock = threading.Lock()
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent
@@ -215,9 +210,8 @@ def download_file(
 ) -> bool:
     """Download a file with progress reporting. Optional label for parallel downloads."""
     prefix = f"  [{label}] " if label else "  "
-    with _print_lock:
-        print(f"\n{prefix}Downloading {description}...")
-        print(f"{prefix}  From: {url}")
+    print(f"\n{prefix}Downloading {description}...")
+    print(f"{prefix}  From: {url}")
     
     try:
         def progress_hook(block_num, block_size, total_size):
@@ -226,18 +220,15 @@ def download_file(
                 percent = min(100, downloaded * 100 / total_size)
                 mb_downloaded = downloaded / (1024 * 1024)
                 mb_total = total_size / (1024 * 1024)
-                with _print_lock:
-                    print(f"\r{prefix}Progress: {percent:.1f}% ({mb_downloaded:.1f} MB / {mb_total:.1f} MB)", end="")
+                print(f"\r{prefix}Progress: {percent:.1f}% ({mb_downloaded:.1f} MB / {mb_total:.1f} MB)", end="")
         
         urllib.request.urlretrieve(url, destination, progress_hook)
-        with _print_lock:
-            print()
-            print(f"{prefix}✓ Downloaded {description}")
+        print()
+        print(f"{prefix}✓ Downloaded {description}")
         return True
     
     except Exception as e:
-        with _print_lock:
-            print(f"\n{prefix}✗ Failed to download: {e}")
+        print(f"\n{prefix}✗ Failed to download: {e}")
         return False
 
 
@@ -334,14 +325,12 @@ def setup_models():
     else:
         print("  ✓ Upscaler models already installed")
     
-    # Run all chosen downloads (in parallel)
+    # Run all chosen downloads one at a time (clean progress output)
     if tasks:
         print()
         print("  Downloading selected models...")
-        with ThreadPoolExecutor(max_workers=min(len(tasks), 4)) as executor:
-            futures = {executor.submit(_download_task, t): t for t in tasks}
-            for future in as_completed(futures):
-                future.result()  # raise any exception
+        for task in tasks:
+            _download_task(task)
         print()
         print("  ✓ All downloads finished")
 

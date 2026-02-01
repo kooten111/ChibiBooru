@@ -77,6 +77,25 @@ def detect_hardware():
     
     return hardware
 
+
+def get_menu_backends(available):
+    """
+    Build ordered list of backends for the menu.
+    Detected GPU first (NVIDIA before Intel), then CPU last.
+    """
+    order = ["cuda", "xpu", "cpu"]
+    return [b for b in order if b in available]
+
+
+def backend_label(backend):
+    """Human-readable label for each backend."""
+    labels = {
+        "cuda": "NVIDIA CUDA",
+        "xpu": "Intel XPU (Arc A/B-Series GPUs)",
+        "cpu": "CPU Only (no GPU acceleration)",
+    }
+    return labels.get(backend, backend.upper())
+
 def get_current_backend():
     """Read current backend from .env file"""
     env_file = os.path.join(os.path.dirname(__file__), '.env')
@@ -206,30 +225,26 @@ def main():
             backend = current
             print(f"  Using existing backend: {backend}")
         else:
-            # Auto-select best available
-            for pref in ['xpu', 'cuda', 'cpu']:
-                if pref in available:
-                    backend = pref
-                    break
+            # Auto-select best available (same order as menu: NVIDIA, Intel, CPU)
+            menu = get_menu_backends(available)
+            backend = menu[0] if menu else "cpu"
             print(f"  Auto-selected backend: {backend}")
     else:
-        # Interactive mode
+        # Interactive mode: option 1 = detected GPU (NVIDIA or Intel), CPU always last
+        menu = get_menu_backends(available)
+        default = (current if current and current in menu else None) or (menu[0] if menu else "cpu")
+        default_num = menu.index(default) + 1
+
         print("\n🎯 Select ML backend:")
-        print("   1) Intel XPU (Arc A/B-Series GPUs) - Recommended for Intel")
-        print("   2) NVIDIA CUDA")
-        print("   3) CPU Only (no GPU acceleration)")
-        
-        default = current or (available[0] if available else 'cpu')
-        choice = input(f"\n   Enter choice [1-3] (default: {default}): ").strip()
-        
-        if choice == "1":
-            backend = "xpu"
-        elif choice == "2":
-            backend = "cuda"
-        elif choice == "3":
-            backend = "cpu"
-        elif choice == "":
+        for i, b in enumerate(menu, 1):
+            print(f"   {i}) {backend_label(b)}")
+        print("\n   Press Enter to use the default.")
+        choice = input(f"   Enter choice [1-{len(menu)}] (default: {default_num}): ").strip()
+
+        if choice == "":
             backend = default
+        elif choice.isdigit() and 1 <= int(choice) <= len(menu):
+            backend = menu[int(choice) - 1]
         else:
             print("   Invalid choice. Using CPU.")
             backend = "cpu"
