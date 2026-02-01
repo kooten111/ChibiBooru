@@ -238,19 +238,19 @@
 
 /* Rating colors */
 .filter-item .dot.general {
-    background: #22c55e;
+    background: var(--rating-general);
 }
 
 .filter-item .dot.sensitive {
-    background: #eab308;
+    background: var(--rating-sensitive);
 }
 
 .filter-item .dot.questionable {
-    background: #f97316;
+    background: var(--rating-questionable);
 }
 
 .filter-item .dot.explicit {
-    background: #ef4444;
+    background: var(--rating-explicit);
 }
 
 /* ============================================================================
@@ -388,19 +388,19 @@
 }
 
 .thumbnail .rating-dot.general {
-    background: #22c55e;
+    background: var(--rating-general);
 }
 
 .thumbnail .rating-dot.sensitive {
-    background: #eab308;
+    background: var(--rating-sensitive);
 }
 
 .thumbnail .rating-dot.questionable {
-    background: #f97316;
+    background: var(--rating-questionable);
 }
 
 .thumbnail .rating-dot.explicit {
-    background: #ef4444;
+    background: var(--rating-explicit);
 }
 
 /* Focused thumbnail (keyboard nav) */

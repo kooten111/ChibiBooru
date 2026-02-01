@@ -51,6 +51,37 @@
     --tag-general: #87ceeb;
     --tag-general-bg: rgba(135, 206, 235, 0.2);
     --tag-general-border: rgba(135, 206, 235, 0.3);
+    --tag-uncategorized: #a0a0a0;
+
+    /* Extended Category Colors */
+    --tag-ext-subject: #87ceeb;
+    --tag-ext-physique: #5ca3d6;
+    --tag-ext-hair: #4a90c4;
+    --tag-ext-face: #3b7eb3;
+    --tag-ext-genitalia: #ff69b4;
+    --tag-ext-attire-main: #90ee90;
+    --tag-ext-attire-inner: #7cdb7c;
+    --tag-ext-attire-legwear: #69c969;
+    --tag-ext-attire-acc: #56b656;
+    --tag-ext-action: #ffd700;
+    --tag-ext-pose: #ffc700;
+    --tag-ext-expression: #ffb700;
+    --tag-ext-sexual: #ff1493;
+    --tag-ext-object: #dda0dd;
+    --tag-ext-setting: #98fb98;
+    --tag-ext-status: #ffa07a;
+    --tag-ext-framing: #ba55d3;
+    --tag-ext-focus: #9370db;
+    --tag-ext-style-art: #8b7ec8;
+    --tag-ext-style-tech: #7a6fb5;
+    --tag-ext-meta-attr: #40e0d0;
+    --tag-ext-meta-text: #48d1cc;
+
+    /* Rating Colors */
+    --rating-general: #22c55e;
+    --rating-sensitive: #eab308;
+    --rating-questionable: #f97316;
+    --rating-explicit: #ef4444;
 
     --spacing-xs: 4px;
     --spacing-sm: 8px;

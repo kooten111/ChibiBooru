@@ -2,25 +2,13 @@
    Rate Review Page Styles
    ============================================ */
 
-/* Color overrides for rating pages */
-:root {
-    /* Rating colors */
-    --rating-general: #4ade80;
-    --rating-sensitive: #60a5fa;
-    --rating-questionable: #fb923c;
-    --rating-explicit: #f87171;
-}
-
 /* Rate Review Page Specific Layout */
 .gallery-page .page-container {
     flex: 1;
     min-height: 0;
     padding: 0 var(--spacing-lg);
-    max-width: 100%;
     width: 100%;
-    box-sizing: border-box;
-    overflow-x: hidden;
-    overflow-y: hidden;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     position: relative;

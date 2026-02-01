@@ -209,6 +209,7 @@ body.image-page {
     border-bottom: var(--border-width-thick) solid var(--border-color-hover);
 }
 
+/* Category-specific colors using variables */
 .image-page .tag-category.character .tag-category-title {
     color: var(--tag-character);
     border-bottom-color: var(--tag-character-border);
@@ -253,146 +254,120 @@ body.image-page {
     opacity: 0.8;
 }
 
-/* Extended Category Colors - Group 1: Identity (Blue tones) */
-.image-page .extended-sub-category.00-subject-count .extended-category-title {
-    color: #87ceeb;
-    /* Sky blue */
-    border-bottom-color: rgba(135, 206, 235, 0.3);
+/* Mapping extended categories to variables using attribute selectors to handle digit-first classes */
+.image-page .extended-sub-category[class*="00-subject-count"] .extended-category-title {
+    color: var(--tag-ext-subject);
+    border-bottom-color: var(--tag-ext-subject);
 }
 
-.image-page .extended-sub-category.01-body-physique .extended-category-title {
-    color: #5ca3d6;
-    /* Medium blue */
-    border-bottom-color: rgba(92, 163, 214, 0.3);
+.image-page .extended-sub-category[class*="01-body-physique"] .extended-category-title {
+    color: var(--tag-ext-physique);
+    border-bottom-color: var(--tag-ext-physique);
 }
 
-.image-page .extended-sub-category.02-body-hair .extended-category-title {
-    color: #4a90c4;
-    /* Steel blue */
-    border-bottom-color: rgba(74, 144, 196, 0.3);
+.image-page .extended-sub-category[class*="02-body-hair"] .extended-category-title {
+    color: var(--tag-ext-hair);
+    border-bottom-color: var(--tag-ext-hair);
 }
 
-.image-page .extended-sub-category.03-body-face .extended-category-title {
-    color: #3b7eb3;
-    /* Deep blue */
-    border-bottom-color: rgba(59, 126, 179, 0.3);
+.image-page .extended-sub-category[class*="03-body-face"] .extended-category-title {
+    color: var(--tag-ext-face);
+    border-bottom-color: var(--tag-ext-face);
 }
 
-.image-page .extended-sub-category.04-body-genitalia .extended-category-title {
-    color: #ff69b4;
-    /* Hot pink */
-    border-bottom-color: rgba(255, 105, 180, 0.3);
+.image-page .extended-sub-category[class*="04-body-genitalia"] .extended-category-title {
+    color: var(--tag-ext-genitalia);
+    border-bottom-color: var(--tag-ext-genitalia);
 }
 
-/* Extended Category Colors - Group 2: Context (Green/Yellow/Orange tones) */
-.image-page .extended-sub-category.05-attire-main .extended-category-title {
-    color: #90ee90;
-    /* Light green */
-    border-bottom-color: rgba(144, 238, 144, 0.3);
+.image-page .extended-sub-category[class*="05-attire-main"] .extended-category-title {
+    color: var(--tag-ext-attire-main);
+    border-bottom-color: var(--tag-ext-attire-main);
 }
 
-.image-page .extended-sub-category.06-attire-inner .extended-category-title {
-    color: #7cdb7c;
-    /* Medium green */
-    border-bottom-color: rgba(124, 219, 124, 0.3);
+.image-page .extended-sub-category[class*="06-attire-inner"] .extended-category-title {
+    color: var(--tag-ext-attire-inner);
+    border-bottom-color: var(--tag-ext-attire-inner);
 }
 
-.image-page .extended-sub-category.07-attire-legwear .extended-category-title {
-    color: #69c969;
-    /* Forest green */
-    border-bottom-color: rgba(105, 201, 105, 0.3);
+.image-page .extended-sub-category[class*="07-attire-legwear"] .extended-category-title {
+    color: var(--tag-ext-attire-legwear);
+    border-bottom-color: var(--tag-ext-attire-legwear);
 }
 
-.image-page .extended-sub-category.08-attire-acc .extended-category-title {
-    color: #56b656;
-    /* Dark green */
-    border-bottom-color: rgba(86, 182, 86, 0.3);
+.image-page .extended-sub-category[class*="08-attire-acc"] .extended-category-title {
+    color: var(--tag-ext-attire-acc);
+    border-bottom-color: var(--tag-ext-attire-acc);
 }
 
-.image-page .extended-sub-category.09-action .extended-category-title {
-    color: #ffd700;
-    /* Gold */
-    border-bottom-color: rgba(255, 215, 0, 0.3);
+.image-page .extended-sub-category[class*="09-action"] .extended-category-title {
+    color: var(--tag-ext-action);
+    border-bottom-color: var(--tag-ext-action);
 }
 
-.image-page .extended-sub-category.10-pose .extended-category-title {
-    color: #ffc700;
-    /* Amber */
-    border-bottom-color: rgba(255, 199, 0, 0.3);
+.image-page .extended-sub-category[class*="10-pose"] .extended-category-title {
+    color: var(--tag-ext-pose);
+    border-bottom-color: var(--tag-ext-pose);
 }
 
-.image-page .extended-sub-category.11-expression .extended-category-title {
-    color: #ffb700;
-    /* Orange gold */
-    border-bottom-color: rgba(255, 183, 0, 0.3);
+.image-page .extended-sub-category[class*="11-expression"] .extended-category-title {
+    color: var(--tag-ext-expression);
+    border-bottom-color: var(--tag-ext-expression);
 }
 
-.image-page .extended-sub-category.12-sexual-act .extended-category-title {
-    color: #ff1493;
-    /* Deep pink */
-    border-bottom-color: rgba(255, 20, 147, 0.3);
+.image-page .extended-sub-category[class*="12-sexual-act"] .extended-category-title {
+    color: var(--tag-ext-sexual);
+    border-bottom-color: var(--tag-ext-sexual);
 }
 
-.image-page .extended-sub-category.13-object .extended-category-title {
-    color: #dda0dd;
-    /* Plum */
-    border-bottom-color: rgba(221, 160, 221, 0.3);
+.image-page .extended-sub-category[class*="13-object"] .extended-category-title {
+    color: var(--tag-ext-object);
+    border-bottom-color: var(--tag-ext-object);
 }
 
-.image-page .extended-sub-category.14-setting .extended-category-title {
-    color: #98fb98;
-    /* Pale green */
-    border-bottom-color: rgba(152, 251, 152, 0.3);
+.image-page .extended-sub-category[class*="14-setting"] .extended-category-title {
+    color: var(--tag-ext-setting);
+    border-bottom-color: var(--tag-ext-setting);
 }
 
-.image-page .extended-sub-category.21-status .extended-category-title {
-    color: #ffa07a;
-    /* Light salmon */
-    border-bottom-color: rgba(255, 160, 122, 0.3);
+.image-page .extended-sub-category[class*="21-status"] .extended-category-title {
+    color: var(--tag-ext-status);
+    border-bottom-color: var(--tag-ext-status);
 }
 
-/* Extended Category Colors - Group 3: Technical/Meta (Purple/Cyan tones) */
-.image-page .extended-sub-category.15-framing .extended-category-title {
-    color: #ba55d3;
-    /* Medium orchid */
-    border-bottom-color: rgba(186, 85, 211, 0.3);
+.image-page .extended-sub-category[class*="15-framing"] .extended-category-title {
+    color: var(--tag-ext-framing);
+    border-bottom-color: var(--tag-ext-framing);
 }
 
-.image-page .extended-sub-category.16-focus .extended-category-title {
-    color: #9370db;
-    /* Medium purple */
-    border-bottom-color: rgba(147, 112, 219, 0.3);
+.image-page .extended-sub-category[class*="16-focus"] .extended-category-title {
+    color: var(--tag-ext-focus);
+    border-bottom-color: var(--tag-ext-focus);
 }
 
-.image-page .extended-sub-category.17-style-art .extended-category-title {
-    color: #8b7ec8;
-    /* Light purple */
-    border-bottom-color: rgba(139, 126, 200, 0.3);
+.image-page .extended-sub-category[class*="17-style-art"] .extended-category-title {
+    color: var(--tag-ext-style-art);
+    border-bottom-color: var(--tag-ext-style-art);
 }
 
-.image-page .extended-sub-category.18-style-tech .extended-category-title {
-    color: #7a6fb5;
-    /* Slate blue */
-    border-bottom-color: rgba(122, 111, 181, 0.3);
+.image-page .extended-sub-category[class*="18-style-tech"] .extended-category-title {
+    color: var(--tag-ext-style-tech);
+    border-bottom-color: var(--tag-ext-style-tech);
 }
 
-.image-page .extended-sub-category.19-meta-attributes .extended-category-title {
-    color: #40e0d0;
-    /* Turquoise */
-    border-bottom-color: rgba(64, 224, 208, 0.3);
+.image-page .extended-sub-category[class*="19-meta-attributes"] .extended-category-title {
+    color: var(--tag-ext-meta-attr);
+    border-bottom-color: var(--tag-ext-meta-attr);
 }
 
-.image-page .extended-sub-category.20-meta-text .extended-category-title {
-    color: #48d1cc;
-    /* Medium turquoise */
-    border-bottom-color: rgba(72, 209, 204, 0.3);
+.image-page .extended-sub-category[class*="20-meta-text"] .extended-category-title {
+    color: var(--tag-ext-meta-text);
+    border-bottom-color: var(--tag-ext-meta-text);
 }
 
-/* Uncategorized tags */
 .image-page .extended-sub-category.uncategorized .extended-category-title {
-    color: #a0a0a0;
-    /* Gray */
-    border-bottom-color: rgba(160, 160, 160, 0.3);
+    color: var(--tag-uncategorized);
+    border-bottom-color: var(--tag-uncategorized);
 }
 
 /* Tag Category Subtitle (for Manual modifications) */
