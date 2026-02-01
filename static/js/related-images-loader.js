@@ -298,31 +298,53 @@
         // Normalize current filepath for comparison
         const currentPathNormalized = normalizePath(filepath);
 
-        // Get existing tag results from the DOM, excluding current image
-        const existingThumbs = container.querySelectorAll('.related-thumb');
-        const tagResults = Array.from(existingThumbs)
-            .map(thumb => {
-                const link = thumb.getAttribute('href');
-                const path = link ? decodeURIComponent(link.replace('/view/', '')) : '';
-                const img = thumb.querySelector('img');
-                // Decode the src since browser returns URL-encoded version
-                // We need the raw path to avoid double-encoding when re-creating elements
-                const rawThumbSrc = img ? img.src.replace(/^.*\/static\//, '') : '';
-                const thumbSrc = rawThumbSrc ? decodeURIComponent(rawThumbSrc) : '';
-                const label = thumb.querySelector('.label');
-                const source = label && label.classList.contains('similar-tag') ? 'tag' : 'unknown';
+        // Get existing tag results from the JSON script tag (preferred) or fall back to DOM scraping
+        let tagResults = [];
+        const relatedDataEl = document.getElementById('relatedImagesData');
+        if (relatedDataEl) {
+            try {
+                const relatedData = JSON.parse(relatedDataEl.textContent);
+                if (Array.isArray(relatedData)) {
+                    tagResults = relatedData
+                        .map(item => ({
+                            path: item.path || '',
+                            thumb: item.thumb || '',
+                            primary_source: item.primary_source || 'tag'
+                        }))
+                        .filter(result => {
+                            const resultPathNormalized = normalizePath(result.path);
+                            return resultPathNormalized !== currentPathNormalized;
+                        });
+                }
+            } catch (e) {
+                console.warn('Failed to parse relatedImagesData, falling back to DOM:', e);
+            }
+        }
 
-                return {
-                    path: path,
-                    thumb: thumbSrc,
-                    primary_source: source
-                };
-            })
-            .filter(result => {
-                // Filter out current image
-                const resultPathNormalized = normalizePath(result.path);
-                return resultPathNormalized !== currentPathNormalized;
-            });
+        // Fallback: DOM scraping (for backwards compatibility or if JSON is missing)
+        if (tagResults.length === 0) {
+            const existingThumbs = container.querySelectorAll('.related-thumb');
+            tagResults = Array.from(existingThumbs)
+                .map(thumb => {
+                    const link = thumb.getAttribute('href');
+                    const path = link ? decodeURIComponent(link.replace('/view/', '')) : '';
+                    const img = thumb.querySelector('img');
+                    const rawThumbSrc = img ? img.src.replace(/^.*\/static\//, '') : '';
+                    const thumbSrc = rawThumbSrc ? decodeURIComponent(rawThumbSrc) : '';
+                    const label = thumb.querySelector('.label');
+                    const source = label && label.classList.contains('similar-tag') ? 'tag' : 'unknown';
+
+                    return {
+                        path: path,
+                        thumb: thumbSrc,
+                        primary_source: source
+                    };
+                })
+                .filter(result => {
+                    const resultPathNormalized = normalizePath(result.path);
+                    return resultPathNormalized !== currentPathNormalized;
+                });
+        }
 
         // Load FAISS results (in 'both' mode we need tag results, in 'faiss' mode we don't)
         if (config.sources === 'faiss' || tagResults.length > 0) {

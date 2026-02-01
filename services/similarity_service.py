@@ -489,8 +489,18 @@ def set_semantic_backend(backend: SemanticBackend):
     """Global helper to set the backend for the singleton engine."""
     get_semantic_engine().set_backend(backend)
 
-def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
-    """Find semantically similar images using local FAISS index."""
+def find_semantic_similar(filepath: str, limit: int = 20, exclude_self: bool = True, exclude_family: bool = False) -> List[Dict]:
+    """Find semantically similar images using local FAISS index.
+    
+    Args:
+        filepath: Path to the reference image (relative, without 'images/' prefix)
+        limit: Maximum number of results
+        exclude_self: If True, exclude the current image from results
+        exclude_family: If True, exclude images in the same parent/child chain
+        
+    Returns:
+        List of similar images with path, thumb, similarity, and primary_source
+    """
     if not SEMANTIC_AVAILABLE: return []
     
     # 1. Get embedding for query image
@@ -519,7 +529,7 @@ def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
     # 2. Search using local FAISS index
     try:
         semantic_index = get_semantic_index()
-        search_results = semantic_index.search(embedding, limit)
+        search_results = semantic_index.search(embedding, limit + 10)  # Fetch extra for filtering
     except Exception as e:
         print(f"[Similarity] Semantic search failed: {e}")
         return []
@@ -533,20 +543,39 @@ def find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]:
     with get_db_connection() as conn:
         placeholders = ','.join('?' * len(ids))
         rows = conn.execute(f"SELECT id, filepath FROM images WHERE id IN ({placeholders})", ids).fetchall()
+    
+    # Build exclusion sets
+    current_path_normalized = f"images/{filepath}"
+    family_paths = set()
+    if exclude_family:
+        try:
+            family_filepaths = _get_family_filepaths(filepath)
+            family_paths = {f"images/{fp}" for fp in family_filepaths}
+        except Exception as e:
+            print(f"[Similarity] Error getting family for {filepath}: {e}")
         
     resolved = []
     for row in rows:
+        result_path = f"images/{row['filepath']}"
+        
+        # Apply exclusion filters
+        if exclude_self and result_path == current_path_normalized:
+            continue
+        if exclude_family and result_path in family_paths:
+            continue
+            
         sim_score = scores.get(row['id'], 0)
         resolved.append({
-            'path': f"images/{row['filepath']}",
-            'thumb': get_thumbnail_path(f"images/{row['filepath']}"),
+            'path': result_path,
+            'thumb': get_thumbnail_path(result_path),
             'similarity': sim_score,
             'match_type': 'semantic',
-            'score': sim_score
+            'score': sim_score,
+            'primary_source': 'semantic'
         })
         
     resolved.sort(key=lambda x: x['score'], reverse=True)
-    return resolved
+    return resolved[:limit]
 
 
 # ============================================================================

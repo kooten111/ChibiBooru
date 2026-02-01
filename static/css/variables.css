@@ -79,9 +79,17 @@
 
     /* Rating Colors */
     --rating-general: #22c55e;
+    --rating-general-bg: rgba(34, 197, 94, 0.2);
     --rating-sensitive: #eab308;
+    --rating-sensitive-bg: rgba(234, 179, 8, 0.2);
     --rating-questionable: #f97316;
+    --rating-questionable-bg: rgba(249, 115, 22, 0.2);
     --rating-explicit: #ef4444;
+    --rating-explicit-bg: rgba(239, 68, 68, 0.2);
+
+    /* Semantic State Colors with Backgrounds */
+    --success-bg: rgba(144, 238, 144, 0.2);
+    --warning-bg: rgba(255, 153, 102, 0.2);
 
     --spacing-xs: 4px;
     --spacing-sm: 8px;

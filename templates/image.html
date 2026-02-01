@@ -39,7 +39,8 @@
     </style>
 </head>
 
-<body class="image-page" data-information-panel-default-collapsed="{{ 'true' if information_panel_default_collapsed else 'false' }}">
+<body class="image-page"
+    data-information-panel-default-collapsed="{{ 'true' if information_panel_default_collapsed else 'false' }}">
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
             <div class="drop-zone-icon">📤</div>
@@ -50,7 +51,8 @@
     {% include 'header.html' %}
 
     <div class="container">
-        <script type="application/json" id="image-page-defaults">{{ {'information_panel_default_collapsed': information_panel_default_collapsed}|tojson }}</script>
+        <script type="application/json"
+            id="image-page-defaults">{{ {'information_panel_default_collapsed': information_panel_default_collapsed}|tojson }}</script>
         <div class="sidebar-left" id="sidebarLeft">
             <div class="section-content" id="tags-content">
                 <div class="tags-list panel">
@@ -292,7 +294,9 @@
             {% if metadata %}
             <div class="section-content" id="metadata-content">
                 <div class="metadata-info panel">
-                    <button class="panel-header mobile-toggle{% if information_panel_default_collapsed %} collapsed{% endif %}" data-section="metadata-panel-content">
+                    <button
+                        class="panel-header mobile-toggle{% if information_panel_default_collapsed %} collapsed{% endif %}"
+                        data-section="metadata-panel-content">
                         <span class="section-icon">ℹ️</span>
                         <span class="section-title">Information</span>
                         <span class="section-arrow">▼</span>
@@ -587,6 +591,7 @@
                 {% if related_images or similar_sidebar_sources == 'faiss' %}
                 <script type="application/json"
                     id="similarConfig">{"sources": "{{ similar_sidebar_sources }}", "showChips": {{ similar_sidebar_show_chips|tojson }}}</script>
+                <script type="application/json" id="relatedImagesData">{{ related_images|tojson }}</script>
                 <div class="related-images-vertical panel" {% if not similar_sidebar_show_chips %}data-hide-chips="true"
                     {% endif %}>
                     <button class="panel-header mobile-toggle" data-section="related-images-content">

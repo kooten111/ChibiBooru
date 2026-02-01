@@ -139,37 +139,37 @@
 .badge.success {
     border-color: var(--success);
     color: var(--success);
-    background: rgba(16, 185, 129, 0.2);
+    background: var(--success-bg);
 }
 
 .badge.warning {
     border-color: var(--warning);
     color: var(--warning);
-    background: rgba(245, 158, 11, 0.2);
+    background: var(--warning-bg);
 }
 
 .badge.general {
     border-color: var(--rating-general);
     color: var(--rating-general);
-    background: rgba(59, 130, 246, 0.2);
+    background: var(--rating-general-bg);
 }
 
 .badge.sensitive {
     border-color: var(--rating-sensitive);
     color: var(--rating-sensitive);
-    background: rgba(139, 92, 246, 0.2);
+    background: var(--rating-sensitive-bg);
 }
 
 .badge.questionable {
     border-color: var(--rating-questionable);
     color: var(--rating-questionable);
-    background: rgba(168, 85, 247, 0.2);
+    background: var(--rating-questionable-bg);
 }
 
 .badge.explicit {
     border-color: var(--rating-explicit);
     color: var(--rating-explicit);
-    background: rgba(239, 68, 68, 0.2);
+    background: var(--rating-explicit-bg);
 }
 
 .processing-overlay {
