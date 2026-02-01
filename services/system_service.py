@@ -1,8 +1,8 @@
-# services/system_service.py
 import os
 from quart import request, jsonify
 from typing import Dict, Any, List, Optional
 import config
+import numpy as np
 from database import models
 from services import processing
 from utils.deduplication import scan_and_remove_duplicates
@@ -903,10 +903,24 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
                 
                 # Also add images missing embeddings
                 if similarity_service.SEMANTIC_AVAILABLE:
+                    # 1. Check for missing embeddings
                     cursor.execute("SELECT id FROM images")
                     all_ids = set(row['id'] for row in cursor.fetchall())
                     missing_embeddings = all_ids - embedding_ids
                     broken_ids.update(missing_embeddings)
+                    
+                    # 2. Check for invalid embedding dimensions (corrupted data)
+                    # We need to scan the embeddings table for this
+                    with similarity_db.get_db_connection() as emb_conn:
+                        emb_cursor = emb_conn.execute("SELECT image_id, embedding FROM embeddings")
+                        for emb_row in emb_cursor:
+                            try:
+                                vec = np.frombuffer(emb_row['embedding'], dtype=np.float32)
+                                if len(vec) != 1024:  # Expected dimension
+                                    broken_ids.add(emb_row['image_id'])
+                            except Exception:
+                                # Malformed tensor buffer
+                                broken_ids.add(emb_row['image_id'])
                 
                 image_ids = list(broken_ids)
         

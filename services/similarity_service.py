@@ -2,613 +2,78 @@
 Perceptual Hash Similarity Service
 
 Provides visual similarity detection using perceptual hashing algorithms.
+This module is the main public API. Implementation is split into:
+- services.similarity.hashing - hash computation
+- services.similarity.semantic - FAISS/semantic search
 """
 import os
 import time
-import threading
 from typing import Optional, List, Dict, Tuple
 from PIL import Image, UnidentifiedImageError
-import imagehash
 import config
 from database import get_db_connection, models
 from utils.file_utils import get_thumbnail_path
-from services import similarity_db, zip_animation_service
-from PIL import ImageFile
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+from services import similarity_db
+
+# Import from new modules (these are the implementations)
+from services.similarity.hashing import (
+    compute_phash,
+    compute_colorhash,
+    compute_phash_for_video,
+    compute_colorhash_for_video,
+    compute_phash_for_zip_animation,
+    compute_phash_for_file,
+    compute_colorhash_for_file,
+    hamming_distance,
+    hash_similarity_score,
+)
+from services.similarity.semantic import (
+    SEMANTIC_AVAILABLE,
+    FAISS_AVAILABLE,
+    ML_WORKER_AVAILABLE,
+    NUMPY_AVAILABLE,
+    SemanticIndex,
+    get_semantic_index,
+    SemanticBackend,
+    MLWorkerSemanticBackend, 
+    SemanticSearchEngine,
+    get_semantic_engine,
+    set_semantic_backend,
+    find_semantic_similar as _find_semantic_similar,
+)
+
+# Re-import numpy if available (needed for batch operations)
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 
 def _log(message: str, level: str = "info"):
-    """
-    Centralized logging helper for similarity service.
-    Uses monitor_service when available, falls back to print.
-    """
+    """Centralized logging helper."""
     try:
         from services import monitor_service
         monitor_service.add_log(f"[Similarity] {message}", level)
     except Exception:
         print(f"[Similarity] {message}")
 
-# Optional dependencies for Semantic Similarity
-# FAISS is now in main app for fast in-memory search
-try:
-    import numpy as np
-    import faiss
-    NUMPY_AVAILABLE = True
-    FAISS_AVAILABLE = True
-except ImportError:
-    NUMPY_AVAILABLE = False
-    FAISS_AVAILABLE = False
-    np = None
-    faiss = None
 
-# ML Worker client - for embedding computation only
-if config.ENABLE_SEMANTIC_SIMILARITY:
-    try:
-        from ml_worker.client import get_ml_worker_client
-        ML_WORKER_AVAILABLE = True
-        SEMANTIC_AVAILABLE = NUMPY_AVAILABLE and FAISS_AVAILABLE  # Need numpy and FAISS for semantic search
-    except ImportError:
-        ML_WORKER_AVAILABLE = False
-        SEMANTIC_AVAILABLE = False
-        print("[Similarity] Warning: ML Worker not available. Semantic similarity disabled.")
-else:
-    ML_WORKER_AVAILABLE = False
-    SEMANTIC_AVAILABLE = False
-
-# Global state for semantic search
-_semantic_engine = None
-
-
-# ============================================================================
-# Hash Computation
-# ============================================================================
-
-def compute_phash(image_path: str, hash_size: int = 8) -> Optional[str]:
-    """
-    Compute perceptual hash for an image.
-    
-    Args:
-        image_path: Path to the image file
-        hash_size: Size of the hash (8 = 64-bit hash, 16 = 256-bit)
-    
-    Returns:
-        Hex string representation of the hash, or None on error
-    """
-    try:
-        with Image.open(image_path) as img:
-            # Convert to RGB if necessary (handles RGBA, P mode, etc.)
-            if img.mode in ('RGBA', 'LA', 'P'):
-                # Create white background for transparency
-                background = Image.new('RGB', img.size, (255, 255, 255))
-                if img.mode == 'P':
-                    img = img.convert('RGBA')
-                if 'A' in img.mode:
-                    background.paste(img, mask=img.split()[-1])
-                else:
-                    background.paste(img)
-                img = background
-            elif img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Compute perceptual hash
-            phash = imagehash.phash(img, hash_size=hash_size)
-            return str(phash)
-    except UnidentifiedImageError:
-        print(f"[Similarity] Cannot identify image: {image_path}")
-        return None
-    except Exception as e:
-        print(f"[Similarity] Error computing hash for {image_path}: {e}")
-        return None
-
-
-def compute_colorhash(image_path: str, binbits: int = 3) -> Optional[str]:
-    """
-    Compute color hash for an image (captures color distribution).
-    
-    Args:
-        image_path: Path to the image file
-        binbits: Bits per channel (3 = 8x8x8 bins)
-    
-    Returns:
-        Hex string representation of the hash, or None on error
-    """
-    try:
-        with Image.open(image_path) as img:
-            # Convert to RGB (colorhash requires color info)
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Compute color hash
-            chash = imagehash.colorhash(img, binbits=binbits)
-            return str(chash)
-    except UnidentifiedImageError:
-        print(f"[Similarity] Cannot identify image for colorhash: {image_path}")
-        return None
-    except Exception as e:
-        print(f"[Similarity] Error computing colorhash for {image_path}: {e}")
-        return None
-
-
-def compute_colorhash_for_video(video_path: str) -> Optional[str]:
-    """
-    Compute color hash from the first frame of a video.
-    
-    Args:
-        video_path: Path to the video file
-        
-    Returns:
-        Hex string representation of the hash, or None on error
-    """
-    from utils.video_utils import extract_first_frame
-    
-    frame = extract_first_frame(video_path)
-    if frame is None:
-        return None
-    
-    try:
-        # Convert to RGB if necessary
-        if frame.mode != 'RGB':
-            frame = frame.convert('RGB')
-        chash = imagehash.colorhash(frame)
-        return str(chash)
-    except Exception as e:
-        print(f"[Similarity] Error computing colorhash for video: {e}")
-        return None
-
-
-def compute_phash_for_video(video_path: str, hash_size: int = 8) -> Optional[str]:
-    """
-    Compute perceptual hash from the first frame of a video.
-    
-    Args:
-        video_path: Path to the video file
-        hash_size: Size of the hash (8 = 64-bit hash, 16 = 256-bit)
-        
-    Returns:
-        Hex string representation of the hash, or None on error
-    """
-    from utils.video_utils import extract_first_frame
-    
-    frame = extract_first_frame(video_path)
-    if frame is None:
-        return None
-    
-    try:
-        # Convert to RGB if necessary (handles RGBA, P mode, etc.)
-        if frame.mode in ('RGBA', 'LA', 'P'):
-            background = Image.new('RGB', frame.size, (255, 255, 255))
-            if frame.mode == 'P':
-                frame = frame.convert('RGBA')
-            if 'A' in frame.mode:
-                background.paste(frame, mask=frame.split()[-1])
-            else:
-                background.paste(frame)
-            frame = background
-        elif frame.mode != 'RGB':
-            frame = frame.convert('RGB')
-        
-        phash = imagehash.phash(frame, hash_size=hash_size)
-        return str(phash)
-    except Exception as e:
-        print(f"[Similarity] Error computing phash for video: {e}")
-        return None
-
-
-def compute_phash_for_zip_animation(md5: str) -> Optional[str]:
-    """
-    Compute perceptual hash from the first frame of a zip animation.
-    
-    Args:
-        md5: MD5 hash of the zip file
-        
-    Returns:
-        Hex string representation of the hash, or None on error
-    """
-    try:
-        from services.zip_animation_service import get_frame_path
-        first_frame = get_frame_path(md5, 0)
-        if first_frame and os.path.exists(first_frame):
-            return compute_phash(first_frame)
-        return None
-    except Exception as e:
-        print(f"[Similarity] Error hashing zip animation: {e}")
-        return None
-
-
-def compute_phash_for_file(filepath: str, md5: str = None) -> Optional[str]:
-    """
-    Compute perceptual hash for any supported file type.
-    
-    Args:
-        filepath: Path to the file
-        md5: MD5 hash (required for zip animations)
-        
-    Returns:
-        Hex string representation of the hash, or None on error
-    """
-    if filepath.lower().endswith(config.SUPPORTED_VIDEO_EXTENSIONS):
-        return compute_phash_for_video(filepath)
-    elif filepath.lower().endswith(config.SUPPORTED_ZIP_EXTENSIONS):
-        if md5:
-            return compute_phash_for_zip_animation(md5)
-        return None
-    else:
-        return compute_phash(filepath)
-
-
-def compute_colorhash_for_file(filepath: str) -> Optional[str]:
-    """
-    Compute color hash for any supported file type.
-    
-    Args:
-        filepath: Path to the file
-        
-    Returns:
-        Hex string representation of the hash, or None on error
-    """
-    if filepath.lower().endswith(config.SUPPORTED_VIDEO_EXTENSIONS):
-        return compute_colorhash_for_video(filepath)
-    elif filepath.lower().endswith(config.SUPPORTED_ZIP_EXTENSIONS):
-        # Compute colorhash from first frame of zip animation
-        # Get MD5 to find extracted frames
-        image_data = models.get_image_details(filepath)
-        if image_data and image_data.get('md5'):
-            md5 = image_data['md5']
-            first_frame_path = zip_animation_service.get_frame_path(md5, 0)
-            if first_frame_path and os.path.exists(first_frame_path):
-                try:
-                    img = Image.open(first_frame_path)
-                    return str(imagehash.colorhash(img))
-                except (OSError, IOError, UnidentifiedImageError) as e:
-                    print(f"Error computing colorhash for zip animation {filepath}: {e}")
-                    return None
-        return None
-    else:
-        return compute_colorhash(filepath)
-
-
-# ============================================================================
-# Semantic Embedding & Search
-# ============================================================================
-
-class SemanticIndex:
-    """
-    FAISS-based semantic similarity index.
-    Singleton pattern to keep index in memory for fast searches.
-    """
-    _instance = None
-    _lock = threading.Lock()
-    
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-                    cls._instance._initialized = False
-        return cls._instance
-    
-    def __init__(self):
-        if self._initialized:
-            return
-            
-        self.index = None
-        self.ids = []
-        self.dimension = 1024
-        self._initialized = True
-        
-        # Build index on initialization if embeddings exist
-        if FAISS_AVAILABLE and SEMANTIC_AVAILABLE:
-            try:
-                self._build_index()
-            except Exception as e:
-                print(f"[SemanticIndex] Failed to build index on init: {e}")
-    
-    def _build_index(self):
-        """Build FAISS index from all embeddings in database."""
-        if not FAISS_AVAILABLE:
-            print("[SemanticIndex] FAISS not available")
-            return
-            
-        # Get all embeddings from database
-        ids, matrix = similarity_db.get_all_embeddings()
-        
-        if len(ids) == 0:
-            print("[SemanticIndex] No embeddings found in database")
-            self.index = None
-            self.ids = []
-            return
-        
-        # Normalize embeddings for cosine similarity (IndexFlatIP with normalized vectors = cosine)
-        # Note: modifies matrix in-place, but this is safe since get_all_embeddings() returns a new array
-        faiss.normalize_L2(matrix)
-        
-        # Build FAISS index
-        self.dimension = matrix.shape[1]
-        self.index = faiss.IndexFlatIP(self.dimension)
-        self.index.add(matrix)
-        self.ids = ids
-        
-        print(f"[SemanticIndex] Built FAISS index with {len(ids)} embeddings")
-    
-    def rebuild(self):
-        """Rebuild the index from scratch (call after adding new embeddings)."""
-        print("[SemanticIndex] Rebuilding index...")
-        self._build_index()
-    
-    def search(self, query_embedding: np.ndarray, limit: int = 50) -> List[Dict]:
-        """
-        Search for similar images using FAISS index.
-        
-        Args:
-            query_embedding: 1024-d embedding vector (numpy array or list)
-            limit: Maximum number of results
-            
-        Returns:
-            List of dicts with 'image_id' and 'score'
-        """
-        if not FAISS_AVAILABLE or self.index is None:
-            return []
-        
-        # Convert to numpy array if needed
-        if not isinstance(query_embedding, np.ndarray):
-            query_embedding = np.array(query_embedding, dtype=np.float32)
-        
-        # Make a copy and reshape to 2D array for FAISS
-        # (copy to avoid modifying the caller's array)
-        query = query_embedding.copy().reshape(1, -1)
-        
-        # Normalize query for cosine similarity
-        faiss.normalize_L2(query)
-        
-        # Search
-        distances, indices = self.index.search(query, min(limit, len(self.ids)))
-        
-        # Build results
-        results = []
-        for dist, idx in zip(distances[0], indices[0]):
-            if idx == -1:
-                continue
-            if idx < len(self.ids):
-                results.append({
-                    'image_id': int(self.ids[idx]),
-                    'score': float(dist)
-                })
-        
-        return results
-
-def get_semantic_index() -> SemanticIndex:
-    """
-    Get the global semantic index singleton.
-    Thread-safe due to SemanticIndex's singleton implementation.
-    """
-    return SemanticIndex()
-
-# Backend Interface
-class SemanticBackend:
-    """Abstract base class for semantic similarity backends."""
-    def is_available(self) -> bool:
-        raise NotImplementedError
-        
-    def get_embedding(self, image_path: str, model_path: str) -> Optional[np.ndarray]:
-        raise NotImplementedError
-        
-    def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
-        raise NotImplementedError
-
-class MLWorkerSemanticBackend(SemanticBackend):
-    """Default backend using ML Worker process via IPC."""
-    def is_available(self) -> bool:
-        return ML_WORKER_AVAILABLE
-        
-    def get_embedding(self, image_path: str, model_path: str) -> Optional[np.ndarray]:
-        if not ML_WORKER_AVAILABLE:
-            return None
-        try:
-            client = get_ml_worker_client()
-            result = client.compute_similarity(image_path=image_path, model_path=model_path)
-            embedding = result['embedding']
-            return np.array(embedding, dtype=np.float32)
-        except Exception as e:
-            print(f"[Similarity] ML Worker error for {image_path}: {e}")
-            return None
-            
-    def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
-        """
-        Deprecated: Search is now done locally with FAISS in main process.
-        This method is kept for backward compatibility but returns empty list.
-        """
-        print("[Similarity] Warning: MLWorkerSemanticBackend.search_similar is deprecated. Use SemanticIndex directly.")
-        return []
-
-class SemanticSearchEngine:
-    """
-    Semantic similarity engine.
-    Delegates actual work to a backend (ML Worker by default, or Local for inside worker).
-    """
-    def __init__(self):
-        self.model_path = config.SEMANTIC_MODEL_PATH
-        self.ml_worker_ready = False
-        self._backend = MLWorkerSemanticBackend()
-        
-    def set_backend(self, backend: SemanticBackend):
-        """Override the backend (e.g. for running inside the worker process)"""
-        self._backend = backend
-        
-    def load_model(self):
-        """Check availability."""
-        if not SEMANTIC_AVAILABLE: return False
-        
-        if not self._backend.is_available():
-            print("[Similarity] ERROR: Backend not available for semantic similarity")
-            return False
-            
-        if not os.path.exists(self.model_path):
-            print(f"[Similarity] Model not found at {self.model_path}")
-            return False
-        
-        self.ml_worker_ready = True
-        return True
-
-    def get_embedding(self, image_path: str) -> Optional[np.ndarray]:
-        """Get embedding via backend."""
-        if not self.ml_worker_ready and not self.load_model():
-            return None
-        return self._backend.get_embedding(image_path, self.model_path)
-    
-    def search_similar(self, query_embedding: List[float], limit: int) -> List[Dict]:
-        """Search via backend."""
-        if not self.ml_worker_ready and not self.load_model():
-            return []
-        return self._backend.search_similar(query_embedding, limit)
-
-def get_semantic_engine():
-    global _semantic_engine
-    if _semantic_engine is None:
-        _semantic_engine = SemanticSearchEngine()
-    return _semantic_engine
-
-def set_semantic_backend(backend: SemanticBackend):
-    """Global helper to set the backend for the singleton engine."""
-    get_semantic_engine().set_backend(backend)
-
+# Wrapper for find_semantic_similar to use the local _get_family_filepaths helper
 def find_semantic_similar(filepath: str, limit: int = 20, exclude_self: bool = True, exclude_family: bool = False) -> List[Dict]:
-    """Find semantically similar images using local FAISS index.
-    
-    Args:
-        filepath: Path to the reference image (relative, without 'images/' prefix)
-        limit: Maximum number of results
-        exclude_self: If True, exclude the current image from results
-        exclude_family: If True, exclude images in the same parent/child chain
-        
-    Returns:
-        List of similar images with path, thumb, similarity, and primary_source
-    """
-    if not SEMANTIC_AVAILABLE: return []
-    
-    # 1. Get embedding for query image
-    # First check DB
-    with get_db_connection() as conn:
-        row = conn.execute("SELECT id FROM images WHERE filepath = ?", (filepath,)).fetchone()
-        if not row: return []
-        image_id = row['id']
-
-    embedding = similarity_db.get_embedding(image_id)
-    
-    # If not in DB, compute it via ml_worker
-    if embedding is None:
-        full_path = os.path.join("static/images", filepath)
-        if os.path.exists(full_path):
-            engine = get_semantic_engine()
-            embedding = engine.get_embedding(full_path)
-            if embedding is not None:
-                # Save it
-                similarity_db.save_embedding(image_id, embedding)
-                # Rebuild index to include new embedding
-                get_semantic_index().rebuild()
-    
-    if embedding is None: return []
-    
-    # 2. Search using local FAISS index
-    try:
-        semantic_index = get_semantic_index()
-        search_results = semantic_index.search(embedding, limit + 10)  # Fetch extra for filtering
-    except Exception as e:
-        print(f"[Similarity] Semantic search failed: {e}")
-        return []
-    
-    # 3. Resolve results
-    if not search_results: return []
-    
-    ids = [r['image_id'] for r in search_results]
-    scores = {r['image_id']: r['score'] for r in search_results}
-    
-    with get_db_connection() as conn:
-        placeholders = ','.join('?' * len(ids))
-        rows = conn.execute(f"SELECT id, filepath FROM images WHERE id IN ({placeholders})", ids).fetchall()
-    
-    # Build exclusion sets
-    current_path_normalized = f"images/{filepath}"
-    family_paths = set()
-    if exclude_family:
-        try:
-            family_filepaths = _get_family_filepaths(filepath)
-            family_paths = {f"images/{fp}" for fp in family_filepaths}
-        except Exception as e:
-            print(f"[Similarity] Error getting family for {filepath}: {e}")
-        
-    resolved = []
-    for row in rows:
-        result_path = f"images/{row['filepath']}"
-        
-        # Apply exclusion filters
-        if exclude_self and result_path == current_path_normalized:
-            continue
-        if exclude_family and result_path in family_paths:
-            continue
-            
-        sim_score = scores.get(row['id'], 0)
-        resolved.append({
-            'path': result_path,
-            'thumb': get_thumbnail_path(result_path),
-            'similarity': sim_score,
-            'match_type': 'semantic',
-            'score': sim_score,
-            'primary_source': 'semantic'
-        })
-        
-    resolved.sort(key=lambda x: x['score'], reverse=True)
-    return resolved[:limit]
-
-
-# ============================================================================
-# Hash Comparison
-# ============================================================================
-
-def hamming_distance(hash1: str, hash2: str) -> int:
-    """
-    Calculate Hamming distance between two hex hash strings.
-    
-    Lower distance = more similar:
-    - 0-5: Near identical (same image, different compression)
-    - 6-10: Very similar (minor edits, cropping)
-    - 11-15: Somewhat similar
-    - 16+: Different images
-    
-    Args:
-        hash1: First hash as hex string
-        hash2: Second hash as hex string
-        
-    Returns:
-        Hamming distance (number of differing bits)
-    """
-    try:
-        h1 = imagehash.hex_to_hash(hash1)
-        h2 = imagehash.hex_to_hash(hash2)
-        # Cast to int because imagehash returns numpy type which isn't JSON serializable
-        return int(h1 - h2)
-    except Exception:
-        return 64  # Maximum distance for 64-bit hash
-
-
-def hash_similarity_score(hash1: str, hash2: str, max_distance: int = 64) -> float:
-    """
-    Convert Hamming distance to a similarity score (0.0 to 1.0).
-    
-    Args:
-        hash1: First hash as hex string
-        hash2: Second hash as hex string
-        max_distance: Maximum possible distance (64 for 64-bit hash)
-        
-    Returns:
-        Similarity score (1.0 = identical, 0.0 = completely different)
-    """
-    distance = hamming_distance(hash1, hash2)
-    return float(max(0.0, 1.0 - (distance / max_distance)))
+    """Find semantically similar images using local FAISS index."""
+    return _find_semantic_similar(
+        filepath=filepath,
+        limit=limit,
+        exclude_self=exclude_self,
+        exclude_family=exclude_family,
+        get_family_func=_get_family_filepaths if exclude_family else None
+    )
 
 
 # ============================================================================
 # Database Operations
 # ============================================================================
+
 
 def get_image_phash(filepath: str) -> Optional[str]:
     """Get the stored phash for an image."""
