@@ -49,6 +49,10 @@ async def get_animation_metadata(filepath):
     if not metadata:
         raise ValueError(f"Animation metadata not found for: {filepath}")
     
+    # Treat legacy stored default_fps 10 as 24 (zip-as-gif default)
+    stored_fps = metadata.get("default_fps", 24)
+    default_fps = 24 if stored_fps == 10 else stored_fps
+
     return {
         "type": "zip",
         "filepath": filepath,
@@ -57,7 +61,7 @@ async def get_animation_metadata(filepath):
         "frames": metadata.get("frames", []),
         "width": metadata.get("width"),
         "height": metadata.get("height"),
-        "default_fps": metadata.get("default_fps", 24),
+        "default_fps": default_fps,
         "is_animated": True
     }
 
@@ -117,12 +121,16 @@ async def get_all_frame_urls(md5):
     
     frames = metadata.get("frames", [])
     frame_urls = [f"/api/animation/frame/{md5}/{i}" for i in range(len(frames))]
-    
+
+    # Treat legacy stored default_fps 10 as 24 (zip-as-gif default)
+    stored_fps = metadata.get("default_fps", 24)
+    default_fps = 24 if stored_fps == 10 else stored_fps
+
     return {
         "md5": md5,
         "frame_count": len(frames),
         "frame_urls": frame_urls,
         "width": metadata.get("width"),
         "height": metadata.get("height"),
-        "default_fps": metadata.get("default_fps", 24)
+        "default_fps": default_fps
     }
