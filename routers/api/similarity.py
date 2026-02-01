@@ -165,57 +165,9 @@ async def generate_hashes():
     
     task_id = f"hash_gen_{uuid.uuid4().hex[:8]}"
     
-    async def generate_hashes_task(task_id, manager):
-        """Background task for generating hashes with progress updates."""
-        from services import monitor_service as mon
-        
-        mon.add_log("Starting hash generation...", "info")
-        
-        loop = asyncio.get_running_loop()
-        
-        import time
-        last_update_time = 0
-        
-        def progress_callback(current, total):
-             nonlocal last_update_time
-             current_time = time.time()
-             
-             # Throttle updates: only update if 0.1s passed OR it's the final update
-             if (current_time - last_update_time > 0.1) or (current >= total):
-                 last_update_time = current_time
-                 future = asyncio.run_coroutine_threadsafe(
-                     manager.update_progress(task_id, current, total, "Generating hashes..."), 
-                     loop
-                 )
-                 # We don't wait for the future
-        
-        # Run synchronous service function in thread
-        stats = await asyncio.to_thread(
-            similarity_service.generate_missing_hashes, 
-            batch_size=100, 
-            progress_callback=progress_callback
-        )
-        
-        success = stats['success']
-        failed = stats['failed']
-        total = stats['total']
-        
-        result_msg = f"✓ Hash generation complete: {success} generated, {failed} failed"
-        mon.add_log(result_msg, "success")
-        
-        # Update task to 100%
-        await manager.update_progress(task_id, total, total, "Complete")
-        
-        return {
-            'success': success,
-            'failed': failed,
-            'total': total,
-            'message': f"Generated {success} hashes ({failed} failed)"
-        }
-    
-    # Start background task
+    # Start background task using service layer function
     monitor_service.add_log("Hash generation task started...", "info")
-    await task_manager.start_task(task_id, generate_hashes_task)
+    await task_manager.start_task(task_id, similarity_service.run_hash_generation_task)
     
     return {
         'status': 'started',

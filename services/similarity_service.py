@@ -2,7 +2,6 @@
 Perceptual Hash Similarity Service
 
 Provides visual similarity detection using perceptual hashing algorithms.
-Similar to Czkawka's duplicate detection approach.
 """
 import os
 import time
@@ -16,6 +15,18 @@ from utils.file_utils import get_thumbnail_path
 from services import similarity_db, zip_animation_service
 from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+
+
+def _log(message: str, level: str = "info"):
+    """
+    Centralized logging helper for similarity service.
+    Uses monitor_service when available, falls back to print.
+    """
+    try:
+        from services import monitor_service
+        monitor_service.add_log(f"[Similarity] {message}", level)
+    except Exception:
+        print(f"[Similarity] {message}")
 
 # Optional dependencies for Semantic Similarity
 # FAISS is now in main app for fast in-memory search
@@ -128,87 +139,58 @@ def compute_colorhash_for_video(video_path: str) -> Optional[str]:
     Returns:
         Hex string representation of the hash, or None on error
     """
-    import subprocess
-    import tempfile
+    from utils.video_utils import extract_first_frame
     
-    # Check for ffmpeg
-    try:
-        result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True)
-        if result.returncode != 0:
-            print("[Similarity] ffmpeg not found, cannot hash video")
-            return None
-    except Exception:
+    frame = extract_first_frame(video_path)
+    if frame is None:
         return None
     
-    # Extract first frame to temp file
     try:
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-            tmp_path = tmp.name
-        
-        cmd = [
-            'ffmpeg', '-y', '-i', video_path,
-            '-vframes', '1', '-f', 'image2',
-            tmp_path
-        ]
-        subprocess.run(cmd, capture_output=True, timeout=30)
-        
-        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-            result = compute_colorhash(tmp_path)
-            os.unlink(tmp_path)
-            return result
-        
-        return None
+        # Convert to RGB if necessary
+        if frame.mode != 'RGB':
+            frame = frame.convert('RGB')
+        chash = imagehash.colorhash(frame)
+        return str(chash)
     except Exception as e:
-        print(f"[Similarity] Error extracting video frame: {e}")
-        if 'tmp_path' in locals() and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+        print(f"[Similarity] Error computing colorhash for video: {e}")
         return None
 
 
-def compute_phash_for_video(video_path: str) -> Optional[str]:
+def compute_phash_for_video(video_path: str, hash_size: int = 8) -> Optional[str]:
     """
     Compute perceptual hash from the first frame of a video.
     
     Args:
         video_path: Path to the video file
+        hash_size: Size of the hash (8 = 64-bit hash, 16 = 256-bit)
         
     Returns:
         Hex string representation of the hash, or None on error
     """
-    import subprocess
-    import tempfile
+    from utils.video_utils import extract_first_frame
     
-    # Check for ffmpeg
-    try:
-        result = subprocess.run(['which', 'ffmpeg'], capture_output=True, text=True)
-        if result.returncode != 0:
-            print("[Similarity] ffmpeg not found, cannot hash video")
-            return None
-    except Exception:
+    frame = extract_first_frame(video_path)
+    if frame is None:
         return None
     
-    # Extract first frame to temp file
     try:
-        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-            tmp_path = tmp.name
+        # Convert to RGB if necessary (handles RGBA, P mode, etc.)
+        if frame.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', frame.size, (255, 255, 255))
+            if frame.mode == 'P':
+                frame = frame.convert('RGBA')
+            if 'A' in frame.mode:
+                background.paste(frame, mask=frame.split()[-1])
+            else:
+                background.paste(frame)
+            frame = background
+        elif frame.mode != 'RGB':
+            frame = frame.convert('RGB')
         
-        cmd = [
-            'ffmpeg', '-y', '-i', video_path,
-            '-vframes', '1', '-f', 'image2',
-            tmp_path
-        ]
-        subprocess.run(cmd, capture_output=True, timeout=30)
-        
-        if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-            result = compute_phash(tmp_path)
-            os.unlink(tmp_path)
-            return result
-        
-        return None
+        phash = imagehash.phash(frame, hash_size=hash_size)
+        return str(phash)
     except Exception as e:
-        print(f"[Similarity] Error extracting video frame: {e}")
-        if 'tmp_path' in locals() and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+        print(f"[Similarity] Error computing phash for video: {e}")
         return None
 
 
@@ -679,6 +661,72 @@ def update_image_colorhash(filepath: str, colorhash: str) -> bool:
         return False
 
 
+def _ensure_image_hashes(filepath: str) -> tuple:
+    """
+    Ensure hashes exist for an image, computing them if missing.
+    
+    Args:
+        filepath: Relative path to the image (without 'images/' prefix)
+        
+    Returns:
+        Tuple of (phash, colorhash) - either may be None if computation fails
+    """
+    ref_phash = get_image_phash(filepath)
+    ref_colorhash = get_image_colorhash(filepath)
+    
+    full_path = os.path.join("static/images", filepath)
+    
+    if not ref_phash and os.path.exists(full_path):
+        ref_phash = compute_phash(full_path)
+        if ref_phash:
+            update_image_phash(filepath, ref_phash)
+            
+    if not ref_colorhash and os.path.exists(full_path):
+        chash = compute_colorhash(full_path)
+        if chash:
+            ref_colorhash = chash
+            update_image_colorhash(filepath, chash)
+    
+    return ref_phash, ref_colorhash
+
+
+def _calculate_similarity_score(
+    ref_phash: str,
+    ref_colorhash: Optional[str],
+    candidate_phash: str,
+    candidate_colorhash: Optional[str],
+    color_weight: float
+) -> tuple:
+    """
+    Calculate hybrid similarity score between reference and candidate.
+    
+    Args:
+        ref_phash: Reference image perceptual hash
+        ref_colorhash: Reference image color hash (optional)
+        candidate_phash: Candidate image perceptual hash
+        candidate_colorhash: Candidate image color hash (optional)
+        color_weight: Weight of color similarity (0.0 = only pHash, 1.0 = only ColorHash)
+        
+    Returns:
+        Tuple of (final_score, effective_distance)
+    """
+    # pHash Score (Structure)
+    phash_score = hash_similarity_score(ref_phash, candidate_phash)
+    
+    # ColorHash Score (Color)
+    color_score = 0.0
+    if candidate_colorhash and ref_colorhash:
+        color_score = hash_similarity_score(ref_colorhash, candidate_colorhash)
+    
+    # Hybrid Score
+    final_score = (phash_score * (1.0 - color_weight)) + (color_score * color_weight)
+    
+    # Convert to effective distance (0-64 scale)
+    effective_distance = 64.0 * (1.0 - final_score)
+    
+    return final_score, effective_distance
+
+
 def find_similar_images(
     filepath: str,
     threshold: int = 10,
@@ -700,36 +748,21 @@ def find_similar_images(
         List of similar images with distance and similarity score
     """
     try:
-        # Get reference hashes and family info
-        ref_phash = get_image_phash(filepath)
-        ref_colorhash = get_image_colorhash(filepath)
-        family_filepaths = set()
+        # Ensure reference hashes exist
+        ref_phash, ref_colorhash = _ensure_image_hashes(filepath)
         
+        if not ref_phash:
+            return []
+        
+        # Get family exclusion set
+        family_filepaths = set()
         if exclude_family:
             try:
                 family_filepaths = _get_family_filepaths(filepath)
             except Exception as e:
                 print(f"[Similarity] Error getting family for {filepath}: {e}")
-                # Continue without exclude_family if it fails
         
-        # If hashes missing, try to compute them
-        full_path = os.path.join("static/images", filepath)
-        
-        if not ref_phash and os.path.exists(full_path):
-            ref_phash = compute_phash(full_path)
-            if ref_phash:
-                update_image_phash(filepath, ref_phash)
-                
-        if not ref_colorhash and os.path.exists(full_path):
-            chash = compute_colorhash(full_path)
-            if chash:
-                ref_colorhash = chash
-                update_image_colorhash(filepath, chash)
-    
-        if not ref_phash:
-            return []
-        
-        # Get all images with hashes
+        # Get all candidate images with hashes
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -739,43 +772,24 @@ def find_similar_images(
             """, (filepath,))
             candidates = cursor.fetchall()
         
-        # Calculate distances
+        # Calculate similarity scores
         similar = []
         for row in candidates:
             try:
-                # Skip family members if requested
                 if exclude_family and row['filepath'] in family_filepaths:
                     continue
-                    
-                # 1. pHash Score (Structure)
-                phash_score = hash_similarity_score(ref_phash, row['phash'])
-                phash_dist = 64 * (1.0 - phash_score) # Estimated distance
                 
-                # 2. ColorHash Score (Color)
-                color_score = 0.0
-                if row['colorhash'] and ref_colorhash:
-                    # Use standard max distance for colorhash? 
-                    # imagehash.colorhash default binbits=3 means 8x8x8 = 512 bits? No.
-                    # It creates a 144 bit hash? 
-                    # Let's rely on hash_similarity_score default max=64?
-                    # Actually, let's use the helper but maybe max distance differs.
-                    # For now treating it same as phash for simplicity of implementation.
-                    color_score = hash_similarity_score(ref_colorhash, row['colorhash'])
-                
-                # 3. Hybrid Score
-                # color_weight 0 -> 100% pHash
-                # color_weight 1 -> 100% ColorHash
-                
-                final_score = (phash_score * (1.0 - color_weight)) + (color_score * color_weight)
-                
-                # Convert back to "Effective Distance" for threshold filtering (0-64 scale)
-                effective_distance = 64.0 * (1.0 - final_score)
+                final_score, effective_distance = _calculate_similarity_score(
+                    ref_phash, ref_colorhash,
+                    row['phash'], row['colorhash'],
+                    color_weight
+                )
                 
                 if effective_distance <= threshold:
                     similar.append({
                         'path': f"images/{row['filepath']}",
                         'thumb': get_thumbnail_path(f"images/{row['filepath']}"),
-                        'distance': int(effective_distance), # Return as int for UI compatibility
+                        'distance': int(effective_distance),
                         'score': float(final_score),
                         'similarity': float(final_score),
                         'match_type': 'visual'
@@ -785,7 +799,6 @@ def find_similar_images(
                 monitor_service.add_log(f"Error processing candidate {row['filepath']}: {e}", "warning")
                 continue
         
-        # Sort by distance (closest first)
         similar.sort(key=lambda x: x['distance'])
         return similar[:limit]
 
@@ -1029,6 +1042,63 @@ def _bulk_save_hashes(results: List[Dict]):
                 
     except Exception as e:
         print(f"[Similarity] Error in bulk save: {e}")
+
+
+async def run_hash_generation_task(task_id: str, manager) -> Dict:
+    """
+    Async background task for generating hashes with progress updates.
+    
+    Args:
+        task_id: The task identifier for progress tracking
+        manager: The background task manager instance
+        
+    Returns:
+        Dictionary with success, failed, and total counts
+    """
+    import asyncio
+    import time
+    from services import monitor_service
+    
+    monitor_service.add_log("Starting hash generation...", "info")
+    
+    loop = asyncio.get_running_loop()
+    last_update_time = 0
+    
+    def progress_callback(current, total):
+        nonlocal last_update_time
+        current_time = time.time()
+        
+        # Throttle updates: only update if 0.1s passed OR it's the final update
+        if (current_time - last_update_time > 0.1) or (current >= total):
+            last_update_time = current_time
+            asyncio.run_coroutine_threadsafe(
+                manager.update_progress(task_id, current, total, "Generating hashes..."), 
+                loop
+            )
+    
+    # Run synchronous service function in thread
+    stats = await asyncio.to_thread(
+        generate_missing_hashes, 
+        batch_size=100, 
+        progress_callback=progress_callback
+    )
+    
+    success = stats['success']
+    failed = stats['failed']
+    total = stats['total']
+    
+    result_msg = f"✓ Hash generation complete: {success} generated, {failed} failed"
+    monitor_service.add_log(result_msg, "success")
+    
+    # Update task to 100%
+    await manager.update_progress(task_id, total, total, "Complete")
+    
+    return {
+        'success': success,
+        'failed': failed,
+        'total': total,
+        'message': f"Generated {success} hashes ({failed} failed)"
+    }
 
 
 def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Dict:
