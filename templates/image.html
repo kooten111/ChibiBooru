@@ -7,7 +7,7 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=13' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/saucenao-modal.css') + '?v=1' }}">
@@ -39,7 +39,7 @@
     </style>
 </head>
 
-<body class="image-page">
+<body class="image-page" data-information-panel-default-collapsed="{{ 'true' if information_panel_default_collapsed else 'false' }}">
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
             <div class="drop-zone-icon">📤</div>
@@ -50,6 +50,7 @@
     {% include 'header.html' %}
 
     <div class="container">
+        <script type="application/json" id="image-page-defaults">{{ {'information_panel_default_collapsed': information_panel_default_collapsed}|tojson }}</script>
         <div class="sidebar-left" id="sidebarLeft">
             <div class="section-content" id="tags-content">
                 <div class="tags-list panel">
@@ -273,7 +274,7 @@
             {% if image_pools %}
             <div class="section-content" id="pools-content">
                 <div class="pool-management panel">
-                    <button class="panel-header mobile-toggle" data-section="pools-panel-content">
+                    <button class="panel-header mobile-toggle collapsed" data-section="pools-panel-content">
                         <span class="section-icon">📁</span>
                         <span class="section-title">Pools</span>
                         <span class="section-arrow">▼</span>
@@ -291,7 +292,7 @@
             {% if metadata %}
             <div class="section-content" id="metadata-content">
                 <div class="metadata-info panel">
-                    <button class="panel-header mobile-toggle" data-section="metadata-panel-content">
+                    <button class="panel-header mobile-toggle{% if information_panel_default_collapsed %} collapsed{% endif %}" data-section="metadata-panel-content">
                         <span class="section-icon">ℹ️</span>
                         <span class="section-title">Information</span>
                         <span class="section-arrow">▼</span>

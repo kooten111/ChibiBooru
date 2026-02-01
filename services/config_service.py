@@ -330,7 +330,15 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Show Tag/FAISS source chips on similar images',
         'editable': True,
     },
-    
+
+    # UI
+    'INFORMATION_PANEL_DEFAULT_VISIBLE': {
+        'category': 'UI',
+        'type': 'bool',
+        'description': 'On image page: Information panel expanded by default (uncheck = collapsed by default)',
+        'editable': True,
+    },
+
     # Feature Flags
     'ENABLE_SAUCENAO': {
         'category': 'Feature Flags',

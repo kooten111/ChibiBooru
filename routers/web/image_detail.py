@@ -86,6 +86,12 @@ def register_routes(blueprint):
         if isinstance(sidebar_show_chips, str):
             sidebar_show_chips = sidebar_show_chips.lower() in ('true', '1', 'yes')
 
+        # Information panel default: collapsed unless INFORMATION_PANEL_DEFAULT_VISIBLE is True
+        ip_visible = config_yml.get('INFORMATION_PANEL_DEFAULT_VISIBLE', getattr(config, 'INFORMATION_PANEL_DEFAULT_VISIBLE', False))
+        information_panel_default_collapsed = not (
+            ip_visible if isinstance(ip_visible, bool) else str(ip_visible).lower() in ('true', '1', 'yes')
+        )
+
         return await render_template(
             'image.html',
             filepath=filepath,
@@ -106,7 +112,8 @@ def register_routes(blueprint):
             image_pools=models.get_pools_for_image(data['id']) if data and data.get('id') else [],
             implied_tag_names=tag_data['implied_tag_names'],  # Tags implied by implication rules
             similar_sidebar_sources=sidebar_sources,
-            similar_sidebar_show_chips=sidebar_show_chips
+            similar_sidebar_show_chips=sidebar_show_chips,
+            information_panel_default_collapsed=information_panel_default_collapsed
         )
 
     @blueprint.route('/similar-visual/<path:filepath>')

@@ -22,7 +22,7 @@ body.image-page {
     grid-template-rows: 1fr;
     max-width: none;
     margin: 0;
-    padding: 24px;
+    padding: 24px 24px 0 24px;
     gap: var(--spacing-xl, 32px);
     flex: 1;
     min-height: 0;
@@ -65,7 +65,7 @@ body.image-page {
     min-height: 0;
     overflow-y: hidden;
     overflow-x: hidden;
-    gap: var(--spacing-md);
+    gap: 8px;
     position: relative;
     /* Remove container styling so panels are distinct */
     background: transparent;
@@ -90,6 +90,21 @@ body.image-page {
 /* When tags panel is collapsed, remove flex space */
 .image-page .tags-list:has(.panel-header.collapsed) {
     flex: 0 0 auto;
+}
+
+/* Tags panel should expand to fill available space */
+.image-page #tags-content {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.image-page .tags-list.panel {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
 }
 
 .image-page .tag-deltas {
@@ -117,6 +132,26 @@ body.image-page {
 /* When metadata-info panel is collapsed, remove flex space */
 .image-page .metadata-info:has(.panel-header.collapsed) {
     flex: 0 0 auto;
+}
+
+/* Metadata-info panel - Keep compact, anchor to bottom (override tags-browser.css flex: 2 1 0) */
+.image-page .sidebar-left #metadata-content {
+    flex: 0 0 auto;
+    margin-top: auto;
+}
+
+.image-page .metadata-info.panel {
+    flex: 0 0 auto;
+    height: auto !important;
+    min-height: 0;
+    margin-bottom: 0;
+}
+
+.image-page .sidebar-left .metadata-info.panel>.panel-collapsible-content {
+    padding: 6px 8px;
+    overflow: visible;
+    flex: 0 0 auto !important;
+    height: auto !important;
 }
 
 /* Panel Design - Consistent with site theme */
@@ -151,7 +186,7 @@ body.image-page {
 /* Panel Collapsible Content - Scrollable area */
 .image-page .sidebar-left .panel>.panel-collapsible-content,
 .image-page .sidebar-right .panel>.panel-collapsible-content {
-    padding: var(--spacing-md);
+    padding: 6px;
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1 1 0;
@@ -578,10 +613,11 @@ body.image-page {
     text-decoration: underline;
 }
 
-/* Related Images Vertical Panel */
+/* Related Images Vertical Panel - fill available height, clip so collapsible content scrolls */
 .image-page .related-images-vertical {
-    flex: 1;
+    flex: 1 1 0;
     min-height: 0;
+    overflow: hidden;
     transition: flex 0.3s ease-in-out;
 }
 
@@ -814,10 +850,11 @@ body:is(.ui-hidden, .focus-mode)::after {
 
 /* Responsive */
 
-/* Expand sidebar content dynamically */
-#sidebar-right-content {
-    flex-grow: 1;
-    max-height: none;
+/* Right sidebar content - constrain to viewport height, inner Similar panel scrolls */
+.image-page .sidebar-right #sidebar-right-content {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
 }
@@ -864,8 +901,8 @@ body:is(.ui-hidden, .focus-mode)::after {
 .image-page .info-section {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: var(--spacing-sm) 0;
+    gap: 4px;
+    padding: 2px 0;
 }
 
 .image-page .info-section:first-child {
@@ -874,28 +911,28 @@ body:is(.ui-hidden, .focus-mode)::after {
 
 .image-page .info-section+.info-section {
     margin-top: 0;
-    padding-top: var(--spacing-sm);
+    padding-top: 2px;
     border-top: 1px solid rgba(99, 179, 237, 0.1);
 }
 
 /* Info Row - Horizontal Layout */
 .image-page .info-row {
     display: grid;
-    grid-template-columns: 80px 1fr;
-    gap: 12px;
+    grid-template-columns: 60px 1fr;
+    gap: 6px;
     align-items: start;
-    font-size: 13px;
+    font-size: 11px;
 }
 
 .image-page .info-label {
     color: var(--text-muted);
-    font-size: 12px;
-    padding-top: 2px;
+    font-size: 10px;
+    padding-top: 1px;
 }
 
 .image-page .info-value {
     color: var(--text-secondary);
-    line-height: 1.4;
+    line-height: 1.3;
     word-wrap: break-word;
     word-break: break-all;
     overflow-wrap: break-word;
@@ -949,17 +986,17 @@ body:is(.ui-hidden, .focus-mode)::after {
 .image-page .stats-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 4px;
 }
 
 .image-page .stat-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 1px;
 }
 
 .image-page .stat-label {
-    font-size: 10px;
+    font-size: 8px;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -967,7 +1004,7 @@ body:is(.ui-hidden, .focus-mode)::after {
 }
 
 .image-page .stat-value {
-    font-size: 13px;
+    font-size: 11px;
     color: var(--text-secondary);
     font-weight: var(--font-weight-medium);
 }

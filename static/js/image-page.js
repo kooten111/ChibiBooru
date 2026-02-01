@@ -184,10 +184,26 @@ function retryTagging(skipLocalFallback = false) {
 }
 
 
+function getDefaultCollapsed() {
+    const defaultCollapsed = ['pools-panel-content'];
+    let informationPanelDefaultCollapsed = document.body.dataset.informationPanelDefaultCollapsed === 'true';
+    const defaultsEl = document.getElementById('image-page-defaults');
+    if (defaultsEl && defaultsEl.textContent) {
+        try {
+            const d = JSON.parse(defaultsEl.textContent);
+            if (typeof d.information_panel_default_collapsed === 'boolean') {
+                informationPanelDefaultCollapsed = d.information_panel_default_collapsed;
+            }
+        } catch (_) { /* use body dataset */ }
+    }
+    if (informationPanelDefaultCollapsed) defaultCollapsed.push('metadata-panel-content');
+    return defaultCollapsed;
+}
+
 function initCollapsibleSections() {
     const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
     const savedStates = JSON.parse(localStorage.getItem('imageSectionStates') || '{}');
-    const defaultCollapsed = ['pools-panel-content', 'metadata-panel-content'];
+    const defaultCollapsed = getDefaultCollapsed();
 
     sectionHeaders.forEach(header => {
         const sectionId = header.dataset.section;
@@ -201,6 +217,11 @@ function initCollapsibleSections() {
             header.classList.add('collapsed');
             if (!isPanelHeader) {
                 content.classList.add('collapsed');
+            }
+        } else {
+            header.classList.remove('collapsed');
+            if (!isPanelHeader) {
+                content.classList.remove('collapsed');
             }
         }
 
@@ -505,7 +526,6 @@ function initSwipeNavigation() {
         document.title = newDoc.title;
 
         const savedStates = JSON.parse(localStorage.getItem('imageSectionStates') || '{}');
-        const defaultCollapsed = ['pools-panel-content', 'metadata-panel-content'];
 
         const container = document.querySelector('.container');
         const newContainer = newDoc.querySelector('.container');
@@ -517,6 +537,8 @@ function initSwipeNavigation() {
             }
 
             container.innerHTML = newContainer.innerHTML;
+
+            const defaultCollapsed = getDefaultCollapsed();
 
             // Update hidden inputs that are outside the container
             const currentFilepathInput = document.getElementById('imageFilepath');
@@ -556,15 +578,16 @@ function initSwipeNavigation() {
             const sectionHeaders = document.querySelectorAll('.mobile-toggle[data-section]');
             sectionHeaders.forEach(header => {
                 const sectionId = header.dataset.section;
+                const content = document.getElementById(sectionId);
                 const isPanelHeader = header.classList.contains('panel-header');
                 const isCollapsed = savedStates[sectionId] !== undefined ? savedStates[sectionId] : defaultCollapsed.includes(sectionId);
 
                 if (isCollapsed) {
                     header.classList.add('collapsed');
-                    if (!isPanelHeader) {
-                        const content = document.getElementById(sectionId);
-                        if (content) content.classList.add('collapsed');
-                    }
+                    if (!isPanelHeader && content) content.classList.add('collapsed');
+                } else {
+                    header.classList.remove('collapsed');
+                    if (!isPanelHeader && content) content.classList.remove('collapsed');
                 }
             });
         }
