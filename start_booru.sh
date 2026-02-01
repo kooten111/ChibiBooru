@@ -14,14 +14,36 @@ for arg in "$@"; do
     fi
 done
 
-# Check if venv exists, create if not
+# Python 3.10–3.12 required (onnxruntime and dependencies)
+check_python_version() {
+    python${1:-} -c '
+import sys
+v = sys.version_info
+ok = (3, 10) <= (v.major, v.minor) <= (3, 12)
+sys.exit(0 if ok else 1)
+' 2>/dev/null
+}
+
+# If we will create a new venv, ensure python3 is in range before creating
 if [ ! -d "venv" ]; then
+    if ! check_python_version 3; then
+        echo "ChibiBooru requires Python 3.10–3.12. Current: $(python3 --version 2>&1)."
+        echo "To use a supported version with pyenv: pyenv install 3.12.2 && pyenv local 3.12.2, then run ./start_booru.sh again."
+        exit 1
+    fi
     echo "Creating virtual environment..."
     python3 -m venv venv
 fi
 
 # Activate virtual environment
 source venv/bin/activate
+
+# Ensure activated Python is in range (catches existing venv created with wrong version)
+if ! check_python_version; then
+    echo "ChibiBooru requires Python 3.10–3.12. Current: $(python --version 2>&1)."
+    echo "Recreate the venv with a supported Python, e.g. with pyenv: pyenv install 3.12.2 && pyenv local 3.12.2, then run ./start_booru.sh --rebuild-venv."
+    exit 1
+fi
 
 # Setup flags: run wizard and/or pip+ML setup when .env or torch is missing
 NEEDS_ENV=false
@@ -35,7 +57,11 @@ fi
 if [ "$NEEDS_TORCH" = true ]; then
     echo "Running initial setup (torch missing)..."
     pip install --upgrade pip -q
-    pip install -r requirements.txt -q
+    if ! pip install -r requirements.txt; then
+        echo ""
+        echo "Dependency installation failed. Fix the error above (e.g. use Python 3.10–3.12 if onnxruntime fails) and run ./start_booru.sh again."
+        exit 1
+    fi
 fi
 
 # Populate .env (secrets, directories, optional models) when .env is missing
