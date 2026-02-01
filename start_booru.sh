@@ -3,6 +3,17 @@
 
 cd "$(dirname "$0")"
 
+# Optional: force venv rebuild (e.g. ./start_booru.sh --rebuild-venv)
+for arg in "$@"; do
+    if [ "$arg" = "--rebuild-venv" ]; then
+        if [ -d "venv" ]; then
+            echo "Removing existing venv (--rebuild-venv)..."
+            rm -rf venv
+        fi
+        break
+    fi
+done
+
 # Check if venv exists, create if not
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
@@ -12,29 +23,29 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
-# Check if this is a first-run (no .env file = needs setup)
-NEEDS_SETUP=false
-if [ ! -f ".env" ]; then
-    NEEDS_SETUP=true
+# Setup flags: run wizard and/or pip+ML setup when .env or torch is missing
+NEEDS_ENV=false
+NEEDS_TORCH=false
+[ ! -f ".env" ] && NEEDS_ENV=true
+if ! python -c "import torch" 2>/dev/null; then
+    NEEDS_TORCH=true
 fi
 
-# Install dependencies if torch is missing
-if ! python -c "import torch" 2>/dev/null; then
-    echo "Running initial setup..."
-    
-    # Upgrade pip first
+# Install base dependencies only when torch is missing (venv assumed correct otherwise)
+if [ "$NEEDS_TORCH" = true ]; then
+    echo "Running initial setup (torch missing)..."
     pip install --upgrade pip -q
-    
-    # Install base requirements (excludes torch)
     pip install -r requirements.txt -q
-    
-    # Run first-time setup wizard if .env doesn't exist
-    if [ "$NEEDS_SETUP" = true ]; then
-        python setup_wizard.py
-    fi
-    
-    # Run ML setup (backend selection + torch install)
-    if [ "$NEEDS_SETUP" = true ]; then
+fi
+
+# Populate .env (secrets, directories, optional models) when .env is missing
+if [ "$NEEDS_ENV" = true ]; then
+    python setup_wizard.py
+fi
+
+# ML backend selection and torch install when torch is missing
+if [ "$NEEDS_TORCH" = true ]; then
+    if [ "$NEEDS_ENV" = true ]; then
         python setup_ml.py
     else
         NON_INTERACTIVE=1 python setup_ml.py
