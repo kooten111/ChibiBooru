@@ -153,6 +153,7 @@ body.image-page {
 .image-page .sidebar-right .panel>.panel-collapsible-content {
     padding: var(--spacing-md);
     overflow-y: auto;
+    overflow-x: hidden;
     flex: 1 1 0;
     min-height: 0;
 }
@@ -896,6 +897,8 @@ body:is(.ui-hidden, .focus-mode)::after {
     color: var(--text-secondary);
     line-height: 1.4;
     word-wrap: break-word;
+    word-break: break-all;
+    overflow-wrap: break-word;
 }
 
 /* Monospace values for hashes */
