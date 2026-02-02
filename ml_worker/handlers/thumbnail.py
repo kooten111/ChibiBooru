@@ -22,7 +22,11 @@ def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
     output_path = request_data['output_path']
     size = request_data.get('size', 512)
     quality = request_data.get('quality', 85)
-    
+
+    if not os.path.exists(filepath):
+        logger.warning(f"Source file not found: {filepath}")
+        raise FileNotFoundError(f"No such file or directory: {filepath}")
+
     logger.info(f"Generating thumbnail for: {os.path.basename(filepath)}")
     
     # Ensure output directory exists

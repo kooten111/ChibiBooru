@@ -31,27 +31,24 @@ class JobRunner(threading.Thread):
                 _job_store[self.job_id]['progress'] = percent
                 _job_store[self.job_id]['message'] = message
             
-            # Inject progress_callback if target accepts it
-            # We assume target function signature handles this if needed
-            # For simplicity, we pass it as a kwarg if supported, or wrapped
+            # Smartly inject progress_callback using inspection
+            import inspect
             
-            # Note: In the original code, it was passed as *self.args or **kwargs
-            # but let's stick to the pattern used: 
-            # result = self.target(progress_callback=progress_callback, *self.args, **self.kwargs)
+            sig = inspect.signature(self.target)
+            params = sig.parameters
             
-            # However some targets might NOT accept progress_callback.
-            # We should probably inspect the target, or rely on the caller to wrap it if needed.
-            # For now, let's keep the existing behavior which seems to assume the target knows what to simplify.
+            # If target accepts 'progress_callback' or **kwargs, pass it
+            accepts_callback = 'progress_callback' in params or \
+                               any(p.kind == p.VAR_KEYWORD for p in params.values())
             
-            # Check if we should pass progress_callback (naive check)
-            try:
-                result = self.target(progress_callback=progress_callback, *self.args, **self.kwargs)
-            except TypeError as e:
-                # Fallback if unexpected argument (e.g. target doesn't accept progress_callback)
-                if "unexpected keyword argument 'progress_callback'" in str(e):
-                     result = self.target(*self.args, **self.kwargs)
+            if accepts_callback:
+                # Avoid passing it twice if it's already in kwargs
+                if 'progress_callback' not in self.kwargs:
+                     result = self.target(progress_callback=progress_callback, *self.args, **self.kwargs)
                 else:
-                    raise e
+                     result = self.target(*self.args, **self.kwargs)
+            else:
+                result = self.target(*self.args, **self.kwargs)
             
             _job_store[self.job_id]['status'] = 'completed'
             _job_store[self.job_id]['progress'] = 100
@@ -66,7 +63,13 @@ class JobRunner(threading.Thread):
 
 def start_job(target, *args, **kwargs) -> str:
     """Start a background job and return its ID"""
-    job_id = str(uuid.uuid4())
+    
+    # Check if job_id was passed in kwargs (special case for handler injection)
+    if 'job_id' in kwargs:
+        job_id = kwargs.pop('job_id')
+    else:
+        job_id = str(uuid.uuid4())
+        
     _job_store[job_id] = {
         'status': 'pending',
         'progress': 0,

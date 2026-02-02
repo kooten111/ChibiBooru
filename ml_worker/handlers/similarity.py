@@ -1,5 +1,10 @@
 """
-Similarity computation handler
+Similarity computation handler.
+
+Note: Loading the ONNX model may log a shape-merge warning for the globalavgpool
+output (e.g. source {1,1024,1,1} vs target {-1,1024}). That comes from the
+exported graph metadata, not our pipeline; inference and embedding quality are
+unchanged. ONNX Runtime does a lenient merge and runs the same computation.
 """
 import os
 import logging
@@ -38,7 +43,7 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
         # Dynamic providers based on backend
         providers = models.get_onnx_providers()
         sess_options = models.get_onnx_session_options()
-            
+        # Shape-merge warning on load is harmless; see module docstring.
         models.similarity_model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
         logger.info("Similarity model loaded")
 

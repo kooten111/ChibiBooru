@@ -77,21 +77,29 @@ def check_dependencies() -> bool:
 
 
 def get_onnx_providers() -> list:
-    """Get the list of ONNX Runtime providers based on configured backend"""
+    """Get the list of ONNX Runtime providers based on configured backend.
+    Only adds a provider if it is actually available (e.g. OpenVINO requires
+    onnxruntime-openvino; otherwise we avoid the warning and fall back to CPU).
+
+    XPU and OpenVINO are related here: backend 'xpu' means Intel-style acceleration
+    (integrated/Arc GPU, etc.), and we use OpenVINOExecutionProvider for that.
+    """
+    import onnxruntime as ort
     backend = os.environ.get('ML_WORKER_BACKEND', 'cpu')
+    available = set(ort.get_available_providers())
     providers = []
-    
-    if backend == 'cuda':
+
+    if backend == 'cuda' and 'CUDAExecutionProvider' in available:
         providers.append('CUDAExecutionProvider')
-    elif backend == 'xpu':
-        # OpenVINO is often used for XPU with ONNX
+    elif backend == 'xpu' and 'OpenVINOExecutionProvider' in available:
         providers.append('OpenVINOExecutionProvider')
-    elif backend == 'mps':
+    elif backend == 'mps' and 'CoreMLExecutionProvider' in available:
         providers.append('CoreMLExecutionProvider')
-    elif backend == 'cpu':
+
+    if not providers or 'CPUExecutionProvider' in available:
         providers.append('CPUExecutionProvider')
-        
-    return providers
+
+    return providers if providers else ['CPUExecutionProvider']
 
 
 def get_onnx_session_options():

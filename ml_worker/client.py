@@ -512,7 +512,7 @@ class MLWorkerClient:
             logger.warning(f"Failed to send shutdown request: {e}")
             return False
 
-    def train_rating_model(self, timeout: float = 600.0) -> Dict[str, Any]:
+    def train_rating_model(self, timeout: float = 600.0, request_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Train rating inference model via ML Worker.
 
@@ -525,7 +525,8 @@ class MLWorkerClient:
         Raises:
             MLWorkerError: If training fails
         """
-        request_id = str(uuid.uuid4())
+        if request_id is None:
+            request_id = str(uuid.uuid4())
         request = Request.train_rating_model(request_id)
 
         # Temporarily increase timeout for this request
@@ -536,7 +537,7 @@ class MLWorkerClient:
         finally:
             self.timeout = old_timeout
 
-    def infer_ratings(self, image_ids: List[int] = None, timeout: float = 600.0) -> Dict[str, Any]:
+    def infer_ratings(self, image_ids: List[int] = None, timeout: float = 600.0, request_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Run rating inference via ML Worker.
 
@@ -550,7 +551,8 @@ class MLWorkerClient:
         Raises:
             MLWorkerError: If inference fails
         """
-        request_id = str(uuid.uuid4())
+        if request_id is None:
+            request_id = str(uuid.uuid4())
         request = Request.infer_ratings(request_id, image_ids)
 
         # Temporarily increase timeout for this request

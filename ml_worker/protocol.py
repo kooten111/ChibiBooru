@@ -191,7 +191,7 @@ class Request:
         return Request.create(
             RequestType.TRAIN_RATING_MODEL,
             request_id,
-            {}
+            {"job_id": request_id}
         )
 
     @staticmethod
@@ -201,7 +201,8 @@ class Request:
             RequestType.INFER_RATINGS,
             request_id,
             {
-                "image_ids": image_ids if image_ids is not None else []
+                "image_ids": image_ids if image_ids is not None else [],
+                "job_id": request_id
             }
         )
 

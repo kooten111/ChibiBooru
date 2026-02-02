@@ -30,7 +30,10 @@ def handle_train_rating_model(request_data: Dict[str, Any]) -> Dict[str, Any]:
     else:
         from services import rating_service
     
-    job_id = start_job(rating_service.train_model)
+    # Use provided job_id or generate one (though start_job handles gen)
+    # But we want to match the request_id if provided
+    request_job_id = request_data.get('job_id')
+    job_id = start_job(rating_service.train_model, job_id=request_job_id)
     
     return {
         "job_id": job_id,
@@ -91,10 +94,10 @@ def handle_infer_ratings(request_data: Dict[str, Any]) -> Dict[str, Any]:
                      
             return stats
             
-        job_id = start_job(_run_specific)
+        job_id = start_job(_run_specific, job_id=request_data.get('job_id'))
     else:
         # Infer all unrated supports callback natively now
-        job_id = start_job(rating_service.infer_all_unrated_images)
+        job_id = start_job(rating_service.infer_all_unrated_images, job_id=request_data.get('job_id'))
     
     return {
         "job_id": job_id,
