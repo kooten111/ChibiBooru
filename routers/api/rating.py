@@ -4,9 +4,91 @@ from services import rating_service as rating_inference
 from database import models
 from database import get_db_connection
 from utils import api_handler, success_response, error_response
+from services.background_tasks import task_manager
 import logging
+import asyncio
+import uuid
+import time
 
 logger = logging.getLogger(__name__)
+
+async def train_model_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task for model training with polling."""
+    from ml_worker.client import get_ml_worker_client
+    
+    # We use task_id as request_id for the ML worker job
+    request_id = task_id
+    client = get_ml_worker_client()
+    loop = asyncio.get_running_loop()
+    
+    # 1. Start the job
+    start_response = await loop.run_in_executor(
+        None, 
+        lambda: client.train_rating_model(timeout=60.0, request_id=request_id)
+    )
+    
+    # 2. Poll until complete
+    while True:
+        await asyncio.sleep(1)
+        try:
+            status = await loop.run_in_executor(None, client.get_job_status, request_id)
+            
+            if status.get('found'):
+                progress = status.get('progress', 0)
+                message = status.get('message', 'Processing...')
+                worker_status = status.get('status')
+                
+                await task_manager_instance.update_progress(task_id, progress, 100, message)
+                
+                if worker_status == 'completed':
+                    return status.get('result')
+                elif worker_status == 'failed':
+                     raise Exception(status.get('error', 'Unknown error'))
+        except Exception as e:
+            # If polling fails temporarily, log but don't crash
+             logger.warning(f"Polling error for {task_id}: {e}")
+
+async def infer_ratings_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task for rating inference with polling."""
+    from ml_worker.client import get_ml_worker_client
+    
+    request_id = task_id
+    image_id = kwargs.get('image_id')
+    
+    # Prepare image_ids list
+    image_ids = [image_id] if image_id else None
+    
+    client = get_ml_worker_client()
+    loop = asyncio.get_running_loop()
+    
+    # 1. Start the job
+    start_response = await loop.run_in_executor(
+        None,
+        lambda: client.infer_ratings(image_ids=image_ids, timeout=60.0, request_id=request_id)
+    )
+    
+    # 2. Poll until complete
+    while True:
+        await asyncio.sleep(1)
+        try:
+            status = await loop.run_in_executor(None, client.get_job_status, request_id)
+            
+            if status.get('found'):
+                progress = status.get('progress', 0)
+                message = status.get('message', 'Processing...')
+                worker_status = status.get('status')
+                
+                await task_manager_instance.update_progress(task_id, progress, 100, message)
+                
+                if worker_status == 'completed':
+                    return status.get('result')
+                elif worker_status == 'failed':
+                     raise Exception(status.get('error', 'Unknown error'))
+        except Exception as e:
+             logger.warning(f"Polling error for {task_id}: {e}")
+
+
+
 
 # ============================================================================
 # Rating Inference API Endpoints
@@ -14,63 +96,56 @@ logger = logging.getLogger(__name__)
 
 @api_blueprint.route('/rate/train', methods=['POST'])
 @api_handler()
+@api_handler()
 async def api_train_model():
     """Train the rating inference model via ML Worker."""
-    try:
-        from ml_worker.client import get_ml_worker_client
-        client = get_ml_worker_client()
-        # Returns job info now
-        response = client.train_rating_model(timeout=30.0)
-        return response
-    except Exception as e:
-        logger.warning(f"ML Worker unavailable, falling back to direct training: {e}")
-        # Fallback to direct call if ML Worker unavailable
-        stats = rating_inference.train_model()
-        return {"stats": stats, "source": "direct", "warning": "ML Worker unavailable"}
+    task_id = str(uuid.uuid4())
+    
+    # Start background task
+    await task_manager.start_task(task_id, train_model_task)
+    
+    # Return immediately with job_id (which is task_id)
+    # The frontend looks for 'job_id' to start polling
+    return {"status": "started", "job_id": task_id, "message": "Training started in background"}
 
 
 @api_blueprint.route('/rate/infer', methods=['POST'])
+@api_handler()
 @api_handler()
 async def api_infer_ratings():
     """Run inference on unrated images or a specific image via ML Worker."""
     data = await request.get_json(silent=True) or {}
     image_id = data.get('image_id')
-
-    try:
-        from ml_worker.client import get_ml_worker_client
-        client = get_ml_worker_client()
-        
-        # Returns job info now
-        if image_id:
-            # Infer single image
-            response = client.infer_ratings(image_ids=[image_id], timeout=30.0)
-        else:
-            # Infer all unrated images
-            response = client.infer_ratings(image_ids=None, timeout=30.0)
-            
-        return response
-    except Exception as e:
-        logger.warning(f"ML Worker unavailable, falling back to direct inference: {e}")
-        # Fallback to direct call if ML Worker unavailable
-        if image_id:
-            result = rating_inference.infer_rating_for_image(image_id)
-            return {"result": result, "source": "direct", "warning": "ML Worker unavailable"}
-        else:
-            stats = rating_inference.infer_all_unrated_images()
-            return {"stats": stats, "source": "direct", "warning": "ML Worker unavailable"}
+    
+    task_id = str(uuid.uuid4())
+    
+    # Start background task, passing image_id if present
+    await task_manager.start_task(task_id, infer_ratings_task, image_id=image_id)
+    
+    return {"status": "started", "job_id": task_id, "message": "Inference started in background"}
 
 
 @api_blueprint.route('/rate/job/<job_id>', methods=['GET'])
 @api_handler()
+@api_handler()
 async def api_get_job_status(job_id):
-    """Get status of an ML Worker job."""
+    """Get status of an ML Worker job or Background Task."""
+    # Check task manager first
+    task_status = await task_manager.get_task_status(job_id)
+    if task_status:
+        # Map task manager status to ML worker status format
+        response = task_status.copy()
+        response['found'] = True
+        return response
+
+    # Fallback to direct ML worker check (for old jobs or internal jobs)
     try:
         from ml_worker.client import get_ml_worker_client
         client = get_ml_worker_client()
         status = client.get_job_status(job_id)
         return status
     except Exception as e:
-        # If ML worker is unavailable, return a response the frontend understands
+        # If ML worker is unavailable
         logger.warning(f"Failed to get job status for {job_id}: {e}")
         return {"found": False, "error": str(e)}
 

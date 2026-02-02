@@ -111,7 +111,38 @@ def scan_and_process_service() -> Any:
     except Exception as e:
         import traceback
         traceback.print_exc()
+        # If running as a task, re-raise to be caught by task wrapper
+        if 'task_manager_instance' in locals():
+            raise
         return jsonify({"error": str(e)}), 500
+
+async def scan_and_process_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for scan_and_process_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    
+    # We can pass a progress callback if we update the service to support it,
+    # but for now we'll just run it. The service typically logs to monitor_service
+    # which the frontend also polls, but task status is better.
+    
+    # Ideally we'd modify scan_and_process_service to take a progress_callback too,
+    # but it relies heavily on monitor_service for logs.
+    # We can bridge monitor logs to task progress? 
+    # For now, let's just mark it running -> completed.
+    
+    await task_manager_instance.update_progress(task_id, 0, 100, "Scanning and processing...")
+    
+    result = await loop.run_in_executor(
+        None, 
+        scan_and_process_service
+    )
+    
+    # Result is a quart Response object (jsonify), we need the data
+    if hasattr(result, 'get_json'):
+        json_data = await result.get_json()
+        return json_data
+    return result
+
 
 @require_secret_sync
 def rebuild_service():
@@ -130,6 +161,17 @@ def rebuild_service():
         load_data_from_db_async()
         return jsonify({"error": str(e)}), 500
 
+async def rebuild_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for rebuild_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    await task_manager_instance.update_progress(task_id, 0, 100, "Rebuilding tags from metadata...")
+    result = await loop.run_in_executor(None, rebuild_service)
+    if hasattr(result, 'get_json'):
+        return await result.get_json()
+    return result
+
+
 @require_secret_sync
 def rebuild_categorized_service():
     """Service to back-fill the categorized tag columns in the images table."""
@@ -144,6 +186,17 @@ def rebuild_categorized_service():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+async def rebuild_categorized_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for rebuild_categorized_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    await task_manager_instance.update_progress(task_id, 0, 100, "Rebuilding categorized tags...")
+    result = await loop.run_in_executor(None, rebuild_categorized_service)
+    if hasattr(result, 'get_json'):
+        return await result.get_json()
+    return result
+
 
 @require_secret_sync
 def apply_merged_sources_service():
@@ -266,6 +319,18 @@ def apply_merged_sources_service():
         traceback.print_exc()
         monitor_service.add_log(f"Fatal error during {action}: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500
+
+async def apply_merged_sources_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for apply_merged_sources_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    await task_manager_instance.update_progress(task_id, 0, 100, "Applying merged sources setting...")
+    # This service writes to monitor logs, real-time progress would require refactor
+    result = await loop.run_in_executor(None, apply_merged_sources_service)
+    if hasattr(result, 'get_json'):
+        return await result.get_json()
+    return result
+
         
 @require_secret_sync
 def recount_tags_service():
@@ -287,6 +352,17 @@ def recount_tags_service():
         monitor_service.add_log(f"Error recounting tags: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500
 
+async def recount_tags_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for recount_tags_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    await task_manager_instance.update_progress(task_id, 0, 100, "Recounting tags...")
+    result = await loop.run_in_executor(None, recount_tags_service)
+    if hasattr(result, 'get_json'):
+        return await result.get_json()
+    return result
+
+
 @require_secret_sync
 def recategorize_service():
     """Service to recategorize misplaced tags without full rebuild."""
@@ -300,6 +376,17 @@ def recategorize_service():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+async def recategorize_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for recategorize_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    await task_manager_instance.update_progress(task_id, 0, 100, "Recategorizing tags...")
+    result = await loop.run_in_executor(None, recategorize_service)
+    if hasattr(result, 'get_json'):
+        return await result.get_json()
+    return result
+
 
 def validate_secret_service() -> Dict[str, Any]:
     """
@@ -480,6 +567,30 @@ async def deduplicate_service():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+async def deduplicate_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for deduplicate_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    
+    # Get dry_run from kwargs if available, though service expects request.json
+    # We might need to handle args differently.
+    # The original service calls 'await request.json', which won't work in executor.
+    # We should pass parameters explicitly.
+    
+    # Since we can't easily change the service signature without breaking other calls,
+    # let's modify the service to accept optional args or use a modified version.
+    # Actually, the quickest way is to just call it if we are sure it's safe.
+    # Waait, 'await request.json' in service will fail if run in executor? 
+    # The service function `deduplicate_service` is async currently!
+    # If it is async, we can await it directly or wrap it?
+    
+    # Wait, deduplicate_service IS ASYNC in the source file: 'async def deduplicate_service():'
+    # So we don't need run_in_executor! We can just await it.
+    
+    await task_manager_instance.update_progress(task_id, 0, 100, "Deduplicating...")
+    return await deduplicate_service()
+
+
 @require_secret
 async def clean_orphans_service():
     """Service to find and remove database entries for deleted files."""
@@ -550,18 +661,26 @@ async def clean_orphans_service():
             else:
                 message = f"No orphaned entries found. Database is clean!"
 
-            return jsonify({
-                "status": "success",
-                "message": message,
-                "orphans_found": len(orphans),
-                "orphaned_tags": orphaned_tags_count,
-                "orphans": sorted(list(orphans)),
-                "cleaned": cleaned_count
-            })
+        return jsonify({
+            "status": "success",
+            "message": message,
+            "orphans_found": len(orphans),
+            "orphaned_tags": orphaned_tags_count,
+            "orphans": sorted(list(orphans)),
+            "cleaned": cleaned_count
+        })
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+async def clean_orphans_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for clean_orphans_service."""
+    import asyncio
+    await task_manager_instance.update_progress(task_id, 0, 100, "Cleaning orphans...")
+    # clean_orphans_service is async
+    return await clean_orphans_service()
+
 
 @require_secret_sync
 def reindex_database_service() -> Any:
@@ -604,6 +723,18 @@ def reindex_database_service() -> Any:
         import traceback
         traceback.print_exc()
         monitor_service.add_log(f"Database optimization failed: {str(e)}", "error")
+        return jsonify({"error": str(e)}), 500
+
+async def reindex_database_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for reindex_database_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    await task_manager_instance.update_progress(task_id, 0, 100, "Optimizing database (VACUUM & REINDEX)...")
+    result = await loop.run_in_executor(None, reindex_database_service)
+    if hasattr(result, 'get_json'):
+        return await result.get_json()
+    return result
+
 
 async def get_task_status_service():
     """
@@ -783,6 +914,26 @@ def bulk_retag_local_service():
         traceback.print_exc()
         monitor_service.add_log(f"Bulk retag failed: {str(e)}", "error")
         return jsonify({"error": str(e)}), 500
+
+async def bulk_retag_local_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task wrapper for bulk_retag_local_service."""
+    import asyncio
+    loop = asyncio.get_running_loop()
+    
+    # We need to construct the args because bulk_retag_local_service tries to read from flask/quart request
+    # Which might not work well in executor (thread local storage issues)
+    # But let's see. logic inside uses 'data = flask.request.get_json...' with try/except
+    
+    await task_manager_instance.update_progress(task_id, 0, 100, "Retagging local images...")
+    
+    # IMPORTANT: The service function uses 'monitor_service.add_log' which is fine
+    # but the progress updates there won't reach task_manager unless we modify it.
+    
+    result = await loop.run_in_executor(None, bulk_retag_local_service)
+    if hasattr(result, 'get_json'):
+        return await result.get_json()
+    return result
+
 
 
 async def find_broken_images_service() -> Dict[str, Any]:

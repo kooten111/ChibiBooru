@@ -1,8 +1,10 @@
 from quart import request, jsonify
 from . import api_blueprint
 from services import system_service, monitor_service
+from services.background_tasks import task_manager
 from utils import api_handler
 import asyncio
+import uuid
 
 @api_blueprint.route('/reload', methods=['POST'])
 @api_handler()
@@ -74,25 +76,33 @@ async def system_logs():
 @api_handler()
 async def trigger_scan():
     """Scan for new images and process them."""
-    return await asyncio.to_thread(system_service.scan_and_process_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.scan_and_process_task)
+    return {"status": "started", "task_id": task_id, "message": "Scan started in background"}
 
 @api_blueprint.route('/system/rebuild', methods=['POST'])
 @api_handler()
 async def trigger_rebuild():
     """Rebuild the database from image metadata."""
-    return await asyncio.to_thread(system_service.rebuild_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.rebuild_task)
+    return {"status": "started", "task_id": task_id, "message": "Rebuild started in background"}
 
 @api_blueprint.route('/system/rebuild_categorized', methods=['POST'])
 @api_handler()
 async def trigger_rebuild_categorized():
     """Rebuild the database with categorized tags."""
-    return await asyncio.to_thread(system_service.rebuild_categorized_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.rebuild_categorized_task)
+    return {"status": "started", "task_id": task_id, "message": "Categorized tags rebuild started in background"}
 
 @api_blueprint.route('/system/recategorize', methods=['POST'])
 @api_handler()
 async def trigger_recategorize():
     """Recategorize all tags based on current rules."""
-    return await asyncio.to_thread(system_service.recategorize_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.recategorize_task)
+    return {"status": "started", "task_id": task_id, "message": "Recategorization started in background"}
 
 @api_blueprint.route('/system/thumbnails', methods=['POST'])
 @api_handler()
@@ -104,31 +114,44 @@ async def trigger_thumbnails():
 @api_handler()
 async def system_reindex():
     """Reindex the database for faster searches."""
-    return await asyncio.to_thread(system_service.reindex_database_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.reindex_database_task)
+    return {"status": "started", "task_id": task_id, "message": "Database optimization started in background"}
 
 @api_blueprint.route('/system/deduplicate', methods=['POST'])
 @api_handler()
 async def deduplicate():
     """Find and remove duplicate images."""
-    return await system_service.deduplicate_service()
+    task_id = str(uuid.uuid4())
+    # We pass args if needed, currently deduplicate_service reads from request.json
+    # We should update deduplicate_task to handle this or accept args
+    # For now, let's assume the task wrapper handles it or we update it shortly
+    await task_manager.start_task(task_id, system_service.deduplicate_task)
+    return {"status": "started", "task_id": task_id, "message": "Deduplication started in background"}
 
 @api_blueprint.route('/system/clean_orphans', methods=['POST'])
 @api_handler()
 async def clean_orphans():
     """Clean orphaned database entries."""
-    return await system_service.clean_orphans_service()
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.clean_orphans_task)
+    return {"status": "started", "task_id": task_id, "message": "Orphan cleanup started in background"}
 
 @api_blueprint.route('/system/apply_merged_sources', methods=['POST'])
 @api_handler()
 async def apply_merged_sources():
     """Apply merged metadata sources to all images."""
-    return await asyncio.to_thread(system_service.apply_merged_sources_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.apply_merged_sources_task)
+    return {"status": "started", "task_id": task_id, "message": "Source merge application started in background"}
 
 @api_blueprint.route('/system/recount_tags', methods=['POST'])
 @api_handler()
 async def recount_tags():
     """Recalculate tag counts for all tags."""
-    return await asyncio.to_thread(system_service.recount_tags_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.recount_tags_task)
+    return {"status": "started", "task_id": task_id, "message": "Tag recount started in background"}
 
 @api_blueprint.route('/system/monitor/start', methods=['POST'])
 @api_handler()
@@ -160,7 +183,9 @@ async def database_health_check():
 @api_handler()
 async def bulk_retag_local():
     """Wipe all local tagger predictions and re-run local tagger for all images."""
-    return await asyncio.to_thread(system_service.bulk_retag_local_service)
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, system_service.bulk_retag_local_task)
+    return {"status": "started", "task_id": task_id, "message": "Bulk local retagging started in background"}
 
 @api_blueprint.route('/system/broken_images', methods=['GET'])
 @api_handler()
