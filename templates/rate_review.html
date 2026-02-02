@@ -83,21 +83,32 @@
 
         <!-- Rating Controls -->
         <div class="rate-controls-wrapper">
+            <!-- Guidelines Toggle -->
+            <div style="text-align: center; margin-bottom: var(--spacing-sm);">
+                <button class="btn btn-text" onclick="showModal('guidelinesModal')">
+                    ℹ️ Rating Guidelines
+                </button>
+            </div>
+
             <div class="rating-controls-grid">
                 <button class="rating-btn general" onclick="setRating('rating:general', 1)">
                     <span class="rating-btn-label">General</span>
+                    <span class="rating-desc">Safe for Work</span>
                     <span class="rating-shortcut">Press <kbd>1</kbd></span>
                 </button>
                 <button class="rating-btn sensitive" onclick="setRating('rating:sensitive', 2)">
                     <span class="rating-btn-label">Sensitive</span>
+                    <span class="rating-desc">Ecchi / Suggestive</span>
                     <span class="rating-shortcut">Press <kbd>2</kbd></span>
                 </button>
                 <button class="rating-btn questionable" onclick="setRating('rating:questionable', 3)">
                     <span class="rating-btn-label">Questionable</span>
+                    <span class="rating-desc">Nudity / Mild NSFW</span>
                     <span class="rating-shortcut">Press <kbd>3</kbd></span>
                 </button>
                 <button class="rating-btn explicit" onclick="setRating('rating:explicit', 4)">
                     <span class="rating-btn-label">Explicit</span>
+                    <span class="rating-desc">Explicit Sex / Genitals</span>
                     <span class="rating-shortcut">Press <kbd>4</kbd></span>
                 </button>
             </div>
@@ -146,6 +157,56 @@
                 <span class="shortcut"><span class="shortcut-key">← →</span> Navigate</span>
                 <span class="shortcut"><span class="shortcut-key">S</span> Skip</span>
                 <span class="shortcut"><span class="shortcut-key">T</span> Toggle Tags</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guidelines Modal -->
+    <div id="guidelinesModal" class="modal-overlay" onclick="closeModal('guidelinesModal')">
+        <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>Rating Guidelines</h3>
+                <button class="modal-close" onclick="closeModal('guidelinesModal')">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="guidelines-list">
+                    <div class="guideline-item">
+                        <div class="guideline-header general">
+                            <span class="guideline-badge general">General</span>
+                            <span class="guideline-title">Safe for Work</span>
+                        </div>
+                        <p>No sexual content, nudity, or heavy violence. Fully clothed characters and innocent scenes.
+                        </p>
+                    </div>
+
+                    <div class="guideline-item">
+                        <div class="guideline-header sensitive">
+                            <span class="guideline-badge sensitive">Sensitive</span>
+                            <span class="guideline-title">Ecchi / Suggestive</span>
+                        </div>
+                        <p>Swimwear, lingerie, revealing outfits, or mild fan service. Panty shots or cleavage.</p>
+                    </div>
+
+                    <div class="guideline-item">
+                        <div class="guideline-header questionable">
+                            <span class="guideline-badge questionable">Questionable</span>
+                            <span class="guideline-title">Nudity / Mild NSFW</span>
+                        </div>
+                        <p>Nudity (nipples, ass), sexual teasing/touching, or strong fan service. No explicit sex acts
+                            or genitals.</p>
+                    </div>
+
+                    <div class="guideline-item">
+                        <div class="guideline-header explicit">
+                            <span class="guideline-badge explicit">Explicit</span>
+                            <span class="guideline-title">Hardcore / Sexual Acts</span>
+                        </div>
+                        <p>Explicit sex acts, visible genitals, fluids, or extreme violence.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('guidelinesModal')">Close</button>
             </div>
         </div>
     </div>
