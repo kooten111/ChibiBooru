@@ -1,6 +1,6 @@
 # ChibiBooru Upscaler Architecture & Inventory
 
-**Last Updated**: 2024-12-31
+**Last Updated**: 2026-02-02
 **Status**: Active
 
 ## Executive Summary
@@ -58,7 +58,8 @@ These components run in a separate, isolated process to manage memory and GPU re
 
 | File Path | Component | Description |
 | :--- | :--- | :--- |
-| **`ml_worker/server.py`** | **Worker Server** | The "Brain". Listens for requests, lazy-loads the PyTorch model, performs inference, and saves the result. Auto-terminates when idle. |
+| **`ml_worker/server.py`** | **Worker Server** | The "Brain". Listens for requests, manages job queues, and delegates to task-specific handlers. |
+| **`ml_worker/handlers/`** | **Task Handlers** | Specialized logic for different ML tasks (tagging, upscaling, similarity, etc.). |
 | **`ml_worker/client.py`** | **IPC Client** | The bridge. Handles spawning the worker process if it's dead, and sending JSON requests over the socket. |
 | **`ml_worker/protocol.py`** | **Protocol** | Defines the data contract (Request/Response schemas) for IPC communication. |
 | **`ml_worker/backends.py`** | **Backend Manager** | Handles hardware detection (Nvidia/Intel/Apple) and environment setup (PyTorch installation directives). |

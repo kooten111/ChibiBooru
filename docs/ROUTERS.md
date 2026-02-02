@@ -272,17 +272,34 @@ Get paginated images for infinite scroll.
 
 ---
 
-#### `POST /api/images/relationship`
-Update parent/child relationships.
+### Animation API (`/api/animation`)
 
-**Request**:
-```json
-{
-    "filepath": "images/child.jpg",
-    "parent_id": 123,
-    "has_children": false
-}
-```
+**File**: `routers/api/animation.py`
+
+#### `GET /api/animation/metadata/<path:filepath>`
+Get metadata for an animation file (Zip, GIF, WebP).
+Returns frame count, dimensions, and FPS.
+
+#### `GET /api/animation/frame/<md5>/<int:frame_index>`
+Serve a specific frame from a zip animation.
+
+#### `GET /api/animation/frames/<md5>`
+Get absolute URLs for all frames of a zip animation.
+
+---
+
+### Favourites API (`/api/favourites`)
+
+**File**: `routers/api/favourites.py`
+
+#### `POST /api/favourites/toggle`
+Toggle favourite status for an image.
+
+#### `GET /api/favourites/status`
+Check if an image is favourited.
+
+#### `GET /api/favourites/count`
+Get total count of user favourites.
 
 ---
 
@@ -426,22 +443,21 @@ Get monitor status.
 
 ---
 
-### SauceNao API (`/api/saucenao`)
+### Similarity API (`/api/similarity`)
 
-**File**: `routers/api/saucenao.py`
+**File**: `routers/api/similarity.py`
 
-#### `POST /api/saucenao/search`
-Search SauceNao for image.
+#### `GET /api/similar/<path:filepath>`
+Find visually similar images using perceptual hash comparison.
 
----
+#### `GET /api/similar-semantic/<path:filepath>`
+Find semantically similar images using FAISS embeddings.
 
-#### `POST /api/saucenao/fetch`
-Fetch metadata from found source.
+#### `GET /api/similar-blended/<path:filepath>`
+Blended search using visual, tag, and semantic similarity.
 
----
-
-#### `POST /api/saucenao/apply`
-Apply metadata and optionally download.
+#### `POST /api/similarity/generate-hashes`
+Trigger background task to generate missing hashes.
 
 ---
 
@@ -493,17 +509,23 @@ Delete implication.
 
 ---
 
-### Tag Categorization API (`/api/tag-categorization`)
-
-**File**: `routers/api/tag_categorization.py`
-
-#### `POST /api/tag-categorization/categorize`
-Categorize a tag.
-
 ---
 
-#### `POST /api/tag-categorization/batch`
-Batch categorize tags.
+### Upscaler API (`/api/upscale`)
+
+**File**: `routers/api/upscaler.py`
+
+#### `POST /api/upscale`
+Request an AI upscale for an image.
+
+#### `GET /api/upscale/status`
+Check ML worker and model availability.
+
+#### `GET /api/upscale/check`
+Check if an upscaled version already exists.
+
+#### `DELETE /api/upscale`
+Delete an upscaled version.
 
 ---
 

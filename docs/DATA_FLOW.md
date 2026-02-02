@@ -78,11 +78,11 @@ User/File → Router → Service → Repository → Database
                       │              │
                      Yes             ↓
                       │      ┌─────────────────────────┐
-                      │      │ 7. Local AI Tagger      │
-                      │      │ • Load ONNX model       │
-                      │      │ • Preprocess image      │
-                      │      │ • Run inference         │
-                      │      │ • Extract tags          │
+                      │      │ 7. ML Worker Delegation  │
+                      │      │ • Send request to worker│
+                      │      │ • Lazy-load model       │
+                      │      │ • Run inference (ONNX)   │
+                      │      │ • Return tags to server │
                       │      └─────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -630,6 +630,54 @@ User/File → Router → Service → Repository → Database
 │    • UI polls /api/system/monitor/status                    │
 │    • Sees new images processed                              │
 │    • Reloads gallery to show new images                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Similarity Search Flow
+
+### Scenario: User finds visually or semantically similar images
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. User Action                                              │
+│    • Clicks "Find Similar" (pHash/Color)                    │
+│    • Clicks "Semantic Search" (Embedding)                   │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 2. API Router (routers/api/similarity.py)                  │
+│    GET /api/similar/<path>                                  │
+│    GET /api/similar-semantic/<path>                         │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Similarity Service (services/similarity_service.py)     │
+│    find_similar_images() / find_semantic_similar()          │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+           ┌──────────────┴──────────────┐
+           ↓                             ↓
+┌─────────────────────────┐   ┌─────────────────────────┐
+│ 4a. Visual Search       │   │ 4b. Semantic Search     │
+│ (hashing.py)            │   │ (semantic.py)           │
+│ • Fetch hashes from DB  │   │ • Get reference embed   │
+│ • Calculate Hamming dist│   │ • Search FAISS index    │
+│ • Filter by threshold   │   │ • Map to image IDs      │
+└─────────────────────────┘   └─────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 5. Results & Ranking                                        │
+│    • Combine phash + colorhash scores (if visual)           │
+│    • Sort by final distance/score                           │
+│    • Limit results                                          │
+└─────────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 6. Response to Client                                       │
+│    • Return JSON with similar image data                    │
+│    • Client renders specialized gallery view                │
 └─────────────────────────────────────────────────────────────┘
 ```
 

@@ -41,12 +41,14 @@ The Services layer contains the business logic for ChibiBooru. Services orchestr
 | Health | `health_service.py` | Database health checks and auto-repair |
 | Image | `image_service.py` | Image CRUD and bulk operations |
 | Implication | `implication_service.py` | Tag implication detection and management |
+| ML Worker | `ml_worker/` | Standalone machine learning service for tagging/upscaling |
 | Monitor | `monitor_service.py` | Background file monitoring and processing |
 | Priority | `priority_service.py` | Source priority change detection |
 | Processing | `processing_service.py` | Metadata fetching and image processing |
-| Query | `query_service.py` | Search, filtering, and similarity calculations |
+| Query | `query_service.py` | Search, filtering, and tag-based similarity |
 | Rating | `rating_service.py` | AI-based rating inference |
 | SauceNao | `saucenao_service.py` | Reverse image search integration |
+| Similarity | `similarity_service.py` | Visual similarity using perceptual hashing and semantic embeddings |
 | Switch Source | `switch_source_db.py` | Metadata source switching |
 | System | `system_service.py` | System operations (scan, rebuild, etc.) |
 | Tag | `tag_service.py` | Tag operations and autocomplete |
@@ -1752,6 +1754,54 @@ Import tag categorizations from exported data.
 
 - **[Extended Categories Documentation](EXTENDED_CATEGORIES.md)** - Complete guide to the 22-category system
 - **[Database Schema](DATABASE.md#tags)** - Tags table with `extended_category` column
+
+---
+
+## Similarity Service
+
+**File**: `services/similarity_service.py`
+
+### Purpose
+Provides visual similarity detection using perceptual hashing and semantic embeddings.
+
+### Core Modules
+The service is modularized into several specialized components:
+
+1.  **Hasting** (`services/similarity/hashing.py`): Implementation of structural perceptual hashing (pHash) and color-based hashing.
+2.  **Semantic** (`services/similarity/semantic.py`): Implementation of semantic similarity using FAISS and ML worker embeddings.
+3.  **Database** (`services/similarity_db.py`): Storage and retrieval of embeddings.
+
+### Functions
+
+#### `find_similar_images(filepath: str, threshold: int = 10, limit: int = 50, color_weight: float = 0.0) -> List[Dict]`
+Find images visually similar to the reference image.
+- **`threshold`**: Maximum Hamming distance (0-64).
+- **`color_weight`**: Ratio between pHash and ColorHash (0.0 to 1.0).
+
+#### `find_semantic_similar(filepath: str, limit: int = 20) -> List[Dict]`
+Find semantically similar images using the ML worker's embeddings.
+
+---
+
+## ML Worker Service
+
+**Directory**: `ml_worker/`
+
+### Purpose
+A standalone, socket-based service that handles heavy machine learning tasks like tagging, upscaling, and animation processing.
+
+### Architecture
+- **Server** (`ml_worker/server.py`): Handles incoming socket requests and manages job queues.
+- **Handlers** (`ml_worker/handlers/`): Specialized logic for different ML tasks.
+    - `animation`: Processes GIF/Video metadata.
+    - `tagging`: Runs tagger models.
+    - `upscaling`: Runs RealESRGAN models.
+- **Client** (`ml_worker/client.py`): Persistent connection handler used by the main application.
+
+### Key Components
+- **`MLWorkerClient`**: Manages the persistent socket connection, handling retries and concurrent job submissions.
+- **`JobManager`**: Tracks active and pending ML jobs.
+- **`ModelManager`**: Handles lazy loading and unloading of ONNX/PyTorch models to manage VRAM.
 
 ---
 

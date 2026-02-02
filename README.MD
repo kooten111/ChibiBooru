@@ -35,7 +35,7 @@ A self-hosted booru application for organizing and browsing your local image col
   - **AI Tagging:** Local ONNX-based tagger analyzes images with no online matches
   - **Flexible Source Switching:** View tags from different sources or merge them all together
 
-- **AI Rating Inference:** Automatic content rating detection (Safe, Questionable, Explicit) with confidence scores
+- **AI Rating Inference:** Automatic content rating detection (General, Sensitive, Questionable, Explicit) with confidence scores
 
 ### 🔍 Advanced Search System
 
@@ -92,8 +92,8 @@ cd Booru
 uv venv venv && source venv/bin/activate  # or: python -m venv venv && source venv/bin/activate
 uv pip install -r requirements.txt        # or: pip install -r requirements.txt
 
-# Configure
-# Create .env file and set required values (see Configuration section below)
+# Run the Setup Wizard (recommended for first-run)
+python setup_wizard.py
 
 # Run (production mode with multiple workers and monitor service)
 ./start_booru.sh
@@ -138,7 +138,18 @@ python app.py
 
    If you need an ONNX tagger model, [Camie Tagger v2](https://huggingface.co/Camais03/camie-tagger-v2) is a good option.
 
-   **Quick setup:**
+   **Quick setup (Recommended):**
+   ```bash
+   python setup_wizard.py
+   ```
+
+   This interactive wizard will guide you through:
+   - Generating secure secrets (`SECRET_KEY`, `SYSTEM_API_SECRET`)
+   - Setting your `APP_PASSWORD`
+   - Creating required directories
+   - Downloading AI models (Tagger, Similarity, Upscaler)
+
+   **Manual setup:**
    ```bash
    python scripts/download_tagger.py
    ```

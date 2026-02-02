@@ -36,6 +36,8 @@ The Repositories layer provides an abstraction over database operations. It hand
 | Tag Repository | `tag_repository.py` | Tag operations and categorization |
 | Pool Repository | `pool_repository.py` | Pool management |
 | Rating Repository | `rating_repository.py` | Rating model data access |
+| Favourites Repository | `favourites_repository.py` | User favourite management |
+| Tagger Predictions | `tagger_predictions_repository.py` | AI tagger raw data access |
 | Delta Tracker | `delta_tracker.py` | Track manual tag modifications |
 
 ---
@@ -797,6 +799,47 @@ Record a tag modification.
 **Side Effects**: Inserts into `tag_deltas` table
 
 ---
+
+## Favourites Repository
+
+**File**: `repositories/favourites_repository.py`
+
+### Purpose
+Manage user's favourite images.
+
+### Functions
+
+#### `add_favourite(image_id: int) -> bool`
+Add image to favourites.
+
+#### `remove_favourite(image_id: int) -> bool`
+Remove image from favourites.
+
+#### `toggle_favourite(image_id: int) -> bool`
+Toggle favourite status.
+
+#### `is_favourite(image_id: int) -> bool`
+Check if image is favourited.
+
+---
+
+## Tagger Predictions Repository
+
+**File**: `repositories/tagger_predictions_repository.py`
+
+### Purpose
+Data access for stored AI tagger predictions.
+
+### Functions
+
+#### `store_predictions(image_id: int, predictions: list, tagger_version: str = None)`
+Store batch of predictions for an image.
+
+#### `get_predictions_for_image(image_id: int, min_confidence: float = None)`
+Retrieve predictions above threshold.
+
+#### `get_merged_general_tags(image_id: int, existing_general_tags: set, min_confidence: float = None)`
+Get tags to be merged into display (excluding already present ones).
 
 #### `compute_tag_deltas(filepath: str, old_tags: Dict, new_tags: Dict) -> List[Dict]`
 

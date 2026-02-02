@@ -155,8 +155,9 @@ ChibiBooru is a self-hosted image booru application built with a layered archite
 Contains 14 specialized services (see [SERVICES.md](SERVICES.md)):
 - Image CRUD and bulk operations
 - Metadata fetching from multiple sources
-- Search and similarity calculations
+- Search and modular similarity calculations (pHash, ColorHash, Semantic)
 - AI rating and tagging
+- Multi-module ML Worker (Job management, Model handlers)
 - Background monitoring
 - Database health checks
 
@@ -462,7 +463,7 @@ Base processing logic with customizable steps for different metadata sources.
 ## Related Documentation
 
 - [DATABASE.md](DATABASE.md) - Database schema and models
-- [SERVICES.md](SERVICES.md) - Service layer documentation
+- [SERVICES.md](SERVICES.md) - Service layer documentation (including ML Worker and Similarity)
 - [REPOSITORIES.md](REPOSITORIES.md) - Data access layer
 - [ROUTERS.md](ROUTERS.md) - Web and API routes
 - [CORE.md](CORE.md) - Core infrastructure

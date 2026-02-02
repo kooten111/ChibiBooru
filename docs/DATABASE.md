@@ -145,6 +145,12 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 | `tags_species` | TEXT | | Space-separated species tags (denormalized) |
 | `tags_meta` | TEXT | | Space-separated meta tags (denormalized) |
 | `tags_general` | TEXT | | Space-separated general tags (denormalized) |
+| `score` | INTEGER | | Post score (if available) |
+| `fav_count` | INTEGER | | Favourite count from source |
+| `phash` | TEXT | | Perceptual hash for visual similarity |
+| `colorhash` | TEXT | | Color hash for color similarity |
+| `image_width` | INTEGER | | Original image width |
+| `image_height` | INTEGER | | Original image height |
 
 **Indexes**:
 - `idx_images_filepath ON images(filepath)`
@@ -155,6 +161,10 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 - `idx_images_active_source ON images(active_source)`
 - `idx_images_relationships ON images(parent_id, has_children)`
 - `idx_images_ingested_at ON images(ingested_at DESC)`
+- `idx_images_score ON images(score DESC)`
+- `idx_images_fav_count ON images(fav_count DESC)`
+- `idx_images_phash ON images(phash)`
+- `idx_images_colorhash ON images(colorhash)`
 
 **Notes**:
 - `filepath` must be unique per image
@@ -201,7 +211,7 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 |--------|------|-------------|-------------|
 | `image_id` | INTEGER | FK → images(id), CASCADE | Reference to image |
 | `tag_id` | INTEGER | FK → tags(id), CASCADE | Reference to tag |
-| `source` | TEXT | DEFAULT 'original', CHECK | Tag source: 'original', 'user', 'ai_inference' |
+| `source` | TEXT | DEFAULT 'original', CHECK | Tag source: 'original', 'user', 'ai_inference', 'implication' |
 
 **Primary Key**: `(image_id, tag_id)`
 
@@ -363,6 +373,49 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 - `idx_tag_deltas_md5 ON tag_deltas(image_md5)`
 
 **Purpose**: Preserve manual tag edits across database rebuilds
+
+---
+
+```
+
+---
+
+### `favourites`
+**Stores user's favourite images**
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `image_id` | INTEGER | PRIMARY KEY, FK → images(id) | Reference to image |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When it was favourited |
+
+---
+
+### `similar_images_cache`
+**Pre-computed similarity results for fast lookups**
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `source_image_id` | INTEGER | PK, FK → images(id) | Reference image |
+| `similar_image_id` | INTEGER | PK, FK → images(id) | Similar image |
+| `similarity_score` | REAL | NOT NULL | Computed score |
+| `similarity_type` | TEXT | PK | 'visual', 'semantic', 'blended' |
+| `rank` | INTEGER | NOT NULL | Order in results |
+| `computed_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When computed |
+
+---
+
+### `local_tagger_predictions`
+**Stores raw predictions from local AI tagger**
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | INTEGER | PRIMARY KEY | Unique ID |
+| `image_id` | INTEGER | NOT NULL, FK → images(id) | Reference to image |
+| `tag_name` | TEXT | NOT NULL | Predicted tag |
+| `category` | TEXT | | Predicted category |
+| `confidence` | REAL | NOT NULL | Confidence score (0-1) |
+| `tagger_version` | TEXT | | Model version used |
+| `created_at` | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When predicted |
 
 ---
 

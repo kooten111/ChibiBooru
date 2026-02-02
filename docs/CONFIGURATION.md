@@ -102,6 +102,23 @@ ChibiBooru uses a centralized configuration system that separates secrets from e
 
 ---
 
+### Setup Wizard
+
+**File**: `setup_wizard.py`
+
+The Setup Wizard is the recommended way to initialize ChibiBooru. It handles:
+- **Secret Generation**: Automatically creates secure `SECRET_KEY` and `SYSTEM_API_SECRET`.
+- **Password Setup**: Prompts for `APP_PASSWORD`.
+- **Directory Creation**: Ensures all storage and model directories exist.
+- **Model Downloads**: Offers to download Tagger, Similarity, and Upscaler models.
+
+Run it with:
+```bash
+python setup_wizard.py
+```
+
+---
+
 ## config.yml File (Editable Settings)
 
 **File**: `config.yml` (created automatically or via migration script)
@@ -204,7 +221,8 @@ The following settings can still be set in `.env` for backward compatibility, bu
 ```python
 IMAGE_DIRECTORY = "./static/images"      # Main image storage
 THUMB_DIR = "./static/thumbnails"        # Thumbnail storage
-THUMB_SIZE = 600                         # Max thumbnail dimension (px; 2x large grid for retina)
+THUMB_SIZE = 600                         # Max thumbnail dimension (px)
+THUMBNAIL_QUALITY = 80                   # WebP thumbnail quality (1-100)
 ```
 
 ---
