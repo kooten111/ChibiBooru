@@ -8,7 +8,7 @@ import subprocess
 import config
 from database import models
 from database import get_db_connection
-from utils.file_utils import get_file_md5
+from utils.file_utils import get_file_md5, sanitize_filename_for_fs
 from utils.tag_extraction import (
     extract_tags_from_source,
     extract_rating_from_source,
@@ -455,6 +455,9 @@ def process_image_file(filepath, move_from_ingest=True):
                 # Fallback to original filename
                 pass
 
+        # Ensure filename fits filesystem limit (e.g. 255 bytes); truncate + hash if too long
+        final_filename = sanitize_filename_for_fs(final_filename)
+
         file_dest = filepath
         if move_from_ingest:
             # Canonical bucket attempt with NEW filename
@@ -500,7 +503,9 @@ def process_image_file(filepath, move_from_ingest=True):
                         else:
                              # Append MD5 to filename and try again (this changes the canonical bucket)
                              print(f"[Processing] Appending MD5 to resolve collision...")
-                             target_filename = f"{name_base}_{md5}{name_ext}"
+                             target_filename = sanitize_filename_for_fs(
+                                 f"{name_base}_{md5}{name_ext}"
+                             )
                              # Recalculate bucket for the new filename
                              final_bucket = get_hash_bucket(target_filename, BUCKET_CHARS)
                         

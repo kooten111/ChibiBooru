@@ -2,6 +2,44 @@ import os
 import hashlib
 from urllib.parse import quote
 
+# Most filesystems (ext4, XFS, etc.) limit filename length to 255 bytes.
+MAX_FILENAME_BYTES = 240
+
+
+def sanitize_filename_for_fs(filename, max_bytes=None):
+    """
+    Ensure filename fits within filesystem byte limit (255 typical).
+    If too long: truncate the base name and append _<8-char-hash><ext>
+    so the result is unique and still human-readable.
+
+    Args:
+        filename: Basename (e.g. "long_name....zip")
+        max_bytes: Max bytes for the whole filename (default MAX_FILENAME_BYTES)
+
+    Returns:
+        Same filename if within limit, else truncated base + _ + hash + ext.
+    """
+    if max_bytes is None:
+        max_bytes = MAX_FILENAME_BYTES
+    name_base, name_ext = os.path.splitext(filename)
+    ext_bytes = name_ext.encode("utf-8")
+    # Reserve space for _ + 8-char hash + extension
+    reserved = 1 + 8 + len(ext_bytes)
+    allowed_base = max_bytes - reserved
+    if allowed_base <= 0:
+        # Extension alone is too long; use hash only
+        safe_hash = hashlib.md5(filename.encode()).hexdigest()[:12]
+        return f"{safe_hash}{name_ext}"
+    base_encoded = name_base.encode("utf-8")
+    if len(base_encoded) + len(ext_bytes) <= max_bytes:
+        return filename
+    # Truncate base to allowed_base bytes (avoid cutting multi-byte chars in half)
+    truncated = base_encoded[:allowed_base].decode("utf-8", errors="ignore")
+    while truncated and len(truncated.encode("utf-8")) + len(ext_bytes) > max_bytes - 9:
+        truncated = truncated[:-1]
+    suffix = hashlib.md5(filename.encode()).hexdigest()[:8]
+    return f"{truncated}_{suffix}{name_ext}"
+
 
 def get_hash_bucket(filename, bucket_chars=3):
     """

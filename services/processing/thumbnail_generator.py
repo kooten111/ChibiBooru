@@ -32,6 +32,11 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
         image_dir: Base image directory
         md5: Optional MD5 hash (required for zip animations)
     """
+    resolved = os.path.abspath(filepath)
+    if not os.path.exists(resolved):
+        print(f"[Thumbnail] File not found, skipping: {os.path.basename(filepath)}")
+        return
+
     # Get just the filename
     filename = os.path.basename(filepath)
     base_name = os.path.splitext(filename)[0]
@@ -57,7 +62,7 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                 # It handles logic internally
                 print(f"[Thumbnail] Generating via ML Worker: {filename}")
                 result = client.generate_thumbnail(
-                    filepath=os.path.abspath(filepath),
+                    filepath=resolved,
                     output_path=os.path.abspath(thumb_path),
                     size=THUMB_SIZE,
                     quality=THUMB_QUALITY
@@ -71,7 +76,7 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
 
         try:
             # Check if this is a zip animation
-            if filepath.lower().endswith('.zip'):
+            if resolved.lower().endswith('.zip'):
                 if md5:
                     from services import zip_animation_service
                     # Get the first frame from the extracted animation
@@ -86,13 +91,13 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                                 img = background
                             img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
                             img.save(thumb_path, 'WEBP', quality=THUMB_QUALITY, method=6)
-                        print(f"[Thumbnail] Created thumbnail for zip animation: {os.path.basename(filepath)}")
+                        print(f"[Thumbnail] Created thumbnail for zip animation: {filename}")
                     else:
-                        print(f"[Thumbnail] ERROR: Could not find first frame for zip animation: {os.path.basename(filepath)}")
+                        print(f"[Thumbnail] ERROR: Could not find first frame for zip animation: {filename}")
                 else:
-                    print(f"[Thumbnail] ERROR: MD5 required for zip animation thumbnail: {os.path.basename(filepath)}")
+                    print(f"[Thumbnail] ERROR: MD5 required for zip animation thumbnail: {filename}")
             # Check if this is a video file
-            elif filepath.lower().endswith(('.mp4', '.webm')):
+            elif resolved.lower().endswith(('.mp4', '.webm')):
                 # Extract first frame from video using ffmpeg
                 # Check if ffmpeg is available
                 ffmpeg_path = shutil.which('ffmpeg')
@@ -106,7 +111,7 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                 try:
                     # Extract frame at 0.1 seconds (works for short videos too)
                     subprocess.run([
-                        ffmpeg_path, '-ss', '0.1', '-i', filepath, '-vframes', '1',
+                        ffmpeg_path, '-ss', '0.1', '-i', resolved, '-vframes', '1',
                         '-strict', 'unofficial', '-y', temp_frame_path
                     ], check=True, capture_output=True)
                     # Now process the extracted frame as an image
@@ -118,7 +123,7 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                         os.unlink(temp_frame_path)
             else:
                 # Regular image processing
-                with Image.open(filepath) as img:
+                with Image.open(resolved) as img:
                     if img.mode in ('RGBA', 'LA', 'P'):
                         background = Image.new('RGB', img.size, (255, 255, 255))
                         if img.mode == 'P': img = img.convert('RGBA')
@@ -127,4 +132,4 @@ def ensure_thumbnail(filepath, image_dir="./static/images", md5=None):
                     img.thumbnail((THUMB_SIZE, THUMB_SIZE), Image.Resampling.LANCZOS)
                     img.save(thumb_path, 'WEBP', quality=THUMB_QUALITY, method=6)
         except Exception as e:
-            print(f"Thumbnail error for {filepath}: {e}")
+            print(f"Thumbnail error for {resolved}: {e}")
