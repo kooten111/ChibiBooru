@@ -98,7 +98,7 @@ async def trigger_recategorize():
 @api_handler()
 async def trigger_thumbnails():
     """Generate thumbnails for all images."""
-    return await asyncio.to_thread(system_service.trigger_thumbnails)
+    return await system_service.trigger_thumbnails_service()
 
 @api_blueprint.route('/system/reindex', methods=['POST'])
 @api_handler()

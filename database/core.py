@@ -149,7 +149,16 @@ def get_db_connection():
         sqlite3.Connection: A database connection (reused within the same thread)
     """
     conn = _get_thread_local_connection()
-    yield conn
+    try:
+        yield conn
+    except Exception:
+        # If an unhandled exception occurs in the caller's block,
+        # ensure we rollback any pending transaction on this thread's connection
+        # before propagating the exception.
+        if conn.in_transaction:
+            logger.warning(f"Rolling back transaction for thread {threading.current_thread().name} due to uncaught exception")
+            conn.rollback()
+        raise
     # Connection remains open for reuse - don't close it here
 
 

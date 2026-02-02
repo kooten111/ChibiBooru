@@ -631,13 +631,16 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
             conn.commit()
             return True
     except sqlite3.IntegrityError as e:
+        conn.rollback() # Ensure transaction is rolled back
         if "UNIQUE constraint failed: images.md5" in str(e):
             print(f"Race condition: MD5 {image_info['md5']} was inserted by another process. Treating as duplicate.")
             return False
         else:
+            conn.rollback() # Ensure transaction is rolled back
             print(f"Database integrity error adding image {image_info['filepath']}: {e}")
             return False
     except Exception as e:
+        conn.rollback() # Ensure transaction is rolled back
         print(f"Database error adding image {image_info['filepath']}: {e}")
         return False
 

@@ -35,7 +35,7 @@ def get_images_for_api(search_query: str, page: int, seed: Optional[int]) -> Dic
     start_idx = (page - 1) * per_page
     end_idx = start_idx + per_page
 
-    from core.cache_manager import get_image_tags_as_string
+    from core.cache_manager import get_image_tags_as_string, remove_image_from_cache
     
     # Process images directly (already running in thread)
     images_page = _process_images_for_api(search_results[start_idx:end_idx])
@@ -103,7 +103,7 @@ def delete_image_service(data: Dict[str, Any]) -> Dict[str, Any]:
         # If anything was actually deleted, update the in-memory data.
         if db_success or image_deleted or thumb_deleted:
             print("Updating cache after deletion.")
-            models.remove_image_from_cache(filepath)
+            remove_image_from_cache(filepath)
             from core.cache_manager import invalidate_tag_cache
             invalidate_tag_cache()
 
@@ -174,7 +174,7 @@ def delete_images_bulk_service(data: Dict[str, Any]) -> Dict[str, Any]:
 
             # Update cache
             if db_success or image_deleted or thumb_deleted:
-                models.remove_image_from_cache(clean_filepath)
+                remove_image_from_cache(clean_filepath)
                 # Remove upscaled version if it exists
                 from services.upscaler_service import delete_upscaled_image
                 delete_upscaled_image(clean_filepath)

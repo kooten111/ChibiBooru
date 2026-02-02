@@ -9,6 +9,8 @@ from utils.deduplication import scan_and_remove_duplicates
 from utils.decorators import require_secret_sync, require_secret
 from utils.logging_config import get_logger
 from . import monitor_service
+from services.background_tasks import task_manager
+import uuid
 
 logger = get_logger('SystemService')
 
@@ -381,14 +383,85 @@ def reload_data():
 def trigger_thumbnails():
     """Service to manually trigger thumbnail generation."""
     try:
-        from services.health_service import check_missing_thumbnails
-        result = check_missing_thumbnails(auto_fix=True)
+        task_id = str(uuid.uuid4())
+        
+        # Start background task
+        # We need to use asyncio.create_task or similar since we are in a sync context called by async router
+        # However, the router calls this with asyncio.to_thread, so we are in a thread.
+        # But task_manager is async.
+        
+        # Actually, the router calls this with asyncio.to_thread, so this function runs in a thread.
+        # But task_manager methods are async. We need to run them in the main event loop or a new loop.
+        # Using a fire-and-forget approach or changing the router to call an async service function is better.
+        
+        # Let's change this service function to be async and update the router to await it directly.
+        # But wait, the router uses @api_handler which expects a response.
+        
         return jsonify({
-            "status": "success",
-            "message": f"Generated {result.issues_fixed} thumbnails (found {result.issues_found} missing)",
-            "issues_found": result.issues_found,
-            "issues_fixed": result.issues_fixed,
-            "messages": result.messages
+            "status": "started",
+            "task_id": task_id,
+            "message": "Thumbnail generation started in background"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+async def run_thumbnail_generation_task(task_id, task_manager_instance, *args, **kwargs):
+    """Background task for thumbnail generation."""
+    from services.health_service import check_missing_thumbnails
+    
+    def progress_callback(current, total):
+        # Create a coroutine for updating progress
+        asyncio.create_task(task_manager_instance.update_progress(
+            task_id, 
+            progress=current, 
+            total=total, 
+            message=f"Generating thumbnails: {current}/{total}"
+        ))
+
+    import asyncio
+    
+    # Run the synchronous health check in a thread executor to avoid blocking the event loop
+    loop = asyncio.get_running_loop()
+    
+    # We need a thread-safe way to call the async progress_callback from the sync function
+    # The progress_callback defined above is async (kind of, it launches a task) 
+    # but check_missing_thumbnails expects a sync callable.
+    
+    def sync_progress_callback(current, total):
+        # Schedule the update_progress coroutine in the running loop
+        asyncio.run_coroutine_threadsafe(
+            task_manager_instance.update_progress(
+                task_id, 
+                progress=current, 
+                total=total, 
+                message=f"Generating thumbnails: {current}/{total}"
+            ),
+            loop
+        )
+
+    result = await loop.run_in_executor(
+        None, 
+        lambda: check_missing_thumbnails(auto_fix=True, progress_callback=sync_progress_callback)
+    )
+    
+    return {
+        "status": "success",
+        "message": f"Generated {result.issues_fixed} thumbnails (found {result.issues_found} missing)",
+        "issues_found": result.issues_found,
+        "issues_fixed": result.issues_fixed
+    }
+
+@require_secret
+async def trigger_thumbnails_service():
+    """Async service to trigger thumbnail generation task."""
+    try:
+        task_id = str(uuid.uuid4())
+        await task_manager.start_task(task_id, run_thumbnail_generation_task)
+        
+        return jsonify({
+            "status": "started",
+            "task_id": task_id,
+            "message": "Thumbnail generation started in background"
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500

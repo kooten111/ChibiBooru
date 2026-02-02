@@ -83,6 +83,16 @@ def should_shutdown() -> bool:
         update_activity()
         return False
         
+    # 3. Check for active client connections
+    # Each client handler runs in a separate thread.
+    # MainThread + IdleMonitor thread = 2 threads minimum.
+    # If active_count > 2, we have clients connected.
+    active_threads = threading.active_count()
+    if active_threads > 2:
+        # Update activity to keep alive
+        # update_activity() # Optional, but good practice
+        return False
+
     return is_idle
 
 

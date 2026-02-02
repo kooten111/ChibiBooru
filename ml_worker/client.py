@@ -17,6 +17,7 @@ import atexit
 import signal
 from pathlib import Path
 from typing import Dict, Any, Optional, List
+import contextlib
 
 from ml_worker.protocol import Message, Request, Response, RequestType, ResponseStatus
 import config  # Import config for ML_WORKER_BACKEND
@@ -37,6 +38,8 @@ class MLWorkerConnectionError(MLWorkerError):
 class MLWorkerTimeoutError(MLWorkerError):
     """Worker request timed out"""
     pass
+
+CONNECTION_ERRORS = (ConnectionError, BrokenPipeError, MLWorkerConnectionError)
 
 
 class MLWorkerClient:
@@ -69,10 +72,59 @@ class MLWorkerClient:
         self._spawn_lock = threading.Lock()  # Lock only for worker spawning
         self._connection_semaphore = threading.Semaphore(10)  # Limit concurrent connections
         
+        # Thread-local storage for persistent connections
+        self._thread_local = threading.local()
+        
         # Register cleanup handlers
         atexit.register(self._cleanup_worker)
         
         logger.info(f"ML Worker Client initialized (socket: {self.socket_path})")
+
+    @contextlib.contextmanager
+    def persistent_session(self):
+        """
+        Context manager for a persistent connection session.
+        Reuses the same socket for multiple requests within the same thread.
+        Greatly improves performance for batch operations (like thumbnail generation).
+        """
+        # Initialize thread-local state if needed
+        if not hasattr(self._thread_local, 'persist'):
+            self._thread_local.persist = False
+            self._thread_local.socket = None
+            self._thread_local.semaphore_acquired = False
+
+        # If already in a session, just yield (nested support)
+        if self._thread_local.persist:
+            yield
+            return
+
+        # Start new session
+        self._thread_local.persist = True
+        token = None 
+        
+        try:
+            # Acquire semaphore once for the whole session
+            if self._connection_semaphore.acquire(timeout=self.timeout):
+                self._thread_local.semaphore_acquired = True
+                yield
+            else:
+                raise MLWorkerTimeoutError("Timed out waiting for connection slot")
+        finally:
+            # Clean up session
+            self._thread_local.persist = False
+            
+            # Close persistent socket
+            if self._thread_local.socket:
+                try:
+                    self._thread_local.socket.close()
+                except:
+                    pass
+                self._thread_local.socket = None
+            
+            # Release semaphore
+            if self._thread_local.semaphore_acquired:
+                self._connection_semaphore.release()
+                self._thread_local.semaphore_acquired = False
     
     def _cleanup_worker(self):
         """Terminate the ML worker process"""
@@ -138,6 +190,19 @@ class MLWorkerClient:
                 stdin=subprocess.DEVNULL
             )
 
+            # Start threads to read stdout/stderr to prevent pipe buffer deadlock
+            threading.Thread(
+                target=self._log_stream,
+                args=(self._worker_process.stdout, logger.info),
+                daemon=True
+            ).start()
+            
+            threading.Thread(
+                target=self._log_stream,
+                args=(self._worker_process.stderr, logger.error),
+                daemon=True
+            ).start()
+
             # Wait for socket to appear (up to 10 seconds)
             for i in range(100):
                 if os.path.exists(self.socket_path):
@@ -157,6 +222,22 @@ class MLWorkerClient:
         except Exception as e:
             logger.error(f"Failed to spawn ML worker: {e}")
             return False
+
+    def _log_stream(self, stream, level):
+        """
+        Background thread to read from a pipe stream and log it.
+        Prevents pipe buffer from filling up (which would deadlock the worker).
+        """
+        try:
+            with stream:
+                for line in iter(stream.readline, b''):
+                    line_str = line.decode('utf-8', errors='replace').strip()
+                    if line_str:
+                         # Prefix to identify worker log
+                         level(f"[Worker] {line_str}")
+        except Exception as e:
+            logger.error(f"Error reading worker stream: {e}")
+
 
     def _connect(self) -> socket.socket:
         """
@@ -202,33 +283,48 @@ class MLWorkerClient:
         """
         for attempt in range(self.max_retries):
             try:
+                # Check for persistent session
+                use_persist = getattr(self._thread_local, 'persist', False)
+                sock = None
+                
                 # Use semaphore to limit concurrent connections (prevents overwhelming server)
-                with self._connection_semaphore:
-                    # Connect (or reconnect) - spawning is protected by separate lock
-                    sock = self._connect()
+                # If in persistent session, we already acquired it
+                if use_persist and getattr(self._thread_local, 'semaphore_acquired', False):
+                    # Reuse existing socket if valid
+                    sock = getattr(self._thread_local, 'socket', None)
+                    if not sock:
+                        sock = self._connect()
+                        self._thread_local.socket = sock
+                else:
+                    # Standard one-off request
+                    with self._connection_semaphore:
+                        sock = self._connect()
+                        return self._perform_request(sock, request)
 
-                    try:
-                        # Send request
-                        Message.send_message(sock, request)
-
-                        # Receive response
-                        response = Message.recv_message(sock, timeout=self.timeout)
-
-                        if response is None:
-                             raise MLWorkerError("Worker returned no response (connection closed or empty)")
-
-                        # Check response status
-                        if response['status'] == ResponseStatus.SUCCESS.value:
-                            return response['data']
-                        else:
-                            error_msg = response.get('error', 'Unknown error')
-                            traceback_str = response.get('traceback')
-                            if traceback_str:
-                                logger.error(f"Worker error traceback:\n{traceback_str}")
-                            raise MLWorkerError(f"Worker error: {error_msg}")
-
-                    finally:
-                        sock.close()
+                # If we are here, we are in persistent mode with a socket
+                # We need to catch errors to handle reconnection logic manually for persistent sockets
+                try:
+                    return self._perform_request(sock, request)
+                except Exception as e:
+                     # If ANY error occurs in persistent mode (timeout, connection, protocol error),
+                     # we MUST close and discard the socket to ensure we don't reuse a bad state.
+                    if sock:
+                        try:
+                            sock.close()
+                        except:
+                            pass
+                    self._thread_local.socket = None
+                    
+                    # If it's a "recoverable" connection error, we raise to trigger retry.
+                    # If it's a logic error (MLWorkerError), we re-raise it (it bubbles up).
+                    # But wait, if we re-raise MLWorkerError, the loop catches it?
+                    # No, the loop catches (socket.timeout, ConnectionError...).
+                    # So MLWorkerError will bubble up and abort the operation. This is correct.
+                    # But we ensured the socket is closed so next operation starts fresh.
+                    
+                    if isinstance(e, (socket.timeout, CONNECTION_ERRORS)):
+                         raise 
+                    raise
 
             except socket.timeout:
                 logger.warning(f"Request timeout (attempt {attempt + 1}/{self.max_retries})")
@@ -245,6 +341,36 @@ class MLWorkerClient:
                     raise MLWorkerConnectionError(f"Connection failed after {self.max_retries} attempts")
 
         raise MLWorkerError("Max retries exceeded")
+
+    def _perform_request(self, sock: socket.socket, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Helper to send/receive on a socket"""
+        try:
+            # Send request
+            Message.send_message(sock, request)
+
+            # Receive response
+            response = Message.recv_message(sock, timeout=self.timeout)
+
+            if response is None:
+                    raise MLWorkerError("Worker returned no response (connection closed or empty)")
+
+            # Check response status
+            if response['status'] == ResponseStatus.SUCCESS.value:
+                return response['data']
+            else:
+                error_msg = response.get('error', 'Unknown error')
+                traceback_str = response.get('traceback')
+                if traceback_str:
+                    logger.error(f"Worker error traceback:\n{traceback_str}")
+                raise MLWorkerError(f"Worker error: {error_msg}")
+
+        finally:
+            # Only close if NOT persistent
+            if not getattr(self._thread_local, 'persist', False):
+                try:
+                    sock.close()
+                except:
+                    pass
 
     def tag_image(self, image_path: str, model_path: str,
                   threshold: float = 0.35,

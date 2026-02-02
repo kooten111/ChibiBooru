@@ -145,10 +145,13 @@ def check_orphaned_image_sources(auto_fix=True):
     return result
 
 
-def check_missing_thumbnails(auto_fix=False):
+from ml_worker.client import get_ml_worker_client, MLWorkerError
+
+def check_missing_thumbnails(auto_fix=False, progress_callback=None):
     """
     Check for images that don't have thumbnails generated.
     If auto_fix=True, generates missing thumbnails (can be slow).
+    progress_callback: Optional callable(current, total)
     """
     import os
     from utils.file_utils import get_hash_bucket
@@ -184,14 +187,74 @@ def check_missing_thumbnails(auto_fix=False):
 
         if auto_fix:
             from services.processing.thumbnail_generator import ensure_thumbnail
-            for item in missing:
-                filepath = item['filepath']
-                md5 = item['md5']
-                full_path = os.path.join("static/images", filepath)
-                if os.path.exists(full_path):
-                    # Pass md5 for zip animation thumbnails
-                    ensure_thumbnail(full_path, md5=md5)
-                    result.issues_fixed += 1
+            total = len(missing)
+            
+            # Start persistent session for faster batch processing
+            client = None
+            try:
+                client = get_ml_worker_client()
+            except:
+                pass # Fallback handled inside ensure_thumbnail
+                
+            # Use persistent session if client available
+            context = client.persistent_session() if client else get_db_connection() # dummy context if no client
+            
+            # Wait, get_db_connection is not a no-op context manager.
+            # Let's use contextlib.nullcontext if strict, but simple if/else is safer.
+            
+            if client:
+                try:
+                    with client.persistent_session():
+                        for idx, item in enumerate(missing):
+                            filepath = item['filepath']
+                            md5 = item['md5']
+                            full_path = os.path.join("static/images", filepath)
+                            
+                            # Log progress every 20 items
+                            if idx % 20 == 0:
+                                logger.info(f"[Thumbnail Task] Processing {idx}/{total}: {filepath}")
+
+                            if os.path.exists(full_path):
+                                try:
+                                    ensure_thumbnail(full_path, md5=md5)
+                                    result.issues_fixed += 1
+                                except Exception as e:
+                                    logger.error(f"[Thumbnail Task] Error processing {filepath}: {e}")
+                            
+                            if progress_callback and idx % 5 == 0:
+                                progress_callback(idx + 1, total)
+                except Exception as e:
+                    logger.error(f"[Thumbnail Task] Persistent session failed: {e}. Falling back to standard loop.")
+                    # Fallback to standard loop if session crashes
+                    for idx, item in enumerate(missing):
+                         filepath = item['filepath']
+                         md5 = item['md5']
+                         full_path = os.path.join("static/images", filepath)
+                         if os.path.exists(full_path):
+                             try:
+                                 ensure_thumbnail(full_path, md5=md5)
+                                 result.issues_fixed += 1
+                             except Exception as loop_e:
+                                 logger.error(f"[Fallback Task] Error: {loop_e}")
+                         
+                         if progress_callback and idx % 5 == 0:
+                            progress_callback(idx + 1, total)
+            else:
+                # Fallback to standard loop (without persistent session optimization)
+                for idx, item in enumerate(missing):
+                    filepath = item['filepath']
+                    md5 = item['md5']
+                    full_path = os.path.join("static/images", filepath)
+                    if os.path.exists(full_path):
+                        ensure_thumbnail(full_path, md5=md5)
+                        result.issues_fixed += 1
+                    
+                    if progress_callback and idx % 5 == 0:
+                        progress_callback(idx + 1, total)
+
+            # Final progress update
+            if progress_callback:
+                progress_callback(total, total)
 
             result.add_message(f"Generated {result.issues_fixed} thumbnails")
 
