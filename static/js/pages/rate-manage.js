@@ -158,7 +158,7 @@ function updateConfigPanel(config) {
 
     // Training parameters with defaults matching config.py
     const trainingDefaults = {
-        'max_pair_count': 15000,
+        'max_pair_count': 25000,
         'min_tag_frequency': 5,
         'min_pair_cooccurrence': 5
     };

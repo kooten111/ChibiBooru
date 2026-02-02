@@ -383,7 +383,7 @@ RATING_MODEL_CONFIG = {
     'pair_weight_multiplier': float(_get_setting('RATING_PAIR_WEIGHT_MULTIPLIER', 1.5)),
     'min_tag_frequency': int(_get_setting('RATING_MIN_TAG_FREQUENCY', 10)),
     'min_pair_cooccurrence': int(_get_setting('RATING_MIN_PAIR_COOCCURRENCE', 10)),
-    'max_pair_count': int(_get_setting('RATING_MAX_PAIR_COUNT', 5000)),
+    'max_pair_count': int(_get_setting('RATING_MAX_PAIR_COUNT', 25000)),
 }
 
 
