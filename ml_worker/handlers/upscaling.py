@@ -12,7 +12,7 @@ from ml_worker.backends import get_torch_device
 
 logger = logging.getLogger(__name__)
 
-def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
+def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -> Dict[str, Any]:
     """
     Handle upscale_image request.
 
@@ -149,7 +149,8 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
             tile_size=256, 
             tile_pad=32, 
             scale=4, 
-            device=device
+            device=device,
+            progress_callback=progress_callback
         )
     except RuntimeError as e:
         if "out of memory" in str(e):
@@ -162,34 +163,19 @@ def handle_upscale_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
                 tile_size=128, 
                 tile_pad=32, 
                 scale=4, 
-                device=device
+                device=device,
+                progress_callback=progress_callback
             )
         else:
             raise e
 
     # 3. Post-process
     output = output.data.squeeze().float().cpu().clamp_(0, 1).numpy()
-    output = np.transpose(output[[2, 1, 0], :, :], (1, 2, 0)) # CHW -> HWC, RGB -> BGR (wait, PIL is RGB, opencv is BGR. Torch usually RGB?)
-    # RealESRGAN outputs are typically RGB if input was RGB. 
-    # But wait, original code might have used cv2 which uses BGR. 
-    # Let's check `RRDBNet` training.
-    # Standard RealESRGAN assumes RGB.
-    # The output above does `output[[2, 1, 0], :, :]` which suggests it flips channels? 
-    # ah, usually cv2.imwrite expects BGR. 
-    # But here we should probably use PIL to save.
     
-    # Let's correct the channel order. Output from model is RGB.
-    # If we want to save with PIL (RGB), we should use 0,1,2.
-    # If the original code was doing 2,1,0 it might have been saving with cv2.
-    # Let's check original implementation... it wasn't shown fully in view_file.
+    # CHW -> HWC
+    output = np.transpose(output, (1, 2, 0))
     
-    # Assuming code uses PIL to save:
-    output_rgb = np.transpose(output, (1, 2, 0)) # CHW -> HWC. No channel flip yet.
-    # If the model output BGR (common in some checkpoints), we might need flip. 
-    # But usually RealESRGAN via PyTorch works in RGB.
-    # Let's assume RGB for PIL.
-    
-    output_img = (output_rgb * 255.0).round().astype(np.uint8)
+    output_img = (output * 255.0).round().astype(np.uint8)
     output_pil = Image.fromarray(output_img)
     
     # Ensure dir

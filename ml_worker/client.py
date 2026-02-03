@@ -268,12 +268,13 @@ class MLWorkerClient:
         except Exception as e:
             raise MLWorkerConnectionError(f"Failed to connect to ML worker: {e}")
 
-    def _send_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    def _send_request(self, request: Dict[str, Any], progress_callback=None) -> Dict[str, Any]:
         """
         Send a request to the worker and receive response.
 
         Args:
             request: Request message dict
+            progress_callback: Optional function(current, total, message)
 
         Returns:
             Response data
@@ -299,12 +300,12 @@ class MLWorkerClient:
                     # Standard one-off request
                     with self._connection_semaphore:
                         sock = self._connect()
-                        return self._perform_request(sock, request)
+                        return self._perform_request(sock, request, progress_callback)
 
                 # If we are here, we are in persistent mode with a socket
                 # We need to catch errors to handle reconnection logic manually for persistent sockets
                 try:
-                    return self._perform_request(sock, request)
+                    return self._perform_request(sock, request, progress_callback)
                 except Exception as e:
                      # If ANY error occurs in persistent mode (timeout, connection, protocol error),
                      # we MUST close and discard the socket to ensure we don't reuse a bad state.
@@ -342,27 +343,37 @@ class MLWorkerClient:
 
         raise MLWorkerError("Max retries exceeded")
 
-    def _perform_request(self, sock: socket.socket, request: Dict[str, Any]) -> Dict[str, Any]:
+    def _perform_request(self, sock: socket.socket, request: Dict[str, Any], progress_callback=None) -> Dict[str, Any]:
         """Helper to send/receive on a socket"""
         try:
             # Send request
             Message.send_message(sock, request)
 
-            # Receive response
-            response = Message.recv_message(sock, timeout=self.timeout)
+            while True:
+                # Receive response
+                response = Message.recv_message(sock, timeout=self.timeout)
 
-            if response is None:
-                    raise MLWorkerError("Worker returned no response (connection closed or empty)")
+                if response is None:
+                        raise MLWorkerError("Worker returned no response (connection closed or empty)")
 
-            # Check response status
-            if response['status'] == ResponseStatus.SUCCESS.value:
-                return response['data']
-            else:
-                error_msg = response.get('error', 'Unknown error')
-                traceback_str = response.get('traceback')
-                if traceback_str:
-                    logger.error(f"Worker error traceback:\n{traceback_str}")
-                raise MLWorkerError(f"Worker error: {error_msg}")
+                # Check response status
+                if response['status'] == ResponseStatus.SUCCESS.value:
+                    return response['data']
+                elif response['status'] == ResponseStatus.PROGRESS.value:
+                    if progress_callback:
+                        data = response.get('data', {})
+                        progress_callback(
+                            data.get('current', 0),
+                            data.get('total', 100),
+                            data.get('message', '')
+                        )
+                    continue
+                else:
+                    error_msg = response.get('error', 'Unknown error')
+                    traceback_str = response.get('traceback')
+                    if traceback_str:
+                        logger.error(f"Worker error traceback:\n{traceback_str}")
+                    raise MLWorkerError(f"Worker error: {error_msg}")
 
         finally:
             # Only close if NOT persistent
@@ -423,7 +434,8 @@ class MLWorkerClient:
 
     def upscale_image(self, image_path: str, output_path: str,
                      model_name: str = 'RealESRGAN_x4plus_anime',
-                     device: str = 'auto') -> Dict[str, Any]:
+                     device: str = 'auto',
+                     progress_callback=None) -> Dict[str, Any]:
         """
         Upscale an image using RealESRGAN.
 
@@ -432,6 +444,7 @@ class MLWorkerClient:
             output_path: Path to save upscaled image
             model_name: Name of upscaler model
             device: Device to use ('cuda', 'xpu', 'cpu', or 'auto')
+            progress_callback: Optional function(current, total, message)
 
         Returns:
             Dict with:
@@ -453,7 +466,7 @@ class MLWorkerClient:
             device
         )
 
-        return self._send_request(request)
+        return self._send_request(request, progress_callback=progress_callback)
 
     def compute_similarity(self, image_path: str,
                           model_path: str) -> Dict[str, Any]:

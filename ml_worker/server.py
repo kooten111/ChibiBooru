@@ -128,12 +128,13 @@ class LocalSemanticBackend(similarity_service.SemanticBackend):
         return []
 
 
-def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
+def handle_request(request: Dict[str, Any], progress_callback=None) -> Dict[str, Any]:
     """
     Handle a request message.
 
     Args:
         request: Request message dict
+        progress_callback: Optional function(current, total, message)
 
     Returns:
         Response message dict
@@ -152,7 +153,8 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
             return Response.success(request_id, result)
 
         elif request_type == RequestType.UPSCALE_IMAGE.value:
-            result = handle_upscale_image(request_data)
+            # Pass progress callback to upscaler
+            result = handle_upscale_image(request_data, progress_callback=progress_callback)
             return Response.success(request_id, result)
 
         elif request_type == RequestType.COMPUTE_SIMILARITY.value:
@@ -220,11 +222,19 @@ def handle_client(client_socket: socket.socket):
             if not validate_request(request):
                 logger.warning(f"Invalid request received: {request}")
                 response = Response.error("unknown", "Invalid request format")
+                Message.send_message(client_socket, response)
             else:
-                response = handle_request(request)
+                # Define progress callback
+                def send_progress(current, total, message=""):
+                    try:
+                        resp = Response.progress(request.get('id'), current, total, message)
+                        Message.send_message(client_socket, resp)
+                    except Exception as e:
+                        logger.warning(f"Failed to send progress update: {e}")
 
-            # Send response
-            Message.send_message(client_socket, response)
+                response = handle_request(request, progress_callback=send_progress)
+                # Send response
+                Message.send_message(client_socket, response)
 
             # Check if shutdown requested
             if _shutdown_requested:
@@ -233,7 +243,10 @@ def handle_client(client_socket: socket.socket):
     except Exception as e:
         logger.error(f"Error in client handler: {e}", exc_info=True)
     finally:
-        client_socket.close()
+        try:
+            client_socket.close()
+        except:
+            pass
 
 
 def idle_monitor():

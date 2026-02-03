@@ -17,6 +17,36 @@ async def get_upscaler_status():
     return get_upscaler_status()
 
 
+@api_blueprint.route('/upscale/progress')
+@api_handler()
+async def get_upscale_progress():
+    """Get progress of an active upscale job."""
+    from services.upscaler_service import get_upscale_progress
+    
+    filepath = request.args.get('filepath')
+    if not filepath:
+        raise ValueError("Missing filepath parameter")
+        
+    progress = get_upscale_progress(filepath)
+    
+    if not progress:
+        # If not in progress, check if it's already done
+        from services.upscaler_service import check_upscale_exists, get_upscale_url
+        if check_upscale_exists(filepath):
+            return {
+                'status': 'completed',
+                'percentage': 100,
+                'upscaled_url': get_upscale_url(filepath)
+            }
+        
+        return {
+            'status': 'idle',
+            'percentage': 0
+        }
+    
+    return progress
+
+
 @api_blueprint.route('/upscale/check')
 @api_handler()
 async def check_upscale():

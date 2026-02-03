@@ -33,6 +33,7 @@ class ResponseStatus(str, Enum):
     """Response status codes"""
     SUCCESS = "success"
     ERROR = "error"
+    PROGRESS = "progress"
 
 
 class Message:
@@ -326,6 +327,20 @@ class Response:
         """Create an error response from an exception"""
         error_msg = f"{type(exc).__name__}: {str(exc)}"
         return Response.error(request_id, error_msg, include_traceback=True)
+
+    @staticmethod
+    def progress(request_id: str, current: int, total: int, message: str = "") -> Dict[str, Any]:
+        """Create a progress response"""
+        return Response.create(
+            request_id,
+            ResponseStatus.PROGRESS,
+            data={
+                "current": current,
+                "total": total,
+                "percentage": (current / total * 100) if total > 0 else 0,
+                "message": message
+            }
+        )
 
 
 def validate_request(msg: Dict[str, Any]) -> bool:

@@ -26,7 +26,7 @@ def is_valid_frame(filename: str) -> bool:
     return filename.lower().endswith(FRAME_EXTENSIONS)
 
 
-def tiled_inference(model, img, tile_size=512, tile_pad=32, scale=4, device='cpu'):
+def tiled_inference(model, img, tile_size=512, tile_pad=32, scale=4, device='cpu', progress_callback=None):
     """
     Run inference using seamless tiling.
     img: Tensor (1, C, H, W)
@@ -42,11 +42,17 @@ def tiled_inference(model, img, tile_size=512, tile_pad=32, scale=4, device='cpu
     # Number of tiles
     tiles_x = math.ceil(width / tile_size)
     tiles_y = math.ceil(height / tile_size)
+    total_tiles = tiles_x * tiles_y
 
     logger.info(f"Tiling: {tiles_x}x{tiles_y} tiles (Input tile: {tile_size}px, Pad: {tile_pad}px)")
 
+    tile_idx = 0
     for y in range(tiles_y):
         for x in range(tiles_x):
+            # Report progress
+            if progress_callback:
+                progress_callback(tile_idx, total_tiles, f"Upscaling tile {tile_idx+1}/{total_tiles}")
+            
             # 1. Determine Input Crop Coordinates (Input Space)
             # Core crop (without padding)
             ofs_x = x * tile_size
@@ -93,5 +99,11 @@ def tiled_inference(model, img, tile_size=512, tile_pad=32, scale=4, device='cpu
             # Place into final output
             output[:, :, output_start_y:output_end_y, output_start_x:output_end_x] = \
                 output_tile[:, :, tile_crop_start_y:tile_crop_end_y, tile_crop_start_x:tile_crop_end_x]
+            
+            tile_idx += 1
+            
+    # Final progress
+    if progress_callback:
+        progress_callback(total_tiles, total_tiles, "Finalizing...")
 
     return output

@@ -10,6 +10,7 @@
     let currentFilepath = null;
     let hasUpscaled = false;
     let isUpscaling = false;
+    let upscaleProgress = 0;
     let showingUpscaled = false;
     let isComparing = false;
     let upscalerEnabled = false;
@@ -143,15 +144,23 @@
             upscaleBtn.classList.add('disabled');
             upscaleBtn.title = 'Upscaler disabled (enable in config)';
             iconSpan.innerHTML = '✨';
+            upscaleBtn.style.background = '';
             return;
         }
 
         if (isUpscaling) {
             upscaleBtn.classList.add('upscale-loading');
-            upscaleBtn.title = 'Upscaling...';
-            iconSpan.innerHTML = '<span class="spinner">⏳</span>';
+            upscaleBtn.title = `Upscaling... ${Math.round(upscaleProgress)}%`;
+            iconSpan.innerHTML = `<span class="progress-text" style="font-size: 0.8em; font-weight: bold;">${Math.round(upscaleProgress)}%</span>`;
+
+            // Visual progress bar using background gradient
+            const p = upscaleProgress;
+            upscaleBtn.style.background = `linear-gradient(to right, rgba(var(--primary-rgb), 0.3) ${p}%, transparent ${p}%)`;
             return;
         }
+
+        // Reset background
+        upscaleBtn.style.background = '';
 
         if (hasUpscaled) {
             upscaleBtn.classList.add('upscale-done');
@@ -273,7 +282,22 @@
         if (!currentFilepath) return;
 
         isUpscaling = true;
+        upscaleProgress = 0;
         updateButtonState();
+
+        // Start progress polling
+        const progressInterval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/upscale/progress?filepath=${encodeURIComponent(currentFilepath)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === 'processing' || data.percentage > 0) {
+                        upscaleProgress = data.percentage;
+                        updateButtonState();
+                    }
+                }
+            } catch (ignore) { }
+        }, 1000);
 
         try {
             const response = await fetch('/api/upscale', {
@@ -287,9 +311,9 @@
             if (!response.ok) {
                 // Provide more helpful error messages
                 let errorMessage = data.error || 'Upscaling failed';
-                
+
                 // Check for common error patterns
-                if (errorMessage.includes('ML Worker is not available') || 
+                if (errorMessage.includes('ML Worker is not available') ||
                     errorMessage.includes('Connection failed')) {
                     errorMessage = 'ML Worker is not available. Please check if the ML Worker process is running and try again.';
                 } else if (errorMessage.includes('ML Worker error')) {
@@ -297,12 +321,13 @@
                 } else if (errorMessage.includes('disabled')) {
                     errorMessage = 'Upscaler is disabled. Enable UPSCALER_ENABLED in config to use this feature.';
                 }
-                
+
                 throw new Error(errorMessage);
             }
 
             hasUpscaled = true;
             showingUpscaled = true;
+            upscaleProgress = 100;
 
             // Show the upscaled image
             showUpscaledImage(data.upscaled_url);
@@ -314,18 +339,20 @@
 
         } catch (error) {
             console.error('Upscaling error:', error);
-            
+
             // Show user-friendly error message
             let userMessage = error.message || 'Upscaling failed';
-            
+
             // Handle network errors
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 userMessage = 'Network error: Could not connect to server. Please check your connection and try again.';
             }
-            
+
             showToast(userMessage, 'error');
         } finally {
+            clearInterval(progressInterval);
             isUpscaling = false;
+            upscaleProgress = 0;
             updateButtonState();
         }
     }

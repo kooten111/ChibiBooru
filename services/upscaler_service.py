@@ -64,6 +64,15 @@ def get_upscale_url(filepath: str) -> Optional[str]:
     return encoded_path
 
 
+# Progress tracking
+# Key: filepath, Value: {status, percentage, message, updated_at}
+active_upscales: Dict[str, Dict] = {}
+
+def get_upscale_progress(filepath: str) -> Optional[Dict]:
+    """Get progress of an active upscale job."""
+    return active_upscales.get(filepath)
+
+
 async def upscale_image(filepath: str, force: bool = False) -> Dict:
     """
     Upscale an image using RealESRGAN via ML Worker.
@@ -123,16 +132,39 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
         # Ensure output directory exists
         os.makedirs(os.path.dirname(upscaled_path), exist_ok=True)
         
+        # Init progress
+        active_upscales[filepath] = {
+            'status': 'starting',
+            'percentage': 0,
+            'message': 'Initializing...',
+            'updated_at': time.time()
+        }
+        
         # Send upscale request to ML Worker
         loop = asyncio.get_event_loop()
         
         def do_upscale():
             client = get_ml_worker_client()
+            
+            def progress_callback(current, total, message):
+                # Update global progress dict
+                if total > 0:
+                    percent = (current / total) * 100
+                    active_upscales[filepath] = {
+                        'status': 'processing',
+                        'percentage': percent,
+                        'message': message,
+                        'current': current,
+                        'total': total,
+                        'updated_at': time.time()
+                    }
+            
             return client.upscale_image(
                 image_path=os.path.abspath(source_path),
                 output_path=os.path.abspath(upscaled_path),
                 model_name=config.UPSCALER_MODEL,
-                device='auto'
+                device='auto',
+                progress_callback=progress_callback
             )
         
         worker_result = await loop.run_in_executor(None, do_upscale)
@@ -162,6 +194,26 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
         result['error'] = error_msg
         result['processing_time'] = time.time() - start_time
         logger.error(f"Upscale failed for {filepath}: {e}", exc_info=True)
+    except MLWorkerConnectionError as e:
+        # ML Worker connection failed
+        result['error'] = "ML Worker is not available. The ML Worker process may not be running. Please check the server logs and try again."
+        result['processing_time'] = time.time() - start_time
+        logger.error(f"Upscale failed for {filepath}: ML Worker connection error: {e}", exc_info=True)
+    except MLWorkerError as e:
+        # Other ML Worker errors
+        result['error'] = f"ML Worker error: {str(e)}"
+        result['processing_time'] = time.time() - start_time
+        logger.error(f"Upscale failed for {filepath}: ML Worker error: {e}", exc_info=True)
+    except Exception as e:
+        # Generic error handling
+        error_msg = str(e)
+        result['error'] = error_msg
+        result['processing_time'] = time.time() - start_time
+        logger.error(f"Upscale failed for {filepath}: {e}", exc_info=True)
+    finally:
+        # Clean up progress
+        if filepath in active_upscales:
+            del active_upscales[filepath]
     
     return result
 
