@@ -147,6 +147,7 @@ def handle_request(request: Dict[str, Any], progress_callback=None) -> Dict[str,
 
     logger.info(f"Handling request {request_id}: {request_type}")
 
+    result = None
     try:
         if request_type == RequestType.TAG_IMAGE.value:
             result = handle_tag_image(request_data)
@@ -205,6 +206,9 @@ def handle_request(request: Dict[str, Any], progress_callback=None) -> Dict[str,
     except Exception as e:
         logger.error(f"Error handling request {request_id}: {e}", exc_info=True)
         return Response.from_exception(request_id, e)
+    finally:
+        # Reset idle timer after any request completes (success or failure)
+        update_activity()
 
 
 def handle_client(client_socket: socket.socket):

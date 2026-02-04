@@ -163,59 +163,74 @@ class ImageFileHandler(FileSystemEventHandler):
     def handle_file_completion(self, future, is_from_ingest, filename):
         """Callback for when file processing completes."""
         try:
-            success = future.result()
+            result = future.result()
+            # process_image_file returns (success, msg) tuple
+            if isinstance(result, tuple):
+                success, msg = result
+            else:
+                success = bool(result)
+                msg = ""
             
             if success:
                 monitor_status["last_scan_found"] = 1
                 monitor_status["total_processed"] += 1
                 add_log(f"Successfully processed: {filename}", 'success')
-            else:
-                # Success = False could mean duplicate or error
-                # The processing function already logs the specific reason
-                pass
+            # Note: duplicates/failures are already logged by process_image_file
                 
         except Exception as e:
             add_log(f"Error processing {filename}: {e}", 'error')
 
     def on_created(self, event):
         """Called when a file is created."""
-        if event.is_directory:
-            return
-
-        filepath = event.src_path
-        if not self.is_image_file(filepath):
-            return
-
-        if not self.should_process(filepath):
-            return
-
-        # Small delay to ensure file is fully written
-        time.sleep(0.5)
-
-        import config
-        
-        # Determine if this is from ingest folder
-        abs_filepath = os.path.abspath(filepath)
-        abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
-        is_from_ingest = self.watch_ingest and abs_filepath.startswith(abs_ingest)
-        filename = os.path.basename(filepath)
-
-        if not is_from_ingest:
-            # Check if already in DB for static/images files
-            rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
-            if rel_path in models.get_all_filepaths():
+        try:
+            if event.is_directory:
                 return
 
-        add_log(f"Detected {filename}, queuing for processing...", 'info')
-        
-        # Submit to global executor with unified processing function
-        if ingest_executor:
-            future = ingest_executor.submit(processing.process_image_file, filepath, is_from_ingest)
-            # Use partial to pass extra args to callback
-            from functools import partial
-            future.add_done_callback(partial(self.handle_file_completion, is_from_ingest=is_from_ingest, filename=filename))
-        else:
-            add_log("Executor not ready, skipping processing.", 'error')
+            filepath = event.src_path
+            if not self.is_image_file(filepath):
+                return
+
+            if not self.should_process(filepath):
+                return
+
+            # Small delay to ensure file is fully written
+            time.sleep(0.5)
+            
+            # Check if file still exists (might have been moved/deleted)
+            if not os.path.exists(filepath):
+                return
+
+            import config
+            
+            # Determine if this is from ingest folder
+            abs_filepath = os.path.abspath(filepath)
+            abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
+            is_from_ingest = self.watch_ingest and abs_filepath.startswith(abs_ingest)
+            filename = os.path.basename(filepath)
+
+            if not is_from_ingest:
+                # Check if already in DB for static/images files
+                rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+                if rel_path in models.get_all_filepaths():
+                    return
+
+            add_log(f"Detected {filename}, queuing for processing...", 'info')
+            
+            # Submit to global executor with unified processing function
+            if ingest_executor:
+                future = ingest_executor.submit(processing.process_image_file, filepath, is_from_ingest)
+                # Use partial to pass extra args to callback
+                from functools import partial
+                future.add_done_callback(partial(self.handle_file_completion, is_from_ingest=is_from_ingest, filename=filename))
+            else:
+                add_log("Executor not ready, skipping processing.", 'error')
+                
+        except Exception as e:
+            # Log but don't crash the watchdog thread
+            try:
+                add_log(f"Error in file handler: {e}", 'error')
+            except:
+                print(f"[Monitor] Error in file handler: {e}")
 
 
 # --- Core Monitor Logic ---

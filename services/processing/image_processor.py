@@ -262,6 +262,31 @@ def process_image_file(filepath, move_from_ingest=True):
     # Check for duplicate in database (with lock)
     lock_fd, acquired = acquire_processing_lock(md5)
     if not acquired:
+        # Lock not acquired - another thread is processing this MD5
+        # But we should still check if this specific file is a duplicate that can be removed
+        if models.md5_exists(md5):
+            # This file is a duplicate of something already in the database
+            existing_filepath = None
+            with get_db_connection() as conn:
+                row = conn.execute('SELECT filepath FROM images WHERE md5 = ?', (md5,)).fetchone()
+                if row:
+                    existing_filepath = row['filepath']
+            
+            # Check that we're not deleting the actual canonical file
+            if existing_filepath and os.path.abspath(filepath) != os.path.abspath(os.path.join("static/images", existing_filepath)):
+                msg = f"[Processing] Duplicate detected (concurrent): {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
+                logger.error(msg)
+                
+                if os.path.exists(filepath):
+                    try:
+                        os.remove(filepath)
+                        print(f"[Processing] Removed duplicate file: {filename}")
+                    except Exception as e:
+                        print(f"[Processing] WARNING: Could not remove duplicate file {filename}: {e}")
+                
+                return False, msg
+        
+        # Not a duplicate, genuinely being processed by another thread
         msg = f"[Processing] Skipped: {filename} (already being processed by another thread)"
         logger.error(msg)
         return False, msg
