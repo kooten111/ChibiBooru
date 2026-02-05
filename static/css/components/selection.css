@@ -46,12 +46,29 @@
     display: none;
 }
 
-/* Skeleton for main image view */
+/* Skeleton for main image view - when dimensions unknown, keep a small placeholder */
 .image-view.skeleton {
-    min-height: 400px;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+/* When dimensions unknown, cap skeleton size so it doesn't fill the viewport */
+.image-page .image-view.skeleton:not(.image-skeleton-sized):not(.has-image) {
+    flex: 0 0 auto;
+    align-self: center;
+    max-width: min(100%, 400px);
+    max-height: min(100%, 400px);
+}
+
+/* Size skeleton to image aspect ratio (not viewport) when dimensions are known */
+.image-page .image-view.skeleton.image-skeleton-sized:not(.has-image) {
+    flex: 0 0 auto;
+    align-self: center;
+    height: 100%;
+    aspect-ratio: var(--img-w, 1) / var(--img-h, 1);
+    max-width: 100%;
 }
 
 .image-view.skeleton::before {
@@ -65,6 +82,16 @@
     border: 3px solid rgba(135, 206, 235, 0.3);
     border-radius: 12px;
     opacity: 0.5;
+}
+
+/* When skeleton is image-sized, fill the box with the shimmer (not a small inner box) */
+.image-view.skeleton.image-skeleton-sized::before {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: none;
+    border-radius: 12px;
 }
 
 /* Hide skeleton when main image loads */
