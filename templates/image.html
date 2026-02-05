@@ -7,7 +7,7 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=13' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=14' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/saucenao-modal.css') + '?v=1' }}">
@@ -59,6 +59,24 @@
                     <button class="panel-header mobile-toggle" data-section="tags-panel-content">
                         <span class="section-icon">🏷️</span>
                         <span class="section-title">Tags</span>
+                        <span class="text-muted-tiny">
+                            {% set tag_count = namespace(n=0) %}
+                            {% if categorized_tags %}
+                                {% if categorized_tags.artist %}{% set tag_count.n = tag_count.n + categorized_tags.artist|length %}{% endif %}
+                                {% if categorized_tags.copyright %}{% set tag_count.n = tag_count.n + categorized_tags.copyright|length %}{% endif %}
+                                {% if categorized_tags.character %}{% set tag_count.n = tag_count.n + categorized_tags.character|length %}{% endif %}
+                                {% if categorized_tags.species %}{% set tag_count.n = tag_count.n + categorized_tags.species|length %}{% endif %}
+                                {% if categorized_tags.meta %}{% set tag_count.n = tag_count.n + categorized_tags.meta|length %}{% endif %}
+                            {% endif %}
+                            {% if extended_grouped_tags %}
+                                {% for cat_key, cat_tags in extended_grouped_tags.items() %}
+                                    {% set tag_count.n = tag_count.n + cat_tags|length %}
+                                {% endfor %}
+                            {% elif tags %}
+                                {% set tag_count.n = tag_count.n + tags|length %}
+                            {% endif %}
+                            {{ tag_count.n }} tags
+                        </span>
                         <span class="section-arrow">▼</span>
                     </button>
                     <div class="panel-collapsible-content" id="tags-panel-content">
@@ -303,19 +321,9 @@
                     </button>
                     <h3 class="desktop-only">Information</h3>
                     <div class="panel-collapsible-content" id="metadata-panel-content">
-                        <!-- File Info Section -->
+                        <!-- Quick Stats Grid - Bordered Boxes -->
                         <div class="info-section">
-                            {% if filepath %}
-                            <div class="info-row">
-                                <div class="info-label">Filename</div>
-                                <div class="info-value">{{ filepath.split('/')[-1] }}</div>
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Quick Stats Grid -->
-                        <div class="info-section">
-                            <div class="stats-grid">
+                            <div class="stats-grid stats-grid-bordered">
                                 {% if metadata.sources %}
                                 {% set first_source = metadata.sources.values()|list|first %}
                                 {% set width = first_source.image_width or (first_source.file.width if first_source.file
@@ -323,29 +331,9 @@
                                 {% set height = first_source.image_height or (first_source.file.height if
                                 first_source.file else none) %}
                                 {% if width and height %}
-                                <div class="stat-item">
-                                    <div class="stat-label">Dimensions</div>
-                                    <div class="stat-value">{{ width }} × {{ height }}</div>
-                                </div>
-                                {% endif %}
-                                {% endif %}
-
-                                {% if metadata.sources %}
-                                {% set first_source = metadata.sources.values()|list|first %}
-                                {% set file_size = first_source.file_size or (first_source.file.size if
-                                first_source.file else none) %}
-                                {% if file_size %}
-                                <div class="stat-item">
-                                    <div class="stat-label">File Size</div>
-                                    <div class="stat-value">
-                                        {% if file_size >= 1048576 %}
-                                        {{ "%.2f"|format(file_size / 1048576.0) }} MB
-                                        {% elif file_size >= 1024 %}
-                                        {{ "%.2f"|format(file_size / 1024.0) }} KB
-                                        {% else %}
-                                        {{ file_size }} bytes
-                                        {% endif %}
-                                    </div>
+                                <div class="stat-box">
+                                    <div class="stat-label">Resolution</div>
+                                    <div class="stat-value">{{ width }}×{{ height }}</div>
                                 </div>
                                 {% endif %}
                                 {% endif %}
@@ -353,9 +341,9 @@
                                 {% if metadata.sources %}
                                 {% set first_source = metadata.sources.values()|list|first %}
                                 {% if first_source.rating %}
-                                <div class="stat-item">
+                                <div class="stat-box">
                                     <div class="stat-label">Rating</div>
-                                    <div class="stat-value">
+                                    <div class="stat-value rating-value {% if first_source.rating == 'g' %}rating-general{% elif first_source.rating == 's' %}rating-sensitive{% elif first_source.rating == 'q' %}rating-questionable{% elif first_source.rating == 'e' %}rating-explicit{% endif %}">
                                         {% if first_source.rating == 'g' %}General
                                         {% elif first_source.rating == 's' %}Sensitive
                                         {% elif first_source.rating == 'q' %}Questionable
@@ -366,13 +354,31 @@
                                 {% endif %}
                                 {% endif %}
 
-                                {% if data.ingested_at %}
-                                <div class="stat-item">
-                                    <div class="stat-label">Added</div>
-                                    <div class="stat-value">{{ data.ingested_at[:10] if data.ingested_at else 'Unknown'
-                                        }}</div>
+                                {% if metadata.sources %}
+                                {% set first_source = metadata.sources.values()|list|first %}
+                                {% set score = first_source.score if first_source.score is defined else none %}
+                                <div class="stat-box">
+                                    <div class="stat-label">Score</div>
+                                    <div class="stat-value">{{ score if score is not none else '—' }}</div>
                                 </div>
                                 {% endif %}
+
+                                {% if metadata.sources %}
+                                {% set first_source = metadata.sources.values()|list|first %}
+                                {% set fav_count = first_source.fav_count if first_source.fav_count is defined else (first_source.favs if first_source.favs is defined else none) %}
+                                <div class="stat-box">
+                                    <div class="stat-label">Favourites</div>
+                                    <div class="stat-value">{{ fav_count if fav_count is not none else '—' }}</div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- File Info -->
+                        <div class="info-section">
+                            <div class="file-info-box">
+                                <div class="stat-label">File</div>
+                                <div class="stat-value">{{ filepath.split('/')[-1] }}{% if metadata.sources %}{% set first_source = metadata.sources.values()|list|first %}{% set file_size = first_source.file_size or (first_source.file.size if first_source.file else none) %}{% if file_size %} · {% if file_size >= 1048576 %}{{ "%.1f"|format(file_size / 1048576.0) }} MB{% elif file_size >= 1024 %}{{ "%.1f"|format(file_size / 1024.0) }} KB{% else %}{{ file_size }} bytes{% endif %}{% endif %}{% endif %}</div>
                             </div>
                         </div>
 
@@ -502,6 +508,8 @@
 
         <div class="main-content">
             <div class="image-and-actions-container">
+                <div class="image-view-wrapper">
+                <button class="image-nav-btn image-nav-prev" id="prevBtn" title="Previous image (←)">◀</button>
                 <div class="image-view skeleton" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
                     data.image_width and data.image_height %}data-width="{{ data.image_width }}"
                     data-height="{{ data.image_height }}" {% endif %} {% if filepath.endswith('.zip')
@@ -546,6 +554,8 @@
                         onload="this.closest('.image-view').classList.add('has-image')">
                     {% endif %}
                     {% endif %}
+                </div>
+                <button class="image-nav-btn image-nav-next" id="nextBtn" title="Next image (→)">▶</button>
                 </div>
 
                 {# Family badge data - parent/child images #}

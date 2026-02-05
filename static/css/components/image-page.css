@@ -688,11 +688,11 @@ body.image-page {
 
 /* Similarity source indicators */
 .image-page .related-thumb .label.similar-tag {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.95) 0%, rgba(37, 99, 235, 0.95) 100%);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(22, 163, 74, 0.95) 100%);
 }
 
 .image-page .related-thumb .label.similar-semantic {
-    background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(22, 163, 74, 0.95) 100%);
+    background: linear-gradient(135deg, rgba(239, 68, 108, 0.95) 0%, rgba(200, 40, 80, 0.95) 100%);
 }
 
 .image-page .related-thumb .label.similar-visual {
@@ -755,7 +755,8 @@ body:is(.ui-hidden, .focus-mode) .header-container {
 
 body:is(.ui-hidden, .focus-mode) .sidebar-left,
 body:is(.ui-hidden, .focus-mode) .sidebar-right,
-body:is(.ui-hidden, .focus-mode) .actions-bar {
+body:is(.ui-hidden, .focus-mode) .actions-bar,
+body:is(.ui-hidden, .focus-mode) .image-nav-btn {
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition-smooth);
@@ -982,6 +983,137 @@ body:is(.ui-hidden, .focus-mode)::after {
     font-size: 11px;
     color: var(--text-secondary);
     font-weight: var(--font-weight-medium);
+}
+
+/* ============================================
+   Bordered Stat Boxes (Design Refresh)
+   ============================================ */
+.image-page .stats-grid-bordered {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.image-page .stat-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    text-align: center;
+    background: rgba(255, 255, 255, 0.02);
+    transition: border-color var(--transition-normal);
+}
+
+.image-page .stat-box:hover {
+    border-color: var(--border-color-hover);
+}
+
+.image-page .stat-box .stat-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: var(--font-weight-medium);
+    margin-bottom: 2px;
+}
+
+.image-page .stat-box .stat-value {
+    font-size: 13px;
+    color: var(--text-primary);
+    font-weight: var(--font-weight-bold);
+}
+
+/* Rating value colors */
+.image-page .rating-value.rating-general {
+    color: var(--rating-general);
+}
+
+.image-page .rating-value.rating-sensitive {
+    color: var(--rating-sensitive);
+}
+
+.image-page .rating-value.rating-questionable {
+    color: var(--rating-questionable);
+}
+
+.image-page .rating-value.rating-explicit {
+    color: var(--rating-explicit);
+}
+
+/* File Info Box */
+.image-page .file-info-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    text-align: center;
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.image-page .file-info-box .stat-label {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: var(--font-weight-medium);
+    margin-bottom: 2px;
+}
+
+.image-page .file-info-box .stat-value {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+    word-break: break-all;
+}
+
+/* ============================================
+   Image Navigation Arrows
+   ============================================ */
+.image-page .image-view-wrapper {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    min-height: 0;
+    position: relative;
+}
+
+.image-page .image-nav-btn {
+    position: relative;
+    z-index: var(--z-base);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    min-width: 32px;
+    height: 48px;
+    background: rgba(30, 30, 45, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    flex-shrink: 0;
+}
+
+.image-page .image-nav-btn:hover {
+    background: rgba(40, 40, 60, 0.9);
+    border-color: var(--border-color-hover);
+    color: var(--primary-blue);
+}
+
+.image-page .image-nav-prev {
+    margin-right: 4px;
+}
+
+.image-page .image-nav-next {
+    margin-left: 4px;
 }
 
 /* Utility Actions */
