@@ -103,8 +103,8 @@ def delete_image_service(data: Dict[str, Any]) -> Dict[str, Any]:
         # If anything was actually deleted, update the in-memory data.
         if db_success or image_deleted or thumb_deleted:
             print("Updating cache after deletion.")
+            from core.cache_manager import remove_image_from_cache, invalidate_tag_cache
             remove_image_from_cache(filepath)
-            from core.cache_manager import invalidate_tag_cache
             invalidate_tag_cache()
 
             # Remove upscaled version if it exists
@@ -174,6 +174,7 @@ def delete_images_bulk_service(data: Dict[str, Any]) -> Dict[str, Any]:
 
             # Update cache
             if db_success or image_deleted or thumb_deleted:
+                from core.cache_manager import remove_image_from_cache
                 remove_image_from_cache(clean_filepath)
                 # Remove upscaled version if it exists
                 from services.upscaler_service import delete_upscaled_image
