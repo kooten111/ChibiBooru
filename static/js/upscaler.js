@@ -57,6 +57,18 @@
         // Check upscaler status
         await checkUpscalerStatus();
 
+        // Check if page was loaded with a pre-rendered upscaled image
+        // The template marks upscaled images with data-original-src attribute
+        if (imageContainer) {
+            const img = imageContainer.querySelector('img[data-original-src]');
+            if (img && hasUpscaled) {
+                // Page loaded with upscaled image already showing
+                showingUpscaled = true;
+                // Set up the image stack so comparison works
+                setupStackForExistingUpscaledImage(img);
+            }
+        }
+
         // Update button state
         updateButtonState();
 
@@ -92,6 +104,48 @@
         }
     }
 
+    /**
+     * Set up image stack for a pre-rendered upscaled image
+     * This is needed when the page loads with an upscaled image already rendered in the template
+     * We need to create the stack structure for comparison (C key) to work
+     */
+    function setupStackForExistingUpscaledImage(upscaledImg) {
+        if (!imageContainer || !upscaledImg) return;
+
+        // Get the original image URL from the data attribute
+        const originalSrc = upscaledImg.dataset.originalSrc;
+        if (!originalSrc) return;
+
+        // Create stack wrapper - fills container so both images use same frame (same size when comparing)
+        const stack = document.createElement('div');
+        stack.className = 'image-stack';
+        stack.style.position = 'relative';
+        stack.style.width = '100%';
+        stack.style.height = '100%';
+        stack.style.maxWidth = '100%';
+        stack.style.maxHeight = '100%';
+
+        // Insert stack and move upscaled image into it
+        upscaledImg.parentNode.insertBefore(stack, upscaledImg);
+        stack.appendChild(upscaledImg);
+
+        // Create original image element (hidden by default when showing upscaled)
+        const originalImg = document.createElement('img');
+        originalImg.src = originalSrc;
+        originalImg.alt = 'Original Image';
+        originalImg.className = 'original';
+        originalImg.dataset.originalSrc = originalSrc;
+        originalImg.style.zIndex = '1';
+
+        // Insert original as the first child (behind upscaled); CSS positions both in same box
+        stack.insertBefore(originalImg, upscaledImg);
+
+        upscaledImg.style.zIndex = '2';
+        upscaledImg.style.visibility = 'visible';
+        upscaledImg.classList.add('upscaled');
+
+        originalImg.style.visibility = 'hidden';
+    }
 
 
     /**
@@ -373,39 +427,17 @@
         }
 
         if (!stack && originalImg) {
-            // Create stack wrapper
+            // Create stack - fills container so original and upscaled share same frame
             stack = document.createElement('div');
             stack.className = 'image-stack';
+            stack.style.position = 'relative';
+            stack.style.width = '100%';
+            stack.style.height = '100%';
+            stack.style.maxWidth = '100%';
+            stack.style.maxHeight = '100%';
 
-            // Layout: Absolute overlay to prevent flow impact
-            // Stack container - just a positioning context
-            stack.style.position = 'absolute';
-            stack.style.top = '0';
-            stack.style.left = '0';
-            stack.style.right = '0';
-            stack.style.bottom = '0';
-            stack.style.boxSizing = 'border-box';
-            stack.style.padding = '24px';
-
-            // Match the padding of the parent container to keep visual consistency
-            // Using a safe approximation for var(--spacing-lg)
-
-            // Remove display: flex/grid entirely
-            // Insert stack and move original image into it
             originalImg.parentNode.insertBefore(stack, originalImg);
             stack.appendChild(originalImg);
-
-            // Original Image Constraints
-            // Original image - absolutely positioned and centered
-            originalImg.style.position = 'absolute';
-            originalImg.style.top = '50%';
-            originalImg.style.left = '50%';
-            originalImg.style.transform = 'translate(-50%, -50%)';
-            originalImg.style.maxWidth = '100%';
-            originalImg.style.maxHeight = '100%';
-            originalImg.style.width = 'auto';
-            originalImg.style.height = 'auto';
-            originalImg.style.objectFit = 'contain';
             originalImg.style.zIndex = '1';
         }
 
@@ -417,20 +449,7 @@
             upscaledImg = document.createElement('img');
             upscaledImg.className = 'upscaled';
             upscaledImg.alt = 'Upscaled Image';
-
-            // Upscaled Image Constraints
-            // Upscaled image - identical positioning, just higher z-index
-            upscaledImg.style.position = 'absolute';
-            upscaledImg.style.top = '50%';
-            upscaledImg.style.left = '50%';
-            upscaledImg.style.transform = 'translate(-50%, -50%)';
-            upscaledImg.style.maxWidth = '100%';
-            upscaledImg.style.maxHeight = '100%';
-            upscaledImg.style.width = 'auto';
-            upscaledImg.style.height = 'auto';
-            upscaledImg.style.objectFit = 'contain';
             upscaledImg.style.zIndex = '2';
-
             stack.appendChild(upscaledImg);
         }
 
@@ -443,8 +462,10 @@
         const cacheBuster = upscaledUrl.includes('?') ? '&t=' : '?t=';
         upscaledImg.src = upscaledUrl + cacheBuster + Date.now();
 
-        // Show upscaled
+        // Show upscaled, hide original so only one image is visible
         upscaledImg.style.visibility = 'visible';
+        const orig = stack.querySelector('img:not(.upscaled)');
+        if (orig) orig.style.visibility = 'hidden';
 
         showingUpscaled = true;
         updateButtonState();
@@ -462,6 +483,8 @@
 
         if (upscaledImg && upscaledImg.src) {
             upscaledImg.style.visibility = 'visible';
+            const orig = stack.querySelector('img:not(.upscaled)');
+            if (orig) orig.style.visibility = 'hidden';
             showingUpscaled = true;
             updateButtonState();
             return;
@@ -497,10 +520,10 @@
 
         const stack = imageContainer.querySelector('.image-stack');
         const upscaledImg = stack?.querySelector('img.upscaled');
+        const originalImg = stack?.querySelector('img:not(.upscaled)');
 
-        if (upscaledImg) {
-            upscaledImg.style.visibility = 'hidden';
-        }
+        if (upscaledImg) upscaledImg.style.visibility = 'hidden';
+        if (originalImg) originalImg.style.visibility = 'visible';
 
         showingUpscaled = false;
         updateButtonState();
@@ -660,12 +683,11 @@
 
         isComparing = true;
 
-        // Hide upscaled layer
         const stack = imageContainer?.querySelector('.image-stack');
         const upscaledImg = stack?.querySelector('img.upscaled');
-        if (upscaledImg) {
-            upscaledImg.style.visibility = 'hidden';
-        }
+        const originalImg = stack?.querySelector('img:not(.upscaled)');
+        if (upscaledImg) upscaledImg.style.visibility = 'hidden';
+        if (originalImg) originalImg.style.visibility = 'visible';
     }
 
     /**
@@ -676,12 +698,11 @@
 
         isComparing = false;
 
-        // Show upscaled layer
         const stack = imageContainer?.querySelector('.image-stack');
         const upscaledImg = stack?.querySelector('img.upscaled');
-        if (upscaledImg) {
-            upscaledImg.style.visibility = 'visible';
-        }
+        const originalImg = stack?.querySelector('img:not(.upscaled)');
+        if (upscaledImg) upscaledImg.style.visibility = 'visible';
+        if (originalImg) originalImg.style.visibility = 'hidden';
     }
 
     /**

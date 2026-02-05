@@ -496,9 +496,9 @@
             <div class="image-and-actions-container">
                 <div class="image-view-wrapper">
                 <button class="image-nav-btn image-nav-prev" id="prevBtn" title="Previous image (←)">◀</button>
-                <div class="image-view skeleton" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
+                <div class="image-view skeleton{% if data.image_width and data.image_height %} image-skeleton-sized{% endif %}" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
                     data.image_width and data.image_height %}data-width="{{ data.image_width }}"
-                    data-height="{{ data.image_height }}" {% endif %} {% if filepath.endswith('.zip')
+                    data-height="{{ data.image_height }}" style="--img-w: {{ data.image_width }}; --img-h: {{ data.image_height }};" {% endif %} {% if filepath.endswith('.zip')
                     %}data-animation-type="zip" data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="24" {% endif
                     %}>
                     {% if filepath.endswith('.mp4') %}
