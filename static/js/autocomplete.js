@@ -1,6 +1,9 @@
 // static/js/autocomplete.js
 import { escapeHtml, formatCount, getCategoryIcon } from './utils/helpers.js';
 
+// Store instance for external access
+let autocompleteInstance = null;
+
 class Autocomplete {
     constructor(chipInputId = 'chipTextInput', suggestionsId = 'autocompleteSuggestions') {
         this.chipTextInput = document.getElementById(chipInputId);
@@ -141,6 +144,7 @@ class Autocomplete {
         this.renderChips();
         this.updateHiddenInput();
         this.updateClearButton();
+        this.triggerLiveFilter();
     }
 
     addChipFromAutocomplete(tag, category = null) {
@@ -168,6 +172,7 @@ class Autocomplete {
         this.updateHiddenInput();
         this.updateClearButton();
         this.chipTextInput.focus();
+        this.triggerLiveFilter();
     }
 
     removeLastChip() {
@@ -176,6 +181,7 @@ class Autocomplete {
             this.renderChips();
             this.updateHiddenInput();
             this.updateClearButton();
+            this.triggerLiveFilter();
         }
     }
 
@@ -194,6 +200,22 @@ class Autocomplete {
 
     updateClearButton() {
         // No clear button anymore
+    }
+
+    triggerLiveFilter() {
+        const query = this.chips.map(chip => chip.token).join(' ');
+
+        // Dispatch custom event for live filtering
+        const event = new CustomEvent('chipsChanged', {
+            detail: { query, chips: this.chips },
+            bubbles: true
+        });
+        this.chipInputWrapper.dispatchEvent(event);
+    }
+
+    // Get current query string
+    getQuery() {
+        return this.chips.map(chip => chip.token).join(' ');
     }
 
     showSuggestions(data) {
@@ -385,12 +407,12 @@ class Autocomplete {
             return;
         }
 
-        // Enter: Create chip from current text OR select from autocomplete AND SUBMIT
+        // Enter: Create chip from current text OR select from autocomplete (live filter, no submit)
         if (e.key === 'Enter') {
             e.preventDefault();
 
             if (hasActiveSuggestions && this.selectedIndex >= 0 && this.selectedIndex < this.currentSuggestions.length) {
-                // If a suggestion is selected, used it
+                // If a suggestion is selected, use it
                 const suggestion = this.currentSuggestions[this.selectedIndex];
                 this.addChipFromAutocomplete(suggestion.tag, suggestion.category);
             } else {
@@ -402,13 +424,7 @@ class Autocomplete {
                     this.suggestions.classList.remove('active');
                 }
             }
-
-            // ALWAYS Submit form if we have a form
-            if (this.searchForm) {
-                setTimeout(() => {
-                    this.searchForm.submit();
-                }, 10);
-            }
+            // Live filter is triggered by addChipFromText/addChipFromAutocomplete
             return;
         }
 
@@ -472,5 +488,8 @@ class Autocomplete {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    new Autocomplete('chipTextInput', 'autocompleteSuggestions');
+    autocompleteInstance = new Autocomplete('chipTextInput', 'autocompleteSuggestions');
 });
+
+// Export for external access
+export { autocompleteInstance };

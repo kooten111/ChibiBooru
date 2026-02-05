@@ -1,3 +1,6 @@
+// Global instance for live filter access
+let infiniteScrollInstance = null;
+
 class InfiniteScroll {
     constructor() {
         this.gallery = document.querySelector('.gallery');
@@ -19,7 +22,12 @@ class InfiniteScroll {
         this.scrollContainer = document.querySelector('.gallery-content') || window;
         this.useWindowScroll = this.scrollContainer === window;
 
+        // Live filter debounce
+        this.liveFilterTimer = null;
+        this.liveFilterDelay = 300; // ms
+
         this.init();
+        this.initLiveFilter();
     }
 
     init() {
@@ -30,6 +38,123 @@ class InfiniteScroll {
             this.startPrefetching();
             this.checkIfNeedMore();
         }, 500);
+    }
+
+    initLiveFilter() {
+        // Listen for chip changes from autocomplete
+        const chipWrapper = document.getElementById('chipInputWrapper');
+        if (chipWrapper) {
+            chipWrapper.addEventListener('chipsChanged', (e) => {
+                this.handleLiveFilter(e.detail.query);
+            });
+        }
+    }
+
+    handleLiveFilter(newQuery) {
+        // Debounce to avoid too many requests
+        clearTimeout(this.liveFilterTimer);
+        this.liveFilterTimer = setTimeout(() => {
+            this.resetWithQuery(newQuery);
+        }, this.liveFilterDelay);
+    }
+
+    async resetWithQuery(newQuery) {
+        // Reset state
+        this.query = newQuery;
+        this.currentPage = 1;
+        this.displayedPage = 1;
+        this.hasMore = true;
+        this.pageCache.clear();
+        this.prefetchQueue = [];
+
+        // Update URL without page reload
+        const url = new URL(window.location);
+        if (newQuery) {
+            url.searchParams.set('query', newQuery);
+        } else {
+            url.searchParams.delete('query');
+        }
+        url.searchParams.delete('page'); // Reset to page 1
+        history.pushState({ query: newQuery }, '', url);
+
+        // Show loading state
+        this.gallery.classList.add('loading');
+        this.showGalleryLoader();
+
+        try {
+            // Fetch first page
+            const data = await this.fetchPage(1);
+
+            // Clear gallery and add new images
+            this.gallery.innerHTML = '';
+            if (data.images && data.images.length > 0) {
+                this.appendImages(data.images);
+            } else {
+                this.showEmptyState(newQuery);
+            }
+
+            this.hasMore = data.has_more;
+            this.displayedPage = 1;
+
+            // Update results info if it exists
+            this.updateResultsInfo(data.total_results);
+
+            // Start prefetching for next pages
+            this.startPrefetching();
+
+            // Check if we need more images to fill the viewport
+            setTimeout(() => this.checkIfNeedMore(), 100);
+        } catch (error) {
+            console.error('Live filter error:', error);
+            this.showError();
+        } finally {
+            this.gallery.classList.remove('loading');
+            this.hideGalleryLoader();
+        }
+    }
+
+    showGalleryLoader() {
+        // Add skeleton placeholders
+        if (this.gallery.children.length === 0) {
+            const loader = document.createElement('div');
+            loader.id = 'galleryLoader';
+            loader.className = 'gallery-loader';
+            loader.innerHTML = `
+                <div class="loader-content">
+                    <div class="loader-spinner"></div>
+                    <span>Searching...</span>
+                </div>
+            `;
+            this.gallery.parentElement.insertBefore(loader, this.gallery);
+        }
+    }
+
+    hideGalleryLoader() {
+        const loader = document.getElementById('galleryLoader');
+        if (loader) loader.remove();
+    }
+
+    updateResultsInfo(total) {
+        const resultsInfo = document.querySelector('.results-info');
+        if (resultsInfo) {
+            if (total > 0) {
+                resultsInfo.textContent = `Found ${total} result${total !== 1 ? 's' : ''}`;
+                resultsInfo.style.display = 'block';
+            } else {
+                resultsInfo.style.display = 'none';
+            }
+        }
+    }
+
+    showEmptyState(query) {
+        const emptyDiv = document.createElement('div');
+        emptyDiv.className = 'empty-results';
+        emptyDiv.innerHTML = `
+            <div class="empty-icon">🔍</div>
+            <div class="empty-text">No images found${query ? ` for "${query}"` : ''}</div>
+            <div class="empty-hint">Try different search terms</div>
+        `;
+        this.gallery.appendChild(emptyDiv);
     }
 
     handleScroll() {
@@ -278,12 +403,73 @@ class InfiniteScroll {
     }
 }
 
-// Add pulse animation
+// Add pulse animation and live filter styles
 const style = document.createElement('style');
 style.textContent = `
     @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.5; }
+    }
+    
+    .gallery.loading {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+    
+    .gallery-loader {
+        display: flex;
+        justify-content: center;
+        padding: 40px;
+        color: var(--accent-primary, #87ceeb);
+    }
+    
+    .gallery-loader .loader-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 600;
+    }
+    
+    .gallery-loader .loader-spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    
+    .empty-results {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 80px 20px;
+        color: var(--text-secondary, #888);
+        text-align: center;
+    }
+    
+    .empty-results .empty-icon {
+        font-size: 4em;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+    
+    .empty-results .empty-text {
+        font-size: 1.3em;
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: var(--text-primary, #fff);
+    }
+    
+    .empty-results .empty-hint {
+        font-size: 0.95em;
+        opacity: 0.7;
     }
 `;
 document.head.appendChild(style);
@@ -292,6 +478,6 @@ document.head.appendChild(style);
 document.addEventListener('DOMContentLoaded', () => {
     // Only initialize on gallery pages (not image detail pages)
     if (document.querySelector('.gallery')) {
-        new InfiniteScroll();
+        infiniteScrollInstance = new InfiniteScroll();
     }
 });
