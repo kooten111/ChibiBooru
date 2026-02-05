@@ -187,24 +187,24 @@ def _build_fts_query(conn, general_terms, negative_terms):
 
         # Escape special FTS5 characters
         clean_term_escaped = clean_term.replace('"', '""')
+        # Safe for filepath: prefix in FTS; skip when term contains ':' (e.g. rating:general) to avoid breaking FTS syntax
+        filepath_fts_safe = clean_term_escaped.replace('"', '') if ':' not in clean_term else ''
 
         if result:
-            # Exact tag - use prefix match operator to ensure whole word
-            # In FTS5, ^term means "token starts with", but we want exact
-            # So we'll use quotes and rely on tokenization
-            fts_query_parts.append(f'^"{clean_term_escaped}"')
+            # Exact tag - add filepath substring so "silk" can match __silka_...; only add filepath: when term has no colon
+            freetext_filepath_terms.append(clean_term)
+            part = f'^"{clean_term_escaped}"'
+            if filepath_fts_safe:
+                part = f'({part} OR filepath:{filepath_fts_safe}*)'
+            fts_query_parts.append(part)
         else:
-            # Freetext term - check if it contains special characters that FTS5 can't handle well
-            # For terms with hyphens or special chars, skip FTS and rely on filepath LIKE matching
-            if '-' in clean_term or any(c in clean_term for c in [':', '(', ')', '{', '}', '[', ']']):
-                # Don't add to FTS query - will be handled by filepath LIKE matching
-                # Track for filepath substring matching
-                freetext_filepath_terms.append(clean_term)
-            else:
-                # Use wildcard for prefix matching
-                # This allows "fellini" to match "pulchra_fellini"
-                fts_query_parts.append(f'{clean_term_escaped}*')
-                # Don't add to freetext_filepath_terms - FTS will handle it
+            # Freetext term: always add to filepath substring matching for full partial-match support
+            freetext_filepath_terms.append(clean_term)
+            if '-' not in clean_term and not any(c in clean_term for c in [':', '(', ')', '{', '}', '[', ']']):
+                part = f'{clean_term_escaped}*'
+                if filepath_fts_safe:
+                    part = f'({part} OR filepath:{filepath_fts_safe}*)'
+                fts_query_parts.append(part)
 
     # Add negative terms
     for term in negative_terms:
@@ -275,20 +275,23 @@ def _apply_filters(sql_parts, where_clauses, params, fts_query, freetext_filepat
     Returns:
         None (modifies sql_parts, where_clauses, params in place)
     """
-    # Add FTS match condition
+    # Add FTS match condition and/or filepath substring conditions
     if fts_query and not freetext_filepath_terms:
         where_clauses.append("images_fts MATCH ?")
         params.append(fts_query)
     elif fts_query and freetext_filepath_terms:
-        # Build OR condition: FTS match OR filepath substring
-        fts_or_conditions = ["fts.filepath IN (SELECT filepath FROM images_fts WHERE images_fts MATCH ?)"]
+        # Match if: (FTS match) OR (filepath contains ALL terms as substrings)
+        filepath_and_parts = ["LOWER(i.filepath) LIKE ?" for _ in freetext_filepath_terms]
+        filepath_and_clause = " AND ".join(filepath_and_parts)
+        fts_subquery = "fts.filepath IN (SELECT filepath FROM images_fts WHERE images_fts MATCH ?)"
         params.append(fts_query)
-
+        params.extend([f"%{t}%" for t in freetext_filepath_terms])
+        where_clauses.append(f"(({fts_subquery}) OR ({filepath_and_clause}))")
+    elif freetext_filepath_terms:
+        # Only filepath-like terms (e.g. partial filename "5123454-khiara"): require ALL terms as substrings
         for term in freetext_filepath_terms:
-            fts_or_conditions.append("LOWER(i.filepath) LIKE ?")
+            where_clauses.append("LOWER(i.filepath) LIKE ?")
             params.append(f"%{term}%")
-
-        where_clauses.append(f"({' OR '.join(fts_or_conditions)})")
 
     # Pool filter
     if pool_filter:
@@ -555,15 +558,17 @@ def _fts_search(general_terms, negative_terms, source_filters, filename_filter,
             where_clauses.append("images_fts MATCH ?")
             params.append(fts_query)
         elif fts_query and freetext_filepath_terms:
-            # Build OR condition: FTS match OR filepath substring
-            fts_or_conditions = ["fts.filepath IN (SELECT filepath FROM images_fts WHERE images_fts MATCH ?)"]
+            # Match if: (FTS match) OR (filepath contains ALL terms as substrings)
+            filepath_and_parts = ["LOWER(i.filepath) LIKE ?" for _ in freetext_filepath_terms]
+            filepath_and_clause = " AND ".join(filepath_and_parts)
+            fts_subquery = "fts.filepath IN (SELECT filepath FROM images_fts WHERE images_fts MATCH ?)"
             params.append(fts_query)
-
+            params.extend([f"%{t}%" for t in freetext_filepath_terms])
+            where_clauses.append(f"(({fts_subquery}) OR ({filepath_and_clause}))")
+        elif freetext_filepath_terms:
             for term in freetext_filepath_terms:
-                fts_or_conditions.append("LOWER(i.filepath) LIKE ?")
+                where_clauses.append("LOWER(i.filepath) LIKE ?")
                 params.append(f"%{term}%")
-
-            where_clauses.append(f"({' OR '.join(fts_or_conditions)})")
 
         # Pool filter
         if pool_filter:
@@ -820,12 +825,12 @@ def perform_search(search_query):
             normalized_tags.append(tag)
         category_filters[category] = normalized_tags
 
-    # Decide whether to use FTS5 or tag-based search
-    # Don't use FTS for very short terms or terms with underscores in the middle (infix matches)
+    # Use FTS when any term is not an exact tag (or freetext mode). Exact-tag-only queries
+    # (e.g. rating:general) use the fast tag path for correctness and performance.
     use_fts = freetext_mode or (general_terms and _should_use_fts(general_terms))
 
     # If any general term looks like an infix search (contains _ in middle or very short),
-    # disable FTS and use LIKE-based search for better substring matching
+    # disable FTS and use traditional path with filepath substring filter
     if use_fts and general_terms:
         for term in general_terms:
             # Skip if term is very short (< 3 chars) or looks like infix (has _ but not at start/end)
@@ -842,10 +847,13 @@ def perform_search(search_query):
         # Use traditional tag-based search
         
         # Optimization: If all terms are exact tags, use the database index
-        # This avoids fetching the entire database for simple tag searches
+        # Single exact tag without colon (e.g. "silk"): load all and filter by tag OR filepath so "silk" finds __silka_...
+        # Terms with colon (e.g. "rating:general") use tag-only search for speed.
         are_all_tags = general_terms and not _should_use_fts(general_terms)
         
-        if are_all_tags:
+        if are_all_tags and len(general_terms) == 1 and ':' not in general_terms[0]:
+            results = models.get_all_images_with_tags()
+        elif are_all_tags:
             results = models.search_images_by_tags(general_terms)
         else:
             results = models.get_all_images_with_tags()
