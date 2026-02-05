@@ -72,6 +72,11 @@ body.image-page {
     padding: 0;
 }
 
+/* Only reduce the gap between Tags and Information (left sidebar); no other layout change */
+.image-page #sidebarLeft.sidebar-left {
+    gap: 4px;
+}
+
 /* Hide scrollbars on image page sidebars while keeping scroll functionality */
 .image-page .sidebar-left *,
 .image-page .sidebar-right * {
@@ -134,10 +139,9 @@ body.image-page {
     flex: 0 0 auto;
 }
 
-/* Metadata-info panel - Keep compact, anchor to bottom (override tags-browser.css flex: 2 1 0) */
+/* Metadata-info panel - Keep compact (override tags-browser.css flex: 2 1 0) */
 .image-page .sidebar-left #metadata-content {
     flex: 0 0 auto;
-    margin-top: auto;
 }
 
 .image-page .metadata-info.panel {
@@ -710,30 +714,65 @@ body.image-page {
     align-self: center;
 }
 
-/* Image View */
+/* Image View - single source of truth for main image area
+   Wrapper uses align-items: stretch so this has a definite height; image is always contained. */
 .image-page .image-view {
     flex: 1 1 auto;
+    min-height: 0;
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 0;
     overflow: hidden;
     padding: var(--spacing-lg);
     padding-bottom: calc(var(--spacing-lg) + 24px);
-    /* Extra space for drop shadow */
     position: relative;
 }
 
-.image-page .image-view img,
-.image-page .image-view video {
+/* Main image / video: always fully visible, never cropped (any aspect ratio or size) */
+.image-page .image-view > img,
+.image-page .image-view > video {
     max-width: 100%;
     max-height: 100%;
     width: auto;
     height: auto;
+    object-fit: contain;
     display: block;
+}
+
+/* Stack fills the image view so original and upscaled use the same frame = same size when comparing */
+.image-page .image-view .image-stack {
+    position: relative;
+    align-self: stretch;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Both images in the same box: same size and alignment for C compare */
+.image-page .image-view .image-stack img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+.image-page .image-view > img,
+.image-page .image-view > video {
     border-radius: var(--radius-xl);
     cursor: zoom-in;
-    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
+}
+
+.image-page .image-view .image-stack img.original,
+.image-page .image-view .image-stack img.upscaled {
+    border-radius: var(--radius-xl);
+    cursor: zoom-in;
     user-select: none;
     -webkit-user-drag: none;
     filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
@@ -885,6 +924,11 @@ body:is(.ui-hidden, .focus-mode)::after {
     padding-top: 0;
 }
 
+/* Space between Information header and first content (stat bubbles) */
+.image-page .metadata-info .panel-collapsible-content > .info-section:first-child {
+    padding-top: 8px;
+}
+
 .image-page .info-section+.info-section {
     margin-top: 0;
     padding-top: 2px;
@@ -914,7 +958,7 @@ body:is(.ui-hidden, .focus-mode)::after {
     overflow-wrap: break-word;
 }
 
-/* Monospace values for hashes */
+/* Monospace values for hashes - single line with horizontal scroll to avoid single-char wrap */
 .image-page .info-value.mono {
     font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
     font-size: 11px;
@@ -923,7 +967,10 @@ body:is(.ui-hidden, .focus-mode)::after {
     border-radius: var(--radius-sm);
     border: 1px solid rgba(99, 179, 237, 0.15);
     user-select: all;
-    word-break: break-all;
+    white-space: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
     line-height: 1.5;
 }
 
@@ -1072,18 +1119,28 @@ body:is(.ui-hidden, .focus-mode)::after {
     word-break: break-all;
 }
 
+.image-page .file-info-box .file-size {
+    display: inline-block;
+    margin-left: 0.5em;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
+}
+
 /* ============================================
    Image Navigation Arrows
    ============================================ */
 .image-page .image-view-wrapper {
     flex: 1 1 auto;
     display: flex;
-    align-items: center;
+    align-items: stretch;
     min-height: 0;
     position: relative;
 }
 
 .image-page .image-nav-btn {
+    align-self: center;
     position: relative;
     z-index: var(--z-base);
     display: flex;
