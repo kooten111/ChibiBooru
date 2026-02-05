@@ -82,7 +82,12 @@ def autocomplete(query: str = ''):
 
     # Special filter suggestions (only if not a negative search)
     if not is_negative_search:
+        # Format: (tag, display, keywords) - keywords can be a string or tuple
         filters = [
+            ("rating:general", "Safe content", ("rating", "general", "safe")),
+            ("rating:sensitive", "Sensitive content", ("rating", "sensitive")),
+            ("rating:questionable", "Questionable content", ("rating", "questionable")),
+            ("rating:explicit", "Explicit content", ("rating", "explicit")),
             ("source:danbooru", "Danbooru images", "danbooru"),
             ("source:e621", "E621 images", "e621"),
             ("source:gelbooru", "Gelbooru images", "gelbooru"),
@@ -106,9 +111,16 @@ def autocomplete(query: str = ''):
             ("order:fav_asc", "Least favorited first", "fav")
         ]
 
-        for tag, display, keyword in filters:
-            # Match if: keyword matches search, OR search matches keyword, OR search matches start of tag
-            if keyword in search_token or search_token in keyword or tag.startswith(search_token):
+        for tag, display, keywords in filters:
+            # Handle keywords as either a string or tuple
+            # Only match if search_token is a prefix/substring of the keyword
+            if isinstance(keywords, tuple):
+                keyword_match = any(kw.startswith(search_token) for kw in keywords)
+            else:
+                keyword_match = keywords.startswith(search_token)
+            
+            # Match if: keyword matches search, OR search matches start of tag
+            if keyword_match or tag.startswith(search_token):
                 groups["Filters"].append({
                     "tag": tag,
                     "display": display,
