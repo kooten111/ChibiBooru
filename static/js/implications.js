@@ -955,6 +955,72 @@ window.closeDetail = function () {
     renderDetailPanel();
 };
 
+// Reusable Tag Autocomplete Setup
+function setupTagAutocomplete(inputId, dropdownId) {
+    const input = document.getElementById(inputId);
+    const dropdown = document.getElementById(dropdownId);
+    if (!input || !dropdown) return;
+
+    let searchTimeout;
+
+    input.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+        clearTimeout(searchTimeout);
+
+        if (query.length < 2) {
+            dropdown.classList.remove('active');
+            return;
+        }
+
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
+                const data = await response.json();
+
+                // Extract tags from groups
+                let tags = [];
+                if (data.groups && data.groups.length > 0) {
+                    const tagGroup = data.groups.find(g => g.name === 'Tags');
+                    if (tagGroup && tagGroup.items) {
+                        tags = tagGroup.items.map(item => ({
+                            name: item.tag || item.label,
+                            category: item.category || 'general'
+                        }));
+                    }
+                }
+
+                if (tags.length > 0) {
+                    dropdown.innerHTML = tags.map(tag => `
+                        <div class="autocomplete-item" data-tag="${tag.name}">
+                            <span class="tag-badge ${tag.category}">${tag.name}</span>
+                        </div>
+                    `).join('');
+                    dropdown.classList.add('active');
+
+                    // Add click handlers
+                    dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            input.value = item.dataset.tag;
+                            dropdown.classList.remove('active');
+                        });
+                    });
+                } else {
+                    dropdown.classList.remove('active');
+                }
+            } catch (error) {
+                console.error('Error fetching tag suggestions:', error);
+            }
+        }, 300);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.remove('active');
+        }
+    });
+}
+
 // Manual Creation Modal
 function initializeManualCreation() {
     const createBtn = document.getElementById('createManualBtn');
@@ -962,6 +1028,10 @@ function initializeManualCreation() {
     const closeBtn = modal.querySelector('.close');
     const previewBtn = document.getElementById('previewManualBtn');
     const submitBtn = document.getElementById('createManualSubmitBtn');
+
+    // Setup autocomplete for both tag inputs
+    setupTagAutocomplete('manualSourceTag', 'manualSourceTagDropdown');
+    setupTagAutocomplete('manualImpliedTag', 'manualImpliedTagDropdown');
 
     createBtn.addEventListener('click', () => {
         modal.classList.add('active');

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Tag Implications - {{ app_name }}</title>
@@ -9,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
 </head>
+
 <body>
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
@@ -47,7 +49,8 @@
                 <div class="panel-section">
                     <h3 class="panel-section-title">Tag Search</h3>
                     <div class="tag-search-input-wrapper">
-                        <input type="text" id="tagSearchInput" class="filter-input" placeholder="Search for a tag..." autocomplete="off">
+                        <input type="text" id="tagSearchInput" class="filter-input" placeholder="Search for a tag..."
+                            autocomplete="off">
                         <div id="tagSearchDropdown" class="autocomplete-dropdown"></div>
                     </div>
                 </div>
@@ -256,12 +259,20 @@
             <div class="manual-creation-form">
                 <div class="filter-group">
                     <label class="filter-label" for="manualSourceTag">When this tag is added:</label>
-                    <input type="text" id="manualSourceTag" class="filter-input" placeholder="e.g., mint_fantome" autocomplete="off">
+                    <div class="tag-search-input-wrapper">
+                        <input type="text" id="manualSourceTag" class="filter-input" placeholder="e.g., mint_fantome"
+                            autocomplete="off">
+                        <div id="manualSourceTagDropdown" class="autocomplete-dropdown"></div>
+                    </div>
                 </div>
                 <div class="flow-arrow">→</div>
                 <div class="filter-group">
                     <label class="filter-label" for="manualImpliedTag">Also add this tag:</label>
-                    <input type="text" id="manualImpliedTag" class="filter-input" placeholder="e.g., indie_virtual_youtuber" autocomplete="off">
+                    <div class="tag-search-input-wrapper">
+                        <input type="text" id="manualImpliedTag" class="filter-input"
+                            placeholder="e.g., indie_virtual_youtuber" autocomplete="off">
+                        <div id="manualImpliedTagDropdown" class="autocomplete-dropdown"></div>
+                    </div>
                 </div>
             </div>
             <div class="page-actions page-actions-spaced">
@@ -366,4 +377,5 @@
         }
     </script>
 </body>
+
 </html>
