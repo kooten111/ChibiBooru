@@ -489,6 +489,8 @@ class Autocomplete {
 
 document.addEventListener('DOMContentLoaded', () => {
     autocompleteInstance = new Autocomplete('chipTextInput', 'autocompleteSuggestions');
+    // Expose on window for gallery.js sidebar integration
+    window.autocompleteInstance = autocompleteInstance;
 });
 
 // Export for external access

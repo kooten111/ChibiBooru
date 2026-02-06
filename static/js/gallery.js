@@ -143,44 +143,120 @@
         state.activeFilters = query.split(/\s+/).filter(f => f.trim());
     }
 
+    // Get autocomplete instance for live filtering integration
+    function getAutocompleteInstance() {
+        // Access the autocomplete instance from the global window object
+        // It's set by autocomplete.js after DOMContentLoaded
+        return window.autocompleteInstance;
+    }
+
     function addFilter(query) {
-        // For rating and source filters, make them exclusive (only one at a time)
+        const autocomplete = getAutocompleteInstance();
+
+        // For rating, source, and order filters, make them exclusive (only one at a time)
         const isRating = query.startsWith('rating:');
         const isSource = query.startsWith('source:');
+        const isOrder = query.startsWith('order:');
 
-        if (isRating) {
-            // Remove any existing rating filters
-            state.activeFilters = state.activeFilters.filter(f => !f.startsWith('rating:'));
-        } else if (isSource) {
-            // Remove any existing source filters  
-            state.activeFilters = state.activeFilters.filter(f => !f.startsWith('source:'));
-        } else if (query.startsWith('order:')) {
-            // Remove any existing order filters
-            state.activeFilters = state.activeFilters.filter(f => !f.startsWith('order:'));
+        if (autocomplete && autocomplete.chips) {
+            // Remove conflicting filters from chips
+            if (isRating) {
+                autocomplete.chips = autocomplete.chips.filter(c => !c.token.startsWith('rating:'));
+            } else if (isSource) {
+                autocomplete.chips = autocomplete.chips.filter(c => !c.token.startsWith('source:'));
+            } else if (isOrder) {
+                autocomplete.chips = autocomplete.chips.filter(c => !c.token.startsWith('order:'));
+            }
+
+            // Check if already exists
+            const exists = autocomplete.chips.some(c => c.token === query);
+            if (!exists) {
+                autocomplete.addChipFromText(query);
+            } else {
+                // Still re-render in case we removed conflicting filters
+                autocomplete.renderChips();
+                autocomplete.updateHiddenInput();
+                autocomplete.triggerLiveFilter();
+            }
+        } else {
+            // Fallback to page navigation if autocomplete not available
+            if (isRating) {
+                state.activeFilters = state.activeFilters.filter(f => !f.startsWith('rating:'));
+            } else if (isSource) {
+                state.activeFilters = state.activeFilters.filter(f => !f.startsWith('source:'));
+            } else if (isOrder) {
+                state.activeFilters = state.activeFilters.filter(f => !f.startsWith('order:'));
+            }
+
+            if (!state.activeFilters.includes(query)) {
+                state.activeFilters.push(query);
+                applyFilters();
+            }
         }
 
-        if (!state.activeFilters.includes(query)) {
-            state.activeFilters.push(query);
-            applyFilters();
-        }
+        // Update local state and sidebar UI
+        parseActiveFilters();
+        updateSidebarActiveStates();
     }
 
     function removeFilter(query) {
-        state.activeFilters = state.activeFilters.filter(f => f !== query);
-        applyFilters();
+        const autocomplete = getAutocompleteInstance();
+
+        if (autocomplete && autocomplete.chips) {
+            // Find and remove the chip with this query
+            const chipIndex = autocomplete.chips.findIndex(c => c.token === query);
+            if (chipIndex !== -1) {
+                autocomplete.removeChip(chipIndex);
+            }
+        } else {
+            // Fallback to page navigation
+            state.activeFilters = state.activeFilters.filter(f => f !== query);
+            applyFilters();
+        }
+
+        // Update local state and sidebar UI
+        parseActiveFilters();
+        updateSidebarActiveStates();
     }
 
     function updateFilter(oldQuery, newQuery) {
-        const idx = state.activeFilters.indexOf(oldQuery);
-        if (idx !== -1) {
-            state.activeFilters[idx] = newQuery.trim();
-            applyFilters();
+        const autocomplete = getAutocompleteInstance();
+
+        if (autocomplete && autocomplete.chips) {
+            const chipIndex = autocomplete.chips.findIndex(c => c.token === oldQuery);
+            if (chipIndex !== -1) {
+                autocomplete.chips[chipIndex] = autocomplete.parseToken(newQuery.trim());
+                autocomplete.renderChips();
+                autocomplete.updateHiddenInput();
+                autocomplete.triggerLiveFilter();
+            }
+        } else {
+            const idx = state.activeFilters.indexOf(oldQuery);
+            if (idx !== -1) {
+                state.activeFilters[idx] = newQuery.trim();
+                applyFilters();
+            }
         }
+
+        parseActiveFilters();
+        updateSidebarActiveStates();
     }
 
     function clearFilters() {
-        state.activeFilters = [];
-        applyFilters();
+        const autocomplete = getAutocompleteInstance();
+
+        if (autocomplete && autocomplete.chips) {
+            autocomplete.chips = [];
+            autocomplete.renderChips();
+            autocomplete.updateHiddenInput();
+            autocomplete.triggerLiveFilter();
+        } else {
+            state.activeFilters = [];
+            applyFilters();
+        }
+
+        parseActiveFilters();
+        updateSidebarActiveStates();
     }
 
     function applyFilters() {
@@ -190,6 +266,27 @@
         } else {
             window.location.href = '/';
         }
+    }
+
+    function updateSidebarActiveStates() {
+        const filterSidebar = document.querySelector('.filter-sidebar');
+        if (!filterSidebar) return;
+
+        // Get current query from autocomplete or URL
+        const autocomplete = getAutocompleteInstance();
+        let currentFilters = [];
+
+        if (autocomplete && autocomplete.chips) {
+            currentFilters = autocomplete.chips.map(c => c.token);
+        } else {
+            currentFilters = state.activeFilters;
+        }
+
+        // Update all filter items
+        filterSidebar.querySelectorAll('.filter-item[data-query]').forEach(item => {
+            const query = item.dataset.query;
+            item.classList.toggle('active', currentFilters.includes(query));
+        });
     }
 
 
