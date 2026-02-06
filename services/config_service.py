@@ -264,6 +264,18 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Category weights for weighted similarity',
         'editable': True,
     },
+    'SIMILARITY_EXTENDED_CATEGORY_WEIGHTS': {
+        'category': 'Similarity',
+        'type': 'dict',
+        'description': 'Extended category weights (22 categories) for fine-grained similarity',
+        'editable': True,
+    },
+    'USE_EXTENDED_SIMILARITY': {
+        'category': 'Similarity',
+        'type': 'bool',
+        'description': 'Use extended categories for tag similarity (requires categorized tags)',
+        'editable': True,
+    },
     'VISUAL_SIMILARITY_ENABLED': {
         'category': 'Similarity',
         'type': 'bool',

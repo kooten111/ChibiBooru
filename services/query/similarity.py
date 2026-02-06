@@ -21,9 +21,16 @@ def _initialize_similarity_cache():
     from database import get_db_connection
 
     with get_db_connection() as conn:
-        query = "SELECT id, category FROM tags"
+        query = "SELECT id, category, extended_category FROM tags"
         results = conn.execute(query).fetchall()
-        _tag_category_cache = {row["id"]: row["category"] or "general" for row in results}
+        # Store both base category and extended category for each tag
+        _tag_category_cache = {
+            row["id"]: {
+                'category': row["category"] or "general",
+                'extended_category': row["extended_category"]
+            }
+            for row in results
+        }
 
     _similarity_context_cache = {
         "tag_counts": models.get_tag_counts(),
@@ -58,8 +65,18 @@ def _get_tag_weight(tag):
     tag_freq = _similarity_context_cache["tag_counts"].get(tag_id, 1)
     idf_weight = 1.0 / log(tag_freq + 1)
 
-    category = _tag_category_cache.get(tag_id, "general")
-    category_weight = config.SIMILARITY_CATEGORY_WEIGHTS.get(category, 1.0)
+    cat_info = _tag_category_cache.get(tag_id, {'category': 'general', 'extended_category': None})
+    
+    # Use extended category weight if enabled and available
+    if config.USE_EXTENDED_SIMILARITY and cat_info['extended_category']:
+        category_weight = config.SIMILARITY_EXTENDED_CATEGORY_WEIGHTS.get(
+            cat_info['extended_category'],
+            # Fall back to base category weight if extended category not in weights
+            config.SIMILARITY_CATEGORY_WEIGHTS.get(cat_info['category'], 1.0)
+        )
+    else:
+        # Use base category weight
+        category_weight = config.SIMILARITY_CATEGORY_WEIGHTS.get(cat_info['category'], 1.0)
 
     return idf_weight * category_weight
 

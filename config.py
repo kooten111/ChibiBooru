@@ -265,6 +265,48 @@ SIMILARITY_CATEGORY_WEIGHTS = _get_setting('SIMILARITY_CATEGORY_WEIGHTS', {
     'meta': 0.5         # Resolution, format, year - less relevant for similarity
 })
 
+# Extended category weights for finer-grained similarity (22 categories)
+# These are used when USE_EXTENDED_SIMILARITY is True and tags have extended categories
+SIMILARITY_EXTENDED_CATEGORY_WEIGHTS = _get_setting('SIMILARITY_EXTENDED_CATEGORY_WEIGHTS', {
+    # Identity tags (WHO/WHAT) - higher weights
+    '00_Subject_Count': 2.0,    # 1girl, solo - moderately important
+    '01_Body_Physique': 4.0,    # animal_ears, tail - permanent traits
+    '02_Body_Hair': 3.5,        # hair color/style - identity
+    '03_Body_Face': 3.0,        # eye color - identity
+    '04_Body_Genitalia': 1.5,   # NSFW anatomy
+    
+    # Attire tags - medium weights
+    '05_Attire_Main': 2.5,      # dress, uniform
+    '06_Attire_Inner': 2.0,     # underwear
+    '07_Attire_Legwear': 2.0,   # thighhighs
+    '08_Attire_Acc': 2.0,       # accessories
+    
+    # Contextual tags - lower weights
+    '09_Action': 1.0,           # holding, eating
+    '10_Pose': 1.0,             # sitting, looking_at_viewer
+    '11_Expression': 1.5,       # blush, smile
+    '12_Sexual_Act': 1.0,       # NSFW actions
+    
+    # Object/Setting - low weights
+    '13_Object': 1.5,           # flower, weapon
+    '14_Setting': 0.8,          # outdoors, simple_background
+    '15_Framing': 0.5,          # upper_body, cowboy_shot
+    '16_Focus': 0.5,            # foot_focus
+    
+    # Style/Meta - lowest weights
+    '17_Style_Art': 0.8,        # monochrome, sketch
+    '18_Style_Tech': 0.5,       # blurry effects
+    '19_Meta_Attributes': 0.3,  # highres, absurdres
+    '20_Meta_Text': 0.3,        # signature, artist_name
+    '21_Status': 1.5,           # nude, wet, censored
+})
+
+# Whether to use extended categories for tag similarity (requires categorized tags)
+# When True, uses the 22 extended categories for finer-grained weighting
+# When False, falls back to the 6 base categories
+use_ext_sim = _get_setting('USE_EXTENDED_SIMILARITY', True)
+USE_EXTENDED_SIMILARITY = use_ext_sim if isinstance(use_ext_sim, bool) else str(use_ext_sim).lower() in ('true', '1', 'yes')
+
 # ==================== VISUAL SIMILARITY (PERCEPTUAL HASH) ====================
 
 # Enable visual similarity in the related images sidebar
