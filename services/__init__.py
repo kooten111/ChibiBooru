@@ -32,7 +32,7 @@ __all__ = [
     'rating_service',
     'saucenao_service',
     'switch_source_db',
-    'system_service',
+    'system',
     'tag_categorization_service',
     'tag_service',
 ]

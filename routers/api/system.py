@@ -1,6 +1,7 @@
 from quart import request, jsonify
 from . import api_blueprint
-from services import system_service, monitor_service
+from services import monitor_service
+from services.system import api as system_service
 from services.background_tasks import task_manager
 from utils import api_handler
 from utils.background_task_helpers import start_background_task
