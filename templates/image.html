@@ -351,7 +351,13 @@
                                 {% set score = first_source.score if first_source.score is defined else none %}
                                 <div class="stat-box">
                                     <div class="stat-label">Score</div>
-                                    <div class="stat-value">{{ score if score is not none else '—' }}</div>
+                                    <div class="stat-value">
+                                        {% if score is mapping %}
+                                            {{ score.total if score.total is defined else (score['total'] if 'total' in score else score) }}
+                                        {% else %}
+                                            {{ score if score is not none else '—' }}
+                                        {% endif %}
+                                    </div>
                                 </div>
                                 {% endif %}
 
