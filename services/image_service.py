@@ -66,7 +66,7 @@ def delete_image_service(data: Dict[str, Any]) -> Dict[str, Any]:
     print(f"[DELETE] Processed filepath for deletion: {filepath}")
 
     if not filepath:
-        return jsonify({"error": "Filepath is required"}), 400
+        raise ValueError("Filepath is required")
 
     try:
         # First, remove the database entry.
@@ -122,8 +122,8 @@ def delete_image_service(data: Dict[str, Any]) -> Dict[str, Any]:
         # Log the full error to the console for easier debugging in the future.
         import traceback
         traceback.print_exc()
-        print(f"Error deleting image {filepath}: {e}")
-        return {"error": "An unexpected error occurred during deletion."}, 500
+        # Re-raise so api_handler can catch it and return 500
+        raise e
 
 def delete_images_bulk_service(data: Dict[str, Any]) -> Dict[str, Any]:
     """Service to delete multiple images at once."""

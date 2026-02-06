@@ -10,13 +10,14 @@ import asyncio
 @api_handler()
 async def reload_data():
     """Reload data from the database."""
-    return await asyncio.to_thread(system_service.reload_data)
+    return await asyncio.to_thread(system_service.run_reload_data)
 
 @api_blueprint.route('/system/validate_secret', methods=['POST'])
 @api_handler()
 async def validate_secret():
     """Validate if the provided secret is correct."""
-    return await asyncio.to_thread(system_service.validate_secret_service)
+    secret = request.args.get('secret', '') or (await request.form).get('secret', '')
+    return await asyncio.to_thread(system_service.validate_secret_string, secret)
 
 @api_blueprint.route('/system/status')
 @api_handler()
@@ -100,7 +101,7 @@ async def trigger_recategorize():
 @api_handler()
 async def trigger_thumbnails():
     """Generate thumbnails for all images."""
-    return await system_service.trigger_thumbnails_service()
+    return await system_service.start_thumbnail_generation()
 
 @api_blueprint.route('/system/reindex', methods=['POST'])
 @api_handler()
@@ -120,7 +121,9 @@ async def deduplicate():
 @api_handler()
 async def clean_orphans():
     """Clean orphaned database entries."""
-    return await start_background_task(system_service.clean_orphans_task, "Orphan cleanup started in background")
+    data = (await request.get_json(silent=True)) or {}
+    dry_run = data.get('dry_run', True)
+    return await start_background_task(system_service.clean_orphans_task, "Orphan cleanup started in background", dry_run=dry_run)
 
 @api_blueprint.route('/system/apply_merged_sources', methods=['POST'])
 @api_handler()
@@ -152,7 +155,15 @@ async def stop_monitor():
 @api_handler()
 async def task_status():
     """Get status of background tasks."""
-    return await system_service.get_task_status_service()
+    task_id = request.args.get('task_id')
+    if not task_id:
+        return {"error": "task_id is required"}, 400
+    
+    status = await system_service.get_task_status_by_id(task_id)
+    if not status:
+        return {"error": "Task not found"}, 404
+        
+    return status
 
 @api_blueprint.route('/database_health_check', methods=['POST'])
 @api_handler()
@@ -181,13 +192,32 @@ async def bulk_retag_local():
 @api_handler()
 async def find_broken_images():
     """Find images with missing tags, hashes, or embeddings."""
-    return await system_service.find_broken_images_service()
+    return await system_service.run_find_broken_images()
 
 @api_blueprint.route('/system/broken_images/cleanup', methods=['POST'])
 @api_handler()
 async def cleanup_broken_images():
     """Cleanup or retry broken images."""
-    return await system_service.cleanup_broken_images_service()
+    import config
+    from utils.validation import validate_enum, validate_list_of_integers
+    
+    data = (await request.get_json(silent=True)) or {}
+    action = validate_enum(
+        data.get('action', 'scan'),
+        param_name='action',
+        allowed_values=['scan', 'delete', 'retry', 'delete_permanent']
+    )
+    image_ids = validate_list_of_integers(
+        data.get('image_ids', []),
+        param_name='image_ids',
+        allow_empty=True
+    )
+    
+    secret = request.args.get('secret', '') or (await request.form).get('secret', '')
+    if secret != config.SYSTEM_API_SECRET:
+        return {"error": "Unauthorized"}, 401
+        
+    return await system_service.run_cleanup_broken_images(action, image_ids)
 
 @api_blueprint.route('/system/config', methods=['GET'])
 @api_handler()

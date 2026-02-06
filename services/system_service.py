@@ -1,12 +1,11 @@
 import os
-from quart import request, jsonify
+from quart import jsonify
 from typing import Dict, Any, List, Optional
 import config
 import numpy as np
 from database import models
 from services import processing
 from utils.deduplication import scan_and_remove_duplicates
-from utils.decorators import require_secret_sync, require_secret
 from utils.logging_config import get_logger
 from . import monitor_service
 from services.background_tasks import task_manager
@@ -18,133 +17,111 @@ logger = get_logger('SystemService')
 # Scan & Process
 # =============================================================================
 
-@require_secret_sync
-def scan_and_process_service() -> Any:
+def run_scan_and_process() -> Dict[str, Any]:
     """Service to find and process new, untracked images."""
 
-    try:
-        # First, process new images
-        processed_count, attempted_count = monitor_service.run_scan()
+    # First, process new images
+    processed_count, attempted_count = monitor_service.run_scan()
 
-        # Then, clean orphaned image_tags entries (broken foreign keys)
-        logger.info("Checking for orphaned image_tags entries...")
-        from database import get_db_connection
-        orphaned_tags_count = 0
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT COUNT(*) FROM image_tags it
-                LEFT JOIN images i ON it.image_id = i.id
-                WHERE i.id IS NULL
-            """)
-            orphaned_tags_count = cursor.fetchone()[0]
-
-            if orphaned_tags_count > 0:
-                logger.info(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
-                cursor.execute("""
-                    DELETE FROM image_tags
-                    WHERE image_id NOT IN (SELECT id FROM images)
-                """)
-                conn.commit()
-                logger.info(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
-
-        # Then, clean orphaned image records for manually deleted files
-        logger.info("Checking for orphaned image records...")
-        db_filepaths = models.get_all_filepaths()
-        logger.debug(f"Database has {len(db_filepaths)} image records")
-
-        disk_filepaths = set()
-        for root, _, files in os.walk("static/images"):
-            for file in files:
-                full_path = os.path.join(root, file)
-                rel_path = os.path.relpath(full_path, "static/images").replace('\\', '/')
-                disk_filepaths.add(rel_path)
-        logger.debug(f"Disk has {len(disk_filepaths)} files")
-
-        orphans = db_filepaths - disk_filepaths
-        cleaned_count = 0
-        logger.info(f"Found {len(orphans)} orphaned image records")
-
-        if orphans:
-            logger.info(f"Cleaning {len(orphans)} orphaned image records...")
-            for orphan_path in orphans:
-                if models.delete_image(orphan_path):
-                    cleaned_count += 1
-            logger.info(f"Cleaned {cleaned_count} orphaned image records")
-        else:
-            logger.info("No orphaned image records to clean")
-
-        # Reload data to update tag counts after cleaning
-        if cleaned_count > 0 or orphaned_tags_count > 0:
-            logger.info("Reloading data to update tag counts...")
-            from core.cache_manager import load_data_from_db_async
-            load_data_from_db_async()
-            logger.info("Data reload complete")
-
-        # Optimize query planner if new images were added
-        if processed_count > 0:
-            logger.info("New images added. Analyzing database statistics...")
-            with get_db_connection() as conn:
-                conn.execute("ANALYZE")
-            logger.info("Database analysis complete")
-
-        # Build response message
-        messages = []
-        if processed_count > 0:
-            messages.append(f"Processed {processed_count} new images")
-        elif attempted_count > 0:
-            messages.append(f"Found {attempted_count} image(s) but none could be processed (see activity log)")
-        else:
-            messages.append("No new images found")
-
-        if cleaned_count > 0:
-            messages.append(f"cleaned {cleaned_count} orphaned image records")
+    # Then, clean orphaned image_tags entries (broken foreign keys)
+    logger.info("Checking for orphaned image_tags entries...")
+    from database import get_db_connection
+    orphaned_tags_count = 0
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) FROM image_tags it
+            LEFT JOIN images i ON it.image_id = i.id
+            WHERE i.id IS NULL
+        """)
+        orphaned_tags_count = cursor.fetchone()[0]
 
         if orphaned_tags_count > 0:
-            messages.append(f"cleaned {orphaned_tags_count} orphaned tag entries")
+            logger.info(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
+            cursor.execute("""
+                DELETE FROM image_tags
+                WHERE image_id NOT IN (SELECT id FROM images)
+            """)
+            conn.commit()
+            logger.info(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
 
-        message = ", ".join(messages) + "."
+    # Then, clean orphaned image records for manually deleted files
+    logger.info("Checking for orphaned image records...")
+    db_filepaths = models.get_all_filepaths()
+    logger.debug(f"Database has {len(db_filepaths)} image records")
 
-        return jsonify({
-            "status": "success",
-            "message": message,
-            "processed": processed_count,
-            "cleaned": cleaned_count,
-            "orphaned_tags_cleaned": orphaned_tags_count
-        })
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        # If running as a task, re-raise to be caught by task wrapper
-        if 'task_manager_instance' in locals():
-            raise
-        return jsonify({"error": str(e)}), 500
+    disk_filepaths = set()
+    for root, _, files in os.walk("static/images"):
+        for file in files:
+            full_path = os.path.join(root, file)
+            rel_path = os.path.relpath(full_path, "static/images").replace('\\', '/')
+            disk_filepaths.add(rel_path)
+    logger.debug(f"Disk has {len(disk_filepaths)} files")
+
+    orphans = db_filepaths - disk_filepaths
+    cleaned_count = 0
+    logger.info(f"Found {len(orphans)} orphaned image records")
+
+    if orphans:
+        logger.info(f"Cleaning {len(orphans)} orphaned image records...")
+        for orphan_path in orphans:
+            if models.delete_image(orphan_path):
+                cleaned_count += 1
+        logger.info(f"Cleaned {cleaned_count} orphaned image records")
+    else:
+        logger.info("No orphaned image records to clean")
+
+    # Reload data to update tag counts after cleaning
+    if cleaned_count > 0 or orphaned_tags_count > 0:
+        logger.info("Reloading data to update tag counts...")
+        from core.cache_manager import load_data_from_db_async
+        load_data_from_db_async()
+        logger.info("Data reload complete")
+
+    # Optimize query planner if new images were added
+    if processed_count > 0:
+        logger.info("New images added. Analyzing database statistics...")
+        with get_db_connection() as conn:
+            conn.execute("ANALYZE")
+        logger.info("Database analysis complete")
+
+    # Build response message
+    messages = []
+    if processed_count > 0:
+        messages.append(f"Processed {processed_count} new images")
+    elif attempted_count > 0:
+        messages.append(f"Found {attempted_count} image(s) but none could be processed (see activity log)")
+    else:
+        messages.append("No new images found")
+
+    if cleaned_count > 0:
+        messages.append(f"cleaned {cleaned_count} orphaned image records")
+
+    if orphaned_tags_count > 0:
+        messages.append(f"cleaned {orphaned_tags_count} orphaned tag entries")
+
+    message = ", ".join(messages) + "."
+
+    return {
+        "status": "success",
+        "message": message,
+        "processed": processed_count,
+        "cleaned": cleaned_count,
+        "orphaned_tags_cleaned": orphaned_tags_count
+    }
 
 async def scan_and_process_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for scan_and_process_service."""
+    """Background task wrapper for run_scan_and_process."""
     import asyncio
     loop = asyncio.get_running_loop()
-    
-    # We can pass a progress callback if we update the service to support it,
-    # but for now we'll just run it. The service typically logs to monitor_service
-    # which the frontend also polls, but task status is better.
-    
-    # Ideally we'd modify scan_and_process_service to take a progress_callback too,
-    # but it relies heavily on monitor_service for logs.
-    # We can bridge monitor logs to task progress? 
-    # For now, let's just mark it running -> completed.
     
     await task_manager_instance.update_progress(task_id, 0, 100, "Scanning and processing...")
     
     result = await loop.run_in_executor(
         None, 
-        scan_and_process_service
+        run_scan_and_process
     )
     
-    # Result is a quart Response object (jsonify), we need the data
-    if hasattr(result, 'get_json'):
-        json_data = await result.get_json()
-        return json_data
     return result
 
 
@@ -152,8 +129,11 @@ async def scan_and_process_task(task_id, task_manager_instance, *args, **kwargs)
 # Rebuild (tags, categorized, repopulate)
 # =============================================================================
 
-@require_secret_sync
-def rebuild_service():
+# =============================================================================
+# Rebuild (tags, categorized, repopulate)
+# =============================================================================
+
+def run_rebuild():
     """Service to re-process all tags from the raw_metadata in the database."""
     try:
         monitor_service.stop_monitor()
@@ -163,51 +143,45 @@ def rebuild_service():
         from core.cache_manager import load_data_from_db_async
         load_data_from_db_async()
         
-        return jsonify({"status": "success", "message": "Tag re-processing complete."})
+        return {"status": "success", "message": "Tag re-processing complete."}
     except Exception as e:
         from core.cache_manager import load_data_from_db_async
         load_data_from_db_async()
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 async def rebuild_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for rebuild_service."""
+    """Background task wrapper for run_rebuild."""
     import asyncio
     loop = asyncio.get_running_loop()
     await task_manager_instance.update_progress(task_id, 0, 100, "Rebuilding tags from metadata...")
-    result = await loop.run_in_executor(None, rebuild_service)
-    if hasattr(result, 'get_json'):
-        return await result.get_json()
+    result = await loop.run_in_executor(None, run_rebuild)
     return result
 
 
-@require_secret_sync
-def rebuild_categorized_service():
+def run_rebuild_categorized():
     """Service to back-fill the categorized tag columns in the images table."""
     try:
         updated_count = models.rebuild_categorized_tags_from_relations()
         from core.cache_manager import load_data_from_db_async
         load_data_from_db_async()  # Refresh cache
-        return jsonify({
+        return {
             "status": "success",
             "message": f"Updated categorized tags for {updated_count} images.",
             "changes": updated_count
-        })
+        }
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 async def rebuild_categorized_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for rebuild_categorized_service."""
+    """Background task wrapper for run_rebuild_categorized."""
     import asyncio
     loop = asyncio.get_running_loop()
     await task_manager_instance.update_progress(task_id, 0, 100, "Rebuilding categorized tags...")
-    result = await loop.run_in_executor(None, rebuild_categorized_service)
-    if hasattr(result, 'get_json'):
-        return await result.get_json()
+    result = await loop.run_in_executor(None, run_rebuild_categorized)
     return result
 
 
-@require_secret_sync
-def apply_merged_sources_service():
+def run_apply_merged_sources():
     """
     Service to apply the merged sources setting to all images with multiple sources.
     
@@ -242,12 +216,12 @@ def apply_merged_sources_service():
 
             if total == 0:
                 monitor_service.add_log("No images with multiple sources found", "info")
-                return jsonify({
+                return {
                     "status": "success",
                     "message": "No images with multiple sources found.",
                     "processed": 0,
                     "errors": 0
-                })
+                }
 
             monitor_service.add_log(f"Starting {action} for {total} images with multiple sources", "info")
 
@@ -314,34 +288,31 @@ def apply_merged_sources_service():
 
         monitor_service.add_log(message, "success")
 
-        return jsonify({
+        return {
             "status": "success",
             "message": message,
             "action": action,
             "processed": processed_count,
             "errors": error_count,
             "total": total
-        })
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()
         monitor_service.add_log(f"Fatal error during {action}: {str(e)}", "error")
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 async def apply_merged_sources_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for apply_merged_sources_service."""
+    """Background task wrapper for run_apply_merged_sources."""
     import asyncio
     loop = asyncio.get_running_loop()
     await task_manager_instance.update_progress(task_id, 0, 100, "Applying merged sources setting...")
     # This service writes to monitor logs, real-time progress would require refactor
-    result = await loop.run_in_executor(None, apply_merged_sources_service)
-    if hasattr(result, 'get_json'):
-        return await result.get_json()
+    result = await loop.run_in_executor(None, run_apply_merged_sources)
     return result
 
         
-@require_secret_sync
-def recount_tags_service():
+def run_recount_tags():
     """Service to recount all tag usage counts."""
     try:
         monitor_service.add_log("Recounting all tags...", "info")
@@ -351,48 +322,43 @@ def recount_tags_service():
         tag_count = len(models.get_tag_counts())
 
         monitor_service.add_log(f"✓ Recounted {tag_count} tags", "success")
-        return jsonify({
+        return {
             "status": "success",
             "message": f"Recounted {tag_count} tags",
             "tag_count": tag_count
-        })
+        }
     except Exception as e:
         monitor_service.add_log(f"Error recounting tags: {str(e)}", "error")
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 async def recount_tags_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for recount_tags_service."""
+    """Background task wrapper for run_recount_tags."""
     import asyncio
     loop = asyncio.get_running_loop()
     await task_manager_instance.update_progress(task_id, 0, 100, "Recounting tags...")
-    result = await loop.run_in_executor(None, recount_tags_service)
-    if hasattr(result, 'get_json'):
-        return await result.get_json()
+    result = await loop.run_in_executor(None, run_recount_tags)
     return result
 
 
-@require_secret_sync
-def recategorize_service():
+def run_recategorize():
     """Service to recategorize misplaced tags without full rebuild."""
     try:
         changes = models.recategorize_misplaced_tags()
         models.load_data_from_db()  # Refresh cache
-        return jsonify({
+        return {
             "status": "success",
             "message": f"Recategorized {changes} tags",
             "changes": changes
-        })
+        }
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 async def recategorize_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for recategorize_service."""
+    """Background task wrapper for run_recategorize."""
     import asyncio
     loop = asyncio.get_running_loop()
     await task_manager_instance.update_progress(task_id, 0, 100, "Recategorizing tags...")
-    result = await loop.run_in_executor(None, recategorize_service)
-    if hasattr(result, 'get_json'):
-        return await result.get_json()
+    result = await loop.run_in_executor(None, run_recategorize)
     return result
 
 
@@ -400,28 +366,21 @@ async def recategorize_task(task_id, task_manager_instance, *args, **kwargs):
 # Secret validation & system status
 # =============================================================================
 
-def validate_secret_service() -> Dict[str, Any]:
+def validate_secret_string(secret: str) -> Dict[str, Any]:
     """
     Service to validate if the provided secret matches config.SYSTEM_API_SECRET.
-    
-    This endpoint does not require authentication (it's used to validate secrets).
-    
-    Returns:
-        JSON response with success=True and valid=True/False indicating if the secret is correct
     """
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-
     if secret and secret == config.SYSTEM_API_SECRET:
-        return jsonify({"success": True, "valid": True})
+        return {"success": True, "valid": True}
     else:
-        return jsonify({"success": True, "valid": False})
+        return {"success": True, "valid": False}
 
 def get_system_status() -> Dict[str, Any]:
     """
     Service to get system status, including monitor status.
     
     Returns:
-        JSON response containing:
+        Dict containing:
         - monitor: Current monitor service status
         - collection: Total images, unprocessed, tagged, and rated counts
     """
@@ -458,7 +417,7 @@ def get_system_status() -> Dict[str, Any]:
     except Exception:
         pass
 
-    return jsonify({
+    return {
         "monitor": monitor_status,
         "collection": {
             "total_images": models.get_image_count(),
@@ -466,66 +425,30 @@ def get_system_status() -> Dict[str, Any]:
             "tagged": tagged_count,
             "rated": rated_count,
         },
-    })
+    }
     
-@require_secret_sync
-def reload_data():
+def run_reload_data():
     """Service to trigger a data reload from the database."""
     if models.load_data_from_db():
         image_count = models.get_image_count()
         tag_count = len(models.get_tag_counts())
-        return jsonify({"status": "success", "images": image_count, "tags": tag_count})
+        return {"status": "success", "images": image_count, "tags": tag_count}
     else:
-        return jsonify({"error": "Failed to reload data"}), 500
+        raise Exception("Failed to reload data")
 
-@require_secret_sync
-def trigger_thumbnails():
-    """Service to manually trigger thumbnail generation."""
-    try:
-        task_id = str(uuid.uuid4())
-        
-        # Start background task
-        # We need to use asyncio.create_task or similar since we are in a sync context called by async router
-        # However, the router calls this with asyncio.to_thread, so we are in a thread.
-        # But task_manager is async.
-        
-        # Actually, the router calls this with asyncio.to_thread, so this function runs in a thread.
-        # But task_manager methods are async. We need to run them in the main event loop or a new loop.
-        # Using a fire-and-forget approach or changing the router to call an async service function is better.
-        
-        # Let's change this service function to be async and update the router to await it directly.
-        # But wait, the router uses @api_handler which expects a response.
-        
-        return jsonify({
-            "status": "started",
-            "task_id": task_id,
-            "message": "Thumbnail generation started in background"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+
+# =============================================================================
+# Thumbnails
+# =============================================================================
 
 async def run_thumbnail_generation_task(task_id, task_manager_instance, *args, **kwargs):
     """Background task for thumbnail generation."""
     from services.health_service import check_missing_thumbnails
-    
-    def progress_callback(current, total):
-        # Create a coroutine for updating progress
-        asyncio.create_task(task_manager_instance.update_progress(
-            task_id, 
-            progress=current, 
-            total=total, 
-            message=f"Generating thumbnails: {current}/{total}"
-        ))
-
     import asyncio
     
-    # Run the synchronous health check in a thread executor to avoid blocking the event loop
     loop = asyncio.get_running_loop()
     
     # We need a thread-safe way to call the async progress_callback from the sync function
-    # The progress_callback defined above is async (kind of, it launches a task) 
-    # but check_missing_thumbnails expects a sync callable.
-    
     def sync_progress_callback(current, total):
         # Schedule the update_progress coroutine in the running loop
         asyncio.run_coroutine_threadsafe(
@@ -550,20 +473,16 @@ async def run_thumbnail_generation_task(task_id, task_manager_instance, *args, *
         "issues_fixed": result.issues_fixed
     }
 
-@require_secret
-async def trigger_thumbnails_service():
-    """Async service to trigger thumbnail generation task."""
-    try:
-        task_id = str(uuid.uuid4())
-        await task_manager.start_task(task_id, run_thumbnail_generation_task)
-        
-        return jsonify({
-            "status": "started",
-            "task_id": task_id,
-            "message": "Thumbnail generation started in background"
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+async def start_thumbnail_generation():
+    """Start thumbnail generation task."""
+    task_id = str(uuid.uuid4())
+    await task_manager.start_task(task_id, run_thumbnail_generation_task)
+    
+    return {
+        "status": "started",
+        "task_id": task_id,
+        "message": "Thumbnail generation started in background"
+    }
 
 # =============================================================================
 # Deduplication
@@ -585,99 +504,103 @@ async def deduplicate_task(task_id, task_manager_instance, *args, **kwargs):
     return await asyncio.to_thread(run_deduplicate, dry_run)
 
 
-@require_secret
-async def clean_orphans_service():
+async def run_clean_orphans(dry_run: bool = True):
     """Service to find and remove database entries for deleted files."""
-    data = await request.json or {}
-    dry_run = data.get('dry_run', True)
-
     try:
         # First, clean orphaned image_tags entries (broken foreign keys)
         logger.info("Checking for orphaned image_tags entries...")
         from database import get_db_connection
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
+        # We need to run DB operations in a thread executor since they are blocking
+        import asyncio
+        loop = asyncio.get_running_loop()
+        
+        def _clean_orphans_sync():
+            orphaned_tags_count = 0
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
 
-            # Count orphaned image_tags
-            cursor.execute("""
-                SELECT COUNT(*) FROM image_tags it
-                LEFT JOIN images i ON it.image_id = i.id
-                WHERE i.id IS NULL
-            """)
-            orphaned_tags_count = cursor.fetchone()[0]
+                # Count orphaned image_tags
+                cursor.execute("""
+                    SELECT COUNT(*) FROM image_tags it
+                    LEFT JOIN images i ON it.image_id = i.id
+                    WHERE i.id IS NULL
+                """)
+                orphaned_tags_count = cursor.fetchone()[0]
 
-            if orphaned_tags_count > 0:
-                logger.info(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
-                if not dry_run:
-                    cursor.execute("""
-                        DELETE FROM image_tags
-                        WHERE image_id NOT IN (SELECT id FROM images)
-                    """)
-                    conn.commit()
-                    logger.info(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
+                if orphaned_tags_count > 0:
+                    logger.info(f"Found {orphaned_tags_count} orphaned image_tags entries. Cleaning...")
+                    if not dry_run:
+                        cursor.execute("""
+                            DELETE FROM image_tags
+                            WHERE image_id NOT IN (SELECT id FROM images)
+                        """)
+                        conn.commit()
+                        logger.info(f"Deleted {orphaned_tags_count} orphaned image_tags entries")
 
-        # Then, find and remove image records for deleted files
-        logger.info("Checking for orphaned image records...")
-        db_filepaths = models.get_all_filepaths()
+            # Then, find and remove image records for deleted files
+            logger.info("Checking for orphaned image records...")
+            db_filepaths = models.get_all_filepaths()
 
-        disk_filepaths = set()
-        for root, _, files in os.walk("static/images"):
-            for file in files:
-                full_path = os.path.join(root, file)
-                rel_path = os.path.relpath(full_path, "static/images").replace('\\', '/')
-                disk_filepaths.add(rel_path)
+            disk_filepaths = set()
+            for root, _, files in os.walk("static/images"):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, "static/images").replace('\\', '/')
+                    disk_filepaths.add(rel_path)
 
-        orphans = db_filepaths - disk_filepaths
+            orphans = db_filepaths - disk_filepaths
 
-        if dry_run:
-            message = f"Found {len(orphans)} orphaned image records and {orphaned_tags_count} orphaned tag entries (dry run - not removed)."
-            return jsonify({
-                "status": "success",
-                "message": message,
-                "orphans_found": len(orphans),
-                "orphaned_tags": orphaned_tags_count,
-                "orphans": sorted(list(orphans)),
-                "cleaned": 0
-            })
-        else:
-            cleaned_count = 0
-            for orphan_path in orphans:
-                if models.delete_image(orphan_path):
-                    cleaned_count += 1
-
-            # Always reload data after cleaning to update tag counts and image cache
-            if cleaned_count > 0 or orphaned_tags_count > 0:
-                logger.info(f"Cleaned {cleaned_count} orphaned image records and {orphaned_tags_count} orphaned tag entries.")
-                logger.info("Reloading data to update tag counts...")
-                models.load_data_from_db()
-                logger.info("Tag counts updated after orphan cleanup.")
-                message = f"Cleaned {cleaned_count} orphaned images and {orphaned_tags_count} orphaned tag entries. Tag counts updated."
+            if dry_run:
+                message = f"Found {len(orphans)} orphaned image records and {orphaned_tags_count} orphaned tag entries (dry run - not removed)."
+                return {
+                    "status": "success",
+                    "message": message,
+                    "orphans_found": len(orphans),
+                    "orphaned_tags": orphaned_tags_count,
+                    "orphans": sorted(list(orphans)),
+                    "cleaned": 0
+                }
             else:
-                message = f"No orphaned entries found. Database is clean!"
+                cleaned_count = 0
+                for orphan_path in orphans:
+                    if models.delete_image(orphan_path):
+                        cleaned_count += 1
 
-        return jsonify({
-            "status": "success",
-            "message": message,
-            "orphans_found": len(orphans),
-            "orphaned_tags": orphaned_tags_count,
-            "orphans": sorted(list(orphans)),
-            "cleaned": cleaned_count
-        })
+                # Always reload data after cleaning to update tag counts and image cache
+                if cleaned_count > 0 or orphaned_tags_count > 0:
+                    logger.info(f"Cleaned {cleaned_count} orphaned image records and {orphaned_tags_count} orphaned tag entries.")
+                    logger.info("Reloading data to update tag counts...")
+                    models.load_data_from_db()
+                    logger.info("Tag counts updated after orphan cleanup.")
+                    message = f"Cleaned {cleaned_count} orphaned images and {orphaned_tags_count} orphaned tag entries. Tag counts updated."
+                else:
+                    message = f"No orphaned entries found. Database is clean!"
+
+                return {
+                    "status": "success",
+                    "message": message,
+                    "orphans_found": len(orphans),
+                    "orphaned_tags": orphaned_tags_count,
+                    "orphans": sorted(list(orphans)),
+                    "cleaned": cleaned_count
+                }
+
+        return await loop.run_in_executor(None, _clean_orphans_sync)
+
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 async def clean_orphans_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for clean_orphans_service."""
-    import asyncio
+    """Background task wrapper for run_clean_orphans."""
     await task_manager_instance.update_progress(task_id, 0, 100, "Cleaning orphans...")
-    # clean_orphans_service is async
-    return await clean_orphans_service()
+    # run_clean_orphans is async
+    dry_run = kwargs.get('dry_run', True)
+    return await run_clean_orphans(dry_run=dry_run)
 
 
-@require_secret_sync
-def reindex_database_service() -> Any:
+def run_reindex_database() -> Dict[str, Any]:
     """Service to optimize the database (VACUUM and REINDEX)."""
     try:
         from database.transaction_helpers import get_db_connection_for_maintenance
@@ -708,25 +631,23 @@ def reindex_database_service() -> Any:
         message = f"Optimization complete: Rebuilt FTS & standard indexes, vacuumed database, and updated statistics ({duration:.2f}s)."
         monitor_service.add_log(message, "success")
         
-        return jsonify({
+        return {
             "status": "success",
             "message": message,
             "duration": duration
-        })
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()
         monitor_service.add_log(f"Database optimization failed: {str(e)}", "error")
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 async def reindex_database_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for reindex_database_service."""
+    """Background task wrapper for run_reindex_database."""
     import asyncio
     loop = asyncio.get_running_loop()
     await task_manager_instance.update_progress(task_id, 0, 100, "Optimizing database (VACUUM & REINDEX)...")
-    result = await loop.run_in_executor(None, reindex_database_service)
-    if hasattr(result, 'get_json'):
-        return await result.get_json()
+    result = await loop.run_in_executor(None, run_reindex_database)
     return result
 
 
@@ -734,27 +655,14 @@ async def reindex_database_task(task_id, task_manager_instance, *args, **kwargs)
 # Task status
 # =============================================================================
 
-async def get_task_status_service():
+async def get_task_status_by_id(task_id: str):
     """
     Service to get the status of a background task.
-    
-    Query Parameters:
-        task_id: ID of the task to check
-        
-    Returns:
-        JSON response with task status, or 404 if task not found
     """
     from services.background_tasks import task_manager
 
-    task_id = request.args.get('task_id')
-    if not task_id:
-        return jsonify({"error": "task_id is required"}), 400
-
     status = await task_manager.get_task_status(task_id)
-    if not status:
-        return jsonify({"error": "Task not found"}), 404
-
-    return jsonify(status)
+    return status
 
 
 # =============================================================================
@@ -879,7 +787,7 @@ async def bulk_retag_local_task(task_id, task_manager_instance, *args, **kwargs)
 # Broken images detection & cleanup
 # =============================================================================
 
-async def find_broken_images_service() -> Dict[str, Any]:
+async def run_find_broken_images() -> Dict[str, Any]:
     """
     Service to find images with missing tags, hashes, or embeddings.
     
@@ -890,7 +798,7 @@ async def find_broken_images_service() -> Dict[str, Any]:
     - Invalid embedding dimensions
     
     Returns:
-        JSON response containing:
+        Dict containing:
         - total_broken: Total number of broken images found
         - images: List of broken images (limited to first 100) with their issues
         - has_more: Whether there are more than 100 broken images
@@ -998,20 +906,19 @@ async def find_broken_images_service() -> Dict[str, Any]:
         # Sort by number of issues (most broken first)
         broken_images.sort(key=lambda x: len(x['issues']), reverse=True)
         
-        return jsonify({
+        return {
             "status": "success",
             "total_broken": len(broken_images),
             "images": broken_images[:100],  # Limit to first 100
             "has_more": len(broken_images) > 100
-        })
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        raise e
 
 
-@require_secret
-async def cleanup_broken_images_service() -> Dict[str, Any]:
+async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[str, Any]:
     """
     Service to cleanup or retry broken images.
     Actions:
@@ -1020,24 +927,6 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
     - 'retry': Re-process broken images (regenerate hashes/embeddings)
     - 'delete_permanent': Remove from database and delete files permanently
     """
-    from utils.validation import validate_enum, validate_list_of_integers
-    
-    data = await request.json or {}
-    action = validate_enum(
-        data.get('action', 'scan'),
-        param_name='action',
-        allowed_values=['scan', 'delete', 'retry', 'delete_permanent']
-    )
-    image_ids = validate_list_of_integers(
-        data.get('image_ids', []),
-        param_name='image_ids',
-        allow_empty=True
-    )
-    
-    secret = request.args.get('secret', '') or request.form.get('secret', '')
-    if secret != config.SYSTEM_API_SECRET:
-        return jsonify({"error": "Unauthorized"}), 401
-    
     try:
         from database import get_db_connection
         from services import similarity_service
@@ -1092,18 +981,18 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
                 image_ids = list(broken_ids)
         
         if action == 'scan':
-            return jsonify({
+            return {
                 "status": "success",
                 "message": f"Found {len(image_ids)} broken images",
                 "count": len(image_ids)
-            })
+            }
         
         if not image_ids:
-            return jsonify({
+            return {
                 "status": "success",
                 "message": "No broken images found",
                 "processed": 0
-            })
+            }
         
         processed = 0
         errors = 0
@@ -1235,17 +1124,17 @@ async def cleanup_broken_images_service() -> Dict[str, Any]:
             if errors > 0:
                 message += f", {errors} errors"
         else:
-            return jsonify({"error": f"Unknown action: {action}"}), 400
+            raise ValueError(f"Unknown action: {action}")
         
         monitor_service.add_log(f"✓ {message}", "success")
         
-        return jsonify({
+        return {
             "status": "success",
             "message": message,
             "processed": processed,
             "errors": errors
-        })
+        }
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        raise e
