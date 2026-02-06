@@ -155,6 +155,11 @@ def load_data_from_db(verbose=True):
         return False
 
 
+def trigger_cache_reload_async(verbose=False):
+    """Trigger a cache reload after tag/category/implication mutations. Fire-and-forget; runs in background."""
+    return load_data_from_db_async(verbose=verbose)
+
+
 def load_data_from_db_async(verbose=False):
     """Load data asynchronously in background thread to avoid blocking the main thread.
 

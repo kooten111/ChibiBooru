@@ -205,6 +205,13 @@ Tag categorization interface.
 
 ## API Routes
 
+### API Conventions
+
+- **JSON body (required):** Use `data = await request.get_json()` then validate with `if not data: raise ValueError("Request body is required")` (or use `require_json_body()` from `utils.request_helpers`).
+- **JSON body (optional):** Use `data = (await request.get_json(silent=True)) or {}` so missing or invalid JSON is treated as an empty dict.
+- **Decorators:** Use `@api_handler()` from `utils` on all API endpoints; use `from utils import api_handler, require_secret` for consistency.
+- **Responses:** The standard is to return a plain dict from API handlers; `@api_handler()` then adds `success: True` and wraps the response, and catches exceptions into a consistent `{ "success": false, "error": "..." }` shape. For explicit control over status codes or message shape, use `success_response` / `error_response` from `utils.api_responses` (see [utils/api_responses.py](utils/api_responses.py)); rating routes use these. Either style is fine; prefer dict + `@api_handler()` for simple endpoints.
+
 ### Images API (`/api/images`)
 
 **File**: `routers/api/images.py`
