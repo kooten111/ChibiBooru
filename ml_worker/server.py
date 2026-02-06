@@ -337,7 +337,8 @@ def run_server():
             except Exception as e:
                 if not _shutdown_requested:
                     logger.error(f"Error accepting connection: {e}")
-
+    except KeyboardInterrupt:
+        logger.info("Interrupted by user")
     finally:
         logger.info("Shutting down server")
         server_socket.close()
