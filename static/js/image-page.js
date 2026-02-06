@@ -9,11 +9,27 @@ window.copyImageTags = copyImageTags;
  * Copy all image tags to clipboard
  */
 function copyImageTags(button) {
-    // Gather all tags from the page
-    const tagElements = document.querySelectorAll('.tag-item a');
-    const tags = Array.from(tagElements)
-        .map(el => el.textContent.trim())
-        .filter(tag => tag.length > 0 && !tag.startsWith('+') && !tag.startsWith('-'));
+    // First try the hidden allTags input (most reliable, already space-separated)
+    const allTagsInput = document.getElementById('allTags');
+    let tags = [];
+
+    if (allTagsInput && allTagsInput.value.trim()) {
+        // Use the pre-computed all_tags from the server
+        tags = allTagsInput.value.trim().split(/\s+/).filter(t => t.length > 0);
+    } else {
+        // Fallback: gather tags from the page DOM
+        const tagElements = document.querySelectorAll('.tag-item a');
+        tags = Array.from(tagElements)
+            .map(el => {
+                let text = el.textContent.trim();
+                // Strip implied tag arrow prefix "→ "
+                if (text.startsWith('→')) {
+                    text = text.substring(1).trim();
+                }
+                return text;
+            })
+            .filter(tag => tag.length > 0 && !tag.startsWith('+') && !tag.startsWith('-'));
+    }
 
     if (tags.length === 0) {
         console.warn('No tags found to copy');
@@ -24,28 +40,68 @@ function copyImageTags(button) {
     // Create comma-separated string
     const tagsText = tags.join(', ');
 
-    // Copy to clipboard
-    navigator.clipboard.writeText(tagsText).then(() => {
-        // Visual feedback
+    // Helper to show success feedback
+    function showSuccess() {
         const icon = button.querySelector('.utility-icon');
         const text = button.querySelector('.utility-text');
-        const originalIcon = icon.textContent;
-        const originalText = text.textContent;
+        if (icon && text) {
+            const originalIcon = icon.textContent;
+            const originalText = text.textContent;
 
-        icon.textContent = '✓';
-        text.textContent = `Copied ${tags.length} tags!`;
-        button.classList.add('success');
+            icon.textContent = '✓';
+            text.textContent = `Copied ${tags.length} tags!`;
+            button.classList.add('success');
 
-        // Reset after 2 seconds
-        setTimeout(() => {
-            icon.textContent = originalIcon;
-            text.textContent = originalText;
-            button.classList.remove('success');
-        }, 2000);
-    }).catch(err => {
-        console.error('Failed to copy tags:', err);
+            setTimeout(() => {
+                icon.textContent = originalIcon;
+                text.textContent = originalText;
+                button.classList.remove('success');
+            }, 2000);
+        }
+        showNotification(`Copied ${tags.length} tags to clipboard!`, 'success');
+    }
+
+    // Try clipboard API first
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(tagsText)
+            .then(() => showSuccess())
+            .catch(err => {
+                console.warn('Clipboard API failed, trying fallback:', err);
+                // Fallback for non-secure contexts
+                fallbackCopyText(tagsText, showSuccess);
+            });
+    } else {
+        // Fallback for browsers without clipboard API
+        fallbackCopyText(tagsText, showSuccess);
+    }
+}
+
+/**
+ * Fallback copy method using a temporary textarea
+ */
+function fallbackCopyText(text, onSuccess) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            onSuccess();
+        } else {
+            showNotification('Failed to copy tags to clipboard', 'error');
+        }
+    } catch (err) {
+        console.error('Fallback copy failed:', err);
         showNotification('Failed to copy tags to clipboard', 'error');
-    });
+    }
+
+    document.body.removeChild(textarea);
 }
 
 function findNextImageUrl() {
