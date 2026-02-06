@@ -901,46 +901,26 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
         "results": results
     }
 
-async def bulk_retry_tagging_service():
-    """Service to retry tagging for images (runs as background task).
-    
-    Request Body (JSON):
-        skip_local_fallback: Only try online sources for locally-tagged images
-        pixiv_only: Add local AI tags to Pixiv images (deprecated)
-        complement_pixiv: Try online sources for Pixiv images, fallback to local AI
-        reprocess_all: Full pipeline on ALL images
-    """
+async def start_bulk_retry_tagging(data: dict) -> dict:
+    """Start bulk retry tagging as a background task. Takes data dict; returns dict with status, message, task_id."""
     from services.background_tasks import task_manager
 
-    data = await request.json or {}
-    skip_local_fallback = data.get('skip_local_fallback', False)
-    pixiv_only = data.get('pixiv_only', False)
-    complement_pixiv = data.get('complement_pixiv', False)
-    reprocess_all = data.get('reprocess_all', False)
+    skip_local_fallback = data.get("skip_local_fallback", False)
+    pixiv_only = data.get("pixiv_only", False)
+    complement_pixiv = data.get("complement_pixiv", False)
+    reprocess_all = data.get("reprocess_all", False)
 
-    # Generate a unique task ID
     task_id = f"bulk_retry_{uuid.uuid4().hex[:8]}"
-
-    try:
-        # Start the background task
-        await task_manager.start_task(
-            task_id,
-            _process_bulk_retry_tagging_task,
-            skip_local_fallback=skip_local_fallback,
-            pixiv_only=pixiv_only,
-            complement_pixiv=complement_pixiv,
-            reprocess_all=reprocess_all
-        )
-
-        return jsonify({
-            "status": "started",
-            "message": "Bulk retry tagging started in background",
-            "task_id": task_id
-        })
-
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+    await task_manager.start_task(
+        task_id,
+        _process_bulk_retry_tagging_task,
+        skip_local_fallback=skip_local_fallback,
+        pixiv_only=pixiv_only,
+        complement_pixiv=complement_pixiv,
+        reprocess_all=reprocess_all,
+    )
+    return {
+        "status": "started",
+        "message": "Bulk retry tagging started in background",
+        "task_id": task_id,
+    }

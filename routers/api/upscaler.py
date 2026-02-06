@@ -6,6 +6,8 @@ Provides endpoints for upscaling images and managing upscaled versions
 from quart import request, jsonify
 from . import api_blueprint
 from utils import api_handler
+from utils.request_helpers import require_json_body
+from utils.validation import validate_string
 import config
 
 
@@ -23,10 +25,7 @@ async def get_upscale_progress():
     """Get progress of an active upscale job."""
     from services.upscaler_service import get_upscale_progress
     
-    filepath = request.args.get('filepath')
-    if not filepath:
-        raise ValueError("Missing filepath parameter")
-        
+    filepath = validate_string(request.args.get('filepath'), 'filepath', min_length=1)
     progress = get_upscale_progress(filepath)
     
     if not progress:
@@ -53,10 +52,7 @@ async def check_upscale():
     """Check if an upscaled version exists for an image."""
     from services.upscaler_service import check_upscale_exists, get_upscale_url, get_upscaled_path
     
-    filepath = request.args.get('filepath')
-    if not filepath:
-        raise ValueError("Missing filepath parameter")
-    
+    filepath = validate_string(request.args.get('filepath'), 'filepath', min_length=1)
     exists = check_upscale_exists(filepath)
     
     return {
@@ -74,14 +70,11 @@ async def upscale_image():
     
     if not config.UPSCALER_ENABLED:
         raise ValueError("Upscaler is disabled. Enable UPSCALER_ENABLED in .env to use this feature.")
-    
-    data = await request.json
-    filepath = data.get('filepath')
+
+    data = await require_json_body(request)
+    filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
     force = data.get('force', False)
-    
-    if not filepath:
-        raise ValueError("Missing filepath")
-    
+
     result = await do_upscale(filepath, force=force)
     
     if not result['success'] and result['error'] != 'Already upscaled':
@@ -95,13 +88,10 @@ async def upscale_image():
 async def delete_upscale():
     """Delete the upscaled version of an image."""
     from services.upscaler_service import delete_upscaled_image
-    
-    data = await request.json
-    filepath = data.get('filepath')
-    
-    if not filepath:
-        raise ValueError("Missing filepath")
-    
+
+    data = await require_json_body(request)
+    filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
+
     result = delete_upscaled_image(filepath)
     
     if not result['success']:
@@ -140,7 +130,7 @@ async def install_dependencies():
     if not config.UPSCALER_ENABLED:
         raise ValueError("Upscaler is disabled. Enable UPSCALER_ENABLED in .env first.")
     
-    data = await request.json or {}
+    data = (await request.get_json(silent=True)) or {}
     variant = data.get('variant', 'auto')
     
     # Run installation in thread pool

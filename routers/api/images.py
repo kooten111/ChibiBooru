@@ -5,6 +5,8 @@ from services.switch_source_db import switch_metadata_source_db, merge_all_sourc
 from database import models
 from utils import api_handler
 from utils.file_utils import normalize_image_path
+from utils.request_helpers import require_json_body
+from utils.validation import validate_string
 import asyncio
 
 @api_blueprint.route('/images')
@@ -22,30 +24,28 @@ async def get_images():
 @api_handler()
 async def edit_tags():
     """Edit tags for an image with category support."""
-    data = await request.json
+    data = await require_json_body(request)
     return await asyncio.to_thread(tag_service.edit_tags_service, data)
 
 @api_blueprint.route('/delete_image', methods=['POST'])
 @api_handler()
 async def delete_image():
     """Delete an image and its associated data."""
-    data = await request.json
+    data = await require_json_body(request)
     return await asyncio.to_thread(image_service.delete_image_service, data)
 
 @api_blueprint.route('/delete_images_bulk', methods=['POST'])
 @api_handler()
 async def delete_images_bulk():
     """Delete multiple images in bulk."""
-    data = await request.json
-    if not data:
-        raise ValueError("Request body is required")
+    data = await require_json_body(request)
     return await asyncio.to_thread(image_service.delete_images_bulk_service, data)
 
 @api_blueprint.route('/download_images_bulk', methods=['POST'])
 @api_handler()
 async def download_images_bulk():
     """Download multiple images as a zip file."""
-    data = await request.json
+    data = await require_json_body(request)
     result = await asyncio.to_thread(image_service.prepare_bulk_download, data)
     
     if isinstance(result, tuple):
@@ -62,24 +62,22 @@ async def download_images_bulk():
 @api_handler()
 async def retry_tagging():
     """Retry tagging for a single image."""
-    data = await request.json
+    data = await require_json_body(request)
     return await asyncio.to_thread(image_service.retry_tagging_service, data)
 
 @api_blueprint.route('/bulk_retry_tagging', methods=['POST'])
 @api_handler()
 async def bulk_retry_tagging():
     """Retry tagging for multiple images in bulk."""
-    return await image_service.bulk_retry_tagging_service()
+    data = (await request.get_json(silent=True)) or {}
+    return await image_service.start_bulk_retry_tagging(data)
 
 @api_blueprint.route('/switch_source', methods=['POST'])
 @api_handler()
 async def switch_source():
-    data = await request.json
-    filepath = data.get('filepath')
-    source = data.get('source')
-
-    if not filepath or not source:
-        raise ValueError("Missing filepath or source")
+    data = await require_json_body(request)
+    filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
+    source = validate_string(data.get('source'), 'source', min_length=1)
 
     # Handle special "merged" source
     if source == 'merged':
@@ -100,13 +98,8 @@ async def switch_source():
 @api_handler()
 async def clear_deltas():
     """Clear tag deltas for a specific image."""
-    data = await request.json
-    filepath = data.get('filepath')
-
-    if not filepath:
-        raise ValueError("Missing filepath")
-
-    # Normalize filepath
+    data = await require_json_body(request)
+    filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
     filepath = normalize_image_path(filepath)
 
     # Clear deltas for this image

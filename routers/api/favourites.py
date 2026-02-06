@@ -9,21 +9,19 @@ from . import api_blueprint
 from database import models
 from repositories import favourites_repository
 from utils import api_handler
+from utils.request_helpers import require_json_body
+from utils.validation import validate_string
 
 
 @api_blueprint.route('/favourites/toggle', methods=['POST'])
 @api_handler()
 async def toggle_favourite():
     """Toggle favourite status for an image."""
-    data = await request.json
-    filepath = data.get('filepath', '')
-    
-    # Normalize filepath
+    data = await require_json_body(request)
+    filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
+
     if filepath.startswith('images/'):
         filepath = filepath[7:]
-    
-    if not filepath:
-        raise ValueError("Filepath is required")
     
     # Get image ID from filepath
     image_id = favourites_repository.get_image_id_by_filepath(filepath)
@@ -43,14 +41,10 @@ async def toggle_favourite():
 @api_handler()
 async def get_favourite_status():
     """Get favourite status for an image."""
-    filepath = request.args.get('filepath', '')
-    
-    # Normalize filepath
+    filepath = validate_string(request.args.get('filepath'), 'filepath', min_length=1)
+
     if filepath.startswith('images/'):
         filepath = filepath[7:]
-    
-    if not filepath:
-        raise ValueError("Filepath is required")
     
     is_favourite = favourites_repository.is_favourite_by_filepath(filepath)
     

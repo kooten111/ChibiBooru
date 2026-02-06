@@ -9,7 +9,7 @@ from utils.validation import validate_string
 @api_handler()
 async def create_pool():
     """Create a new pool."""
-    data = await request.json
+    data = await request.get_json()
     if not data:
         raise ValueError("Request body is required")
     
@@ -32,7 +32,7 @@ async def update_pool(pool_id: int):
     
     validate_integer(pool_id, 'pool_id', min_value=1)
     
-    data = await request.json
+    data = await request.get_json()
     if not data:
         raise ValueError("Request body is required")
     
@@ -65,7 +65,7 @@ async def add_image_to_pool(pool_id: int):
     
     validate_integer(pool_id, 'pool_id', min_value=1)
     
-    data = await request.json
+    data = await request.get_json()
     if not data:
         raise ValueError("Request body is required")
     
@@ -85,7 +85,7 @@ async def add_image_to_pool(pool_id: int):
 @api_handler()
 async def remove_image_from_pool(pool_id):
     """Remove an image from a pool."""
-    data = await request.json
+    data = await request.get_json()
     filepath = normalize_image_path(data.get('filepath', ''))
 
     # Get image ID from filepath
@@ -101,7 +101,7 @@ async def remove_image_from_pool(pool_id):
 @api_handler()
 async def reorder_pool(pool_id):
     """Reorder images in a pool."""
-    data = await request.json
+    data = await request.get_json()
     filepath = normalize_image_path(data.get('filepath', ''))
     new_position = data.get('position')
 

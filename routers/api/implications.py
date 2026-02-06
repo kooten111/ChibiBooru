@@ -1,44 +1,23 @@
 from quart import request, jsonify
 from . import api_blueprint
 from utils import api_handler
+from utils.request_helpers import get_query_list
 
 @api_blueprint.route('/implications/suggestions', methods=['GET'])
 @api_handler()
 async def get_implication_suggestions():
     """Get paginated auto-detected implication suggestions."""
     from services import implication_service
-    
-    # Get pagination parameters
+
     page = request.args.get('page', 1, type=int)
     limit = request.args.get('limit', 50, type=int)
     pattern_type = request.args.get('type', None)
-    
-    # Robustly get list filters (check both with and without brackets)
-    source_categories = request.args.getlist('source_categories[]')
-    if not source_categories:
-        source_categories = request.args.getlist('source_categories')
-        
-    implied_categories = request.args.getlist('implied_categories[]')
-    if not implied_categories:
-        implied_categories = request.args.getlist('implied_categories')
-    
-    # Also support comma-separated if passed as single string
-    if not source_categories and request.args.get('source_categories'):
-        val = request.args.get('source_categories')
-        source_categories = val.split(',') if val else []
-        
-    if not implied_categories and request.args.get('implied_categories'):
-        val = request.args.get('implied_categories')
-        implied_categories = val.split(',') if val else []
-    
-    # Clean up empty strings if any
-    source_categories = [c for c in source_categories if c]
-    implied_categories = [c for c in implied_categories if c]
-        
-    # Clamp values to reasonable ranges
+    source_categories = get_query_list(request, 'source_categories')
+    implied_categories = get_query_list(request, 'implied_categories')
+
     page = max(1, page)
     limit = max(1, min(200, limit))
-    
+
     return implication_service.get_paginated_suggestions(
         page, limit, pattern_type, source_categories, implied_categories
     )
@@ -51,7 +30,7 @@ async def approve_implication():
     from services import implication_service
     from utils.validation import validate_string, validate_enum, validate_integer
     
-    data = await request.json
+    data = await request.get_json()
     if not data:
         raise ValueError("Request body is required")
     
@@ -96,7 +75,7 @@ async def create_implication():
     from services import implication_service
     from utils.validation import validate_string
     
-    data = await request.json
+    data = await request.get_json()
     if not data:
         raise ValueError("Request body is required")
     
@@ -118,7 +97,7 @@ async def delete_implication():
     from services import implication_service
     from utils.validation import validate_string
     
-    data = await request.json
+    data = await request.get_json()
     if not data:
         raise ValueError("Request body is required")
     
@@ -156,7 +135,7 @@ async def get_implication_chain(tag_name):
 async def preview_implication():
     """Preview the impact of creating an implication."""
     from services import implication_service
-    data = await request.json
+    data = await request.get_json()
     source_tag = data.get('source_tag')
     implied_tag = data.get('implied_tag')
 
@@ -190,7 +169,7 @@ async def get_implications_for_tag(tag_name):
 async def bulk_approve_implications():
     """Approve multiple suggestions at once."""
     from services import implication_service
-    data = await request.json
+    data = await request.get_json()
     suggestions = data.get('suggestions', [])
     
     if not suggestions:
@@ -220,7 +199,7 @@ async def auto_approve_naming_patterns():
 async def auto_approve_high_confidence():
     """Auto-approve high-confidence correlation suggestions with statistical significance."""
     from services import implication_service
-    data = await request.json or {}
+    data = (await request.get_json(silent=True)) or {}
     
     min_confidence = data.get('min_confidence', 0.95)
     min_sample_size = data.get('min_sample_size', 10)
