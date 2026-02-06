@@ -62,7 +62,7 @@ APP_NAME = _get_setting('APP_NAME', 'ChibiBooru')
 # Image storage
 IMAGE_DIRECTORY = _get_setting('IMAGE_DIRECTORY', "./static/images")
 THUMB_DIR = _get_setting('THUMB_DIR', "./static/thumbnails")
-THUMB_SIZE = _get_setting('THUMB_SIZE', 600)  # Max dimension for thumbnails (2x large grid for retina)
+THUMB_SIZE = _get_setting('THUMB_SIZE', 800)  # Max dimension for thumbnails (2x large grid for retina)
 THUMB_QUALITY = int(_get_setting('THUMB_QUALITY', 85))  # WebP quality for thumbnails (1-100)
 
 # Ingest folder - drop images here and they'll be processed automatically
@@ -206,7 +206,7 @@ FLASK_PORT = int(os.environ.get('FLASK_PORT', 5000))
 FLASK_DEBUG = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
 # Pagination
-IMAGES_PER_PAGE = int(_get_setting('IMAGES_PER_PAGE', 100))
+IMAGES_PER_PAGE = int(_get_setting('IMAGES_PER_PAGE', 150))
 
 # ==================== FEATURE FLAGS ====================
 
