@@ -12,11 +12,29 @@ function initImageViewer() {
 
     const imageView = document.querySelector('.image-view');
     const body = document.body;
+    const isVisibleImage = (img) => {
+        if (!img) return false;
+        const style = window.getComputedStyle(img);
+        return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    };
+
+    const getPreferredImgElement = (root) => {
+        const upscaled = root?.querySelector('.image-stack img.upscaled');
+        if (isVisibleImage(upscaled)) return upscaled;
+
+        const stackImgs = root?.querySelectorAll('.image-stack img') || [];
+        for (const img of stackImgs) {
+            if (isVisibleImage(img)) return img;
+        }
+
+        return root?.querySelector('img');
+    };
+
     // Target the stack wrapper if it exists (created by upscaler), otherwise the image itself
     let transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
 
-    // We also need access to the image for dimensions/cursor, prefer the visible one or any
-    let imgElement = imageView?.querySelector('img');
+    // We also need access to the image for dimensions/cursor, prefer the upscaled if present
+    let imgElement = getPreferredImgElement(imageView);
 
     if (!body.classList.contains('image-page')) return;
 
@@ -175,7 +193,7 @@ function initImageViewer() {
     const wheelHandler = function (event) {
         // Refresh target reference in case it changed (e.g. upscaler init)
         transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
-        imgElement = imageView?.querySelector('img');
+        imgElement = getPreferredImgElement(imageView);
 
         if (!body.classList.contains('focus-mode') || !transformTarget) return;
 
@@ -187,7 +205,10 @@ function initImageViewer() {
 
         if (newScale !== scale) {
             // Use imgElement for rect calculation to pivot around the image center
-            const rect = (imgElement || transformTarget).getBoundingClientRect();
+            let rect = (imgElement || transformTarget).getBoundingClientRect();
+            if (!rect.width || !rect.height) {
+                rect = transformTarget.getBoundingClientRect();
+            }
             const pointX = event.clientX;
             const pointY = event.clientY;
             const imgCenterX = rect.left + rect.width / 2;
@@ -370,7 +391,7 @@ function initImageViewer() {
                     if (node.tagName === 'IMG' || node.classList?.contains('image-stack')) {
                         // Re-fetch targets
                         transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
-                        imgElement = imageView?.querySelector('img');
+                        imgElement = getPreferredImgElement(imageView);
 
                         // Bind events if it's an image
                         if (node.tagName === 'IMG') bindImageEvents(node);

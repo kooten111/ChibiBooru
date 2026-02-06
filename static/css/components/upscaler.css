@@ -259,3 +259,24 @@
         font-size: 12px;
     }
 }
+
+/* Stack Layout */
+.image-stack {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+    width: fit-content;
+    height: fit-content;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.image-stack>img {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
