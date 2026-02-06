@@ -82,7 +82,8 @@ def tag_with_local_tagger(filepath):
             "source": "local_tagger",
             "data": {
                 "tags": result['tags'],
-                "tagger_name": result['tagger_name'],
+                # Use config's LOCAL_TAGGER_NAME so it's preserved with the image
+                "tagger_name": config.LOCAL_TAGGER_NAME,
                 "all_predictions": result['all_predictions']
             }
         }
@@ -150,6 +151,8 @@ def tag_video_with_frames(video_filepath, num_frames=DEFAULT_VIDEO_FRAMES):
             character_threshold=CHARACTER_THRESHOLD,
             metadata_path=tagger_config.get('metadata_path')
         )
+        # Override tagger_name with config value
+        result['tagger_name'] = f"{config.LOCAL_TAGGER_NAME} (video)"
         
         return {
             "source": "local_tagger",

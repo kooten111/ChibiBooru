@@ -48,18 +48,23 @@
                         <span class="text-muted-tiny">
                             {% set tag_count = namespace(n=0) %}
                             {% if categorized_tags %}
-                                {% if categorized_tags.artist %}{% set tag_count.n = tag_count.n + categorized_tags.artist|length %}{% endif %}
-                                {% if categorized_tags.copyright %}{% set tag_count.n = tag_count.n + categorized_tags.copyright|length %}{% endif %}
-                                {% if categorized_tags.character %}{% set tag_count.n = tag_count.n + categorized_tags.character|length %}{% endif %}
-                                {% if categorized_tags.species %}{% set tag_count.n = tag_count.n + categorized_tags.species|length %}{% endif %}
-                                {% if categorized_tags.meta %}{% set tag_count.n = tag_count.n + categorized_tags.meta|length %}{% endif %}
+                            {% if categorized_tags.artist %}{% set tag_count.n = tag_count.n +
+                            categorized_tags.artist|length %}{% endif %}
+                            {% if categorized_tags.copyright %}{% set tag_count.n = tag_count.n +
+                            categorized_tags.copyright|length %}{% endif %}
+                            {% if categorized_tags.character %}{% set tag_count.n = tag_count.n +
+                            categorized_tags.character|length %}{% endif %}
+                            {% if categorized_tags.species %}{% set tag_count.n = tag_count.n +
+                            categorized_tags.species|length %}{% endif %}
+                            {% if categorized_tags.meta %}{% set tag_count.n = tag_count.n +
+                            categorized_tags.meta|length %}{% endif %}
                             {% endif %}
                             {% if extended_grouped_tags %}
-                                {% for cat_key, cat_tags in extended_grouped_tags.items() %}
-                                    {% set tag_count.n = tag_count.n + cat_tags|length %}
-                                {% endfor %}
+                            {% for cat_key, cat_tags in extended_grouped_tags.items() %}
+                            {% set tag_count.n = tag_count.n + cat_tags|length %}
+                            {% endfor %}
                             {% elif tags %}
-                                {% set tag_count.n = tag_count.n + tags|length %}
+                            {% set tag_count.n = tag_count.n + tags|length %}
                             {% endif %}
                             {{ tag_count.n }} tags
                         </span>
@@ -329,7 +334,8 @@
                                 {% if first_source.rating %}
                                 <div class="stat-box">
                                     <div class="stat-label">Rating</div>
-                                    <div class="stat-value rating-value {% if first_source.rating == 'g' %}rating-general{% elif first_source.rating == 's' %}rating-sensitive{% elif first_source.rating == 'q' %}rating-questionable{% elif first_source.rating == 'e' %}rating-explicit{% endif %}">
+                                    <div
+                                        class="stat-value rating-value {% if first_source.rating == 'g' %}rating-general{% elif first_source.rating == 's' %}rating-sensitive{% elif first_source.rating == 'q' %}rating-questionable{% elif first_source.rating == 'e' %}rating-explicit{% endif %}">
                                         {% if first_source.rating == 'g' %}General
                                         {% elif first_source.rating == 's' %}Sensitive
                                         {% elif first_source.rating == 'q' %}Questionable
@@ -351,7 +357,8 @@
 
                                 {% if metadata.sources %}
                                 {% set first_source = metadata.sources.values()|list|first %}
-                                {% set fav_count = first_source.fav_count if first_source.fav_count is defined else (first_source.favs if first_source.favs is defined else none) %}
+                                {% set fav_count = first_source.fav_count if first_source.fav_count is defined else
+                                (first_source.favs if first_source.favs is defined else none) %}
                                 <div class="stat-box">
                                     <div class="stat-label">Favourites</div>
                                     <div class="stat-value">{{ fav_count if fav_count is not none else '—' }}</div>
@@ -364,7 +371,13 @@
                         <div class="info-section">
                             <div class="file-info-box">
                                 <div class="stat-label">File</div>
-                                <div class="stat-value"><span>{{ filepath.split('/')[-1] }}</span>{% if metadata.sources %}{% set first_source = metadata.sources.values()|list|first %}{% set file_size = first_source.file_size or (first_source.file.size if first_source.file else none) %}{% if file_size %} <span class="file-size">{% if file_size >= 1048576 %}{{ "%.1f"|format(file_size / 1048576.0) }} MB{% elif file_size >= 1024 %}{{ "%.1f"|format(file_size / 1024.0) }} KB{% else %}{{ file_size }} bytes{% endif %}</span>{% endif %}{% endif %}</div>
+                                <div class="stat-value"><span>{{ filepath.split('/')[-1] }}</span>{% if metadata.sources
+                                    %}{% set first_source = metadata.sources.values()|list|first %}{% set file_size =
+                                    first_source.file_size or (first_source.file.size if first_source.file else none)
+                                    %}{% if file_size %} <span class="file-size">{% if file_size >= 1048576 %}{{
+                                        "%.1f"|format(file_size / 1048576.0) }} MB{% elif file_size >= 1024 %}{{
+                                        "%.1f"|format(file_size / 1024.0) }} KB{% else %}{{ file_size }} bytes{% endif
+                                        %}</span>{% endif %}{% endif %}</div>
                             </div>
                         </div>
 
@@ -424,11 +437,28 @@
                                         class="source-link ai-tagged-link"
                                         title="Click to retry tagging from online sources">
                                         <span>🤖</span>
-                                        <span>{{ source_data.tagger_name or 'CamieTagger' }}</span>
+                                        <span>{% if source_data.tagger_name and source_data.tagger_name != 'Unknown'
+                                            %}{{ source_data.tagger_name }}{% else %}Not Found{% endif %}</span>
                                         <span class="retry-icon">🔄</span>
                                     </a>
                                     {% endif %}
                                     {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <!-- No sources found - show Not Found with retry option -->
+                        <div class="info-section">
+                            <div class="info-row">
+                                <div class="info-label">Found On</div>
+                                <div class="source-links">
+                                    <a href="javascript:void(0)" onclick="confirmRetryTagging()"
+                                        class="source-link unknown-source-link"
+                                        title="Click to try finding tags from online sources">
+                                        <span>🤖</span>
+                                        <span>Not Found</span>
+                                        <span class="retry-icon">🔄</span>
+                                    </a>
                                 </div>
                             </div>
                         </div>
@@ -495,53 +525,54 @@
         <div class="main-content">
             <div class="image-and-actions-container">
                 <div class="image-view-wrapper">
-                <button class="image-nav-btn image-nav-prev" id="prevBtn" title="Previous image (←)">◀</button>
-                <div class="image-view skeleton{% if data.image_width and data.image_height %} image-skeleton-sized{% endif %}" id="imageViewContainer" data-filepath="{{ filepath }}" {% if
-                    data.image_width and data.image_height %}data-width="{{ data.image_width }}"
-                    data-height="{{ data.image_height }}" style="--img-w: {{ data.image_width }}; --img-h: {{ data.image_height }};" {% endif %} {% if filepath.endswith('.zip')
-                    %}data-animation-type="zip" data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="24" {% endif
-                    %}>
-                    {% if filepath.endswith('.mp4') %}
-                    <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
-                        onloadeddata="this.closest('.image-view').classList.add('has-image')">
-                        <source
-                            src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                            type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                    {% elif filepath.endswith('.webm') %}
-                    <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
-                        onloadeddata="this.closest('.image-view').classList.add('has-image')">
-                        <source
-                            src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                            type="video/webm">
-                        Your browser does not support the video tag.
-                    </video>
-                    {% elif filepath.endswith('.zip') %}
-                    {# Zip animation - show thumbnail as poster, animation player will take over #}
-                    <img src="/static/{{ thumbnail_path | urlencode_path }}" alt="Animation" fetchpriority="high"
-                        onload="this.closest('.image-view').classList.add('has-image')" class="animation-poster">
-                    <span class="animation-badge">ZIP Animation</span>
-                    {% elif filepath.endswith(('.gif', '.webp', '.apng')) %}
-                    {# Animated images - play natively with their own embedded FPS #}
-                    <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                        alt="Animated Image" fetchpriority="high"
-                        onload="this.closest('.image-view').classList.add('has-image')">
-                    <span class="animation-badge">Animated</span>
-                    {% else %}
-                    {% if upscaled_image_url %}
-                    <img src="{{ upscaled_image_url }}" alt="Upscaled Image" fetchpriority="high"
-                        onload="this.closest('.image-view').classList.add('has-image')"
-                        data-original-src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}">
-                    <span class="animation-badge" style="background: rgba(0, 255, 128, 0.8);">Upscaled</span>
-                    {% else %}
-                    <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                        alt="Image" fetchpriority="high"
-                        onload="this.closest('.image-view').classList.add('has-image')">
-                    {% endif %}
-                    {% endif %}
-                </div>
-                <button class="image-nav-btn image-nav-next" id="nextBtn" title="Next image (→)">▶</button>
+                    <button class="image-nav-btn image-nav-prev" id="prevBtn" title="Previous image (←)">◀</button>
+                    <div class="image-view skeleton{% if data.image_width and data.image_height %} image-skeleton-sized{% endif %}"
+                        id="imageViewContainer" data-filepath="{{ filepath }}" {% if data.image_width and
+                        data.image_height %}data-width="{{ data.image_width }}" data-height="{{ data.image_height }}"
+                        style="--img-w: {{ data.image_width }}; --img-h: {{ data.image_height }};" {% endif %} {% if
+                        filepath.endswith('.zip') %}data-animation-type="zip"
+                        data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="24" {% endif %}>
+                        {% if filepath.endswith('.mp4') %}
+                        <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
+                            onloadeddata="this.closest('.image-view').classList.add('has-image')">
+                            <source
+                                src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                                type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        {% elif filepath.endswith('.webm') %}
+                        <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
+                            onloadeddata="this.closest('.image-view').classList.add('has-image')">
+                            <source
+                                src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                                type="video/webm">
+                            Your browser does not support the video tag.
+                        </video>
+                        {% elif filepath.endswith('.zip') %}
+                        {# Zip animation - show thumbnail as poster, animation player will take over #}
+                        <img src="/static/{{ thumbnail_path | urlencode_path }}" alt="Animation" fetchpriority="high"
+                            onload="this.closest('.image-view').classList.add('has-image')" class="animation-poster">
+                        <span class="animation-badge">ZIP Animation</span>
+                        {% elif filepath.endswith(('.gif', '.webp', '.apng')) %}
+                        {# Animated images - play natively with their own embedded FPS #}
+                        <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                            alt="Animated Image" fetchpriority="high"
+                            onload="this.closest('.image-view').classList.add('has-image')">
+                        <span class="animation-badge">Animated</span>
+                        {% else %}
+                        {% if upscaled_image_url %}
+                        <img src="{{ upscaled_image_url }}" alt="Upscaled Image" fetchpriority="high"
+                            onload="this.closest('.image-view').classList.add('has-image')"
+                            data-original-src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}">
+                        <span class="animation-badge" style="background: rgba(0, 255, 128, 0.8);">Upscaled</span>
+                        {% else %}
+                        <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+                            alt="Image" fetchpriority="high"
+                            onload="this.closest('.image-view').classList.add('has-image')">
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                    <button class="image-nav-btn image-nav-next" id="nextBtn" title="Next image (→)">▶</button>
                 </div>
 
                 {# Family badge data - parent/child images #}
