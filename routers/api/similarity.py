@@ -6,7 +6,8 @@ Provides API endpoints for visual similarity operations using perceptual hashing
 import asyncio
 from quart import request, jsonify
 from . import api_blueprint
-from utils.decorators import api_handler, require_secret
+from utils import api_handler, require_secret
+from utils.background_task_helpers import start_background_task
 from services import similarity_service
 import config
 
@@ -159,21 +160,13 @@ async def generate_hashes():
     Requires secret authorization.
     Returns a task_id for polling progress.
     """
-    import uuid
-    from services.background_tasks import task_manager
     from services import monitor_service
-    
-    task_id = f"hash_gen_{uuid.uuid4().hex[:8]}"
-    
-    # Start background task using service layer function
     monitor_service.add_log("Hash generation task started...", "info")
-    await task_manager.start_task(task_id, similarity_service.run_hash_generation_task)
-    
-    return {
-        'status': 'started',
-        'task_id': task_id,
-        'message': 'Hash generation started in background'
-    }
+    return await start_background_task(
+        similarity_service.run_hash_generation_task,
+        "Hash generation started in background",
+        task_id_prefix="hash_gen",
+    )
 
 
 @api_blueprint.route('/similarity/stats')
@@ -243,12 +236,8 @@ async def rebuild_similarity_cache():
     Requires secret authorization.
     Returns a task_id for polling progress.
     """
-    import uuid
-    from services.background_tasks import task_manager
     from services import monitor_service, similarity_cache
-    
-    task_id = f"similarity_cache_{uuid.uuid4().hex[:8]}"
-    
+
     async def rebuild_cache_task(task_id, manager):
         """Background task for rebuilding similarity cache via ML Worker."""
         from services import monitor_service as mon
@@ -303,15 +292,12 @@ async def rebuild_similarity_cache():
             mon.add_log(f"Similarity cache rebuild failed: {e}", "error")
             raise e
     
-    # Start background task
     monitor_service.add_log("Similarity cache rebuild task started...", "info")
-    await task_manager.start_task(task_id, rebuild_cache_task)
-    
-    return {
-        'status': 'started',
-        'task_id': task_id,
-        'message': 'Similarity cache rebuild started in background'
-    }
+    return await start_background_task(
+        rebuild_cache_task,
+        "Similarity cache rebuild started in background",
+        task_id_prefix="similarity_cache",
+    )
 
 
 @api_blueprint.route('/similarity/cache-stats')

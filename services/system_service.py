@@ -14,6 +14,10 @@ import uuid
 
 logger = get_logger('SystemService')
 
+# =============================================================================
+# Scan & Process
+# =============================================================================
+
 @require_secret_sync
 def scan_and_process_service() -> Any:
     """Service to find and process new, untracked images."""
@@ -143,6 +147,10 @@ async def scan_and_process_task(task_id, task_manager_instance, *args, **kwargs)
         return json_data
     return result
 
+
+# =============================================================================
+# Rebuild (tags, categorized, repopulate)
+# =============================================================================
 
 @require_secret_sync
 def rebuild_service():
@@ -388,6 +396,10 @@ async def recategorize_task(task_id, task_manager_instance, *args, **kwargs):
     return result
 
 
+# =============================================================================
+# Secret validation & system status
+# =============================================================================
+
 def validate_secret_service() -> Dict[str, Any]:
     """
     Service to validate if the provided secret matches config.SYSTEM_API_SECRET.
@@ -553,42 +565,24 @@ async def trigger_thumbnails_service():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@require_secret
-async def deduplicate_service():
-    """Service to run MD5 deduplication scan."""
-    data = await request.json or {}
-    dry_run = data.get('dry_run', True)
+# =============================================================================
+# Deduplication
+# =============================================================================
 
-    try:
-        results = scan_and_remove_duplicates(dry_run=dry_run)
-        if not dry_run and results['removed'] > 0:
-            models.load_data_from_db()
-        return jsonify({"status": "success", "results": results})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+def run_deduplicate(dry_run: bool = True) -> dict:
+    """Run MD5 deduplication scan. Returns dict with status and results."""
+    results = scan_and_remove_duplicates(dry_run=dry_run)
+    if not dry_run and results.get("removed", 0) > 0:
+        models.load_data_from_db()
+    return {"status": "success", "results": results}
+
 
 async def deduplicate_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for deduplicate_service."""
+    """Background task wrapper for run_deduplicate."""
     import asyncio
-    loop = asyncio.get_running_loop()
-    
-    # Get dry_run from kwargs if available, though service expects request.json
-    # We might need to handle args differently.
-    # The original service calls 'await request.json', which won't work in executor.
-    # We should pass parameters explicitly.
-    
-    # Since we can't easily change the service signature without breaking other calls,
-    # let's modify the service to accept optional args or use a modified version.
-    # Actually, the quickest way is to just call it if we are sure it's safe.
-    # Waait, 'await request.json' in service will fail if run in executor? 
-    # The service function `deduplicate_service` is async currently!
-    # If it is async, we can await it directly or wrap it?
-    
-    # Wait, deduplicate_service IS ASYNC in the source file: 'async def deduplicate_service():'
-    # So we don't need run_in_executor! We can just await it.
-    
+    dry_run = kwargs.get("dry_run", True)
     await task_manager_instance.update_progress(task_id, 0, 100, "Deduplicating...")
-    return await deduplicate_service()
+    return await asyncio.to_thread(run_deduplicate, dry_run)
 
 
 @require_secret
@@ -736,6 +730,10 @@ async def reindex_database_task(task_id, task_manager_instance, *args, **kwargs)
     return result
 
 
+# =============================================================================
+# Task status
+# =============================================================================
+
 async def get_task_status_service():
     """
     Service to get the status of a background task.
@@ -759,182 +757,127 @@ async def get_task_status_service():
     return jsonify(status)
 
 
-async def database_health_check_service():
-    """
-    Service to run database health checks and optionally fix issues.
-    
-    Request Body (JSON):
-        auto_fix: If True, automatically fix issues found (default: True)
-        include_thumbnails: If True, check for missing thumbnails (default: False)
-        include_tag_deltas: If True, check tag delta consistency (default: True)
-        
-    Returns:
-        JSON response with health check results including issues found and fixed
-    """
-    data = await request.json or {}
-    auto_fix = data.get('auto_fix', True)
-    include_thumbnails = data.get('include_thumbnails', False)
-    include_tag_deltas = data.get('include_tag_deltas', True)
+# =============================================================================
+# Database health check
+# =============================================================================
 
-    try:
-        from services import health_service as database_health
+def run_database_health_check(
+    auto_fix: bool = True,
+    include_thumbnails: bool = False,
+    include_tag_deltas: bool = True,
+) -> dict:
+    """Run database health checks and optionally fix issues. Returns dict with status, message, results."""
+    from services import health_service as database_health
 
-        results = database_health.run_all_health_checks(
-            auto_fix=auto_fix,
-            include_thumbnails=include_thumbnails,
-            include_tag_deltas=include_tag_deltas
-        )
+    results = database_health.run_all_health_checks(
+        auto_fix=auto_fix,
+        include_thumbnails=include_thumbnails,
+        include_tag_deltas=include_tag_deltas,
+    )
+    return {
+        "status": "success",
+        "message": f"Health check complete: {results['total_issues_found']} issues found, {results['total_issues_fixed']} fixed",
+        "results": results,
+    }
 
-        return jsonify({
+
+# =============================================================================
+# Bulk local retagger
+# =============================================================================
+
+def run_bulk_retag_local(local_only: bool = False) -> dict:
+    """Re-run local tagger for images. Returns dict with status, message, processed, etc."""
+    from database import get_db_connection
+    from repositories import tagger_predictions_repository
+
+    mode_desc = "locally-tagged images only" if local_only else "ALL images"
+    monitor_service.add_log(f"Starting bulk local tagger re-run ({mode_desc})...", "info")
+
+    if not local_only:
+        deleted = tagger_predictions_repository.clear_all_predictions()
+        monitor_service.add_log(f"Cleared {deleted} existing predictions", "info")
+
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        if local_only:
+            cursor.execute("""
+                SELECT id, filepath FROM images 
+                WHERE active_source IN ('local_tagger', 'camie_tagger')
+            """)
+        else:
+            cursor.execute("SELECT id, filepath FROM images")
+        all_images = cursor.fetchall()
+
+    total = len(all_images)
+    if total == 0:
+        return {
             "status": "success",
-            "message": f"Health check complete: {results['total_issues_found']} issues found, {results['total_issues_fixed']} fixed",
-            "results": results
-        })
+            "message": "No images to process.",
+            "processed": 0,
+            "predictions_stored": 0,
+        }
 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+    monitor_service.add_log(f"Processing {total} images...", "info")
 
+    processed = 0
+    total_predictions = 0
+    errors = 0
 
-@require_secret_sync
-def bulk_retag_local_service():
-    """
-    Service to re-run local tagger for images.
-    
-    Request Body (JSON):
-        local_only: If True, only process images with active_source='local_tagger' or 'camie_tagger'
-                   If False/not provided, process ALL images
-    """
-    try:
-        from database import get_db_connection
-        from repositories import tagger_predictions_repository
-        import config
-        from quart import request as quart_request
-        import json
-        
-        # Get request body if available
-        local_only = False
+    for idx, row in enumerate(all_images, 1):
+        image_id = row["id"]
+        filepath = row["filepath"]
+
+        if idx % max(1, total // 10) == 0:
+            progress_pct = int((idx / total) * 100)
+            monitor_service.add_log(f"Progress: {idx}/{total} ({progress_pct}%)", "info")
+
         try:
-            # For sync context, we need to get the raw data differently
-            import flask
-            if hasattr(flask, 'request'):
-                data = flask.request.get_json(silent=True) or {}
-                local_only = data.get('local_only', False)
-        except:
-            pass
+            full_path = f"static/images/{filepath}"
+            if not os.path.exists(full_path):
+                continue
+            if full_path.endswith((".mp4", ".webm")):
+                continue
 
-        mode_desc = "locally-tagged images only" if local_only else "ALL images"
-        monitor_service.add_log(f"Starting bulk local tagger re-run ({mode_desc})...", "info")
+            result = processing.tag_with_local_tagger(full_path)
+            if result and result.get("data", {}).get("all_predictions"):
+                predictions = result["data"]["all_predictions"]
+                tagger_name = result["data"].get("tagger_name")
+                stored = tagger_predictions_repository.store_predictions(
+                    image_id, predictions, tagger_name
+                )
+                total_predictions += stored
+                processed += 1
+        except Exception as e:
+            errors += 1
+            if errors <= 5:
+                monitor_service.add_log(f"Error processing {filepath}: {str(e)}", "error")
 
-        # Step 1: Clear existing local tagger predictions (only for targeted images if local_only)
-        if not local_only:
-            deleted = tagger_predictions_repository.clear_all_predictions()
-            monitor_service.add_log(f"Cleared {deleted} existing predictions", "info")
+    message = f"✓ Processed {processed}/{total} images, stored {total_predictions} predictions"
+    if errors > 0:
+        message += f", {errors} errors"
+    monitor_service.add_log(message, "success")
 
-        # Step 2: Get images to process based on mode
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            if local_only:
-                cursor.execute("""
-                    SELECT id, filepath FROM images 
-                    WHERE active_source IN ('local_tagger', 'camie_tagger')
-                """)
-            else:
-                cursor.execute("SELECT id, filepath FROM images")
-            all_images = cursor.fetchall()
+    return {
+        "status": "success",
+        "message": message,
+        "processed": processed,
+        "predictions_stored": total_predictions,
+        "errors": errors,
+    }
 
-        total = len(all_images)
-        if total == 0:
-            return jsonify({
-                "status": "success",
-                "message": "No images to process.",
-                "processed": 0,
-                "predictions_stored": 0
-            })
-
-        monitor_service.add_log(f"Processing {total} images...", "info")
-
-        # Step 3: Re-run local tagger for each image
-        processed = 0
-        total_predictions = 0
-        errors = 0
-
-        for idx, row in enumerate(all_images, 1):
-            image_id = row['id']
-            filepath = row['filepath']
-
-            # Log progress every 10%
-            if idx % max(1, total // 10) == 0:
-                progress_pct = int((idx / total) * 100)
-                monitor_service.add_log(f"Progress: {idx}/{total} ({progress_pct}%)", "info")
-
-            try:
-                # Construct full path
-                full_path = f"static/images/{filepath}"
-                
-                # Skip if file doesn't exist
-                if not os.path.exists(full_path):
-                    continue
-
-                # Skip videos for now (handled differently)
-                if full_path.endswith(('.mp4', '.webm')):
-                    continue
-
-                # Run local tagger
-                result = processing.tag_with_local_tagger(full_path)
-                if result and result.get('data', {}).get('all_predictions'):
-                    predictions = result['data']['all_predictions']
-                    tagger_name = result['data'].get('tagger_name')
-                    
-                    stored = tagger_predictions_repository.store_predictions(
-                        image_id, predictions, tagger_name
-                    )
-                    total_predictions += stored
-                    processed += 1
-            except Exception as e:
-                errors += 1
-                if errors <= 5:  # Only log first 5 errors
-                    monitor_service.add_log(f"Error processing {filepath}: {str(e)}", "error")
-
-        message = f"✓ Processed {processed}/{total} images, stored {total_predictions} predictions"
-        if errors > 0:
-            message += f", {errors} errors"
-        monitor_service.add_log(message, "success")
-
-        return jsonify({
-            "status": "success",
-            "message": message,
-            "processed": processed,
-            "predictions_stored": total_predictions,
-            "errors": errors
-        })
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        monitor_service.add_log(f"Bulk retag failed: {str(e)}", "error")
-        return jsonify({"error": str(e)}), 500
 
 async def bulk_retag_local_task(task_id, task_manager_instance, *args, **kwargs):
-    """Background task wrapper for bulk_retag_local_service."""
+    """Background task wrapper for run_bulk_retag_local."""
     import asyncio
-    loop = asyncio.get_running_loop()
-    
-    # We need to construct the args because bulk_retag_local_service tries to read from flask/quart request
-    # Which might not work well in executor (thread local storage issues)
-    # But let's see. logic inside uses 'data = flask.request.get_json...' with try/except
-    
+    local_only = kwargs.get("local_only", False)
     await task_manager_instance.update_progress(task_id, 0, 100, "Retagging local images...")
-    
-    # IMPORTANT: The service function uses 'monitor_service.add_log' which is fine
-    # but the progress updates there won't reach task_manager unless we modify it.
-    
-    result = await loop.run_in_executor(None, bulk_retag_local_service)
-    if hasattr(result, 'get_json'):
-        return await result.get_json()
-    return result
+    return await asyncio.to_thread(run_bulk_retag_local, local_only)
 
 
+
+# =============================================================================
+# Broken images detection & cleanup
+# =============================================================================
 
 async def find_broken_images_service() -> Dict[str, Any]:
     """

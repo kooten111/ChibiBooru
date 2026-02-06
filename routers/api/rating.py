@@ -4,6 +4,7 @@ from services import rating_service as rating_inference
 from database import models
 from database import get_db_connection
 from utils import api_handler, success_response, error_response
+from utils.background_task_helpers import start_background_task
 from services.background_tasks import task_manager
 import logging
 import asyncio
@@ -96,37 +97,30 @@ async def infer_ratings_task(task_id, task_manager_instance, *args, **kwargs):
 
 @api_blueprint.route('/rate/train', methods=['POST'])
 @api_handler()
-@api_handler()
 async def api_train_model():
     """Train the rating inference model via ML Worker."""
-    task_id = str(uuid.uuid4())
-    
-    # Start background task
-    await task_manager.start_task(task_id, train_model_task)
-    
-    # Return immediately with job_id (which is task_id)
-    # The frontend looks for 'job_id' to start polling
-    return {"status": "started", "job_id": task_id, "message": "Training started in background"}
+    return await start_background_task(
+        train_model_task,
+        "Training started in background",
+        task_id_key="job_id",
+    )
 
 
 @api_blueprint.route('/rate/infer', methods=['POST'])
 @api_handler()
-@api_handler()
 async def api_infer_ratings():
     """Run inference on unrated images or a specific image via ML Worker."""
-    data = await request.get_json(silent=True) or {}
-    image_id = data.get('image_id')
-    
-    task_id = str(uuid.uuid4())
-    
-    # Start background task, passing image_id if present
-    await task_manager.start_task(task_id, infer_ratings_task, image_id=image_id)
-    
-    return {"status": "started", "job_id": task_id, "message": "Inference started in background"}
+    data = (await request.get_json(silent=True)) or {}
+    image_id = data.get("image_id")
+    return await start_background_task(
+        infer_ratings_task,
+        "Inference started in background",
+        task_id_key="job_id",
+        image_id=image_id,
+    )
 
 
 @api_blueprint.route('/rate/job/<job_id>', methods=['GET'])
-@api_handler()
 @api_handler()
 async def api_get_job_status(job_id):
     """Get status of an ML Worker job or Background Task."""
@@ -176,7 +170,7 @@ async def api_precompute_ratings():
     from services import monitor_service
     import config
     
-    data = await request.get_json() or {}
+    data = (await request.get_json(silent=True)) or {}
     num_workers = data.get('num_workers', getattr(config, 'MAX_WORKERS', 2))
     batch_size = data.get('batch_size', 200)
     limit = data.get('limit', None)
@@ -269,9 +263,8 @@ async def api_set_rating():
 
     result = rating_inference.set_image_rating(image_id, rating, source='user')
 
-    # Reload data to update in-memory cache (async to avoid blocking)
-    from core.cache_manager import load_data_from_db_async
-    load_data_from_db_async()
+    from core.cache_manager import trigger_cache_reload_async
+    trigger_cache_reload_async()  # Reload in-memory cache after rating change
 
     return {
         'status': 'success',

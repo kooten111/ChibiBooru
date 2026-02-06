@@ -53,8 +53,8 @@ async def api_set_tag_category():
     result = tag_cat.set_tag_category(tag_name, category)
 
     # Reload data to update in-memory cache (async to avoid blocking)
-    from core.cache_manager import load_data_from_db_async
-    load_data_from_db_async()
+    from core.cache_manager import trigger_cache_reload_async
+    trigger_cache_reload_async()
 
     return result
 
@@ -91,8 +91,8 @@ async def api_bulk_categorize():
     result = tag_cat.bulk_categorize_tags(cat_tuples)
 
     # Reload data to update in-memory cache (async to avoid blocking)
-    from core.cache_manager import load_data_from_db_async
-    load_data_from_db_async()
+    from core.cache_manager import trigger_cache_reload_async
+    trigger_cache_reload_async()
 
     return result
 
@@ -146,8 +146,8 @@ async def api_import_categorizations():
     stats = tag_cat.import_tag_categorizations(data, mode=mode)
 
     # Reload data to update in-memory cache (async to avoid blocking)
-    from core.cache_manager import load_data_from_db_async
-    load_data_from_db_async()
+    from core.cache_manager import trigger_cache_reload_async
+    trigger_cache_reload_async()
 
     return stats
 
@@ -159,8 +159,8 @@ async def api_sync_base_categories():
     stats = tag_cat.sync_base_categories_from_extended()
 
     # Reload data to update in-memory cache (async to avoid blocking)
-    from core.cache_manager import load_data_from_db_async
-    load_data_from_db_async()
+    from core.cache_manager import trigger_cache_reload_async
+    trigger_cache_reload_async()
 
     return stats
 
