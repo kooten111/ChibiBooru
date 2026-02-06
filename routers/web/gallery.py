@@ -86,6 +86,24 @@ def register_routes(blueprint):
     @blueprint.route('/similar/<path:filepath>')
     @login_required
     async def similar(filepath):
-        similar_images = query_service.find_related_by_tags(filepath, limit=50)
+        cached_images = query_service.find_related_by_tags(filepath, limit=50)
+        
+        # Create copies to avoid mutating the LRU cache, and rename 'score' to 'similarity'
+        similar_images = []
+        for img in cached_images:
+            new_img = dict(img)
+            if 'score' in new_img:
+                new_img['similarity'] = new_img.pop('score')
+            similar_images.append(new_img)
+        
         stats = query_service.get_enhanced_stats()
-        return await render_template('index.html', images=similar_images, query=f"similar:{filepath}", stats=stats, show_similarity=True)
+        return await render_template(
+            'index.html',
+            images=similar_images,
+            query=f"similar:{filepath}",
+            stats=stats,
+            total_results=len(similar_images),
+            show_similarity=True,
+            app_name=config.APP_NAME
+        )
+

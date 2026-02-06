@@ -407,7 +407,9 @@ class Autocomplete {
             return;
         }
 
-        // Enter: Create chip from current text OR select from autocomplete (live filter, no submit)
+        // Enter: Create chip from current text OR select from autocomplete
+        // On gallery page: live filter (no navigation)
+        // On other pages: navigate to gallery with the search query
         if (e.key === 'Enter') {
             e.preventDefault();
 
@@ -424,7 +426,14 @@ class Autocomplete {
                     this.suggestions.classList.remove('active');
                 }
             }
-            // Live filter is triggered by addChipFromText/addChipFromAutocomplete
+
+            // If NOT on gallery page and we have chips, navigate to gallery
+            const isOnGallery = document.body.classList.contains('gallery-page');
+            if (!isOnGallery && this.chips.length > 0 && this.searchForm) {
+                this.updateHiddenInput();
+                this.searchForm.submit();
+            }
+            // On gallery, live filter is triggered by addChipFromText/addChipFromAutocomplete
             return;
         }
 

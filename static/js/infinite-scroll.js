@@ -51,6 +51,15 @@ class InfiniteScroll {
     }
 
     handleLiveFilter(newQuery) {
+        // Skip live filtering for special queries that are server-side only
+        // These include similarity searches which require special processing
+        if (newQuery && (
+            newQuery.startsWith('similar:') ||
+            newQuery.includes(' similar:')
+        )) {
+            return;
+        }
+
         // Debounce to avoid too many requests
         clearTimeout(this.liveFilterTimer);
         this.liveFilterTimer = setTimeout(() => {
