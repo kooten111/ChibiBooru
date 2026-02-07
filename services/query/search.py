@@ -178,8 +178,9 @@ def _apply_filters(
             INNER JOIN pool_images pi ON i.id = pi.image_id
             INNER JOIN pools p ON pi.pool_id = p.id
         """
-        where_clauses.append("LOWER(p.name) LIKE ?")
-        params.append(f"%{pool_filter}%")
+        if pool_filter != "_ANY_":
+            where_clauses.append("LOWER(p.name) LIKE ?")
+            params.append(f"%{pool_filter}%")
 
     if relationship_filter:
         if relationship_filter == "parent":
@@ -474,6 +475,8 @@ def perform_search(search_query):
             rel_type = token.split(":", 1)[1].strip()
             if rel_type in ["parent", "child", "relationship"]:
                 relationship_filter = "any" if rel_type == "relationship" else rel_type
+            elif rel_type == "pool":
+                pool_filter = "_ANY_"
         elif token.startswith("is:"):
             is_type = token.split(":", 1)[1].strip()
             if is_type in ["favourite", "favorite", "fav"]:
@@ -561,7 +564,8 @@ def perform_search(search_query):
 
 
         if pool_filter:
-            pool_images = models.search_images_by_pool(pool_filter)
+            search_param = "" if pool_filter == "_ANY_" else pool_filter
+            pool_images = models.search_images_by_pool(search_param)
             if pool_images:
                 pool_filepaths = {img["filepath"] for img in pool_images}
                 results = [
