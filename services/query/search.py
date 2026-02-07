@@ -121,22 +121,57 @@ def _apply_filters(
     filename_filter,
 ):
     """Apply filters to the SQL query by adding WHERE clauses and JOINs."""
+    tag_columns = [
+        "tags_general",
+        "tags_character",
+        "tags_copyright",
+        "tags_artist",
+        "tags_species",
+        "tags_meta",
+    ]
+
     if fts_query and not freetext_filepath_terms:
         where_clauses.append("images_fts MATCH ?")
         params.append(fts_query)
     elif fts_query and freetext_filepath_terms:
-        filepath_and_parts = [
-            "LOWER(i.filepath) LIKE ?" for _ in freetext_filepath_terms
-        ]
-        filepath_and_clause = " AND ".join(filepath_and_parts)
+        # Match FTS OR (filepath LIKE OR tag columns LIKE)
+        or_conditions = []
         fts_subquery = "fts.filepath IN (SELECT filepath FROM images_fts WHERE images_fts MATCH ?)"
+        or_conditions.append(fts_subquery)
         params.append(fts_query)
-        params.extend([f"%{t}%" for t in freetext_filepath_terms])
-        where_clauses.append(f"(({fts_subquery}) OR ({filepath_and_clause}))")
-    elif freetext_filepath_terms:
+
+        term_conditions = []
         for term in freetext_filepath_terms:
-            where_clauses.append("LOWER(i.filepath) LIKE ?")
-            params.append(f"%{term}%")
+            term_param = f"%{term}%"
+            # Filepath match
+            sub_conds = ["LOWER(i.filepath) LIKE ?"]
+            params.append(term_param)
+
+            # Tag columns match
+            for col in tag_columns:
+                sub_conds.append(f"COALESCE(i.{col}, '') LIKE ?")
+                params.append(term_param)
+
+            term_conditions.append("(" + " OR ".join(sub_conds) + ")")
+
+        # Combine all term conditions with AND (must match all terms in some way)
+        combined_term_condition = " AND ".join(term_conditions)
+        or_conditions.append(combined_term_condition)
+
+        where_clauses.append(f"({' OR '.join(or_conditions)})")
+
+    elif freetext_filepath_terms:
+        # No FTS, just freetext matching
+        for term in freetext_filepath_terms:
+            term_param = f"%{term}%"
+            sub_conds = ["LOWER(i.filepath) LIKE ?"]
+            params.append(term_param)
+
+            for col in tag_columns:
+                sub_conds.append(f"COALESCE(i.{col}, '') LIKE ?")
+                params.append(term_param)
+
+            where_clauses.append("(" + " OR ".join(sub_conds) + ")")
 
     if pool_filter:
         sql_parts[0] += """
@@ -295,21 +330,79 @@ def _fts_search(
     order_filter=None,
 ):
     """Perform full-text search using FTS5 and apply filters."""
+    # print(f"DEBUG: _fts_search start. Terms: {general_terms}")
     with get_db_connection() as conn:
         fts_query, freetext_filepath_terms = _build_fts_query(
             conn, general_terms, negative_terms
         )
+    # print(f"DEBUG: FTS Query built: {fts_query}, FreeText: {freetext_filepath_terms}")
 
-    sql_parts = _build_base_sql_query(freetext_filepath_terms)
-    where_clauses = []
+    cte_parts = []
     params = []
 
+    # Part 1: FTS Search (Prefix/Exact)
+    if fts_query:
+        cte_parts.append("SELECT filepath, rank FROM images_fts WHERE images_fts MATCH ?")
+        params.append(fts_query)
+
+    # Part 2: Substring Search (Partial matches on all tag columns)
+    if freetext_filepath_terms:
+        likes = []
+        tag_columns = [
+            "tags_general",
+            "tags_character",
+            "tags_copyright",
+            "tags_artist",
+            "tags_species",
+            "tags_meta",
+        ]
+        
+        for term in freetext_filepath_terms:
+            term_param = f"%{term}%"
+            # Filepath match
+            likes.append("LOWER(filepath) LIKE ?")
+            params.append(term_param)
+            
+            # Tag columns match
+            for col in tag_columns:
+                likes.append(f"COALESCE({col}, '') LIKE ?")
+                params.append(term_param)
+        
+        if likes:
+            like_clause = " OR ".join(likes)
+            # Use 0 as rank for these results (lower priority than FTS exact matches)
+            cte_parts.append(f"SELECT filepath, 0 as rank FROM images WHERE {like_clause}")
+
+    if not cte_parts:
+        return []
+
+    cte_sql = " UNION ".join(cte_parts)
+
+    sql_parts = [f"""
+    WITH matches AS (
+        {cte_sql}
+    )
+    SELECT i.id, i.filepath,
+           COALESCE(i.tags_character, '') || ' ' ||
+           COALESCE(i.tags_copyright, '') || ' ' ||
+           COALESCE(i.tags_artist, '') || ' ' ||
+           COALESCE(i.tags_species, '') || ' ' ||
+           COALESCE(i.tags_meta, '') || ' ' ||
+           COALESCE(i.tags_general, '') as tags,
+           matches.rank
+    FROM matches
+    JOIN images i ON matches.filepath = i.filepath
+    """]
+    
+    where_clauses = []
+    
+    # We pass None for text filters because we handled them in the CTE
     _apply_filters(
         sql_parts,
         where_clauses,
         params,
-        fts_query,
-        freetext_filepath_terms,
+        None, # fts_query handled in CTE
+        None, # freetext_filepath_terms handled in CTE
         pool_filter,
         relationship_filter,
         source_filters,
@@ -323,12 +416,15 @@ def _fts_search(
     sql_parts.append("ORDER BY rank")
     full_query = "\n".join(sql_parts)
 
+    # print("DEBUG: Executing SQL query...")
     with get_db_connection() as conn:
         try:
             cursor = conn.execute(full_query, params)
             rows = cursor.fetchall()
+            # print(f"DEBUG: SQL returned {len(rows)} rows.")
 
             results = _post_filter_results(conn, rows, general_terms)
+            # print(f"DEBUG: Post-filter returned {len(results)} results.")
             results = _apply_ordering(conn, results, order_filter)
 
             return results
@@ -429,12 +525,6 @@ def perform_search(search_query):
 
     use_fts = freetext_mode or (general_terms and _should_use_fts(general_terms))
 
-    if use_fts and general_terms:
-        for term in general_terms:
-            if len(term) < 3 or ("_" in term.strip("_")):
-                use_fts = False
-                break
-
     if use_fts and (general_terms or negative_terms):
         results = _fts_search(
             general_terms,
@@ -450,9 +540,7 @@ def perform_search(search_query):
     else:
         are_all_tags = general_terms and not _should_use_fts(general_terms)
 
-        if are_all_tags and len(general_terms) == 1 and ":" not in general_terms[0]:
-            results = models.get_all_images_with_tags()
-        elif are_all_tags:
+        if are_all_tags:
             results = models.search_images_by_tags(general_terms)
         else:
             results = models.get_all_images_with_tags()
