@@ -85,6 +85,11 @@ fi
 # Populate .env (secrets, directories, optional models) when .env is missing
 if [ "$NEEDS_ENV" = true ]; then
     python setup_wizard.py
+    
+    # Re-check for torch - wizard might have installed it
+    if python -c "import torch" 2>/dev/null; then
+        NEEDS_TORCH=false
+    fi
 fi
 
 # ML backend selection and torch install when torch is missing

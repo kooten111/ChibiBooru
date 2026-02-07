@@ -147,17 +147,17 @@ def install_torch(backend):
     if backend == "xpu":
         # Intel XPU requires PyTorch nightly
         print("  Using PyTorch nightly for Intel XPU support")
-        cmd = f"{installer} install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/xpu"
+        cmd = f"{installer} install --pre torch torchvision transformers --index-url https://download.pytorch.org/whl/nightly/xpu"
         
     elif backend == "cuda":
         # CUDA uses stable PyTorch with CUDA support
         print("  Using PyTorch stable with CUDA 12.4")
-        cmd = f"{installer} install torch torchvision --index-url https://download.pytorch.org/whl/cu124"
+        cmd = f"{installer} install torch torchvision transformers --index-url https://download.pytorch.org/whl/cu124"
         
     elif backend == "cpu":
         # CPU-only version
         print("  Using PyTorch stable (CPU only)")
-        cmd = f"{installer} install torch torchvision --index-url https://download.pytorch.org/whl/cpu"
+        cmd = f"{installer} install torch torchvision transformers --index-url https://download.pytorch.org/whl/cpu"
         
     else:
         print(f"  ❌ Unknown backend: {backend}")
