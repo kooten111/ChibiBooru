@@ -439,6 +439,7 @@ def _fts_search(
 
 def perform_search(search_query):
     """Perform a search using data from the database, handling special queries and combinations."""
+    print(f"DEBUG: Perform Search with query '{search_query}'")
     if not search_query:
         return models.get_all_images_with_tags(), True
 
@@ -507,6 +508,7 @@ def perform_search(search_query):
             general_terms.append(token)
 
     # Normalize rating tags and extract them
+    print(f"DEBUG: General terms before normalization: {general_terms}")
     normalized_general_terms = []
     rating_terms = []
 
@@ -524,6 +526,7 @@ def perform_search(search_query):
             normalized_general_terms.append(term)
             
     general_terms = normalized_general_terms
+    print(f"DEBUG: Rating terms: {rating_terms}, General terms: {general_terms}")
 
     for category in category_filters:
         normalized_tags = []
@@ -534,6 +537,9 @@ def perform_search(search_query):
         category_filters[category] = normalized_tags
 
     use_fts = freetext_mode or (general_terms and _should_use_fts(general_terms))
+    
+    # Check if all general terms are exact tags (for non-FTS path)
+    are_all_tags = general_terms and not _should_use_fts(general_terms)
 
     if use_fts and (general_terms or negative_terms):
         results = _fts_search(
@@ -719,33 +725,36 @@ def perform_search(search_query):
                     filtered_results.append(img)
             results = filtered_results
 
-        if rating_terms:
-            with get_db_connection() as conn:
-                filtered_results = []
-                for img in results:
-                    if img is None:
-                        continue
-
-                    placeholders = ",".join("?" for _ in rating_terms)
-                    cursor = conn.execute(
-                        f"""
-                        SELECT COUNT(*) FROM image_tags it 
-                        JOIN tags t ON it.tag_id = t.id 
-                        JOIN images i ON it.image_id = i.id
-                        WHERE i.filepath = ?
-                        AND t.name IN ({placeholders})
-                    """,
-                        (img["filepath"], *rating_terms),
-                    )
-
-                    count = cursor.fetchone()[0]
-                    if count == len(rating_terms):
-                        filtered_results.append(img)
-                results = filtered_results
-
         should_shuffle = bool(general_terms) and not (
             source_filters or filename_filter or extension_filter
         )
+
+    # Apply rating filter to both FTS and non-FTS paths
+    if rating_terms:
+        print(f"DEBUG: Filtering {len(results)} results by rating terms: {rating_terms}")
+        with get_db_connection() as conn:
+            filtered_results = []
+            for img in results:
+                if img is None:
+                    continue
+
+                placeholders = ",".join("?" for _ in rating_terms)
+                cursor = conn.execute(
+                    f"""
+                    SELECT COUNT(*) FROM image_tags it 
+                    JOIN tags t ON it.tag_id = t.id 
+                    JOIN images i ON it.image_id = i.id
+                    WHERE i.filepath = ?
+                    AND t.name IN ({placeholders})
+                """,
+                    (img["filepath"], *rating_terms),
+                )
+
+                count = cursor.fetchone()[0]
+                if count == len(rating_terms):
+                    filtered_results.append(img)
+            results = filtered_results
+        print(f"DEBUG: Results after rating filter: {len(results)}")
 
     if order_filter and order_filter in [
         "score_desc",
