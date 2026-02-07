@@ -11,11 +11,21 @@ import os
 import sys
 import secrets
 import urllib.request
+import subprocess
 from pathlib import Path
 from typing import Optional, Tuple, List
+import importlib.util
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent
+
+
+def is_library_installed(name: str) -> bool:
+    """Check if a python library is installed."""
+    try:
+        return importlib.util.find_spec(name) is not None
+    except ImportError:
+        return False
 
 
 def print_banner():
@@ -311,6 +321,24 @@ def setup_models():
         print("     Requires: transformers, torch (will be installed if missing)")
         download_siglip = prompt_yes_no("Download and export SigLIP model?", default=True)
         if download_siglip:
+            # Check dependencies first
+            has_torch = is_library_installed("torch")
+            has_transformers = is_library_installed("transformers")
+            
+            if not (has_torch and has_transformers):
+                print()
+                print("  ⚠️  SigLIP requires PyTorch and Transformers (not found).")
+                if prompt_yes_no("Run ML backend setup (setup_ml.py) now to install them?", default=True):
+                    print()
+                    try:
+                        subprocess.run([sys.executable, str(PROJECT_ROOT / "setup_ml.py")], check=True)
+                        print()
+                        print("  ✓ ML Backend setup finished")
+                    except subprocess.CalledProcessError:
+                        print("  ❌ ML Backend setup failed. SigLIP export will likely fail.")
+                else:
+                    print("  ⚠ Skipping dependency install. Export may fail.")
+
             print()
             print("  Exporting SigLIP 2 model (this may take a few minutes)...")
             try:
