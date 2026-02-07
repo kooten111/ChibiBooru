@@ -76,3 +76,4 @@ requirements-dev.txt
 .env.backup
 config.yml
 config.yml.backup
+data/similarity.db.bak.*
