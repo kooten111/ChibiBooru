@@ -8,7 +8,16 @@ Run as: python -m ml_worker.server
 """
 
 import os
+import os
 import sys
+
+# Monkeypatch os.exit if it doesn't exist (Python 3) to fix broken libraries
+# specifically intel_extension_for_pytorch v2.8 which calls os.exit(127) on version mismatch
+if not hasattr(os, 'exit'):
+    def _fake_exit(code):
+        raise ImportError(f"Library attempted to exit with code {code} (compatibility check failed)")
+    os.exit = _fake_exit
+
 import socket
 import signal
 import time

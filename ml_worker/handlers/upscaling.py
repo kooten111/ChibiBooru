@@ -66,9 +66,10 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
         try:
             import intel_extension_for_pytorch as ipex
             logger.info("Intel Extension for PyTorch imported for Upscaler")
-        except ImportError:
+        except (ImportError, AttributeError, RuntimeError) as e:
             # IPEX not required with PyTorch nightly - XPU support is built-in
-            logger.info("IPEX not installed, using built-in XPU support")
+            # Also IPEX v2.8 crashes with AttributeError: module 'os' has no attribute 'exit' on version mismatch
+            logger.warning(f"IPEX failed to import ({e}), using built-in XPU support")
             
     device = get_torch_device(backend)
     
