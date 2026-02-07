@@ -386,6 +386,7 @@ def setup_models():
     else:
         print("  ✓ Upscaler models already installed")
     
+    
     # Run all chosen downloads one at a time (clean progress output)
     if tasks:
         print()
@@ -394,6 +395,25 @@ def setup_models():
             _download_task(task)
         print()
         print("  ✓ All downloads finished")
+
+    # Record environment changes based on what was installed/exists
+    env_changes = {}
+    
+    # Tagger enabled if installed
+    if (PROJECT_ROOT / "models" / "Tagger" / "model.onnx").exists():
+        env_changes["ENABLE_LOCAL_TAGGER"] = "true"
+        
+    # SigLIP enabled if installed (assuming success)
+    if (PROJECT_ROOT / "models" / "SigLIP" / "model.onnx").exists():
+        env_changes["ENABLE_SEMANTIC_SIMILARITY"] = "true"
+        # Also ensure SigLIP is the selected model type
+        env_changes["SEMANTIC_MODEL_TYPE"] = "siglip"
+        
+    # Upscaler enabled if installed
+    if (PROJECT_ROOT / "models" / "Upscaler" / "RealESRGAN_x4plus.pth").exists():
+        env_changes["UPSCALER_ENABLED"] = "true"
+        
+    return env_changes
 
 
 def is_first_run() -> bool:
@@ -469,7 +489,14 @@ def main():
     setup_directories()
     
     # Model downloads
-    setup_models()
+    model_changes = setup_models()
+    env_changes.update(model_changes)
+    
+    # Apply model env changes
+    if model_changes:
+        current_env = read_env_file()
+        current_env.update(model_changes)
+        write_env_file(current_env)
     
     # Summary
     print_summary(env_changes)
