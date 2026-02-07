@@ -213,7 +213,8 @@ def setup_directories():
         ("./static/upscaled", "Upscaled images"),
         ("./ingest", "File ingest folder"),
         ("./models/Tagger", "Tagger model"),
-        ("./models/Similarity", "Similarity model"),
+        ("./models/Similarity", "Similarity model (legacy)"),
+        ("./models/SigLIP", "SigLIP similarity model"),
         ("./models/Upscaler", "Upscaler models"),
         ("./data", "Database"),
     ]
@@ -299,28 +300,36 @@ def setup_models():
     
     print()
     
-    # Similarity
-    similarity_path = PROJECT_ROOT / "models" / "Similarity" / "model.onnx"
-    similarity_dir = similarity_path.parent
-    if not similarity_path.exists():
-        print("  📌 Similarity Model (WD14-ConvNext) - ~400 MB")
-        print("     Used for finding visually similar images")
-        download_similarity = prompt_yes_no("Download similarity model?", default=True)
-        if download_similarity:
-            tasks.append((
-                "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/model.onnx",
-                similarity_path,
-                "similarity model",
-                "Similarity",
-            ))
-            tasks.append((
-                "https://huggingface.co/SmilingWolf/wd-v1-4-convnext-tagger-v2/resolve/main/selected_tags.csv",
-                similarity_dir / "selected_tags.csv",
-                "tags mapping",
-                "Similarity",
-            ))
+    # Similarity (SigLIP 2)
+    siglip_path = PROJECT_ROOT / "models" / "SigLIP" / "model.onnx"
+    siglip_dir = siglip_path.parent
+    siglip_dir.mkdir(parents=True, exist_ok=True)
+    
+    if not siglip_path.exists():
+        print("  📌 Similarity Model (SigLIP 2) - ~4.5 GB download, ~1.8 GB ONNX")
+        print("     Used for finding visually similar images (state-of-the-art)")
+        print("     Requires: transformers, torch (will be installed if missing)")
+        download_siglip = prompt_yes_no("Download and export SigLIP model?", default=True)
+        if download_siglip:
+            print()
+            print("  Exporting SigLIP 2 model (this may take a few minutes)...")
+            try:
+                # Import and run the export script
+                import subprocess
+                result = subprocess.run(
+                    [sys.executable, str(PROJECT_ROOT / "scripts" / "export_siglip.py")],
+                    cwd=str(PROJECT_ROOT),
+                    capture_output=False,
+                )
+                if result.returncode == 0:
+                    print("  ✓ SigLIP model exported successfully")
+                else:
+                    print("  ⚠ SigLIP export failed - you can run 'python scripts/export_siglip.py' later")
+            except Exception as e:
+                print(f"  ⚠ SigLIP export failed: {e}")
+                print("    You can run 'python scripts/export_siglip.py' later")
     else:
-        print("  ✓ Similarity model already installed")
+        print("  ✓ Similarity model (SigLIP) already installed")
     
     print()
     

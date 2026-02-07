@@ -207,7 +207,16 @@ The following settings can still be set in `.env` for backward compatibility, bu
 **Description**: Similarity calculation method  
 **Options**:
 - `"jaccard"`: Basic set intersection/union
-- `"weighted"`: IDF + category weights (recommended)
+- `"weighted"`: IDF + category weights (original formula)
+- `"weighted_tfidf"`: Enhanced TF-IDF formula (better discrimination)
+- `"asymmetric"`: Prioritizes query coverage (good for "find similar")
+- `"asymmetric_tfidf"`: Asymmetric + TF-IDF (recommended)
+
+#### `ASYMMETRIC_ALPHA`
+**Type**: Float  
+**Default**: `0.6`  
+**Range**: 0.0 to 1.0  
+**Description**: Blend factor for asymmetric similarity methods. Higher values prioritize query coverage, lower values favor union similarity.
 
 ---
 
@@ -257,6 +266,23 @@ LOCAL_TAGGER_NAME = os.environ.get('LOCAL_TAGGER_NAME', 'CamieTagger')
 
 **Threshold**: Higher = fewer but more confident tags  
 **Target Size**: Model input dimension (don't change unless using different model)
+
+---
+
+### Semantic Similarity (SigLIP 2)
+
+```python
+SEMANTIC_MODEL_PATH = './models/SigLIP/model.onnx'  # SigLIP 2 vision encoder
+SEMANTIC_MODEL_TYPE = 'siglip'                       # 'siglip' or 'tagger' (legacy)
+SEMANTIC_IMAGE_SIZE = 384                            # Input size (384 for SigLIP)
+SEMANTIC_EMBEDDING_DIM = 1152                        # Embedding dimension
+```
+
+**Model Types**:
+- `siglip`: SigLIP 2 (recommended) - trained for similarity, 1152-d embeddings
+- `tagger`: Legacy WD tagger backbone - 1024-d embeddings
+
+**Setup**: Run `python scripts/export_siglip.py` to download and export the SigLIP model.
 
 ---
 

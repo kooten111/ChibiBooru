@@ -102,7 +102,14 @@ LOCAL_TAGGER_MODEL_PATH = "./models/Tagger/model.onnx"
 LOCAL_TAGGER_METADATA_PATH = "./models/Tagger/metadata.json"
 
 # Semantic similarity model path
-SEMANTIC_MODEL_PATH = _get_setting('SEMANTIC_MODEL_PATH', './models/Similarity/model.onnx')
+# Default now points to SigLIP 2 for proper contrastive embeddings
+SEMANTIC_MODEL_PATH = _get_setting('SEMANTIC_MODEL_PATH', './models/SigLIP/model.onnx')
+
+# Semantic model configuration
+# Model type determines preprocessing: 'siglip' or 'tagger' (legacy)
+SEMANTIC_MODEL_TYPE = str(_get_setting('SEMANTIC_MODEL_TYPE', 'siglip')).lower()
+SEMANTIC_IMAGE_SIZE = int(_get_setting('SEMANTIC_IMAGE_SIZE', 384))  # SigLIP: 384, tagger: 448
+SEMANTIC_EMBEDDING_DIM = int(_get_setting('SEMANTIC_EMBEDDING_DIM', 1152))  # SigLIP: 1152, tagger: 1024
 
 # Model behavior
 LOCAL_TAGGER_THRESHOLD = float(_get_setting('LOCAL_TAGGER_THRESHOLD', 0.6))  # Confidence threshold for tag predictions
@@ -251,8 +258,18 @@ IMPLICATION_ALLOWED_EXTENDED_CATEGORIES = _get_setting('IMPLICATION_ALLOWED_EXTE
 # ==================== SIMILARITY CALCULATION ====================
 
 # Similarity calculation method
-# Options: 'jaccard' (basic set intersection/union), 'weighted' (IDF + category weights)
+# Options:
+#   'jaccard': Basic Jaccard (intersection/union)
+#   'weighted': Original IDF + category weights
+#   'weighted_tfidf': Enhanced TF-IDF formula (better discrimination)
+#   'asymmetric': Prioritizes query coverage (good for "find similar to X")
+#   'asymmetric_tfidf': Asymmetric + enhanced TF-IDF (recommended)
 SIMILARITY_METHOD = str(_get_setting('SIMILARITY_METHOD', 'weighted'))
+
+# Blend factor for asymmetric similarity methods
+# Higher values prioritize query coverage, lower values favor union similarity
+# Range: 0.0 to 1.0 (default 0.6)
+ASYMMETRIC_ALPHA = float(_get_setting('ASYMMETRIC_ALPHA', 0.6))
 
 # Category weights for weighted similarity
 # Higher values mean matching tags in that category contributes more to similarity

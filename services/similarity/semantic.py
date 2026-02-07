@@ -73,7 +73,7 @@ class SemanticIndex:
             
         self.index = None
         self.ids = []
-        self.dimension = 1024
+        self.dimension = config.SEMANTIC_EMBEDDING_DIM  # 1152 for SigLIP, 1024 for legacy tagger
         self._initialized = True
         
         if FAISS_AVAILABLE and SEMANTIC_AVAILABLE:
@@ -96,7 +96,8 @@ class SemanticIndex:
             self.ids = []
             return
         
-        faiss.normalize_L2(matrix)
+        # Embeddings are already L2-normalized when saved (in ml_worker/handlers/similarity.py)
+        # so no need to re-normalize here
         
         self.dimension = matrix.shape[1]
         self.index = faiss.IndexFlatIP(self.dimension)
@@ -167,7 +168,13 @@ class MLWorkerSemanticBackend(SemanticBackend):
             return None
         try:
             client = get_ml_worker_client()
-            result = client.compute_similarity(image_path=image_path, model_path=model_path)
+            result = client.compute_similarity(
+                image_path=image_path,
+                model_path=model_path,
+                model_type=config.SEMANTIC_MODEL_TYPE,
+                image_size=config.SEMANTIC_IMAGE_SIZE,
+                embedding_dim=config.SEMANTIC_EMBEDDING_DIM
+            )
             embedding = result['embedding']
             return np.array(embedding, dtype=np.float32)
         except Exception as e:

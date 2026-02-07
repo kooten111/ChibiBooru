@@ -157,14 +157,18 @@ class Request:
 
     @staticmethod
     def compute_similarity(request_id: str, image_path: str,
-                          model_path: str) -> Dict[str, Any]:
+                          model_path: str, model_type: str = 'siglip',
+                          image_size: int = 384, embedding_dim: int = 1152) -> Dict[str, Any]:
         """Create a compute_similarity request"""
         return Request.create(
             RequestType.COMPUTE_SIMILARITY,
             request_id,
             {
                 "image_path": image_path,
-                "model_path": model_path
+                "model_path": model_path,
+                "model_type": model_type,
+                "image_size": image_size,
+                "embedding_dim": embedding_dim
             }
         )
 

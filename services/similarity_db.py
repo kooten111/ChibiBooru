@@ -40,7 +40,7 @@ def save_embedding(image_id: int, embedding: np.ndarray):
     
     Args:
         image_id: ID of the image from main DB
-        embedding: numpy array of the 1024-d vector
+        embedding: numpy array of the embedding vector (dimension from config.SEMANTIC_EMBEDDING_DIM)
     """
     # Ensure it's float32 bytes
     if embedding.dtype != np.float32:
@@ -77,9 +77,9 @@ def get_all_embeddings() -> Tuple[List[int], np.ndarray]:
     Returns:
         (ids, embeddings_matrix)
         ids: List of image_ids corresponding to rows
-        embeddings_matrix: numpy array of shape (N, 1024)
+        embeddings_matrix: numpy array of shape (N, SEMANTIC_EMBEDDING_DIM)
     """
-    EXPECTED_DIM = 1024
+    EXPECTED_DIM = config.SEMANTIC_EMBEDDING_DIM
     
     with get_db_connection() as conn:
         # Fetch all

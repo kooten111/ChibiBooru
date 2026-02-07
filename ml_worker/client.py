@@ -469,13 +469,19 @@ class MLWorkerClient:
         return self._send_request(request, progress_callback=progress_callback)
 
     def compute_similarity(self, image_path: str,
-                          model_path: str) -> Dict[str, Any]:
+                          model_path: str,
+                          model_type: str = 'siglip',
+                          image_size: int = 384,
+                          embedding_dim: int = 1152) -> Dict[str, Any]:
         """
         Compute semantic similarity embedding for an image.
 
         Args:
             image_path: Path to image file
             model_path: Path to similarity model
+            model_type: Model type ('siglip' or 'tagger')
+            image_size: Input image size (384 for SigLIP, 448 for tagger)
+            embedding_dim: Expected embedding dimension (1152 for SigLIP, 1024 for tagger)
 
         Returns:
             Dict with:
@@ -489,7 +495,10 @@ class MLWorkerClient:
         request = Request.compute_similarity(
             request_id,
             image_path,
-            model_path
+            model_path,
+            model_type,
+            image_size,
+            embedding_dim
         )
 
         return self._send_request(request)

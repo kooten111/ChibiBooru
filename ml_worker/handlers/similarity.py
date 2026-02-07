@@ -1,14 +1,12 @@
 """
 Similarity computation handler.
 
-Note: Loading the ONNX model may log a shape-merge warning for the globalavgpool
-output (e.g. source {1,1024,1,1} vs target {-1,1024}). That comes from the
-exported graph metadata, not our pipeline; inference and embedding quality are
-unchanged. ONNX Runtime does a lenient merge and runs the same computation.
+Supports multiple model types:
+- 'siglip': SigLIP 2 (384x384, no normalization, 1152-d embeddings)
+- 'tagger': Legacy WD tagger backbone (448x448, ImageNet normalization, 1024-d)
 """
 import os
 import logging
-import json
 import numpy as np
 from typing import Dict, Any
 
@@ -16,46 +14,72 @@ from ml_worker import models
 
 logger = logging.getLogger(__name__)
 
+# Cache for current model configuration
+_current_model_path = None
+
+
 def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle compute_similarity request.
 
     Args:
-        request_data: {image_path, model_path}
+        request_data: {
+            image_path: str,
+            model_path: str,
+            model_type: str (optional, 'siglip' or 'tagger', default 'siglip'),
+            image_size: int (optional, default from model_type),
+            embedding_dim: int (optional, expected output dimension)
+        }
 
     Returns:
         Dict with embedding vector
     """
+    global _current_model_path
+    
     image_path = request_data['image_path']
     model_path = request_data['model_path']
+    model_type = request_data.get('model_type', 'siglip').lower()
+    
+    # Get config from request or use defaults based on model type
+    if model_type == 'siglip':
+        image_size = request_data.get('image_size', 384)
+        embedding_dim = request_data.get('embedding_dim', 1152)
+    else:  # 'tagger' or legacy
+        image_size = request_data.get('image_size', 448)
+        embedding_dim = request_data.get('embedding_dim', 1024)
 
-    logger.info(f"Computing similarity embedding: {os.path.basename(image_path)}")
+    logger.info(f"Computing {model_type} embedding ({embedding_dim}-d): {os.path.basename(image_path)}")
 
     # Lazy load ONNX and torch
     import onnxruntime as ort
     import torchvision.transforms as transforms
     from PIL import Image
 
-    # Load model if not already loaded
-    if models.similarity_model is None:
+    # Load model if not already loaded or if model path changed
+    if models.similarity_model is None or _current_model_path != model_path:
         logger.info(f"Loading similarity model from {model_path}")
 
         # Dynamic providers based on backend
         providers = models.get_onnx_providers()
         sess_options = models.get_onnx_session_options()
-        # Shape-merge warning on load is harmless; see module docstring.
         models.similarity_model = ort.InferenceSession(model_path, sess_options=sess_options, providers=providers)
-        logger.info("Similarity model loaded")
+        _current_model_path = model_path
+        logger.info(f"Similarity model loaded ({model_type})")
 
-    # Preprocess image
-    # Model expects 448x448 and NHWC format (Batch, Height, Width, Channels)
-    image_size = 448
-
-    transform = transforms.Compose([
-        transforms.Resize((image_size, image_size), interpolation=transforms.InterpolationMode.BICUBIC),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    # Build transform based on model type
+    if model_type == 'siglip':
+        # SigLIP: expects [0, 1] normalized RGB, no ImageNet normalization
+        transform = transforms.Compose([
+            transforms.Resize((image_size, image_size), interpolation=transforms.InterpolationMode.BICUBIC),
+            transforms.ToTensor(),  # Converts to [0, 1] range
+        ])
+    else:
+        # Tagger: expects ImageNet normalization
+        transform = transforms.Compose([
+            transforms.Resize((image_size, image_size), interpolation=transforms.InterpolationMode.BICUBIC),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
 
     try:
         # Handle Video files by extracting a frame
@@ -73,7 +97,6 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
                     with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_frame:
                         temp_frame_path = temp_frame.name
                     
-                    # Extract frame at 1s or 0s
                     subprocess.run([
                         ffmpeg_path, '-ss', '0.0', '-i', image_path,
                         '-vframes', '1', '-strict', 'unofficial', '-y', temp_frame_path
@@ -84,17 +107,21 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
                         logger.info(f"Extracted frame for similarity: {target_path}")
                 except Exception as e:
                     logger.warning(f"Failed to extract frame from video {image_path}: {e}")
-                    # Fallthrough to try opening original (might work for gifs)
 
         with Image.open(target_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
             
-            # Produces (1, 3, 448, 448)
+            # Transform to tensor
             img_tensor = transform(img).unsqueeze(0)
             
-            # Transpose to (1, 448, 448, 3) for NHWC
-            img_numpy = img_tensor.permute(0, 2, 3, 1).numpy()
+            # Model input format depends on type
+            if model_type == 'siglip':
+                # SigLIP expects NCHW (standard PyTorch format)
+                img_numpy = img_tensor.numpy()
+            else:
+                # Legacy tagger expects NHWC
+                img_numpy = img_tensor.permute(0, 2, 3, 1).numpy()
             
         # Clean up temp file
         if temp_frame_path and os.path.exists(temp_frame_path):
@@ -108,26 +135,32 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Run inference
     input_name = models.similarity_model.get_inputs()[0].name
-    # Some models might have different output structure, but usually last hidden state or pooler output
     raw_outputs = models.similarity_model.run(None, {input_name: img_numpy})
     
-    # Find the 1024-d embedding output (not the 9083-d classification)
-    # Model outputs: predictions_sigmoid (9083), globalavgpooling (1024,1,1), predictions_norm (1024)
+    # Find the embedding output matching expected dimension
     embedding = None
     for out in raw_outputs:
-        # Look for exactly 1024 dimensions (the embedding vector)
         flat = out.flatten() if len(out.shape) > 2 else out[0] if len(out.shape) == 2 else out
-        if hasattr(flat, '__len__') and len(flat) == 1024:
+        if hasattr(flat, '__len__') and len(flat) == embedding_dim:
             embedding = flat.astype(np.float32)
             break
+    
+    # If exact match not found, try to find any reasonable embedding
+    if embedding is None:
+        for out in raw_outputs:
+            flat = out.flatten() if len(out.shape) > 2 else out[0] if len(out.shape) == 2 else out
+            # Accept embeddings in typical range (512-2048)
+            if hasattr(flat, '__len__') and 512 <= len(flat) <= 2048:
+                embedding = flat.astype(np.float32)
+                logger.warning(f"Expected {embedding_dim}-d, found {len(flat)}-d embedding")
+                break
             
     if embedding is None:
-        logger.error(f"Could not find 1024-d embedding. Output shapes: {[o.shape for o in raw_outputs]}")
-        # Build strict error message
         shapes = [o.shape for o in raw_outputs]
-        raise ValueError(f"Model did not produce valid 1024-d embedding. Found shapes: {shapes}")
+        logger.error(f"Could not find {embedding_dim}-d embedding. Output shapes: {shapes}")
+        raise ValueError(f"Model did not produce valid embedding. Expected {embedding_dim}-d, found shapes: {shapes}")
 
-    # Normalize embedding (essential for cosine similarity to work with simple dot product/euclidean stats)
+    # Normalize embedding for cosine similarity
     norm = np.linalg.norm(embedding)
     if norm > 0:
         embedding = embedding / norm
@@ -135,3 +168,4 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "embedding": embedding.tolist()
     }
+

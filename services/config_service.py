@@ -255,8 +255,16 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
     'SIMILARITY_METHOD': {
         'category': 'Similarity',
         'type': 'string',
-        'description': 'Similarity calculation method: jaccard or weighted',
+        'description': 'Similarity method: jaccard, weighted, weighted_tfidf, asymmetric, asymmetric_tfidf',
         'editable': True,
+    },
+    'ASYMMETRIC_ALPHA': {
+        'category': 'Similarity',
+        'type': 'float',
+        'description': 'Higher = more tolerant of extra tags in detailed images (0.6 default)',
+        'editable': True,
+        'min': 0.0,
+        'max': 1.0,
     },
     'SIMILARITY_CATEGORY_WEIGHTS': {
         'category': 'Similarity',
