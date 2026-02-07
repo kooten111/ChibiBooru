@@ -137,6 +137,62 @@ def write_env_file(env_vars: dict):
         f.writelines(lines)
 
 
+def write_config_yml(changes: dict):
+    """Update config.yml with changes."""
+    config_path = PROJECT_ROOT / "config.yml"
+    
+    # Simple line-based replacement to avoid dependency on PyYAML if not installed yet
+    # (though it should be installed if we are running wizard from start_booru.sh)
+    
+    current_lines = []
+    if config_path.exists():
+        with open(config_path, 'r') as f:
+            current_lines = f.readlines()
+    
+    new_lines = []
+    processed_keys = set()
+    
+    # Update existing keys
+    for line in current_lines:
+        key_match = False
+        for key, value in changes.items():
+            if line.strip().startswith(f"{key}:"):
+                # Preserve comments if any, but update value
+                comment = ""
+                if "#" in line:
+                    comment = "  # " + line.split("#", 1)[1].strip()
+                
+                # Format value (booleans lowercased for YAML)
+                if isinstance(value, bool):
+                    val_str = "true" if value else "false"
+                else:
+                    val_str = str(value)
+                
+                new_lines.append(f"{key}: {val_str}{comment}\n")
+                processed_keys.add(key)
+                key_match = True
+                break
+        
+        if not key_match:
+            new_lines.append(line)
+    
+    # Add new keys
+    if not new_lines and not current_lines:
+        # Create fresh if empty
+        pass
+    
+    for key, value in changes.items():
+        if key not in processed_keys:
+            if isinstance(value, bool):
+                val_str = "true" if value else "false"
+            else:
+                val_str = str(value)
+            new_lines.append(f"{key}: {val_str}\n")
+            
+    with open(config_path, 'w') as f:
+        f.writelines(new_lines)
+
+
 def is_default_secret(value: str, key: str) -> bool:
     """Check if a secret is still the default value."""
     defaults = {
@@ -396,24 +452,24 @@ def setup_models():
         print()
         print("  ✓ All downloads finished")
 
-    # Record environment changes based on what was installed/exists
-    env_changes = {}
+    # Record configuration changes
+    config_changes = {}
     
     # Tagger enabled if installed
     if (PROJECT_ROOT / "models" / "Tagger" / "model.onnx").exists():
-        env_changes["ENABLE_LOCAL_TAGGER"] = "true"
+        config_changes["ENABLE_LOCAL_TAGGER"] = True
         
     # SigLIP enabled if installed (assuming success)
     if (PROJECT_ROOT / "models" / "SigLIP" / "model.onnx").exists():
-        env_changes["ENABLE_SEMANTIC_SIMILARITY"] = "true"
+        config_changes["ENABLE_SEMANTIC_SIMILARITY"] = True
         # Also ensure SigLIP is the selected model type
-        env_changes["SEMANTIC_MODEL_TYPE"] = "siglip"
+        config_changes["SEMANTIC_MODEL_TYPE"] = "siglip"
         
     # Upscaler enabled if installed
     if (PROJECT_ROOT / "models" / "Upscaler" / "RealESRGAN_x4plus.pth").exists():
-        env_changes["UPSCALER_ENABLED"] = "true"
+        config_changes["UPSCALER_ENABLED"] = True
         
-    return env_changes
+    return config_changes
 
 
 def is_first_run() -> bool:
@@ -439,14 +495,20 @@ def is_first_run() -> bool:
     return False
 
 
-def print_summary(env_changes: dict):
+def print_summary(env_changes: dict, config_changes: dict = None):
     """Print setup completion summary."""
     print_section("✅ Setup Complete")
     
     if env_changes:
-        print("  Configuration saved to .env")
+        print("  Secrets saved to .env:")
         for key in env_changes:
             print(f"    • {key} configured")
+        print()
+            
+    if config_changes:
+        print("  Features enabled in config.yml:")
+        for key in config_changes:
+            print(f"    • {key} = {config_changes[key]}")
     
     print()
     print("  Next steps:")
@@ -489,17 +551,14 @@ def main():
     setup_directories()
     
     # Model downloads
-    model_changes = setup_models()
-    env_changes.update(model_changes)
+    model_config_changes = setup_models()
     
-    # Apply model env changes
-    if model_changes:
-        current_env = read_env_file()
-        current_env.update(model_changes)
-        write_env_file(current_env)
+    # Apply model config changes
+    if model_config_changes:
+        write_config_yml(model_config_changes)
     
     # Summary
-    print_summary(env_changes)
+    print_summary(env_changes, model_config_changes)
     
     return 0
 
