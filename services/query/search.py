@@ -503,8 +503,10 @@ def perform_search(search_query):
         else:
             general_terms.append(token)
 
-    # Normalize rating tags
+    # Normalize rating tags and extract them
     normalized_general_terms = []
+    rating_terms = []
+
     for term in general_terms:
         if term.startswith("rating_"):
             term = term.replace("rating_", "rating:", 1)
@@ -512,7 +514,12 @@ def perform_search(search_query):
             parts = term.split(":", 1)
             if len(parts) == 2:
                 term = parts[1].replace("rating_", "rating:", 1)
-        normalized_general_terms.append(term)
+        
+        if term.startswith("rating:"):
+            rating_terms.append(term)
+        else:
+            normalized_general_terms.append(term)
+            
     general_terms = normalized_general_terms
 
     for category in category_filters:
@@ -538,12 +545,20 @@ def perform_search(search_query):
         )
         should_shuffle = False
     else:
-        are_all_tags = general_terms and not _should_use_fts(general_terms)
-
-        if are_all_tags:
+        # If we only have rating terms, we should search by them (if no general terms)
+        if not general_terms and rating_terms:
+             results = models.search_images_by_tags(rating_terms)
+             should_shuffle = False
+             # We can clear rating_terms since we used them for search
+             rating_terms = []
+        
+        elif are_all_tags:
             results = models.search_images_by_tags(general_terms)
         else:
             results = models.get_all_images_with_tags()
+
+        # ... (rest of filtering)
+
 
         if pool_filter:
             pool_images = models.search_images_by_pool(pool_filter)
@@ -699,6 +714,30 @@ def perform_search(search_query):
                 if not exclude:
                     filtered_results.append(img)
             results = filtered_results
+
+        if rating_terms:
+            with get_db_connection() as conn:
+                filtered_results = []
+                for img in results:
+                    if img is None:
+                        continue
+
+                    placeholders = ",".join("?" for _ in rating_terms)
+                    cursor = conn.execute(
+                        f"""
+                        SELECT COUNT(*) FROM image_tags it 
+                        JOIN tags t ON it.tag_id = t.id 
+                        JOIN images i ON it.image_id = i.id
+                        WHERE i.filepath = ?
+                        AND t.name IN ({placeholders})
+                    """,
+                        (img["filepath"], *rating_terms),
+                    )
+
+                    count = cursor.fetchone()[0]
+                    if count == len(rating_terms):
+                        filtered_results.append(img)
+                results = filtered_results
 
         should_shuffle = bool(general_terms) and not (
             source_filters or filename_filter or extension_filter
