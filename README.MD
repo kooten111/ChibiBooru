@@ -37,20 +37,20 @@ A self-hosted booru application for organizing and browsing your local image col
 
 - **AI Rating Inference:** Automatic content rating detection (General, Sensitive, Questionable, Explicit) with confidence scores
 
-### 🔍 Advanced Search System
+### 🔍 Search System
 
-- **Tag Search:** Intelligent autocomplete with category-specific filtering (`character:name`, `artist:name`, `copyright:series`)
+- **Tag Search:** Autocomplete with category-specific filtering (`character:name`, `artist:name`, `copyright:series`)
 - **Full-Text Search:** FTS5-powered fuzzy matching and partial tag search
 - **Negative Filters:** Exclude tags with `-` prefix (e.g., `-sketch`)
 - **File Filters:** Search by filename (`filename:text`) or extension (`.png`, `.gif`)
 - **Relationship Filters:** Find parent/child images (`has:parent`, `has:child`, `has:relationship`)
 - **Pool Search:** Find images in collections (`pool:series_name`)
 - **Source Filtering:** Filter by metadata source (`source:danbooru`)
-- **Smart Similarity:** Weighted similarity matching that prioritizes rare tags and important categories
+- **Similarity Search:** Weighted similarity matching that prioritizes rare tags and important categories
 
 ### 🏷️ Tag Management
 
-- **Full Tag Control:**
+- **Tag Editing:**
   - Inline tag editor with category management
   - Switch between metadata sources on-the-fly
   - Tag delta tracking preserves manual edits across rebuilds
@@ -58,10 +58,10 @@ A self-hosted booru application for organizing and browsing your local image col
 - **Tag Implications:**
   - Automatic detection via naming patterns and statistical analysis
   - Manual creation and approval workflow
-  - Chain preview to see full impact before applying
+  - Chain preview before applying
 
 - **Extended Categories:**
-  - 22-category extended system for granular tag organization
+  - 22-category system for tag organization
   - Manual categorization interface with keyboard shortcuts
   - LLM-powered auto-categorization for bulk processing
   - Visual grouping by category on image pages
@@ -78,28 +78,23 @@ A self-hosted booru application for organizing and browsing your local image col
 - **Image Upload:** Drag-and-drop interface with automatic processing
 - **Ingest Folder:** Drop images in the ingest folder for automated processing
 - **Background Monitor:** Optional service that watches for new files and processes them automatically
-- **Debug Panel:** Comprehensive tools for database maintenance, optimization, and bulk operations
-- **Health Checks:** Automatic startup health checks with self-repair capabilities
+- **Debug Panel:** Tools for database maintenance, optimization, and bulk operations
+- **Health Checks:** Automatic startup health checks with self-repair
 
 ---
 
 ## Quick Start
 
 ```bash
-# Clone and install (uv is faster; pip works too)
+# Clone the repository
 git clone <repository-url>
-cd Booru
-uv venv venv && source venv/bin/activate  # or: python -m venv venv && source venv/bin/activate
-uv pip install -r requirements.txt        # or: pip install -r requirements.txt
+cd ChibiBooru
 
-# Run the Setup Wizard (recommended for first-run)
-python setup_wizard.py
+# Create a virtual environment (optional - start_booru.sh will create it if missing)
+python3 -m venv venv
 
-# Run (production mode with multiple workers and monitor service)
+# Run (handles setup wizard, dependencies, and starts the server)
 ./start_booru.sh
-
-# Or run in development mode (single worker, no monitor)
-python app.py
 
 # Visit http://127.0.0.1:5000
 ```
@@ -112,52 +107,53 @@ python app.py
 
 - Python 3.10–3.12 (required by onnxruntime)
 - Git (for cloning the repository)
-- Optional: [uv](https://docs.astral.sh/uv/) for faster venv and dependency installs
 
 ### Step-by-Step Installation
 
 1. **Clone the repository:**
    ```bash
    git clone <repository-url>
-   cd Booru
+   cd ChibiBooru
    ```
 
-2. **Create a virtual environment** (highly recommended). Use [uv](https://docs.astral.sh/uv/) for faster installs:
+2. **Create a virtual environment** (optional - `start_booru.sh` will create it if missing):
    ```bash
-   uv venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python3 -m venv venv
    ```
-   Or with pip: `python -m venv venv` then activate.
 
-3. **Install dependencies:**
+3. **Run the start script:**
    ```bash
-   uv pip install -r requirements.txt   # or: pip install -r requirements.txt
+   ./start_booru.sh
    ```
 
-4. **Optional: Download tagger model:**
+   The script will automatically:
+   - Create or activate the virtual environment
+   - Install all dependencies
+   - Run the setup wizard (on first run) to configure secrets and download AI models
+   - Start the application with uvicorn and the monitor service
 
-   If you need an ONNX tagger model, [Camie Tagger v2](https://huggingface.co/Camais03/camie-tagger-v2) is a good option.
+4. **Visit the application:**
+   - Open your browser to `http://127.0.0.1:5000`
+   - Log in with the password you set during setup
 
-   **Quick setup (Recommended):**
-   ```bash
-   python setup_wizard.py
-   ```
+### Optional: Advanced Setup
 
-   This interactive wizard will guide you through:
-   - Generating secure secrets (`SECRET_KEY`, `SYSTEM_API_SECRET`)
-   - Setting your `APP_PASSWORD`
-   - Creating required directories
-   - Downloading AI models (Tagger, Similarity, Upscaler)
+**If you need to rebuild your virtual environment:**
+```bash
+./start_booru.sh --rebuild-venv
+```
 
-   **Manual setup:**
-   ```bash
-   python scripts/download_tagger.py
-   ```
+**For development mode (single worker, no monitor):**
+```bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+python app.py
+```
 
-   **Manual download:**
-   Place these files in `models/Tagger/`:
-   - [camie-tagger-v2.onnx](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2.onnx) → rename to `model.onnx`
-   - [camie-tagger-v2-metadata.json](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2-metadata.json) → rename to `metadata.json`
+**Manual model download:**
+
+If you prefer to manually download the tagger model, place these files in `models/Tagger/`:
+- [camie-tagger-v2.onnx](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2.onnx) → rename to `model.onnx`
+- [camie-tagger-v2-metadata.json](https://huggingface.co/Camais03/camie-tagger-v2/resolve/main/camie-tagger-v2-metadata.json) → rename to `metadata.json`
 
 ---
 
@@ -393,18 +389,6 @@ For detailed technical documentation, see the [`docs/`](docs/) directory:
 - **[Extended Categories](docs/EXTENDED_CATEGORIES.md)** - 22-category extended system for advanced tag organization
 - **[Monitor Architecture](docs/MONITOR_ARCHITECTURE.md)** - Monitor service architecture and deployment
 - **[Upscaler Overview](docs/UPSCALER_OVERVIEW.md)** - AI upscaling feature documentation
-
-### Code Quality & Architecture
-
-ChibiBooru follows consistent patterns and best practices:
-
-- **Consistent API Error Handling:** All API endpoints use the `@api_handler()` decorator for standardized error responses and logging
-- **Centralized Utilities:** Common operations consolidated in the `utils/` package (tag database, file handling, path normalization)
-- **Modern JavaScript:** ES6 modules with shared helper functions for consistent client-side behavior
-- **Standardized Notifications:** Unified notification system across all UI interactions
-- **Comprehensive Logging:** Structured logging framework with configurable levels and output
-
-**Refactoring Impact:** ~2,000+ lines of duplicated code eliminated across 30+ files, resulting in better maintainability and consistency.
 
 ---
 
