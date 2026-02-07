@@ -65,12 +65,9 @@
     transform: translateX(-50%) translateY(0);
 }
 
-/* Hide menu items when no upscaled version exists */
-.upscale-hover-menu:not(.has-upscaled) .view-original,
-.upscale-hover-menu:not(.has-upscaled) .view-upscaled,
-.upscale-hover-menu:not(.has-upscaled) .upscale-menu-divider,
-.upscale-hover-menu:not(.has-upscaled) .delete-upscaled {
-    display: none;
+/* Hide entire menu when no upscaled version exists */
+.upscale-hover-menu:not(.has-upscaled) {
+    display: none !important;
 }
 
 /* Menu Items */
