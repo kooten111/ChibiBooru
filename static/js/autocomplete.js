@@ -70,12 +70,26 @@ class Autocomplete {
 
     loadInitialQuery() {
         // Parse initial query from hidden input and create chips
-        const initialQuery = this.hiddenInput.value.trim();
+        let initialQuery = this.hiddenInput.value.trim();
+
+        // Fallback: Check URL parameters if hidden input is empty
+        if (!initialQuery) {
+            const params = new URLSearchParams(window.location.search);
+            initialQuery = params.get('query') || '';
+            // Update hidden input to match
+            if (initialQuery) {
+                this.hiddenInput.value = initialQuery;
+            }
+        }
+
         if (initialQuery) {
+            // Decode URI component if coming from URL (already handled by browser for value, but just in case)
+            initialQuery = decodeURIComponent(initialQuery);
+
             const tokens = initialQuery.split(/\s+/);
             tokens.forEach(token => {
                 if (token) {
-                    this.addChipFromText(token);
+                    this.addChipFromText(token, true);
                 }
             });
         }
@@ -135,7 +149,7 @@ class Autocomplete {
         return { token, type, display, icon, category };
     }
 
-    addChipFromText(text) {
+    addChipFromText(text, silent = false) {
         const trimmed = text.trim();
         if (!trimmed) return;
 
@@ -144,7 +158,9 @@ class Autocomplete {
         this.renderChips();
         this.updateHiddenInput();
         this.updateClearButton();
-        this.triggerLiveFilter();
+        if (!silent) {
+            this.triggerLiveFilter();
+        }
     }
 
     addChipFromAutocomplete(tag, category = null) {
