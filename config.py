@@ -230,12 +230,6 @@ ENABLE_DEDUPLICATION = enable_dedup if isinstance(enable_dedup, bool) else str(e
 always_run = _get_setting('LOCAL_TAGGER_ALWAYS_RUN', False)
 LOCAL_TAGGER_ALWAYS_RUN = always_run if isinstance(always_run, bool) else str(always_run).lower() in ('true', '1', 'yes')
 
-# Pixiv complement behavior
-# If True, always runs local tagger to complement Pixiv tags (even when LOCAL_TAGGER_ALWAYS_RUN is False)
-# Pixiv tags are often incomplete, so this helps add missing tags
-complement_pixiv = _get_setting('LOCAL_TAGGER_COMPLEMENT_PIXIV', True)
-LOCAL_TAGGER_COMPLEMENT_PIXIV = complement_pixiv if isinstance(complement_pixiv, bool) else str(complement_pixiv).lower() in ('true', '1', 'yes')
-
 # Tag Implications behavior
 # If True, automatically applies tag implications when images are ingested
 # (e.g., if 'hatsune_miku' implies 'vocaloid', adds 'vocaloid' automatically)

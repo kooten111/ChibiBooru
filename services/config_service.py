@@ -166,12 +166,6 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Run tagger on all images, not just fallback',
         'editable': True,
     },
-    'LOCAL_TAGGER_COMPLEMENT_PIXIV': {
-        'category': 'AI Tagging',
-        'type': 'bool',
-        'description': 'Always run tagger to complement Pixiv tags',
-        'editable': True,
-    },
     
     # Database
     'DB_CACHE_SIZE_MB': {

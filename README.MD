@@ -30,9 +30,8 @@ A self-hosted booru application for organizing and browsing your local image col
 
 - **Multi-Source Tag Fetching:**
   - **Direct Hash Matching:** Finds metadata from Danbooru, e621, Gelbooru, and Yandere using MD5 hash
-  - **Pixiv Integration:** Fetches tags and artist info from Pixiv, automatically complemented with local AI tagging
   - **Reverse Image Search:** Uses SauceNao to discover sources when direct matching fails
-  - **AI Tagging:** Local ONNX-based tagger analyzes images with no online matches
+  - **AI Tagging:** Local ONNX-based tagger runs only when no online sources provide metadata
   - **Flexible Source Switching:** View tags from different sources or merge them all together
 
 - **AI Rating Inference:** Automatic content rating detection (General, Sensitive, Questionable, Explicit) with confidence scores

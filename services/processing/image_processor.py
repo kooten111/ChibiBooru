@@ -305,8 +305,16 @@ def process_image_file(filepath, move_from_ingest=True):
             
             msg = f"[Processing] Duplicate detected: {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
             logger.error(msg)
+
+            # If this is the canonical file already stored in the DB, do not delete it.
+            if existing_filepath:
+                canonical_path = os.path.abspath(os.path.join("static/images", existing_filepath))
+                if os.path.abspath(filepath) == canonical_path:
+                    msg = f"[Processing] Duplicate check hit canonical file, skipping deletion: {filename}"
+                    logger.error(msg)
+                    return False, msg
             
-            # Remove duplicate file if it exists
+            # Remove duplicate file if it exists (e.g., ingest copy or stray file)
             if os.path.exists(filepath):
                 try:
                     os.remove(filepath)
@@ -376,12 +384,9 @@ def process_image_file(filepath, move_from_ingest=True):
                         if pixiv_result:
                             all_results[pixiv_result['source']] = pixiv_result['data']
             
-            # Local tagger logic
-            pixiv_found = 'pixiv' in all_results
+            # Local tagger logic: Only run if no online sources found or if always-on
             should_run_tagger = False
             if config.LOCAL_TAGGER_ALWAYS_RUN:
-                should_run_tagger = True
-            elif pixiv_found and config.LOCAL_TAGGER_COMPLEMENT_PIXIV:
                 should_run_tagger = True
             elif not all_results:
                 should_run_tagger = True
