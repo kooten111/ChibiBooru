@@ -342,8 +342,7 @@ def setup_models():
             print()
             print("  Exporting SigLIP 2 model (this may take a few minutes)...")
             try:
-                # Import and run the export script
-                import subprocess
+                # Run the export script
                 result = subprocess.run(
                     [sys.executable, str(PROJECT_ROOT / "scripts" / "export_siglip.py")],
                     cwd=str(PROJECT_ROOT),
