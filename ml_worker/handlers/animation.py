@@ -37,7 +37,9 @@ def handle_extract_animation(request_data: Dict[str, Any]) -> Dict[str, Any]:
             image_files = [f for f in all_files if is_valid_frame(os.path.basename(f))]
             
             if not image_files:
-                raise ValueError(f"No valid image files found in {zip_filepath}")
+                # Provide diagnostic info about what files were found
+                file_list = ", ".join(all_files[:10]) + ("..." if len(all_files) > 10 else "")
+                raise ValueError(f"No valid image files found in {zip_filepath}. Found {len(all_files)} files: {file_list}. Supported formats: .png, .jpg, .jpeg, .gif, .webp, .bmp")
             
             # Sort files naturally
             image_files = sorted(image_files, key=natural_sort_key)
