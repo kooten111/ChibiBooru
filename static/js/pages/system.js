@@ -1398,6 +1398,7 @@ window.systemRecountTags = systemRecountTags;
 window.systemReindexDatabase = systemReindexDatabase;
 window.systemBulkRetagLocal = systemBulkRetagLocal;
 window.systemBulkRetryTagging = systemBulkRetryTagging;
+window.systemReprocessImages = systemReprocessImages;
 window.systemDatabaseHealthCheck = systemDatabaseHealthCheck;
 window.systemStartMonitor = systemStartMonitor;
 window.systemStopMonitor = systemStopMonitor;

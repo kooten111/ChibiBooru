@@ -226,6 +226,41 @@
             </div>
         </div>
     </template>
+
+    <template id="reprocess-images-modal-template">
+        <div class="custom-confirm-overlay">
+            <div class="custom-confirm-modal" style="max-width: 550px;">
+                <h3>🔄 Reprocess Images</h3>
+                <p>Choose which images to reprocess:</p>
+                <div class="retry-options">
+                    <button class="retry-option-btn" data-option="refresh-local">
+                        <div class="retry-option-title">🎯 Refresh Local AI (Locally Tagged Only)</div>
+                        <div class="retry-option-desc">Re-run local AI tagger only on images currently tagged by local AI. Fast and safe.</div>
+                    </button>
+                    <button class="retry-option-btn" data-option="find-online">
+                        <div class="retry-option-title">🌐 Find Online Sources</div>
+                        <div class="retry-option-desc">Try to find better tags from online sources (Danbooru, e621, SauceNao) for locally-tagged images. Keeps current tags if nothing found.</div>
+                    </button>
+                    <button class="retry-option-btn" data-option="complement-pixiv">
+                        <div class="retry-option-title">🎨 Complement Pixiv Images</div>
+                        <div class="retry-option-desc">Add local AI tags to images with Pixiv source. Falls back to local AI if no online sources found.</div>
+                    </button>
+                    <button class="retry-option-btn" data-option="retag-all">
+                        <div class="retry-option-title">📦 Retag Everything</div>
+                        <div class="retry-option-desc">Re-run AI tagger on EVERY image. Takes a long time but ensures all images have fresh predictions.</div>
+                    </button>
+                    <button class="retry-option-btn" data-option="reprocess-all">
+                        <div class="retry-option-title">⚠️ Full Reprocess All</div>
+                        <div class="retry-option-desc">Run the full reprocessing pipeline on EVERY image. This overwrites existing data and takes a very long time.</div>
+                    </button>
+                </div>
+                <div class="button-group">
+                    <button class="btn-cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <template id="progress-modal-template">
         <div class="progress-modal-overlay">
             <div class="progress-modal">
