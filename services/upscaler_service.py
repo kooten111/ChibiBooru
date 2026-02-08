@@ -225,7 +225,8 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
             elif db_path.startswith('static/images/'):
                  db_path = db_path.replace('static/images/', '')
             
-            update_image_upscale_info(db_path, result['upscaled_size'][0], result['upscaled_size'][1])
+            if result['upscaled_size']:
+                update_image_upscale_info(db_path, result['upscaled_size'][0], result['upscaled_size'][1])
         except Exception as e:
              logger.error(f"Failed to update database with upscale info for {filepath}: {e}")
         

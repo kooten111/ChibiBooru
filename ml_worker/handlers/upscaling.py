@@ -129,6 +129,8 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
 
     # 1. Load image
     with Image.open(image_path) as img:
+        original_width, original_height = img.size
+        
         if img.mode == 'P':
             img = img.convert('RGB')
         elif img.mode == 'RGBA':
@@ -179,10 +181,18 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
     output_img = (output * 255.0).round().astype(np.uint8)
     output_pil = Image.fromarray(output_img)
     
+    # Get upscaled dimensions
+    upscaled_width, upscaled_height = output_pil.size
+    
     # Ensure dir
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
     # Save as PNG (lossless for upscale result)
     output_pil.save(output_path)
     
-    return {"success": True, "output_path": output_path}
+    return {
+        "success": True, 
+        "output_path": output_path,
+        "original_size": [original_width, original_height],
+        "upscaled_size": [upscaled_width, upscaled_height]
+    }

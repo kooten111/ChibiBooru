@@ -83,6 +83,22 @@
 
         if (isUpscaled) {
             // ... (existing logic)
+            // Ensure originalMetadata is initialized before updating
+            if (!originalMetadata) {
+                let resText = '';
+                if (resEl) {
+                    resText = resEl.dataset.originalResolution || resEl.textContent.trim();
+                    if (!resEl.dataset.originalResolution && resText.includes('➜')) {
+                        resText = resText.split('➜')[0].trim();
+                    }
+                }
+                originalMetadata = {
+                    resolution: resText,
+                    filesize: sizeEl ? sizeEl.textContent : '',
+                    downloadHref: dlBtn ? dlBtn.href : ''
+                };
+            }
+
             // Update cache if data provided
             if (data) {
                 upscaledMetadata = data;
@@ -151,6 +167,10 @@
 
         imageContainer = document.getElementById('imageViewContainer');
 
+        // Initialize originalMetadata first (for any metadata operations)
+        // This ensures we capture the original resolution before any updates
+        updateMetadata(false);
+
         // Check if page was loaded with a pre-rendered upscaled image
         // The template marks upscaled images with data-original-src attribute
         // Don't create the stack yet - it changes CSS layout and degrades rendering.
@@ -161,6 +181,18 @@
                 hasUpscaled = true;
                 showingUpscaled = true;
                 preloadOriginalForComparison();
+
+                // Fetch upscaled resolution data and cache it
+                fetch(`/api/upscale/check?filepath=${encodeURIComponent(currentFilepath)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.upscaled_size) {
+                            upscaledMetadata = data;
+                            // Update metadata to show both resolutions in one box
+                            updateMetadata(true, data);
+                        }
+                    })
+                    .catch(() => { /* silently ignore */ });
             }
         }
 
@@ -712,7 +744,7 @@
             }
         }, 100);
 
-        // Update metadata
+        // Update metadata (shows both resolutions in one box with arrow format)
         updateMetadata(true, data);
 
         showingUpscaled = true;
@@ -747,8 +779,8 @@
                 imageContainer.classList.add('has-image');
             }
 
-            // If we have data cached from a check, use it
-            updateMetadata(true);
+            // Update metadata to show both resolutions if cached
+            updateMetadata(true, upscaledMetadata);
             updateButtonState();
             return;
         }
@@ -831,12 +863,15 @@
             // Show original image
             showOriginalImage();
 
-            // Remove upscaled element
+            // Remove upscaled element from DOM
             const stack = imageContainer?.querySelector('.image-stack');
             const upscaledImg = stack?.querySelector('img.upscaled');
             if (upscaledImg) {
                 upscaledImg.remove();
             }
+
+            // Clear cached metadata so resolution metadata reverts to original
+            upscaledMetadata = null;
 
             // Optionally unwrap original if we want to clean up completely
             // But leaving stack is fine for now
