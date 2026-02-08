@@ -73,6 +73,16 @@ def delete_implication(source_tag: str, implied_tag: str) -> bool:
         return cursor.rowcount > 0
 
 
+def delete_all_implications() -> int:
+    """Delete all active implications."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM tag_implications WHERE status = 'active'")
+        deleted_count = cursor.rowcount
+        conn.commit()
+        return deleted_count
+
+
 def get_all_implications() -> List[Dict]:
     """Get all existing implications with metadata."""
     with get_db_connection() as conn:

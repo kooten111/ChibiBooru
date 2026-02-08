@@ -67,7 +67,8 @@ def get_paginated_suggestions(page: int = 1,
                                limit: int = 50, 
                                pattern_type: str = None,
                                source_categories: List[str] = None,
-                               implied_categories: List[str] = None) -> Dict:
+                               implied_categories: List[str] = None,
+                               query: str = None) -> Dict:
     """
     Get paginated suggestions with optional filtering.
     
@@ -88,7 +89,8 @@ def get_paginated_suggestions(page: int = 1,
         all_suggestions, 
         pattern_type, 
         source_categories, 
-        implied_categories
+        implied_categories,
+        query
     )
     
     total = len(filtered_suggestions)
@@ -122,9 +124,19 @@ def get_paginated_suggestions(page: int = 1,
 
 def _filter_suggestions(suggestions: List[Dict], pattern_type: str = None,
                         source_categories: List[str] = None,
-                        implied_categories: List[str] = None) -> List[Dict]:
+                        implied_categories: List[str] = None,
+                        query: str = None) -> List[Dict]:
     """Helper to filter detailed suggestions list."""
     filtered = suggestions
+    
+    # Text query filter
+    if query:
+        query = query.lower()
+        filtered = [
+            s for s in filtered
+            if query in s.get('source_tag', '').lower() 
+            or query in s.get('implied_tag', '').lower()
+        ]
     
     # Pattern type filter
     if pattern_type and pattern_type != 'all':

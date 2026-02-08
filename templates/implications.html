@@ -55,6 +55,14 @@
                     </div>
                 </div>
 
+                <div class="panel-section">
+                    <h3 class="panel-section-title">Filter Implications</h3>
+                    <div class="tag-search-input-wrapper">
+                        <input type="text" id="filterInput" class="filter-input" placeholder="Filter by tag name..."
+                            autocomplete="off">
+                    </div>
+                </div>
+
                 <div class="panel-section selected-tag-info" id="selectedTagInfo" style="display: none;">
                     <div class="tag-info-header">
                         <span class="tag-badge" id="selectedTagBadge"></span>
@@ -180,6 +188,11 @@
                             title="Clear all tags added by implications (source='implication')">
                             Clear Implied Tags
                         </button>
+                        <button id="clearAllBtn" class="action-btn action-btn-danger"
+                            style="width: 100%; margin-top: 8px;"
+                            title="Delete ALL active implication rules (Destructive!)">
+                            Clear All Rules
+                        </button>
                     </div>
                 </div>
             </aside>
@@ -227,6 +240,12 @@
                             <span class="collapse-arrow">▼</span>
                         </button>
                         <div id="activeContent" class="section-content">
+                            <div class="select-all-row">
+                                <label class="filter-checkbox-label">
+                                    <input type="checkbox" id="selectAllActive">
+                                    <span>Select all active</span>
+                                </label>
+                            </div>
                             <div id="activeList" class="list-container implications-list">
                                 <div class="empty-state">
                                     <div class="empty-state-icon">⏳</div>
@@ -327,7 +346,6 @@
         </div>
     </div>
 
-    <!-- Clear Implied Tags Modal -->
     <div id="clearImpliedModal" class="modal">
         <div class="modal-content">
             <span class="close">&times;</span>
@@ -342,6 +360,25 @@
             <div class="page-actions page-actions-spaced">
                 <button id="clearImpliedCancelBtn" class="action-btn action-btn-secondary">Cancel</button>
                 <button id="clearImpliedSubmitBtn" class="action-btn action-btn-danger">Clear Tags</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear All Rules Modal -->
+    <div id="clearAllRulesModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h3>⚠ Clear All Rules?</h3>
+            <div class="warning-box"
+                style="background: #3a1c1c; border: 1px solid #ff4444; padding: 12px; border-radius: 4px; color: #ffadad; margin-bottom: 16px;">
+                <strong>WARNING:</strong> This action is destructive and cannot be undone.
+            </div>
+            <p>You are about to delete <strong>ALL active implication rules</strong>.</p>
+            <p>This will NOT revert tags that have already been applied to images. It only removes the rules themselves.
+            </p>
+            <div class="page-actions page-actions-spaced">
+                <button id="clearAllRulesCancelBtn" class="action-btn action-btn-secondary">Cancel</button>
+                <button id="clearAllRulesSubmitBtn" class="action-btn action-btn-danger">Yes, Delete Everything</button>
             </div>
         </div>
     </div>

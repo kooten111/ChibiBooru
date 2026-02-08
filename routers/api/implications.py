@@ -14,12 +14,13 @@ async def get_implication_suggestions():
     pattern_type = request.args.get('type', None)
     source_categories = get_query_list(request, 'source_categories')
     implied_categories = get_query_list(request, 'implied_categories')
+    query = request.args.get('q', None)
 
     page = max(1, page)
     limit = max(1, min(200, limit))
 
     return implication_service.get_paginated_suggestions(
-        page, limit, pattern_type, source_categories, implied_categories
+        page, limit, pattern_type, source_categories, implied_categories, query
     )
 
 
@@ -110,6 +111,16 @@ async def delete_implication():
         raise FileNotFoundError("Implication not found")
 
     return {"message": f"Implication deleted: {source_tag} → {implied_tag}"}
+
+
+@api_blueprint.route('/implications/delete-all', methods=['POST'])
+@api_handler()
+async def delete_all_implications():
+    """Delete all active implications."""
+    from services import implication_service
+    
+    count = implication_service.delete_all_implications()
+    return {"message": f"Deleted {count} active implications", "count": count}
 
 
 @api_blueprint.route('/implications/all', methods=['GET'])

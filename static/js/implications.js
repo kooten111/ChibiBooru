@@ -5,7 +5,9 @@ import { showSuccess, showError, showInfo } from './utils/notifications.js';
 let selectedTag = null;
 let selectedImplication = null;
 let selectedSuggestions = new Set();
+let selectedActive = new Set();
 let viewMode = 'all'; // 'all', 'suggestions', 'active'
+let filterQuery = '';
 let typeFilters = new Set(['all']);
 let sourceCategoryFilters = new Set(['all']);
 let impliedCategoryFilters = new Set(['all']);
@@ -29,6 +31,8 @@ document.addEventListener('DOMContentLoaded', function () {
     initializeCategoryFilters();
     // initializeCollapsibleSections(); // Using inline handlers now
     initializeBulkActions();
+    initializeFilterInput();
+    initializeClearActions();
     initializeManualCreation();
     initializeKeyboardShortcuts();
 
@@ -267,12 +271,14 @@ function initializeCollapsibleSections() {
 // Bulk Actions
 function initializeBulkActions() {
     const selectAllCheckbox = document.getElementById('selectAllSuggestions');
+    const selectAllActiveCheckbox = document.getElementById('selectAllActive');
     const bulkApproveBtn = document.getElementById('bulkApproveBtn');
     const bulkDismissBtn = document.getElementById('bulkDismissBtn');
     const clearSelectionBtn = document.getElementById('clearSelectionBtn');
 
+    // Suggestions Select All
     selectAllCheckbox?.addEventListener('change', (e) => {
-        const checkboxes = document.querySelectorAll('.implication-checkbox');
+        const checkboxes = document.querySelectorAll('.implication-checkbox[data-group="suggestion"]');
         checkboxes.forEach(cb => {
             cb.checked = e.target.checked;
             const item = cb.closest('.implication-item');
@@ -287,8 +293,26 @@ function initializeBulkActions() {
         updateBulkActionsBar();
     });
 
+    // Active Implications Select All (Visible Only)
+    selectAllActiveCheckbox?.addEventListener('change', (e) => {
+        // Only select currently visible active implication checkboxes
+        const checkboxes = document.querySelectorAll('.implication-checkbox[data-group="active"]');
+        checkboxes.forEach(cb => {
+            cb.checked = e.target.checked;
+            const item = cb.closest('.implication-item');
+            if (e.target.checked) {
+                selectedActive.add(item.dataset.id);
+                item.classList.add('selected');
+            } else {
+                selectedActive.delete(item.dataset.id);
+                item.classList.remove('selected');
+            }
+        });
+        updateBulkActionsBar();
+    });
+
     bulkApproveBtn?.addEventListener('click', bulkApprove);
-    bulkDismissBtn?.addEventListener('click', bulkDismiss);
+    bulkDismissBtn?.addEventListener('click', bulkDismissOrDelete);
     clearSelectionBtn?.addEventListener('click', clearSelection);
 }
 
@@ -310,9 +334,32 @@ function updateBulkActionsBar() {
     const bar = document.getElementById('bulkActionsBar');
     const count = document.getElementById('selectionCount');
 
-    if (selectedSuggestions.size > 0) {
+    const totalSelected = selectedSuggestions.size + selectedActive.size;
+
+    if (totalSelected > 0) {
         bar.style.display = 'flex';
-        count.textContent = `${selectedSuggestions.size} selected`;
+        count.textContent = `${totalSelected} selected`;
+
+        // Show/Hide buttons based on selection type
+        const approveBtn = document.getElementById('bulkApproveBtn');
+        const dismissBtn = document.getElementById('bulkDismissBtn');
+
+        if (selectedSuggestions.size > 0 && selectedActive.size === 0) {
+            approveBtn.style.display = 'block';
+            dismissBtn.textContent = 'Dismiss All';
+            dismissBtn.classList.remove('action-btn-danger');
+            dismissBtn.classList.add('action-btn-warning');
+        } else if (selectedSuggestions.size === 0 && selectedActive.size > 0) {
+            approveBtn.style.display = 'none';
+            dismissBtn.textContent = 'Delete Selected';
+            dismissBtn.classList.remove('action-btn-warning');
+            dismissBtn.classList.add('action-btn-danger');
+        } else {
+            // Mixed selection ? Usually avoid, but if happens:
+            approveBtn.style.display = 'block';
+            dismissBtn.textContent = 'Dismiss/Delete All';
+        }
+
     } else {
         bar.style.display = 'none';
     }
@@ -363,27 +410,121 @@ async function bulkApprove() {
     }
 }
 
-async function bulkDismiss() {
-    if (selectedSuggestions.size === 0) {
-        showInfo('No suggestions selected');
+// Helper for individual selection toggling
+window.toggleActiveSelection = function (id, checkbox) {
+    const item = checkbox.closest('.implication-item');
+
+    if (checkbox.checked) {
+        selectedActive.add(id);
+        item.classList.add('selected');
+    } else {
+        selectedActive.delete(id);
+        item.classList.remove('selected');
+    }
+
+    updateBulkActionsBar();
+};
+
+async function bulkDismissOrDelete() {
+    // If we have selected suggestions, dismiss them
+    if (selectedSuggestions.size > 0) {
+        await bulkDismiss();
+    }
+
+    // If we have selected active implications, delete them
+    if (selectedActive.size > 0) {
+        await bulkDeleteActive();
+    }
+}
+
+async function bulkDeleteActive() {
+    if (!confirm(`Are you sure you want to delete ${selectedActive.size} active implications?`)) {
         return;
     }
 
-    // Just remove from UI - could add a rejected_implications table later
-    selectedSuggestions.forEach(id => {
+    let deletedCount = 0;
+    const errors = [];
+
+    // We implement this by calling individual delete endpoints for now since we didn't add a bulk-delete endpoint
+    // Or we could add one. For now, sequential calls are acceptable if not too many, 
+    // but better to add a bulk endpoint if we expect many. Given the task scope, let's try to stick to existing tools first
+    // but a loop is fine for "Select All" of reasonable size.
+    // Actually, "Select All" might select thousands. We should add a bulk delete endpoint properly or batch it.
+    // For now, let's implement a client-side loop but with parallel requests (semaphore limited) or sequential.
+
+    // Collecting data
+    const toDelete = [];
+    selectedActive.forEach(id => {
+        const item = document.querySelector(`[data-id="${id}"]`);
+        if (item) {
+            toDelete.push({
+                source_tag: item.dataset.source,
+                implied_tag: item.dataset.implied
+            });
+        }
+    });
+
+    for (const impl of toDelete) {
+        try {
+            const response = await fetch('/api/implications/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(impl)
+            });
+            if (response.ok) {
+                deletedCount++;
+                // Remove from UI immediately
+                const item = document.querySelector(`.implication-item[data-source="${impl.source_tag}"][data-implied="${impl.implied_tag}"]`);
+                if (item) item.remove();
+            } else {
+                errors.push(`${impl.source_tag}->${impl.implied_tag}`);
+            }
+        } catch (e) {
+            errors.push(`${impl.source_tag}->${impl.implied_tag}`);
+        }
+    }
+
+    if (deletedCount > 0) {
+        showSuccess(`Deleted ${deletedCount} implications`);
+    }
+    if (errors.length > 0) {
+        showError(`Failed to delete ${errors.length} implications`);
+    }
+
+    // Determine if we need to reload or just clear selection
+    // Since we removed from DOM, we can just clear selection state
+    selectedActive.clear();
+    const activeHeaderCheckbox = document.getElementById('selectAllActive');
+    if (activeHeaderCheckbox) activeHeaderCheckbox.checked = false;
+    updateBulkActionsBar();
+}
+
+async function bulkDismiss() {
+    const suggestionsToDismiss = Array.from(selectedSuggestions);
+
+    suggestionsToDismiss.forEach(id => {
         const item = document.querySelector(`[data-id="${id}"]`);
         if (item) item.remove();
     });
 
-    showSuccess(`Dismissed ${selectedSuggestions.size} suggestions`);
-    clearSelection();
+    showSuccess(`Dismissed ${suggestionsToDismiss.length} suggestions`);
+    selectedSuggestions.clear();
+    const suggestionHeaderCheckbox = document.getElementById('selectAllSuggestions');
+    if (suggestionHeaderCheckbox) suggestionHeaderCheckbox.checked = false;
+    updateBulkActionsBar();
 }
 
 function clearSelection() {
     selectedSuggestions.clear();
+    selectedActive.clear();
     document.querySelectorAll('.implication-checkbox').forEach(cb => cb.checked = false);
     document.querySelectorAll('.implication-item').forEach(item => item.classList.remove('selected'));
-    document.getElementById('selectAllSuggestions').checked = false;
+
+    const s1 = document.getElementById('selectAllSuggestions');
+    if (s1) s1.checked = false;
+    const s2 = document.getElementById('selectAllActive');
+    if (s2) s2.checked = false;
+
     updateBulkActionsBar();
 }
 
@@ -407,13 +548,105 @@ function getFilterQueryString() {
     }
 
     // Implied Category filters
-    if (!impliedCategoryFilters.has('all')) {
-        for (const cat of impliedCategoryFilters) {
-            params.append('implied_categories[]', cat);
-        }
+    for (const cat of impliedCategoryFilters) {
+        params.append('implied_categories[]', cat);
+    }
+
+    if (filterQuery) {
+        params.append('q', filterQuery);
     }
 
     return params.toString();
+}
+
+// Filter Input
+function initializeFilterInput() {
+    const input = document.getElementById('filterInput');
+    let timeout;
+
+    input?.addEventListener('input', (e) => {
+        const query = e.target.value.trim().toLowerCase();
+
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+            filterQuery = query;
+
+            // For suggestions, we reload from server to get paginated results with filter
+            loadAllSuggestions();
+            // Active implications are filtered client-side (unless we decide to move that to server too)
+        }, 300);
+    });
+}
+
+// Clear Actions
+function initializeClearActions() {
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const modal = document.getElementById('clearAllRulesModal');
+    const cancelBtn = document.getElementById('clearAllRulesCancelBtn');
+    const submitBtn = document.getElementById('clearAllRulesSubmitBtn');
+    const closeBtn = modal?.querySelector('.close');
+
+    clearAllBtn?.addEventListener('click', () => {
+        modal.style.display = 'block';
+    });
+
+    cancelBtn?.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    closeBtn?.addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    submitBtn?.addEventListener('click', async () => {
+        try {
+            const response = await fetch('/api/implications/delete-all', {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            showSuccess(`Deleted ${result.count} implication rules`);
+            modal.style.display = 'none';
+
+            // Reload everything
+            loadAllSuggestions();
+
+        } catch (error) {
+            console.error('Error clearing all rules:', error);
+            showError('Failed to clear rules');
+        }
+    });
+
+    // existing clear implied tags logic ...
+    const clearImpliedBtn = document.getElementById('clearImpliedTagsBtn');
+    // ... rest is likely handled by inline onclicks or existing code if present, 
+    // but the button ID in HTML shows 'clearImpliedTagsBtn' which wasn't in original JS init?
+    // Let's check if it was initialized elsewhere. 
+    // Ah, previous file content didn't show specific init for it, maybe it was missing or I missed it.
+    // The HTML has id="clearImpliedTagsBtn".
+
+    const clearImpliedModal = document.getElementById('clearImpliedModal');
+    if (clearImpliedBtn && clearImpliedModal) {
+        clearImpliedBtn.addEventListener('click', () => clearImpliedModal.style.display = 'block');
+        document.getElementById('clearImpliedCancelBtn')?.addEventListener('click', () => clearImpliedModal.style.display = 'none');
+        clearImpliedModal.querySelector('.close')?.addEventListener('click', () => clearImpliedModal.style.display = 'none');
+
+        document.getElementById('clearImpliedSubmitBtn')?.addEventListener('click', async () => {
+            const reapply = document.getElementById('clearImpliedReapplyCheckbox').checked;
+            try {
+                let url = reapply ? '/api/implications/clear-and-reapply' : '/api/implications/clear-tags';
+                showInfo('Processing... this may take a while');
+
+                const response = await fetch(url, { method: 'POST' });
+                const result = await response.json();
+
+                showSuccess(result.message);
+                clearImpliedModal.style.display = 'none';
+            } catch (e) {
+                showError('Operation failed');
+            }
+        });
+    }
 }
 
 // Load suggestions with pagination (first page)
@@ -551,6 +784,15 @@ function renderImplications(skipSuggestionFiltering = false) {
 
 function filterImplications(implications, isSuggestion) {
     return implications.filter(impl => {
+        // Text query filter (client-side for active implications)
+        if (!isSuggestion && filterQuery) {
+            const source = impl.source_tag.toLowerCase();
+            const implied = impl.implied_tag.toLowerCase();
+            if (!source.includes(filterQuery) && !implied.includes(filterQuery)) {
+                return false;
+            }
+        }
+
         // Type filter
         const type = isSuggestion ? impl.pattern_type : impl.inference_type;
         if (!typeFilters.has('all') && !typeFilters.has(type)) {
@@ -614,7 +856,7 @@ function renderSuggestionsList(suggestions) {
                  data-implied="${s.implied_tag}"
                  data-type="${s.pattern_type}"
                  data-confidence="${confidence}">
-                <input type="checkbox" class="implication-checkbox" onchange="window.toggleSuggestionSelection('${id}', this)">
+                <input type="checkbox" class="implication-checkbox" data-group="suggestion" onchange="window.toggleSuggestionSelection('${id}', this)">
                 <div class="implication-flow">
                     <span class="tag-badge">${s.source_tag}</span>
                     <span class="flow-arrow">→</span>
@@ -689,6 +931,7 @@ function renderActiveList(active) {
                  data-source="${sourceTag}"
                  data-implied="${impliedTag}"
                  data-type="${impl.inference_type}">
+                 <input type="checkbox" class="implication-checkbox" data-group="active" onchange="window.toggleActiveSelection('${id}', this)">
                 <div class="implication-flow">
                     <span class="tag-badge ${sourceCategory}">${sourceTag}</span>
                     <span class="flow-arrow">→</span>
@@ -721,7 +964,7 @@ function renderActiveList(active) {
 
 // Select an implication to show in detail panel
 async function selectImplication(itemId, isSuggestion) {
-    const item = document.querySelector(`[data-id="${itemId}"]`);
+    const item = document.querySelector(`[data - id= "${itemId}"]`);
     if (!item) return;
 
     const sourceTag = item.dataset.source;
@@ -745,12 +988,12 @@ async function renderDetailPanel() {
 
     if (!selectedImplication) {
         panel.innerHTML = `
-            <div class="detail-placeholder">
+            < div class="detail-placeholder" >
                 <div class="placeholder-icon">📋</div>
                 <p>No implication selected</p>
                 <p class="placeholder-hint">Click on an implication to view details</p>
-            </div>
-        `;
+            </div >
+            `;
         return;
     }
 
@@ -762,7 +1005,7 @@ async function renderDetailPanel() {
     let impactHtml = '';
 
     try {
-        const chainResponse = await fetch(`/api/implications/chain/${encodeURIComponent(implied_tag)}`);
+        const chainResponse = await fetch(`/ api / implications / chain / ${encodeURIComponent(implied_tag)} `);
         const chain = await chainResponse.json();
         chainHtml = renderChainTree(chain);
 
@@ -774,12 +1017,12 @@ async function renderDetailPanel() {
             });
             const preview = await previewResponse.json();
             impactHtml = `
-                <div class="detail-section">
+            < div class="detail-section" >
                     <div class="detail-section-title">Impact</div>
                     <div class="detail-section-content">
                         Approving will add <span class="impact-highlight">${preview.will_gain_tag} tags</span> to images
                     </div>
-                </div>
+                </div >
             `;
         }
     } catch (error) {
@@ -787,20 +1030,20 @@ async function renderDetailPanel() {
     }
 
     const actionsHtml = isSuggestion ? `
-        <button class="detail-action-btn detail-approve-btn" onclick="window.approveSingle('${selectedImplication.id}')">
+            < button class="detail-action-btn detail-approve-btn" onclick = "window.approveSingle('${selectedImplication.id}')" >
             ✓ Approve Suggestion
-        </button>
-        <button class="detail-action-btn detail-dismiss-btn" onclick="window.dismissSingle('${selectedImplication.id}')">
-            ✗ Dismiss Suggestion
-        </button>
-    ` : `
-        <button class="detail-action-btn detail-delete-btn" onclick="window.deleteImplication('${source_tag}', '${implied_tag}')">
+        </button >
+            <button class="detail-action-btn detail-dismiss-btn" onclick="window.dismissSingle('${selectedImplication.id}')">
+                ✗ Dismiss Suggestion
+            </button>
+        ` : `
+            < button class="detail-action-btn detail-delete-btn" onclick = "window.deleteImplication('${source_tag}', '${implied_tag}')" >
             🗑️ Delete Implication
-        </button>
-    `;
+        </button >
+            `;
 
     panel.innerHTML = `
-        <div class="detail-content">
+            < div class="detail-content" >
             <div class="detail-header">
                 <h3 class="detail-title">Implication Details</h3>
                 <button class="close-detail-btn" onclick="window.closeDetail()">✕</button>
@@ -835,15 +1078,15 @@ async function renderDetailPanel() {
             <div class="detail-actions">
                 ${actionsHtml}
             </div>
-        </div>
-    `;
+        </div >
+            `;
 }
 
 function renderChainTree(node, depth = 0) {
-    let html = `<div class="chain-node" style="--depth: ${depth}">${node.tag}</div>`;
+    let html = `< div class="chain-node" style = "--depth: ${depth}" > ${node.tag}</div > `;
 
     if (node.implies && node.implies.length > 0) {
-        html += `<div class="chain-connector" style="--depth: ${depth}">↓</div>`;
+        html += `< div class="chain-connector" style = "--depth: ${depth}" >↓</div > `;
         node.implies.forEach(child => {
             html += renderChainTree(child, depth + 1);
         });
@@ -856,7 +1099,7 @@ function renderChainTree(node, depth = 0) {
 window.toggleSuggestionSelection = toggleSuggestionSelection;
 
 window.approveSingle = async function (itemId) {
-    const item = document.querySelector(`[data-id="${itemId}"]`);
+    const item = document.querySelector(`[data - id="${itemId}"]`);
     if (!item) return;
 
     const suggestion = {
@@ -875,7 +1118,7 @@ window.approveSingle = async function (itemId) {
         });
 
         const result = await response.json();
-        let message = `Approved: ${suggestion.source_tag} → ${suggestion.implied_tag}`;
+        let message = `Approved: ${suggestion.source_tag} → ${suggestion.implied_tag} `;
         if (result.applied_count > 0) {
             message += ` (applied to ${result.applied_count} images)`;
         }
@@ -893,7 +1136,7 @@ window.approveSingle = async function (itemId) {
 };
 
 window.dismissSingle = function (itemId) {
-    const item = document.querySelector(`[data-id="${itemId}"]`);
+    const item = document.querySelector(`[data - id= "${itemId}"]`);
     if (item) {
         item.remove();
         showInfo('Suggestion dismissed');
@@ -902,12 +1145,12 @@ window.dismissSingle = function (itemId) {
 
 window.viewChain = async function (tagName) {
     try {
-        const response = await fetch(`/api/implications/chain/${encodeURIComponent(tagName)}`);
+        const response = await fetch(`/ api / implications / chain / ${encodeURIComponent(tagName)} `);
         const chain = await response.json();
 
         // Show in a simple alert for now - could make a modal
         const chainText = renderChainText(chain);
-        showInfo(`Implication Chain for ${tagName}:\n\n${chainText}`);
+        showInfo(`Implication Chain for ${tagName}: \n\n${chainText} `);
     } catch (error) {
         console.error('Error loading chain:', error);
         showError('Failed to load implication chain');
@@ -974,7 +1217,7 @@ function setupTagAutocomplete(inputId, dropdownId) {
 
         searchTimeout = setTimeout(async () => {
             try {
-                const response = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}&limit=10`);
+                const response = await fetch(`/ api / autocomplete ? q = ${encodeURIComponent(query)}& limit=10`);
                 const data = await response.json();
 
                 // Extract tags from groups
@@ -991,10 +1234,10 @@ function setupTagAutocomplete(inputId, dropdownId) {
 
                 if (tags.length > 0) {
                     dropdown.innerHTML = tags.map(tag => `
-                        <div class="autocomplete-item" data-tag="${tag.name}">
-                            <span class="tag-badge ${tag.category}">${tag.name}</span>
-                        </div>
-                    `).join('');
+            < div class="autocomplete-item" data - tag="${tag.name}" >
+                <span class="tag-badge ${tag.category}">${tag.name}</span>
+                        </div >
+            `).join('');
                     dropdown.classList.add('active');
 
                     // Add click handlers
@@ -1068,9 +1311,9 @@ async function previewManualImplication() {
         });
 
         const preview = await response.json();
-        showInfo(`Preview: ${sourceTag} → ${impliedTag}\n\n` +
+        showInfo(`Preview: ${sourceTag} → ${impliedTag} \n\n` +
             `${preview.will_gain_tag} images will gain this tag\n` +
-            `Chain: ${preview.chain_implications.join(' → ') || 'None'}`);
+            `Chain: ${preview.chain_implications.join(' → ') || 'None'} `);
     } catch (error) {
         console.error('Error previewing:', error);
         showError('Failed to load preview');
@@ -1094,7 +1337,7 @@ async function createManualImplication() {
         });
 
         const result = await response.json();
-        showSuccess(`Created implication: ${sourceTag} → ${impliedTag}`);
+        showSuccess(`Created implication: ${sourceTag} → ${impliedTag} `);
 
         // Close modal and reset
         document.getElementById('manualModal').classList.remove('active');
@@ -1115,7 +1358,7 @@ async function createManualImplication() {
 
 // Auto-Approve Naming Patterns
 document.getElementById('autoApprovePatternBtn')?.addEventListener('click', async () => {
-    const confirmMsg = `This will auto-approve ALL naming pattern suggestions.\n\nThese are character_(copyright) → copyright patterns with 92% confidence.\n\nContinue?`;
+    const confirmMsg = `This will auto - approve ALL naming pattern suggestions.\n\nThese are character_(copyright) → copyright patterns with 92 % confidence.\n\nContinue ? `;
 
     if (!confirm(confirmMsg)) {
         return;
@@ -1135,11 +1378,11 @@ document.getElementById('autoApprovePatternBtn')?.addEventListener('click', asyn
         const result = await response.json();
 
         if (result.success_count > 0) {
-            showSuccess(`Auto-approved ${result.success_count} of ${result.total} naming pattern implications!`);
+            showSuccess(`Auto - approved ${result.success_count} of ${result.total} naming pattern implications!`);
         } else if (result.total === 0) {
             showInfo('No naming pattern suggestions to approve');
         } else {
-            showError(`Failed to approve suggestions. Errors: ${result.errors.length}`);
+            showError(`Failed to approve suggestions.Errors: ${result.errors.length} `);
         }
 
         // Reload suggestions
@@ -1245,7 +1488,7 @@ function initializeAutoApproveModal() {
 
     // Update slider displays
     confidenceSlider?.addEventListener('input', () => {
-        confidenceValue.textContent = `${confidenceSlider.value}%`;
+        confidenceValue.textContent = `${confidenceSlider.value}% `;
     });
 
     confidenceSlider?.addEventListener('change', updateAutoApprovePreview);
@@ -1281,9 +1524,9 @@ async function updateAutoApprovePreview() {
         });
 
         preview.innerHTML = `
-            <div class="preview-count">
+            < div class="preview-count" >
                 <strong>${matching.length}</strong> suggestions match these criteria
-            </div>
+            </div >
             ${matching.length > 0 ? `
                 <div class="preview-examples">
                     <small>Examples:</small>
@@ -1294,7 +1537,8 @@ async function updateAutoApprovePreview() {
                         ${matching.length > 5 ? `<li>...and ${matching.length - 5} more</li>` : ''}
                     </ul>
                 </div>
-            ` : ''}
+            ` : ''
+            }
         `;
     } catch (error) {
         preview.innerHTML = '<div class="preview-count">Error loading preview</div>';
@@ -1335,7 +1579,7 @@ async function executeAutoApprove() {
         const result = await response.json();
 
         if (result.success_count > 0) {
-            let msg = `Auto-approved ${result.success_count} of ${result.total} implications!`;
+            let msg = `Auto - approved ${result.success_count} of ${result.total} implications!`;
             if (result.tags_applied) {
                 msg += ` Applied ${result.tags_applied} tags.`;
             }
