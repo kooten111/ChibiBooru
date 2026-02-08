@@ -30,7 +30,7 @@ A self-hosted booru application for organizing and browsing your local image col
 
 - **Multi-Source Tag Fetching:**
   - **Direct Hash Matching:** Finds metadata from Danbooru, e621, Gelbooru, and Yandere using MD5 hash
-  - **Reverse Image Search:** Uses SauceNao to discover sources when direct matching fails
+  - **Reverse Image Search:** Uses SauceNao to discover sources when direct matching fails. Consider upgrading your account with them if you arent patient.
   - **AI Tagging:** Local ONNX-based tagger runs only when no online sources provide metadata
   - **Flexible Source Switching:** View tags from different sources or merge them all together
 
