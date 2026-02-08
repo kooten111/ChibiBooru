@@ -27,6 +27,7 @@ async def get_upscale_progress():
     from services.upscaler_service import get_upscale_progress
     
     filepath = validate_string(request.args.get('filepath'), 'filepath', min_length=1)
+    filepath = normalize_image_path(filepath)
     progress = get_upscale_progress(filepath)
     
     if not progress:
