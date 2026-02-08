@@ -58,6 +58,8 @@ from repositories.data_access import (
     search_images_by_relationship,
     add_image_with_metadata,
     get_tags_with_extended_categories,
+    update_image_dimensions,
+    update_image_upscale_info
 )
 
 def repopulate_from_database():

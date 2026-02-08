@@ -456,6 +456,52 @@ function initImageViewer() {
         document.removeEventListener('mouseup', mouseUpHandler);
         document.removeEventListener('keydown', keydownHandler);
     };
+
+    // ============================================================================
+    // RESOLUTION DISPLAY
+    // ============================================================================
+
+    function updateImageResolution() {
+        // Find the resolution display element
+        const resEl = document.getElementById('metadata-resolution');
+        if (!resEl) return;
+
+        // Get the current image element (prefer original or upscaled)
+        const img = getPreferredImgElement(imageView);
+        if (!img) return;
+
+        // If image is loaded, update resolution
+        if (img.complete && img.naturalWidth > 0) {
+            // Check if we already have a resolution set and if it matches
+            // If it's a value, only update if it's different and we are looking at the original
+
+            // If upscaled, upscaler.js handles the logic, so we only touch if not upscaled
+
+            if (!img.classList.contains('upscaled') && !img.classList.contains('upscaled-active')) {
+                // Only update if the element is empty or we really need to.
+                // But better to just let it be if server rendered it.
+                // However, if server didn't render it (no metadata), we still want this.
+                if (!resEl.textContent.trim()) {
+                    resEl.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+                    const resBox = document.getElementById('resolution-stat-box');
+                    if (resBox) resBox.style.display = '';
+                }
+            }
+        } else {
+            // Wait for load
+            img.onload = () => updateImageResolution();
+        }
+    }
+
+    // Initial check
+    updateImageResolution();
+
+    // Also listen for image load events on the container capture phase to catch any lazy loaded images
+    imageView.addEventListener('load', (e) => {
+        if (e.target.tagName === 'IMG') {
+            updateImageResolution();
+        }
+    }, true);
 };
 
 document.addEventListener('DOMContentLoaded', initImageViewer);

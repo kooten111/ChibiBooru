@@ -44,14 +44,44 @@
 
         // Initialize original metadata on first run
         if (!originalMetadata) {
+            let resText = '';
+            if (resEl) {
+                resText = resEl.dataset.originalResolution || resEl.textContent.trim();
+                // If taking from text content and it has arrow, strip it
+                if (!resEl.dataset.originalResolution && resText.includes('➜')) {
+                    resText = resText.split('➜')[0].trim();
+                }
+            }
+
             originalMetadata = {
-                resolution: resEl ? resEl.textContent : '',
+                resolution: resText,
                 filesize: sizeEl ? sizeEl.textContent : '',
                 downloadHref: dlBtn ? dlBtn.href : ''
             };
         }
 
+        // If the original resolution was empty, try to update it from the element content again
+        if (originalMetadata.resolution === '') {
+            if (resEl) {
+                // Check data attribute first (most reliable)
+                if (resEl.dataset.originalResolution) {
+                    originalMetadata.resolution = resEl.dataset.originalResolution;
+                } else if (resEl.textContent.trim() !== '') {
+                    // Fallback to text content (might be "A x B -> C x D", need to be careful)
+                    const text = resEl.textContent.trim();
+                    if (text.includes('➜')) {
+                        // Extract original from "Original ➜ Upscaled"
+                        // But text content might be just numbers, so split by ➜
+                        originalMetadata.resolution = text.split('➜')[0].trim();
+                    } else {
+                        originalMetadata.resolution = text;
+                    }
+                }
+            }
+        }
+
         if (isUpscaled) {
+            // ... (existing logic)
             // Update cache if data provided
             if (data) {
                 upscaledMetadata = data;
@@ -61,7 +91,9 @@
 
             if (data) {
                 if (resEl && data.upscaled_size) {
-                    resEl.textContent = `${data.upscaled_size[0]}×${data.upscaled_size[1]}`;
+                    // Show "Original -> Upscaled"
+                    const originalRes = originalMetadata.resolution !== '...' ? originalMetadata.resolution : 'Original';
+                    resEl.innerHTML = `<span style="opacity: 0.7">${originalRes}</span> ➜ <strong>${data.upscaled_size[0]}×${data.upscaled_size[1]}</strong>`;
                 }
                 if (sizeEl && data.upscaled_filesize) {
                     sizeEl.textContent = formatBytes(data.upscaled_filesize);
@@ -72,7 +104,14 @@
             }
         } else {
             // Restore original
-            if (resEl) resEl.textContent = originalMetadata.resolution;
+            if (resEl) {
+                // Prefer data attribute if available, as it is the ground truth
+                if (resEl.dataset.originalResolution) {
+                    resEl.textContent = resEl.dataset.originalResolution;
+                } else {
+                    resEl.textContent = originalMetadata.resolution;
+                }
+            }
             if (sizeEl) sizeEl.textContent = originalMetadata.filesize;
             if (dlBtn) dlBtn.href = originalMetadata.downloadHref;
         }
@@ -191,6 +230,9 @@
         const originalSrc = upscaledImg.dataset.originalSrc;
         if (!originalSrc) return;
 
+        // Check if the upscaled image is already loaded
+        const isAlreadyLoaded = upscaledImg.complete && upscaledImg.naturalWidth > 0;
+
         // Create stack wrapper - fills container so both images use same frame (same size when comparing)
         // Create stack wrapper - fills container so both images use same frame
         const stack = document.createElement('div');
@@ -238,17 +280,22 @@
         originalImg.style.left = '';
         originalImg.style.width = '';
         originalImg.style.height = '';
-
+        
         // Insert original as the first child (behind upscaled); CSS positions both in same box
         stack.insertBefore(originalImg, upscaledImg);
 
         upscaledImg.style.zIndex = '2';
         upscaledImg.style.visibility = 'visible';
         upscaledImg.style.display = 'block';
-        upscaledImg.classList.add('upscaled');
 
         originalImg.style.visibility = 'hidden';
         originalImg.style.display = 'none';
+        
+        // If the upscaled image was already loaded when we set up the stack,
+        // manually add the has-image class since the onload event already fired
+        if (isAlreadyLoaded && imageContainer) {
+            imageContainer.classList.add('has-image');
+        }
     }
 
 
@@ -596,31 +643,25 @@
 
         // Prepare onload handler to swap visibility cleanly
         upscaledImg.onload = () => {
+            // Remove skeleton loading animation
+            if (imageContainer) {
+                imageContainer.classList.add('has-image');
+            }
+            
             // Only hide original if we are still showing upscaled
             if (showingUpscaled && originalImg) {
                 originalImg.style.visibility = 'hidden';
                 originalImg.style.display = 'none';
-
-                // Unwrap the upscaled image from the stack to correct zoom behavior
-                if (stack && stack.parentNode) {
-                    // Move upscaled image out of stack
-                    stack.parentNode.insertBefore(upscaledImg, stack);
-
-                    // Remove stack
-                    stack.remove();
-
-                    // Clean up upscaled image styles
-                    upscaledImg.className = '';
-                    upscaledImg.classList.add('upscaled-active');
-                    upscaledImg.style.zIndex = '';
-                    upscaledImg.style.position = '';
-                    upscaledImg.style.maxWidth = '';
-                    upscaledImg.style.maxHeight = '';
-
-                    // Update viewer references
-                    if (window.initImageViewer) window.initImageViewer();
-                }
+                // Keep stack for comparison - don't unwrap it
             }
+        };
+
+        // Add error handler to remove skeleton on load failure
+        upscaledImg.onerror = () => {
+            if (imageContainer) {
+                imageContainer.classList.add('has-image', 'load-error');
+            }
+            console.error('Failed to load upscaled image:', upscaledUrl);
         };
 
         upscaledImg.src = upscaledUrl;
@@ -628,6 +669,25 @@
         // Show upscaled immediately (will load over original)
         upscaledImg.style.visibility = 'visible';
         upscaledImg.style.display = 'block';
+
+        // Fallback polling in case onload doesn't fire (e.g., hard refresh)
+        // Check every 100ms if image has actual dimensions
+        let loadCheckAttempts = 0;
+        const loadCheckInterval = setInterval(() => {
+            loadCheckAttempts++;
+            
+            // Check if image is actually loaded
+            if (upscaledImg.complete && upscaledImg.naturalWidth > 0) {
+                // Image loaded! Manually trigger onload logic
+                clearInterval(loadCheckInterval);
+                if (imageContainer) {
+                    imageContainer.classList.add('has-image');
+                }
+            } else if (loadCheckAttempts >= 100) {
+                // Timeout after 10 seconds - stop polling but don't give up on display
+                clearInterval(loadCheckInterval);
+            }
+        }, 100);
 
         // Update metadata
         updateMetadata(true, data);
@@ -657,15 +717,12 @@
                 originalImg.style.display = 'none';
             }
 
-            // Unwrap if inside stack
-            if (stack && stack.parentNode) {
-                stack.parentNode.insertBefore(upscaledImg, stack);
-                stack.remove();
-                upscaledImg.classList.add('upscaled-active');
-                if (window.initImageViewer) window.initImageViewer();
-            }
-
             showingUpscaled = true;
+            
+            // Ensure skeleton is removed since we're showing a cached image
+            if (imageContainer) {
+                imageContainer.classList.add('has-image');
+            }
 
             // If we have data cached from a check, use it
             updateMetadata(true);
@@ -873,80 +930,51 @@
 
         isComparing = true;
 
-        // If we unwrapped the image, we need to find the upscaled-active one
-        const activeUpscaled = imageContainer?.querySelector('img.upscaled-active');
-
-        if (activeUpscaled) {
-            // We need to bring back the original image to compare
-            // It might be gone if we removed the stack.
-            // We can recreate it from data-original-src or just reload logic
-            // But simpler: just hide upscaled and show original (if exists nearby or recreate)
-
-            // Check if we have original stored or can find it
-            let originalImg = imageContainer.querySelector('img:not(.upscaled-active)');
-
-            // If original is missing (because we removed stack), recreate it?
-            // Or better: Re-create the stack structure for comparison?
-
-            // Strategy: Just hide upscaled and show original
-            activeUpscaled.style.display = 'none';
-
-            if (!originalImg) {
-                // Create original if missing
-                originalImg = document.createElement('img');
-
-                // Determin correct source
-                let originalSrc = `/static/${currentFilepath}`;
-                if (currentFilepath.startsWith('http')) {
-                    originalSrc = currentFilepath;
-                } else if (!currentFilepath.startsWith('images/') && !currentFilepath.startsWith('/static/')) {
-                    originalSrc = `/static/images/${currentFilepath}`;
-                } else if (currentFilepath.startsWith('/static/')) { // Handle absolute static paths
-                    originalSrc = currentFilepath;
-                }
-
-                originalImg.src = originalSrc;
-                originalImg.className = 'original-recreated';
-                imageContainer.appendChild(originalImg);
-            }
-
-            // Sync dimensions and style to match upscaled exactly
-            originalImg.style.width = activeUpscaled.width + 'px';
-            originalImg.style.height = activeUpscaled.height + 'px';
-
-            // Copy transform if it exists on the upscaled image (though usually handled by viewer on container or target)
-            // But if viewer applies transform to the ELEMENT, we need to ensure viewer targets this new element
-            // Since we use delegation, viewer will pick it up on next event ? 
-            // NO, viewer maintains 'transformTarget'. 
-            // We need to trigger a viewer update or ensure styling is identical.
-
-            // If upscaled has transform style directly (from image viewer)
-            if (activeUpscaled.style.transform) {
-                originalImg.style.transform = activeUpscaled.style.transform;
-                originalImg.style.transformOrigin = activeUpscaled.style.transformOrigin;
-            }
-
-            // Important: Set these to block/visible
-            originalImg.style.display = 'block';
-            originalImg.style.visibility = 'visible';
-
-            updateMetadata(false);
-            return;
-        }
-
+        // Ensure stack exists for comparison
         const stack = ensureStack();
-        const upscaledImg = stack?.querySelector('img.upscaled');
-        const originalImg = stack?.querySelector('img:not(.upscaled)');
+        if (!stack) return;
+
+        const upscaledImg = stack.querySelector('img.upscaled');
+        const originalImg = stack.querySelector('img:not(.upscaled)');
+
+        // Hide upscaled, show original
         if (upscaledImg) {
             upscaledImg.style.visibility = 'hidden';
             upscaledImg.style.display = 'none';
         }
 
-        // Restore metadata to original
-        updateMetadata(false);
         if (originalImg) {
             originalImg.style.visibility = 'visible';
             originalImg.style.display = 'block';
+        }
+
+        updateMetadata(false);
+    }
+
+    /**
+     * Stop comparing (show upscaled again)
+     */
+    function stopComparison() {
+        if (!isComparing) return;
+
+        isComparing = false;
+
+        // Make sure stack exists
+        const stack = imageContainer?.querySelector('.image-stack');
+        if (!stack) return;
+
+        const upscaledImg = stack.querySelector('img.upscaled');
+        const originalImg = stack.querySelector('img:not(.upscaled)');
+
+        // Show upscaled again
+        if (upscaledImg) {
+            upscaledImg.style.visibility = 'visible';
+            upscaledImg.style.display = 'block';
+        }
+
+        if (originalImg) {
+            originalImg.style.visibility = 'hidden';
+            originalImg.style.display = 'none';
         }
     }
 
@@ -958,33 +986,26 @@
 
         isComparing = false;
 
-        const activeUpscaled = imageContainer?.querySelector('img.upscaled-active');
-        if (activeUpscaled) {
-            activeUpscaled.style.display = 'block';
-            activeUpscaled.style.visibility = 'visible';
-
-            const originalImg = imageContainer.querySelector('img.original-recreated') || imageContainer.querySelector('img:not(.upscaled-active)');
-            if (originalImg) {
-                originalImg.style.display = 'none';
-            }
-            updateMetadata(true);
-            return;
-        }
-
+        // Make sure stack exists
         const stack = imageContainer?.querySelector('.image-stack');
-        const upscaledImg = stack?.querySelector('img.upscaled');
-        const originalImg = stack?.querySelector('img:not(.upscaled)');
+        if (!stack) return;
+
+        const upscaledImg = stack.querySelector('img.upscaled');
+        const originalImg = stack.querySelector('img:not(.upscaled)');
+
+        // Show upscaled again
         if (upscaledImg) {
             upscaledImg.style.visibility = 'visible';
             upscaledImg.style.display = 'block';
         }
 
-        // Restore metadata to upscaled
-        updateMetadata(true);
         if (originalImg) {
             originalImg.style.visibility = 'hidden';
             originalImg.style.display = 'none';
         }
+
+        // Restore metadata to upscaled
+        updateMetadata(true);
     }
 
     /**

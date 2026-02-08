@@ -8,6 +8,7 @@ from . import api_blueprint
 from utils import api_handler
 from utils.request_helpers import require_json_body
 from utils.validation import validate_string
+from utils.file_utils import normalize_image_path
 import config
 
 
@@ -53,6 +54,7 @@ async def check_upscale():
     from services.upscaler_service import check_upscale_exists, get_upscale_url, get_upscaled_path
     
     filepath = validate_string(request.args.get('filepath'), 'filepath', min_length=1)
+    filepath = normalize_image_path(filepath)
     exists = check_upscale_exists(filepath)
     
     if exists:
@@ -96,6 +98,7 @@ async def upscale_image():
 
     data = await require_json_body(request)
     filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
+    filepath = normalize_image_path(filepath)
     force = data.get('force', False)
 
     result = await do_upscale(filepath, force=force)
@@ -114,6 +117,7 @@ async def delete_upscale():
 
     data = await require_json_body(request)
     filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
+    filepath = normalize_image_path(filepath)
 
     result = delete_upscaled_image(filepath)
     

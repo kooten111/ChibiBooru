@@ -10,6 +10,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Optional
 import time
+import hashlib
 
 import config
 
@@ -57,11 +58,40 @@ def get_upscale_url(filepath: str) -> Optional[str]:
     encoded_parts = [quote(part) for part in parts]
     encoded_path = '/'.join(encoded_parts)
     
-    if encoded_path.startswith('./static/'):
+    # Remove ./static/ prefix and use /upscaled/ route
+    if encoded_path.startswith('./static/upscaled/'):
+        return encoded_path.replace('./static/upscaled/', '/upscaled/')
+    elif encoded_path.startswith('static/upscaled/'):
+        return '/' + encoded_path.replace('static/', '')
+    elif encoded_path.startswith('./static/'):
         return encoded_path.replace('./static/', '/static/')
     elif encoded_path.startswith('static/'):
         return '/' + encoded_path
     return encoded_path
+
+
+def get_upscale_etag(filepath: str) -> str:
+    """
+    Generate an ETag for cache invalidation based on upscale status.
+    Changes whenever upscale is added/removed.
+    """
+    upscaled_path = get_upscaled_path(filepath)
+    upscale_exists = os.path.exists(upscaled_path)
+    
+    if upscale_exists:
+        # Include modification time in ETag if upscale exists
+        try:
+            mtime = os.path.getmtime(upscaled_path)
+            etag_string = f"{filepath}-upscaled-{mtime}"
+        except OSError:
+            etag_string = f"{filepath}-upscaled"
+    else:
+        # Simple ETag for original image
+        etag_string = f"{filepath}-original"
+    
+    # Generate a short hash
+    etag_hash = hashlib.md5(etag_string.encode()).hexdigest()
+    return f'"{etag_hash}"'
 
 
 # Progress tracking
@@ -185,42 +215,74 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
         
         logger.info(f"Upscaled {filepath}: {result['original_size']} -> {result['upscaled_size']} in {result['processing_time']:.2f}s")
         
+        # Update database with new dimensions
+        try:
+            from repositories.data_access import update_image_upscale_info
+            # Normalize filepath for DB lookup (remove ./static/images/ prefix if present)
+            db_path = filepath
+            if db_path.startswith('./static/images/'):
+                db_path = db_path.replace('./static/images/', '')
+            elif db_path.startswith('static/images/'):
+                 db_path = db_path.replace('static/images/', '')
+            
+            update_image_upscale_info(db_path, result['upscaled_size'][0], result['upscaled_size'][1])
+        except Exception as e:
+             logger.error(f"Failed to update database with upscale info for {filepath}: {e}")
+        
+        # Mark as completed in progress dict
+        active_upscales[filepath] = {
+            'status': 'completed',
+            'percentage': 100,
+            'message': 'Upscale complete',
+            'updated_at': time.time()
+        }
+        
     except MLWorkerConnectionError as e:
         # ML Worker connection failed
         result['error'] = "ML Worker is not available. The ML Worker process may not be running. Please check the server logs and try again."
         result['processing_time'] = time.time() - start_time
         logger.error(f"Upscale failed for {filepath}: ML Worker connection error: {e}", exc_info=True)
+        # Mark as failed in progress dict
+        active_upscales[filepath] = {
+            'status': 'failed',
+            'percentage': 0,
+            'message': result['error'],
+            'updated_at': time.time()
+        }
     except MLWorkerError as e:
         # Other ML Worker errors
         result['error'] = f"ML Worker error: {str(e)}"
         result['processing_time'] = time.time() - start_time
         logger.error(f"Upscale failed for {filepath}: ML Worker error: {e}", exc_info=True)
+        # Mark as failed in progress dict
+        active_upscales[filepath] = {
+            'status': 'failed',
+            'percentage': 0,
+            'message': result['error'],
+            'updated_at': time.time()
+        }
     except Exception as e:
         # Generic error handling
         error_msg = str(e)
         result['error'] = error_msg
         result['processing_time'] = time.time() - start_time
         logger.error(f"Upscale failed for {filepath}: {e}", exc_info=True)
-    except MLWorkerConnectionError as e:
-        # ML Worker connection failed
-        result['error'] = "ML Worker is not available. The ML Worker process may not be running. Please check the server logs and try again."
-        result['processing_time'] = time.time() - start_time
-        logger.error(f"Upscale failed for {filepath}: ML Worker connection error: {e}", exc_info=True)
-    except MLWorkerError as e:
-        # Other ML Worker errors
-        result['error'] = f"ML Worker error: {str(e)}"
-        result['processing_time'] = time.time() - start_time
-        logger.error(f"Upscale failed for {filepath}: ML Worker error: {e}", exc_info=True)
-    except Exception as e:
-        # Generic error handling
-        error_msg = str(e)
-        result['error'] = error_msg
-        result['processing_time'] = time.time() - start_time
-        logger.error(f"Upscale failed for {filepath}: {e}", exc_info=True)
+        # Mark as failed in progress dict
+        active_upscales[filepath] = {
+            'status': 'failed',
+            'percentage': 0,
+            'message': error_msg,
+            'updated_at': time.time()
+        }
     finally:
-        # Clean up progress
-        if filepath in active_upscales:
-            del active_upscales[filepath]
+        # Delay cleanup so frontend can poll final status
+        async def cleanup_progress():
+            await asyncio.sleep(3)  # Give frontend time to poll final state
+            if filepath in active_upscales:
+                del active_upscales[filepath]
+        
+        # Schedule cleanup task
+        asyncio.create_task(cleanup_progress())
     
     return result
 
@@ -258,6 +320,20 @@ def delete_upscaled_image(filepath: str) -> Dict:
                 break
         
         logger.info(f"Deleted upscaled image: {upscaled_path}")
+        
+        # Clear database info
+        try:
+            from repositories.data_access import update_image_upscale_info
+            # Normalize filepath for DB lookup
+            db_path = filepath
+            if db_path.startswith('./static/images/'):
+                db_path = db_path.replace('./static/images/', '')
+            elif db_path.startswith('static/images/'):
+                 db_path = db_path.replace('static/images/', '')
+
+            update_image_upscale_info(db_path, None, None)
+        except Exception as e:
+             logger.error(f"Failed to clear database upscale info for {filepath}: {e}")
         
     except Exception as e:
         result['error'] = str(e)

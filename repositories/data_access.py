@@ -176,6 +176,42 @@ def delete_image(filepath):
         return False
 
 
+def update_image_dimensions(filepath, width, height):
+    """Update the original dimensions of an image."""
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE images 
+                SET image_width = ?, image_height = ? 
+                WHERE filepath = ?
+            """, (width, height, filepath))
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Database error updating dimensions for {filepath}: {e}")
+        return False
+
+
+def update_image_upscale_info(filepath, width=None, height=None):
+    """
+    Update the upscaled dimensions of an image.
+    If width and height are None, it clears them (e.g. on deletion).
+    """
+    try:
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE images 
+                SET upscaled_width = ?, upscaled_height = ? 
+                WHERE filepath = ?
+            """, (width, height, filepath))
+            conn.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        print(f"Database error updating upscale info for {filepath}: {e}")
+        return False
+
 # ============================================================================
 # RELATIONSHIP QUERIES
 # ============================================================================

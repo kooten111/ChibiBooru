@@ -15,9 +15,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/upscaler.css') + '?v=1' }}">
 
     {# Preload main image with high priority - start loading ASAP #}
+    {# If upscaled version exists, preload that; otherwise preload original #}
     {% if not (filepath.endswith('.mp4') or filepath.endswith('.webm')) %}
-    <link rel=" preload"
-        href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
+    <link rel="preload"
+        href="{% if upscaled_image_url %}{{ upscaled_image_url }}{% else %}/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}{% endif %}"
         as="image" fetchpriority="high">
     {% endif %}
 
@@ -321,12 +322,21 @@
                                 else none) %}
                                 {% set height = first_source.image_height or (first_source.file.height if
                                 first_source.file else none) %}
-                                {% if width and height %}
-                                <div class="stat-box">
+                                <div class="stat-box" id="resolution-stat-box" {% if not (data.image_width and
+                                    data.image_height) %}style="display: none" {% endif %}>
                                     <div class="stat-label">Resolution</div>
-                                    <div class="stat-value" id="metadata-resolution">{{ width }}×{{ height }}</div>
+                                    <div class="stat-value" id="metadata-resolution"
+                                        data-original-resolution="{% if data.image_width and data.image_height %}{{ data.image_width }}×{{ data.image_height }}{% endif %}">
+                                        {% if data.image_width and data.image_height %}
+                                        {% if data.upscaled_width and data.upscaled_height %}
+                                        <span style="opacity: 0.7">{{ data.image_width }}×{{ data.image_height }}</span>
+                                        ➜ <strong>{{ data.upscaled_width }}×{{ data.upscaled_height }}</strong>
+                                        {% else %}
+                                        {{ data.image_width }}×{{ data.image_height }}
+                                        {% endif %}
+                                        {% endif %}
+                                    </div>
                                 </div>
-                                {% endif %}
                                 {% endif %}
 
                                 {% if metadata.sources %}
@@ -536,12 +546,17 @@
             <div class="image-and-actions-container">
                 <div class="image-view-wrapper">
                     <button class="image-nav-btn image-nav-prev" id="prevBtn" title="Previous image (←)">◀</button>
-                    <div class="image-view skeleton{% if data.image_width and data.image_height %} image-skeleton-sized{% endif %}"
-                        id="imageViewContainer" data-filepath="{{ filepath }}" {% if data.image_width and
-                        data.image_height %}data-width="{{ data.image_width }}" data-height="{{ data.image_height }}"
-                        style="--img-w: {{ data.image_width }}; --img-h: {{ data.image_height }};" {% endif %} {% if
-                        filepath.endswith('.zip') %}data-animation-type="zip"
-                        data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="24" {% endif %}>
+                    <div class="image-view skeleton{% if (data.upscaled_width and data.upscaled_height) or (data.image_width and data.image_height) %} image-skeleton-sized{% endif %}"
+                        id="imageViewContainer" data-filepath="{{ filepath }}" 
+                        {% if data.upscaled_width and data.upscaled_height %}
+                        data-width="{{ data.upscaled_width }}" data-height="{{ data.upscaled_height }}"
+                        style="--img-w: {{ data.upscaled_width }}; --img-h: {{ data.upscaled_height }};"
+                        {% elif data.image_width and data.image_height %}
+                        data-width="{{ data.image_width }}" data-height="{{ data.image_height }}"
+                        style="--img-w: {{ data.image_width }}; --img-h: {{ data.image_height }};"
+                        {% endif %}
+                        {% if filepath.endswith('.zip') %}data-animation-type="zip"
+                        data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="24"{% endif %}>
                         {% if filepath.endswith('.mp4') %}
                         <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
                             onloadeddata="this.closest('.image-view').classList.add('has-image')">
@@ -573,12 +588,14 @@
                         {% if upscaled_image_url %}
                         <img src="{{ upscaled_image_url }}" alt="Upscaled Image" fetchpriority="high"
                             onload="this.closest('.image-view').classList.add('has-image')"
+                            onerror="this.src='/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}'; this.onerror = null; this.closest('.image-view').classList.add('has-image');"
                             data-original-src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}">
                         <span class="animation-badge" style="background: rgba(0, 255, 128, 0.8);">Upscaled</span>
                         {% else %}
                         <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
                             alt="Image" fetchpriority="high"
-                            onload="this.closest('.image-view').classList.add('has-image')">
+                            onload="this.closest('.image-view').classList.add('has-image')"
+                            onerror="this.closest('.image-view').classList.add('has-image', 'load-error'); console.error('Image failed to load:', this.src);">
                         {% endif %}
                         {% endif %}
                     </div>
@@ -843,12 +860,46 @@
             if (imageView) {
                 const mediaElement = imageView.querySelector('img, video');
                 if (mediaElement) {
-                    // Check if already loaded (cached)
-                    if (mediaElement.tagName === 'IMG' && mediaElement.complete) {
-                        imageView.classList.add('has-image');
-                    } else if (mediaElement.tagName === 'VIDEO' && mediaElement.readyState >= 2) {
-                        imageView.classList.add('has-image');
+                    // Function to check if media is loaded and remove skeleton
+                    function removeSkeleton() {
+                        let isLoaded = false;
+                        
+                        if (mediaElement.tagName === 'IMG') {
+                            // Image is loaded if it's complete AND has actual dimensions
+                            isLoaded = mediaElement.complete && mediaElement.naturalWidth > 0;
+                        } else if (mediaElement.tagName === 'VIDEO') {
+                            // Video is loaded when metadata is ready
+                            isLoaded = mediaElement.readyState >= 2;
+                        }
+                        
+                        if (isLoaded) {
+                            imageView.classList.add('has-image');
+                            return true;
+                        }
+                        return false;
                     }
+                    
+                    // Check if already loaded (browser cache)
+                    if (removeSkeleton()) {
+                        return;
+                    }
+                    
+                    // Poll for actual image dimensions since onload might not fire on hard refresh
+                    // Check every 100ms for up to 10 seconds
+                    let attempts = 0;
+                    const maxAttempts = 100; // 100 * 100ms = 10 seconds
+                    const pollInterval = setInterval(() => {
+                        attempts++;
+                        
+                        if (removeSkeleton()) {
+                            clearInterval(pollInterval);
+                        } else if (attempts >= maxAttempts) {
+                            // Timeout - force remove skeleton to unblock UI
+                            clearInterval(pollInterval);
+                            console.warn('Image load timeout, removing skeleton');
+                            imageView.classList.add('has-image');
+                        }
+                    }, 100);
                 }
             }
         });
@@ -869,7 +920,7 @@
     <script src="{{ url_for('static', filename='js/animation-player.js', v='1.0') }}"></script>
     <script src="{{ url_for('static', filename='js/family-badge.js', v='3.0') }}"></script>
     <script src="{{ url_for('static', filename='js/favourites.js', v='1.0') }}"></script>
-    <script src="{{ url_for('static', filename='js/upscaler.js', v='1.0') }}"></script>
+    <script src="{{ url_for('static', filename='js/upscaler.js', v='1.1') }}"></script>
     <script src="{{ url_for('static', filename='js/related-images-loader.js', v='1.0') }}"></script>
 </body>
 

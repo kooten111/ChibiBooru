@@ -2,7 +2,7 @@
 Image detail and viewing routes.
 """
 
-from quart import render_template
+from quart import render_template, make_response
 import config
 from database import models
 from services import query_service
@@ -92,7 +92,7 @@ def register_routes(blueprint):
             ip_visible if isinstance(ip_visible, bool) else str(ip_visible).lower() in ('true', '1', 'yes')
         )
 
-        return await render_template(
+        html = await render_template(
             'image.html',
             filepath=filepath,
             thumbnail_path=thumbnail_path,
@@ -115,6 +115,18 @@ def register_routes(blueprint):
             similar_sidebar_show_chips=sidebar_show_chips,
             information_panel_default_collapsed=information_panel_default_collapsed
         )
+        
+        # Add cache-busting headers for dynamic content
+        response = await make_response(html)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        
+        # Add ETag based on upscale status for automatic cache invalidation
+        etag = upscaler_service.get_upscale_etag(lookup_path)
+        response.headers['ETag'] = etag
+        
+        return response
 
     @blueprint.route('/similar-visual/<path:filepath>')
     @login_required
@@ -138,7 +150,7 @@ def register_routes(blueprint):
         stats = query_service.get_enhanced_stats()
         thumbnail_path = get_thumbnail_path(filepath)
         
-        return await render_template(
+        html = await render_template(
             'similar_visual.html',
             filepath=filepath,
             thumbnail_path=thumbnail_path,
@@ -148,6 +160,13 @@ def register_routes(blueprint):
             stats=stats,
             app_name=config.APP_NAME
         )
+        
+        # Add cache-busting headers for dynamic content
+        response = await make_response(html)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
 
     @blueprint.route('/raw/<path:filepath>')
     @login_required
@@ -160,7 +179,7 @@ def register_routes(blueprint):
         raw_metadata = data.get('raw_metadata')
         stats = query_service.get_enhanced_stats()
 
-        return await render_template(
+        html = await render_template(
             'raw_data.html',
             filepath=filepath,
             raw_data=raw_metadata,
@@ -169,3 +188,10 @@ def register_routes(blueprint):
             random_tags=[],
             app_name=config.APP_NAME
         )
+        
+        # Add cache-busting headers for dynamic content
+        response = await make_response(html)
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response

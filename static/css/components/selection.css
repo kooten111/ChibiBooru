@@ -58,6 +58,7 @@
 .image-page .image-view.skeleton:not(.image-skeleton-sized):not(.has-image) {
     flex: 0 0 auto;
     align-self: center;
+    margin: auto;
     max-width: min(100%, 400px);
     max-height: min(100%, 400px);
 }
