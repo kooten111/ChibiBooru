@@ -17,6 +17,7 @@
     let upscalerReady = false;
     let originalMetadata = null;
     let upscaledMetadata = null;
+    let preloadedOriginalSrc = null;
 
     // DOM Elements
     let upscaleBtn = null;
@@ -159,6 +160,7 @@
             if (img) {
                 hasUpscaled = true;
                 showingUpscaled = true;
+                preloadOriginalForComparison();
             }
         }
 
@@ -216,6 +218,19 @@
 
         setupStackForExistingUpscaledImage(upscaledImg);
         return imageContainer.querySelector('.image-stack');
+    }
+
+    function preloadOriginalForComparison() {
+        if (!imageContainer) return;
+        const upscaledImg = imageContainer.querySelector('img[data-original-src]');
+        if (!upscaledImg) return;
+
+        const originalSrc = upscaledImg.dataset.originalSrc;
+        if (!originalSrc || preloadedOriginalSrc === originalSrc) return;
+
+        preloadedOriginalSrc = originalSrc;
+        const preloadImg = new Image();
+        preloadImg.src = originalSrc;
     }
 
     /**

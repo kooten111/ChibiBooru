@@ -778,6 +778,19 @@ body.image-page {
     filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
 }
 
+/* Optimize for zoom/pan performance - disable expensive properties during transform */
+body.focus-mode .image-page .image-view > img,
+body.focus-mode .image-page .image-view > video,
+body.focus-mode .image-page .image-view .image-stack,
+body.focus-mode .image-page .image-view .image-stack img {
+    transition: none !important;
+    animation: none !important;
+    filter: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+}
+
 .image-page .image-view video {
     cursor: default;
 }
