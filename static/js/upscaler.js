@@ -15,11 +15,68 @@
     let isComparing = false;
     let upscalerEnabled = false;
     let upscalerReady = false;
+    let originalMetadata = null;
+    let upscaledMetadata = null;
 
     // DOM Elements
     let upscaleBtn = null;
     let imageContainer = null;
     let hoverMenu = null;
+
+    /**
+     * Helper to format bytes
+     */
+    function formatBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 bytes';
+        const k = 1024;
+        const sizes = ['bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    /**
+     * Update image metadata (resolution, filesize, download link)
+     */
+    function updateMetadata(isUpscaled, data = null) {
+        const resEl = document.getElementById('metadata-resolution');
+        const sizeEl = document.getElementById('metadata-filesize');
+        const dlBtn = document.getElementById('download-btn');
+
+        // Initialize original metadata on first run
+        if (!originalMetadata) {
+            originalMetadata = {
+                resolution: resEl ? resEl.textContent : '',
+                filesize: sizeEl ? sizeEl.textContent : '',
+                downloadHref: dlBtn ? dlBtn.href : ''
+            };
+        }
+
+        if (isUpscaled) {
+            // Update cache if data provided
+            if (data) {
+                upscaledMetadata = data;
+            } else if (upscaledMetadata) {
+                data = upscaledMetadata;
+            }
+
+            if (data) {
+                if (resEl && data.upscaled_size) {
+                    resEl.textContent = `${data.upscaled_size[0]}×${data.upscaled_size[1]}`;
+                }
+                if (sizeEl && data.upscaled_filesize) {
+                    sizeEl.textContent = formatBytes(data.upscaled_filesize);
+                }
+                if (dlBtn && data.upscaled_url) {
+                    dlBtn.href = data.upscaled_url;
+                }
+            }
+        } else {
+            // Restore original
+            if (resEl) resEl.textContent = originalMetadata.resolution;
+            if (sizeEl) sizeEl.textContent = originalMetadata.filesize;
+            if (dlBtn) dlBtn.href = originalMetadata.downloadHref;
+        }
+    }
 
     /**
      * Initialize the upscaler module
@@ -431,7 +488,10 @@
             upscaleProgress = 100;
 
             // Show the upscaled image
-            showUpscaledImage(data.upscaled_url);
+            upscaleProgress = 100;
+
+            // Show the upscaled image with metadata update
+            showUpscaledImage(data.upscaled_url, data);
 
             showToast(`Upscaled in ${data.processing_time?.toFixed(1) || '?'}s`, 'success');
 
@@ -461,7 +521,10 @@
     /**
      * Show the upscaled image using a stacked approach for seamless switching
      */
-    function showUpscaledImage(upscaledUrl) {
+    /**
+     * Show the upscaled image using a stacked approach for seamless switching
+     */
+    function showUpscaledImage(upscaledUrl, data = null) {
         if (!imageContainer) return;
 
         // Get or create stack
@@ -531,18 +594,43 @@
             originalImg.dataset.originalSrc = originalImg.src;
         }
 
-        // Update upscaled source with cache buster
-        const cacheBuster = upscaledUrl.includes('?') ? '&t=' : '?t=';
-        upscaledImg.src = upscaledUrl + cacheBuster + Date.now();
+        // Prepare onload handler to swap visibility cleanly
+        upscaledImg.onload = () => {
+            // Only hide original if we are still showing upscaled
+            if (showingUpscaled && originalImg) {
+                originalImg.style.visibility = 'hidden';
+                originalImg.style.display = 'none';
 
-        // Show upscaled, hide original so only one image is visible
+                // Unwrap the upscaled image from the stack to correct zoom behavior
+                if (stack && stack.parentNode) {
+                    // Move upscaled image out of stack
+                    stack.parentNode.insertBefore(upscaledImg, stack);
+
+                    // Remove stack
+                    stack.remove();
+
+                    // Clean up upscaled image styles
+                    upscaledImg.className = '';
+                    upscaledImg.classList.add('upscaled-active');
+                    upscaledImg.style.zIndex = '';
+                    upscaledImg.style.position = '';
+                    upscaledImg.style.maxWidth = '';
+                    upscaledImg.style.maxHeight = '';
+
+                    // Update viewer references
+                    if (window.initImageViewer) window.initImageViewer();
+                }
+            }
+        };
+
+        upscaledImg.src = upscaledUrl;
+
+        // Show upscaled immediately (will load over original)
         upscaledImg.style.visibility = 'visible';
         upscaledImg.style.display = 'block';
-        const orig = stack.querySelector('img:not(.upscaled)');
-        if (orig) {
-            orig.style.visibility = 'hidden';
-            orig.style.display = 'none';
-        }
+
+        // Update metadata
+        updateMetadata(true, data);
 
         showingUpscaled = true;
         updateButtonState();
@@ -561,12 +649,26 @@
         if (upscaledImg && upscaledImg.src) {
             upscaledImg.style.visibility = 'visible';
             upscaledImg.style.display = 'block';
-            const orig = stack.querySelector('img:not(.upscaled)');
-            if (orig) {
-                orig.style.visibility = 'hidden';
-                orig.style.display = 'none';
+
+            // Hide original immediately since this is from cache/existing DOM
+            const originalImg = stack.querySelector('img:not(.upscaled)');
+            if (originalImg) {
+                originalImg.style.visibility = 'hidden';
+                originalImg.style.display = 'none';
             }
+
+            // Unwrap if inside stack
+            if (stack && stack.parentNode) {
+                stack.parentNode.insertBefore(upscaledImg, stack);
+                stack.remove();
+                upscaledImg.classList.add('upscaled-active');
+                if (window.initImageViewer) window.initImageViewer();
+            }
+
             showingUpscaled = true;
+
+            // If we have data cached from a check, use it
+            updateMetadata(true);
             updateButtonState();
             return;
         }
@@ -585,7 +687,7 @@
             .then(r => r.json())
             .then(data => {
                 if (data.upscaled_url) {
-                    showUpscaledImage(data.upscaled_url);
+                    showUpscaledImage(data.upscaled_url, data);
                 } else {
                     updateButtonState();
                 }
@@ -613,6 +715,7 @@
         }
 
         showingUpscaled = false;
+        updateMetadata(false);
         updateButtonState();
     }
 
@@ -770,6 +873,67 @@
 
         isComparing = true;
 
+        // If we unwrapped the image, we need to find the upscaled-active one
+        const activeUpscaled = imageContainer?.querySelector('img.upscaled-active');
+
+        if (activeUpscaled) {
+            // We need to bring back the original image to compare
+            // It might be gone if we removed the stack.
+            // We can recreate it from data-original-src or just reload logic
+            // But simpler: just hide upscaled and show original (if exists nearby or recreate)
+
+            // Check if we have original stored or can find it
+            let originalImg = imageContainer.querySelector('img:not(.upscaled-active)');
+
+            // If original is missing (because we removed stack), recreate it?
+            // Or better: Re-create the stack structure for comparison?
+
+            // Strategy: Just hide upscaled and show original
+            activeUpscaled.style.display = 'none';
+
+            if (!originalImg) {
+                // Create original if missing
+                originalImg = document.createElement('img');
+
+                // Determin correct source
+                let originalSrc = `/static/${currentFilepath}`;
+                if (currentFilepath.startsWith('http')) {
+                    originalSrc = currentFilepath;
+                } else if (!currentFilepath.startsWith('images/') && !currentFilepath.startsWith('/static/')) {
+                    originalSrc = `/static/images/${currentFilepath}`;
+                } else if (currentFilepath.startsWith('/static/')) { // Handle absolute static paths
+                    originalSrc = currentFilepath;
+                }
+
+                originalImg.src = originalSrc;
+                originalImg.className = 'original-recreated';
+                imageContainer.appendChild(originalImg);
+            }
+
+            // Sync dimensions and style to match upscaled exactly
+            originalImg.style.width = activeUpscaled.width + 'px';
+            originalImg.style.height = activeUpscaled.height + 'px';
+
+            // Copy transform if it exists on the upscaled image (though usually handled by viewer on container or target)
+            // But if viewer applies transform to the ELEMENT, we need to ensure viewer targets this new element
+            // Since we use delegation, viewer will pick it up on next event ? 
+            // NO, viewer maintains 'transformTarget'. 
+            // We need to trigger a viewer update or ensure styling is identical.
+
+            // If upscaled has transform style directly (from image viewer)
+            if (activeUpscaled.style.transform) {
+                originalImg.style.transform = activeUpscaled.style.transform;
+                originalImg.style.transformOrigin = activeUpscaled.style.transformOrigin;
+            }
+
+            // Important: Set these to block/visible
+            originalImg.style.display = 'block';
+            originalImg.style.visibility = 'visible';
+
+            updateMetadata(false);
+            return;
+        }
+
         const stack = ensureStack();
         const upscaledImg = stack?.querySelector('img.upscaled');
         const originalImg = stack?.querySelector('img:not(.upscaled)');
@@ -777,6 +941,9 @@
             upscaledImg.style.visibility = 'hidden';
             upscaledImg.style.display = 'none';
         }
+
+        // Restore metadata to original
+        updateMetadata(false);
         if (originalImg) {
             originalImg.style.visibility = 'visible';
             originalImg.style.display = 'block';
@@ -791,6 +958,19 @@
 
         isComparing = false;
 
+        const activeUpscaled = imageContainer?.querySelector('img.upscaled-active');
+        if (activeUpscaled) {
+            activeUpscaled.style.display = 'block';
+            activeUpscaled.style.visibility = 'visible';
+
+            const originalImg = imageContainer.querySelector('img.original-recreated') || imageContainer.querySelector('img:not(.upscaled-active)');
+            if (originalImg) {
+                originalImg.style.display = 'none';
+            }
+            updateMetadata(true);
+            return;
+        }
+
         const stack = imageContainer?.querySelector('.image-stack');
         const upscaledImg = stack?.querySelector('img.upscaled');
         const originalImg = stack?.querySelector('img:not(.upscaled)');
@@ -798,6 +978,9 @@
             upscaledImg.style.visibility = 'visible';
             upscaledImg.style.display = 'block';
         }
+
+        // Restore metadata to upscaled
+        updateMetadata(true);
         if (originalImg) {
             originalImg.style.visibility = 'hidden';
             originalImg.style.display = 'none';

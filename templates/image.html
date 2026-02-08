@@ -324,7 +324,7 @@
                                 {% if width and height %}
                                 <div class="stat-box">
                                     <div class="stat-label">Resolution</div>
-                                    <div class="stat-value">{{ width }}×{{ height }}</div>
+                                    <div class="stat-value" id="metadata-resolution">{{ width }}×{{ height }}</div>
                                 </div>
                                 {% endif %}
                                 {% endif %}
@@ -381,15 +381,18 @@
                                 <div class="stat-value"><span>{{ filepath.split('/')[-1] }}</span>{% if metadata.sources
                                     %}{% set first_source = metadata.sources.values()|list|first %}{% set file_size =
                                     first_source.file_size or (first_source.file.size if first_source.file else none)
-                                    %}{% if file_size %} <span class="file-size">{% if file_size >= 1048576 %}{{
+                                    %}{% if file_size %} <span class="file-size" id="metadata-filesize">{% if
+                                        file_size >= 1048576 %}{{
                                         "%.1f"|format(file_size / 1048576.0) }} MB{% elif file_size >= 1024 %}{{
-                                        "%.1f"|format(file_size / 1024.0) }} KB{% else %}{{ file_size }} bytes{% endif
+                                        "%.1f"|format(file_size / 1024.0) }} KB{% else %}{{ file_size }} bytes{%
+                                        endif
                                         %}</span>{% endif %}{% endif %}</div>
                             </div>
                         </div>
 
                         <!-- Sources Section -->
                         {% if metadata.sources %}
+
                         <div class="info-section">
                             <div class="info-row">
                                 <div class="info-label">Found On</div>
@@ -608,7 +611,7 @@
                             👁️
                         </a>
                         <a href="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                            download class="action-btn success" title="Download">
+                            download class="action-btn success" title="Download" id="download-btn">
                             💾
                         </a>
                         <button id="deleteImageBtn" class="action-btn danger" title="Delete Image">

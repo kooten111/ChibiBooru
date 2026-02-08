@@ -19,19 +19,30 @@ function initImageViewer() {
     };
 
     const getPreferredImgElement = (root) => {
-        const upscaled = root?.querySelector('.image-stack img.upscaled');
-        if (isVisibleImage(upscaled)) return upscaled;
+        // First check for unwrapped upscaled image
+        const upscaledActive = root?.querySelector('img.upscaled-active');
+        if (upscaledActive && isVisibleImage(upscaledActive)) return upscaledActive;
 
-        const stackImgs = root?.querySelectorAll('.image-stack img') || [];
-        for (const img of stackImgs) {
-            if (isVisibleImage(img)) return img;
+        // Then check for upscaled image in stack
+        const upscaled = root?.querySelector('.image-stack img.upscaled');
+        if (upscaled && isVisibleImage(upscaled)) return upscaled;
+
+        // Then check for any visible image in stack ensuring we don't pick hidden ones
+        const stackImgs = root?.querySelectorAll('.image-stack img');
+        if (stackImgs) {
+            for (const img of stackImgs) {
+                if (img.classList.contains('upscaled')) continue; // Already checked
+                if (isVisibleImage(img)) return img;
+            }
         }
 
         return root?.querySelector('img');
     };
 
-    // Target the stack wrapper if it exists (created by upscaler), otherwise the image itself
-    let transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
+    // Target the stack wrapper if it exists, otherwise the active upscaled image, or fallback to any image
+    let transformTarget = imageView?.querySelector('.image-stack') ||
+        imageView?.querySelector('img.upscaled-active') ||
+        imageView?.querySelector('img');
 
     // We also need access to the image for dimensions/cursor, prefer the upscaled if present
     let imgElement = getPreferredImgElement(imageView);
@@ -65,6 +76,12 @@ function initImageViewer() {
     const MAX_SCALE = 8;
 
     function toggleZoom() {
+        // Always refresh target before zooming to catch upscaled image
+        transformTarget = imageView?.querySelector('.image-stack') ||
+            imageView?.querySelector('img.upscaled-active') ||
+            imageView?.querySelector('img');
+        imgElement = getPreferredImgElement(imageView);
+
         if (scale === 1) {
             // Enter focus mode if not active
             if (!body.classList.contains('focus-mode')) {
@@ -179,6 +196,12 @@ function initImageViewer() {
 
     // Image click - toggle focus mode
     const imgClickHandler = function (event) {
+        // Refresh targets
+        transformTarget = imageView?.querySelector('.image-stack') ||
+            imageView?.querySelector('img.upscaled-active') ||
+            imageView?.querySelector('img');
+        imgElement = getPreferredImgElement(imageView);
+
         if (scale === 1) {
             event.stopPropagation();
             if (body.classList.contains('focus-mode')) {
@@ -192,7 +215,9 @@ function initImageViewer() {
     // Mouse wheel to zoom (only in focus mode)
     const wheelHandler = function (event) {
         // Refresh target reference in case it changed (e.g. upscaler init)
-        transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
+        transformTarget = imageView?.querySelector('.image-stack') ||
+            imageView?.querySelector('img.upscaled-active') ||
+            imageView?.querySelector('img');
         imgElement = getPreferredImgElement(imageView);
 
         if (!body.classList.contains('focus-mode') || !transformTarget) return;
@@ -371,43 +396,33 @@ function initImageViewer() {
 
     // Image zoom/pan events
     // Attach to container to catch events on any image inside
-    if (imageView) {
-        // We delegate click/mousedown to the container or specific images
-        // But for drag start, we want to listen on the image(s)
-        const bindImageEvents = (element) => {
-            if (!element) return;
-            element.addEventListener('click', imgClickHandler);
-            element.addEventListener('mousedown', mouseDownHandler);
-            element.addEventListener('contextmenu', contextMenuHandler);
-        };
 
-        // Bind to existing image
-        bindImageEvents(imgElement);
+    // Named handlers for delegation
+    const onDelegatedClick = (e) => {
+        if (e.target.tagName === 'IMG') {
+            imgClickHandler(e);
+        } else {
+            imageViewClickHandler(e);
+        }
+    };
 
-        // Observer to bind to new images (e.g. upscaled one added later)
-        const observer = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                for (const node of mutation.addedNodes) {
-                    if (node.tagName === 'IMG' || node.classList?.contains('image-stack')) {
-                        // Re-fetch targets
-                        transformTarget = imageView?.querySelector('.image-stack') || imageView?.querySelector('img');
-                        imgElement = getPreferredImgElement(imageView);
+    const onDelegatedMouseDown = (e) => {
+        if (e.target.tagName === 'IMG') {
+            mouseDownHandler(e);
+        }
+    };
 
-                        // Bind events if it's an image
-                        if (node.tagName === 'IMG') bindImageEvents(node);
-                        if (node.classList?.contains('image-stack')) {
-                            node.querySelectorAll('img').forEach(bindImageEvents);
-                        }
-                    }
-                }
-            }
-        });
-        observer.observe(imageView, { childList: true, subtree: true });
-    }
+    const onDelegatedContextMenu = (e) => {
+        if (e.target.tagName === 'IMG') {
+            contextMenuHandler(e);
+        }
+    };
 
     if (imageView) {
         imageView.addEventListener('wheel', wheelHandler, { passive: false });
-        imageView.addEventListener('click', imageViewClickHandler);
+        imageView.addEventListener('click', onDelegatedClick);
+        imageView.addEventListener('mousedown', onDelegatedMouseDown);
+        imageView.addEventListener('contextmenu', onDelegatedContextMenu);
     }
 
     document.addEventListener('mousemove', mouseMoveHandler);
@@ -430,22 +445,18 @@ function initImageViewer() {
         prevBtn?.removeEventListener('click', () => navigate('prev'));
         nextBtn?.removeEventListener('click', () => navigate('next'));
 
-        if (imgElement) {
-            imgElement.removeEventListener('click', imgClickHandler);
-            imgElement.removeEventListener('mousedown', mouseDownHandler);
-            imgElement.removeEventListener('contextmenu', contextMenuHandler);
-        }
-
         if (imageView) {
             imageView.removeEventListener('wheel', wheelHandler);
-            imageView.removeEventListener('click', imageViewClickHandler);
+            imageView.removeEventListener('click', onDelegatedClick);
+            imageView.removeEventListener('mousedown', onDelegatedMouseDown);
+            imageView.removeEventListener('contextmenu', onDelegatedContextMenu);
         }
 
         document.removeEventListener('mousemove', mouseMoveHandler);
         document.removeEventListener('mouseup', mouseUpHandler);
         document.removeEventListener('keydown', keydownHandler);
     };
-}
+};
 
 document.addEventListener('DOMContentLoaded', initImageViewer);
 

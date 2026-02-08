@@ -55,10 +55,33 @@ async def check_upscale():
     filepath = validate_string(request.args.get('filepath'), 'filepath', min_length=1)
     exists = check_upscale_exists(filepath)
     
+    if exists:
+        from services.upscaler_service import get_upscaled_path
+        import os
+        from PIL import Image
+        
+        upscaled_path = get_upscaled_path(filepath)
+        data = {
+            'filepath': filepath,
+            'has_upscaled': True,
+            'upscaled_url': get_upscale_url(filepath),
+            'upscaled_filesize': 0,
+            'upscaled_size': None
+        }
+        
+        try:
+            data['upscaled_filesize'] = os.path.getsize(upscaled_path)
+            with Image.open(upscaled_path) as img:
+                data['upscaled_size'] = [img.width, img.height]
+        except Exception:
+            pass
+            
+        return data
+
     return {
         'filepath': filepath,
-        'has_upscaled': exists,
-        'upscaled_url': get_upscale_url(filepath) if exists else None
+        'has_upscaled': False,
+        'upscaled_url': None
     }
 
 

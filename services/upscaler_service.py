@@ -174,6 +174,13 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
         result['upscaled_url'] = get_upscale_url(filepath)
         result['original_size'] = worker_result.get('original_size')
         result['upscaled_size'] = worker_result.get('upscaled_size')
+        
+        # Get file size
+        try:
+             result['upscaled_filesize'] = os.path.getsize(upscaled_path)
+        except OSError:
+             result['upscaled_filesize'] = 0
+
         result['processing_time'] = time.time() - start_time
         
         logger.info(f"Upscaled {filepath}: {result['original_size']} -> {result['upscaled_size']} in {result['processing_time']:.2f}s")
