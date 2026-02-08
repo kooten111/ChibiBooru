@@ -49,6 +49,19 @@ function initImageViewer() {
 
     if (!body.classList.contains('image-page')) return;
 
+    // Cache refs to avoid expensive DOM queries during interactions
+    let cachedStack = imageView?.querySelector('.image-stack');
+    let cachedUpscaledActive = imageView?.querySelector('img.upscaled-active');
+    let cachedImg = imageView?.querySelector('img');
+
+    function refreshTransformTarget() {
+        cachedStack = imageView?.querySelector('.image-stack');
+        cachedUpscaledActive = imageView?.querySelector('img.upscaled-active');
+        cachedImg = imageView?.querySelector('img');
+        transformTarget = cachedStack || cachedUpscaledActive || cachedImg;
+        imgElement = getPreferredImgElement(imageView);
+    }
+
     // Elements
     const sidebarLeft = document.getElementById('sidebarLeft');
     const sidebarRight = document.getElementById('sidebarRight');
@@ -72,15 +85,21 @@ function initImageViewer() {
     let isDragging = false;
     let startX = 0;
     let startY = 0;
+    let dragStartClientX = 0;
+    let dragStartClientY = 0;
+    let didDrag = false;
+    let suppressClick = false;
+    const DRAG_CLICK_THRESHOLD = 5;
     const MIN_SCALE = 1;
     const MAX_SCALE = 8;
+    let transformRaf = null;
+    let lastMoveTime = 0;
+    const MOVE_THROTTLE = 8; // ~120fps, allows browser to batch repaints
+    let cursorUpdateScheduled = false;
 
     function toggleZoom() {
-        // Always refresh target before zooming to catch upscaled image
-        transformTarget = imageView?.querySelector('.image-stack') ||
-            imageView?.querySelector('img.upscaled-active') ||
-            imageView?.querySelector('img');
-        imgElement = getPreferredImgElement(imageView);
+        // Refresh target only when toggling to catch upscaler changes
+        refreshTransformTarget();
 
         if (scale === 1) {
             // Enter focus mode if not active
@@ -136,11 +155,20 @@ function initImageViewer() {
         body.classList.add('focus-mode');
         toggleFocus?.classList.add('active');
 
+        // Minimal GPU hint - avoid expensive contain property during transform
+        if (transformTarget) {
+            transformTarget.style.backfaceVisibility = 'hidden';
+            transformTarget.style.WebkitBackfaceVisibility = 'hidden';
+            // Skip perspective and contain - they cause expensive composition
+        }
+
         // Reset focus hint animation
         if (focusHint) {
             focusHint.style.animation = 'none';
-            focusHint.offsetHeight; // Trigger reflow
-            focusHint.style.animation = null;
+            requestAnimationFrame(() => {
+                void focusHint.offsetHeight; // Trigger reflow in next frame
+                focusHint.style.animation = '';
+            });
         }
     }
 
@@ -149,6 +177,12 @@ function initImageViewer() {
         toggleFocus?.classList.remove('active');
         resetZoom();
         updateCursor();
+
+        // Clear GPU hints
+        if (transformTarget) {
+            transformTarget.style.backfaceVisibility = 'visible';
+            transformTarget.style.WebkitBackfaceVisibility = 'visible';
+        }
     }
 
     // ============================================================================
@@ -174,6 +208,27 @@ function initImageViewer() {
         }
     }
 
+    function scheduleTransformUpdate() {
+        if (transformRaf) return;
+        transformRaf = requestAnimationFrame(() => {
+            transformRaf = null;
+            updateTransform();
+            // Update cursor in same frame to avoid separate repaint
+            if (cursorUpdateScheduled) {
+                cursorUpdateScheduled = false;
+                updateCursor();
+            }
+        });
+    }
+
+    function scheduleCursorUpdate() {
+        cursorUpdateScheduled = true;
+        // Cursor will be updated in next scheduleTransformUpdate's RAF
+        if (!transformRaf) {
+            scheduleTransformUpdate();
+        }
+    }
+
     function resetZoom() {
         scale = 1;
         translateX = 0;
@@ -185,8 +240,10 @@ function initImageViewer() {
         if (!transformTarget) return;
         if (scale > 1) {
             transformTarget.style.cursor = isDragging ? 'grabbing' : 'grab';
+            transformTarget.style.willChange = 'transform';
         } else {
             transformTarget.style.cursor = 'zoom-in';
+            transformTarget.style.willChange = '';
         }
     }
 
@@ -196,12 +253,6 @@ function initImageViewer() {
 
     // Image click - toggle focus mode
     const imgClickHandler = function (event) {
-        // Refresh targets
-        transformTarget = imageView?.querySelector('.image-stack') ||
-            imageView?.querySelector('img.upscaled-active') ||
-            imageView?.querySelector('img');
-        imgElement = getPreferredImgElement(imageView);
-
         if (scale === 1) {
             event.stopPropagation();
             if (body.classList.contains('focus-mode')) {
@@ -214,26 +265,16 @@ function initImageViewer() {
 
     // Mouse wheel to zoom (only in focus mode)
     const wheelHandler = function (event) {
-        // Refresh target reference in case it changed (e.g. upscaler init)
-        transformTarget = imageView?.querySelector('.image-stack') ||
-            imageView?.querySelector('img.upscaled-active') ||
-            imageView?.querySelector('img');
-        imgElement = getPreferredImgElement(imageView);
-
         if (!body.classList.contains('focus-mode') || !transformTarget) return;
-
-        event.preventDefault();
-
+        
         const delta = -Math.sign(event.deltaY);
         const zoomIntensity = 0.1;
         const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * (1 + delta * zoomIntensity)));
 
         if (newScale !== scale) {
+            event.preventDefault();
             // Use imgElement for rect calculation to pivot around the image center
-            let rect = (imgElement || transformTarget).getBoundingClientRect();
-            if (!rect.width || !rect.height) {
-                rect = transformTarget.getBoundingClientRect();
-            }
+            const rect = (imgElement || transformTarget).getBoundingClientRect();
             const pointX = event.clientX;
             const pointY = event.clientY;
             const imgCenterX = rect.left + rect.width / 2;
@@ -244,8 +285,8 @@ function initImageViewer() {
             translateY = pointY - imgCenterY - (pointY - imgCenterY - translateY) * scaleChange;
 
             scale = newScale;
-            updateTransform();
-            updateCursor();
+            scheduleTransformUpdate();
+            scheduleCursorUpdate();
         }
     };
 
@@ -256,22 +297,53 @@ function initImageViewer() {
             isDragging = true;
             startX = event.clientX - translateX;
             startY = event.clientY - translateY;
-            updateCursor();
+            dragStartClientX = event.clientX;
+            dragStartClientY = event.clientY;
+            didDrag = false;
+            suppressClick = false;
+            // Hint browser to pre-composite during drag
+            if (transformTarget) {
+                transformTarget.style.willChange = 'transform';
+            }
+            // Disable pointer events on body to prevent hover effects during drag
+            transformTarget.style.pointerEvents = 'none';
+            scheduleCursorUpdate();
         }
     };
 
     const mouseMoveHandler = function (event) {
         if (isDragging) {
+            // Throttle pan updates to reduce repaint frequency
+            const now = performance.now();
+            if (now - lastMoveTime < MOVE_THROTTLE) return;
+            lastMoveTime = now;
+
+            if (!didDrag) {
+                const deltaX = Math.abs(event.clientX - dragStartClientX);
+                const deltaY = Math.abs(event.clientY - dragStartClientY);
+                if (deltaX > DRAG_CLICK_THRESHOLD || deltaY > DRAG_CLICK_THRESHOLD) {
+                    didDrag = true;
+                }
+            }
+
             translateX = event.clientX - startX;
             translateY = event.clientY - startY;
-            updateTransform();
+            scheduleTransformUpdate();
         }
     };
 
     const mouseUpHandler = function () {
         if (isDragging) {
             isDragging = false;
-            updateCursor();
+            if (didDrag) {
+                suppressClick = true;
+                didDrag = false;
+            }
+            if (transformTarget) {
+                transformTarget.style.pointerEvents = '';
+                transformTarget.style.willChange = 'auto'; // Release pre-composite hint
+            }
+            scheduleCursorUpdate();
         }
     };
 
@@ -399,6 +471,10 @@ function initImageViewer() {
 
     // Named handlers for delegation
     const onDelegatedClick = (e) => {
+        if (suppressClick) {
+            suppressClick = false;
+            return;
+        }
         if (e.target.tagName === 'IMG') {
             imgClickHandler(e);
         } else {
@@ -455,6 +531,11 @@ function initImageViewer() {
         document.removeEventListener('mousemove', mouseMoveHandler);
         document.removeEventListener('mouseup', mouseUpHandler);
         document.removeEventListener('keydown', keydownHandler);
+
+        if (transformRaf) {
+            cancelAnimationFrame(transformRaf);
+            transformRaf = null;
+        }
     };
 
     // ============================================================================
