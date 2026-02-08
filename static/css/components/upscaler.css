@@ -266,9 +266,10 @@
     height: fit-content;
     max-width: 100%;
     max-height: 100%;
+    position: relative;
 }
 
-.image-stack>img {
+.image-stack > img {
     grid-column: 1 / -1;
     grid-row: 1 / -1;
     width: auto;
@@ -276,4 +277,18 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+    /* Ensure proper stacking and visibility control */
+    transition: opacity 0.1s ease, visibility 0.1s ease;
+}
+
+/* Original image - shown during comparison (hidden by default) */
+.image-stack > img.original {
+    z-index: 1;
+    position: relative;
+}
+
+/* Upscaled image - shown normally (visible by default) */
+.image-stack > img.upscaled {
+    z-index: 2;
+    position: relative;
 }

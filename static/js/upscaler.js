@@ -234,10 +234,8 @@
         const isAlreadyLoaded = upscaledImg.complete && upscaledImg.naturalWidth > 0;
 
         // Create stack wrapper - fills container so both images use same frame (same size when comparing)
-        // Create stack wrapper - fills container so both images use same frame
         const stack = document.createElement('div');
         stack.className = 'image-stack';
-        // Remove inline styles that might conflict with grid
         stack.style.position = 'relative';
         stack.style.maxWidth = '100%';
         stack.style.maxHeight = '100%';
@@ -256,13 +254,20 @@
             upscaledImg.style.transformOrigin = '';
         }
 
-        // Enforce overlay positioning
         // Enforce overlay positioning (handled by CSS Grid in .image-stack)
         upscaledImg.style.position = '';
         upscaledImg.style.top = '';
         upscaledImg.style.left = '';
         upscaledImg.style.width = '';
         upscaledImg.style.height = '';
+
+        // Mark as upscaled and set proper z-index
+        upscaledImg.classList.add('upscaled');
+        upscaledImg.style.zIndex = '2';
+        upscaledImg.style.visibility = 'visible';
+        upscaledImg.style.display = 'block';
+        upscaledImg.style.opacity = '1';
+        upscaledImg.style.pointerEvents = 'auto';
 
         stack.appendChild(upscaledImg);
 
@@ -272,24 +277,27 @@
         originalImg.alt = 'Original Image';
         originalImg.className = 'original';
         originalImg.dataset.originalSrc = originalSrc;
-        originalImg.style.zIndex = '1';
 
-        // Style original to match overlay (handled by CSS Grid in .image-stack)
+        // Style for proper stacking
+        originalImg.style.zIndex = '1';
         originalImg.style.position = '';
         originalImg.style.top = '';
         originalImg.style.left = '';
         originalImg.style.width = '';
         originalImg.style.height = '';
-        
-        // Insert original as the first child (behind upscaled); CSS positions both in same box
-        stack.insertBefore(originalImg, upscaledImg);
-
-        upscaledImg.style.zIndex = '2';
-        upscaledImg.style.visibility = 'visible';
-        upscaledImg.style.display = 'block';
-
         originalImg.style.visibility = 'hidden';
         originalImg.style.display = 'none';
+        originalImg.style.opacity = '0';
+        originalImg.style.pointerEvents = 'none';
+        
+        // Insert original as the first child (behind upscaled in z-order)
+        stack.insertBefore(originalImg, upscaledImg);
+        
+        // Preload the original image to prevent stutter during comparison
+        // This ensures smooth switching between original and upscaled
+        const preloadImg = new Image();
+        preloadImg.src = originalSrc;
+        // No need to append to DOM, just let browser cache it
         
         // If the upscaled image was already loaded when we set up the stack,
         // manually add the has-image class since the onload event already fired
@@ -937,15 +945,21 @@
         const upscaledImg = stack.querySelector('img.upscaled');
         const originalImg = stack.querySelector('img:not(.upscaled)');
 
-        // Hide upscaled, show original
+        // Hide upscaled, show original - use multiple properties to ensure visibility
         if (upscaledImg) {
             upscaledImg.style.visibility = 'hidden';
             upscaledImg.style.display = 'none';
+            upscaledImg.style.opacity = '0';
+            upscaledImg.style.pointerEvents = 'none';
+            upscaledImg.style.zIndex = '1';
         }
 
         if (originalImg) {
             originalImg.style.visibility = 'visible';
             originalImg.style.display = 'block';
+            originalImg.style.opacity = '1';
+            originalImg.style.pointerEvents = 'auto';
+            originalImg.style.zIndex = '2';
         }
 
         updateMetadata(false);
@@ -970,38 +984,15 @@
         if (upscaledImg) {
             upscaledImg.style.visibility = 'visible';
             upscaledImg.style.display = 'block';
+            upscaledImg.style.opacity = '1';
+            upscaledImg.style.pointerEvents = 'auto';
         }
 
         if (originalImg) {
             originalImg.style.visibility = 'hidden';
             originalImg.style.display = 'none';
-        }
-    }
-
-    /**
-     * Stop comparing (show upscaled again)
-     */
-    function stopComparison() {
-        if (!isComparing) return;
-
-        isComparing = false;
-
-        // Make sure stack exists
-        const stack = imageContainer?.querySelector('.image-stack');
-        if (!stack) return;
-
-        const upscaledImg = stack.querySelector('img.upscaled');
-        const originalImg = stack.querySelector('img:not(.upscaled)');
-
-        // Show upscaled again
-        if (upscaledImg) {
-            upscaledImg.style.visibility = 'visible';
-            upscaledImg.style.display = 'block';
-        }
-
-        if (originalImg) {
-            originalImg.style.visibility = 'hidden';
-            originalImg.style.display = 'none';
+            originalImg.style.opacity = '0';
+            originalImg.style.pointerEvents = 'none';
         }
 
         // Restore metadata to upscaled
