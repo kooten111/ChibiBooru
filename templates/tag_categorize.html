@@ -45,7 +45,8 @@
                     Import
                 </button>
                 <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
-                <button class="action-btn action-btn-success" onclick="syncBaseCategories()">
+                <button class="action-btn action-btn-success" onclick="syncBaseCategories()"
+                    title="Update base categories (general/meta) based on their extended categories. Character, artist, copyright, and species tags are not affected.">
                     Sync Base Categories
                 </button>
             </div>
