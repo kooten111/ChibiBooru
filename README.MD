@@ -52,9 +52,8 @@ A self-hosted booru application for organizing and browsing your local image col
 - **Tag Editing:**
   - Inline tag editor with category management
   - Switch between metadata sources on-the-fly
-  - Tag delta tracking preserves manual edits across rebuilds
   
-- **Tag Implications:**
+- **Tag Implications (WIP):**
   - Automatic detection via naming patterns and statistical analysis
   - Manual creation and approval workflow
   - Chain preview before applying
@@ -86,10 +85,10 @@ A self-hosted booru application for organizing and browsing your local image col
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/kooten111/ChibiBooru
 cd ChibiBooru
 
-# Create a virtual environment (optional - start_booru.sh will create it if missing)
+# Create a virtual environment (3.12 is tested)
 python3 -m venv venv
 
 # Run (handles setup wizard, dependencies, and starts the server)
