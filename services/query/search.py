@@ -120,6 +120,7 @@ def _apply_filters(
     extension_filter,
     filename_filter,
     upscaled_filter,
+    upscaled_filter_exclude,
 ):
     """Apply filters to the SQL query by adding WHERE clauses and JOINs."""
     tag_columns = [
@@ -208,7 +209,9 @@ def _apply_filters(
         where_clauses.append("LOWER(i.filepath) LIKE ?")
         params.append(f"%{filename_filter}%")
 
-    if upscaled_filter:
+    if upscaled_filter_exclude:
+        where_clauses.append("i.upscaled_width IS NULL AND i.upscaled_height IS NULL")
+    elif upscaled_filter:
         where_clauses.append("i.upscaled_width IS NOT NULL AND i.upscaled_height IS NOT NULL")
 
 
@@ -333,6 +336,7 @@ def _fts_search(
     relationship_filter,
     pool_filter,
     upscaled_filter,
+    upscaled_filter_exclude,
     order_filter=None,
 ):
     """Perform full-text search using FTS5 and apply filters."""
@@ -415,6 +419,7 @@ def _fts_search(
         extension_filter,
         filename_filter,
         upscaled_filter,
+        upscaled_filter_exclude,
     )
 
     if where_clauses:
@@ -459,6 +464,7 @@ def perform_search(search_query):
     order_filter = None
     favourite_filter = False
     upscaled_filter = False
+    upscaled_filter_exclude = False
     category_filters = {}
     general_terms = []
     negative_terms = []
@@ -487,6 +493,10 @@ def perform_search(search_query):
                 pool_filter = "_ANY_"
             elif rel_type in ["upscaled", "upscale"]:
                 upscaled_filter = True
+        elif token.startswith("-has:"):
+            rel_type = token.split(":", 1)[1].strip()
+            if rel_type in ["upscaled", "upscale"]:
+                upscaled_filter_exclude = True
         elif token.startswith("is:"):
             is_type = token.split(":", 1)[1].strip()
             if is_type in ["favourite", "favorite", "fav"]:
@@ -560,6 +570,7 @@ def perform_search(search_query):
             relationship_filter,
             pool_filter,
             upscaled_filter,
+            upscaled_filter_exclude,
             order_filter,
         )
         should_shuffle = False
@@ -599,11 +610,15 @@ def perform_search(search_query):
                 img for img in results if img and img["filepath"] in relationship_images
             ]
 
-        if upscaled_filter:
+        if upscaled_filter or upscaled_filter_exclude:
+            if upscaled_filter_exclude:
+                query = "SELECT filepath FROM images WHERE upscaled_width IS NULL AND upscaled_height IS NULL"
+            else:
+                query = "SELECT filepath FROM images WHERE upscaled_width IS NOT NULL AND upscaled_height IS NOT NULL"
+
             with get_db_connection() as conn:
-                upscaled_rows = conn.execute(
-                    "SELECT filepath FROM images WHERE upscaled_width IS NOT NULL AND upscaled_height IS NOT NULL"
-                ).fetchall()
+                upscaled_rows = conn.execute(query).fetchall()
+
             upscaled_filepaths = {row["filepath"] for row in upscaled_rows}
             results = [
                 img for img in results if img and img["filepath"] in upscaled_filepaths
