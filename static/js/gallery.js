@@ -68,6 +68,7 @@
             { label: 'Has Parent', query: 'has:parent', icon: '↑' },
             { label: 'Has Children', query: 'has:child', icon: '↓' },
             { label: 'In Pool', query: 'has:pool', icon: '📚' },
+            { label: 'Has Upscaled', query: 'has:upscaled', icon: '✨' },
             { label: 'Favourites', query: 'is:favourite', icon: '⭐' }
         ]
     };

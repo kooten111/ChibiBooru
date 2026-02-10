@@ -96,6 +96,8 @@ def autocomplete(query: str = ''):
             ("source:local_tagger", "Locally tagged images", "local"),
             ("has:parent", "Images with parent", "parent"),
             ("has:child", "Images with children", "child"),
+            ("has:upscaled", "Images with upscaled version", ("upscale", "upscaled", "4x")),
+            ("has:upscale", "Images with upscaled version", ("upscale", "upscaled", "4x")),
             ("is:favourite", "Favourited images", "favourite"),
             ("is:favourite", "Favourited images", "fav"),
             ("pool:", "Search pools", "pool"),

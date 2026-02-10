@@ -208,6 +208,8 @@ def initialize_database():
             'colorhash': 'TEXT',  # Color hash for color similarity
             'image_width': 'INTEGER',  # Original image width in pixels
             'image_height': 'INTEGER',  # Original image height in pixels
+            'upscaled_width': 'INTEGER',  # Upscaled image width in pixels
+            'upscaled_height': 'INTEGER',  # Upscaled image height in pixels
         }
 
         cur.execute("PRAGMA table_info(images);")

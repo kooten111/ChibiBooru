@@ -119,6 +119,7 @@ def _apply_filters(
     source_filters,
     extension_filter,
     filename_filter,
+    upscaled_filter,
 ):
     """Apply filters to the SQL query by adding WHERE clauses and JOINs."""
     tag_columns = [
@@ -206,6 +207,9 @@ def _apply_filters(
     if filename_filter:
         where_clauses.append("LOWER(i.filepath) LIKE ?")
         params.append(f"%{filename_filter}%")
+
+    if upscaled_filter:
+        where_clauses.append("i.upscaled_width IS NOT NULL AND i.upscaled_height IS NOT NULL")
 
 
 def _post_filter_results(conn, rows, general_terms):
@@ -328,6 +332,7 @@ def _fts_search(
     extension_filter,
     relationship_filter,
     pool_filter,
+    upscaled_filter,
     order_filter=None,
 ):
     """Perform full-text search using FTS5 and apply filters."""
@@ -409,6 +414,7 @@ def _fts_search(
         source_filters,
         extension_filter,
         filename_filter,
+        upscaled_filter,
     )
 
     if where_clauses:
@@ -452,6 +458,7 @@ def perform_search(search_query):
     metadata_filter = None
     order_filter = None
     favourite_filter = False
+    upscaled_filter = False
     category_filters = {}
     general_terms = []
     negative_terms = []
@@ -478,6 +485,8 @@ def perform_search(search_query):
                 relationship_filter = "any" if rel_type == "relationship" else rel_type
             elif rel_type == "pool":
                 pool_filter = "_ANY_"
+            elif rel_type in ["upscaled", "upscale"]:
+                upscaled_filter = True
         elif token.startswith("is:"):
             is_type = token.split(":", 1)[1].strip()
             if is_type in ["favourite", "favorite", "fav"]:
@@ -550,6 +559,7 @@ def perform_search(search_query):
             extension_filter,
             relationship_filter,
             pool_filter,
+            upscaled_filter,
             order_filter,
         )
         should_shuffle = False
@@ -587,6 +597,16 @@ def perform_search(search_query):
             }
             results = [
                 img for img in results if img and img["filepath"] in relationship_images
+            ]
+
+        if upscaled_filter:
+            with get_db_connection() as conn:
+                upscaled_rows = conn.execute(
+                    "SELECT filepath FROM images WHERE upscaled_width IS NOT NULL AND upscaled_height IS NOT NULL"
+                ).fetchall()
+            upscaled_filepaths = {row["filepath"] for row in upscaled_rows}
+            results = [
+                img for img in results if img and img["filepath"] in upscaled_filepaths
             ]
 
         if source_filters:
