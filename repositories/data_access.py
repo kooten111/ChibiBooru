@@ -199,8 +199,6 @@ def update_image_upscale_info(filepath, width=None, height=None):
     If width and height are None, it clears them (e.g. on deletion).
     """
     try:
-        # Debug print
-        # print(f"Updating upscale info for {filepath}: {width}x{height}")
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -209,7 +207,6 @@ def update_image_upscale_info(filepath, width=None, height=None):
                 WHERE filepath = ?
             """, (width, height, filepath))
             conn.commit()
-            # print(f"Rows affected: {cursor.rowcount}")
             return cursor.rowcount > 0
     except Exception as e:
         print(f"Database error updating upscale info for {filepath}: {e}")
