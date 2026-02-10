@@ -255,8 +255,8 @@ def main():
     parser = argparse.ArgumentParser(description='Automatically categorize tags using a local LLM')
     parser.add_argument('--api-url', type=str, default=CHIBIBOORU_API_URL,
                         help=f'ChibiBooru API base URL (default: {CHIBIBOORU_API_URL})')
-    parser.add_argument('--batch-size', type=int, default=100,
-                        help='Number of tags to process per batch (default: 100)')
+    parser.add_argument('--batch-size', type=int, default=2500,
+                        help='Number of tags to process per batch (default: 2500)')
     parser.add_argument('--limit', type=int, default=None,
                         help='Maximum total number of tags to process (default: unlimited)')
     parser.add_argument('--dry-run', action='store_true',

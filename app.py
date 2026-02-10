@@ -65,6 +65,47 @@ def create_app():
             if not any(path.startswith(p) for p in allowed_paths):
                 return redirect('/startup')
 
+    # Helper function for importing default categorizations
+    async def _import_default_categorizations():
+        """Import default tag categorizations if file exists and this is a first run."""
+        from pathlib import Path
+        import json
+        
+        default_cat_file = Path(__file__).parent / "data" / "default_tag_categorizations.json"
+        
+        # Check if file exists
+        if not default_cat_file.exists():
+            logger.debug("No default tag categorizations file found")
+            return
+        
+        try:
+            # Check if database already has categorizations (not first run)
+            from database import get_db_connection
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("SELECT COUNT(*) as count FROM tags WHERE extended_category IS NOT NULL")
+                result = cur.fetchone()
+                categorized_count = result['count'] if result else 0
+            
+            # Only import if no categorizations exist yet
+            if categorized_count > 0:
+                logger.debug(f"Database already has {categorized_count} categorized tags, skipping default import")
+                return
+            
+            # Load and import the default categorizations
+            with open(default_cat_file, 'r') as f:
+                data = json.load(f)
+            
+            from services import tag_categorization_service
+            stats = tag_categorization_service.import_tag_categorizations(data, mode='merge')
+            
+            logger.info(f"Imported default tag categorizations: {stats['updated']} updated, {stats['skipped']} skipped")
+            if stats.get('errors'):
+                logger.warning(f"Import errors: {stats['errors']}")
+                
+        except Exception as e:
+            logger.warning(f"Failed to import default tag categorizations: {e}")
+
     # Heavy initialization runs as a BACKGROUND TASK (non-blocking)
     @app.before_serving
     async def start_background_init():
@@ -95,6 +136,11 @@ def create_app():
             await asyncio.sleep(0)
             startup_health_check()
             
+            _init_status = "Importing default tag categorizations..."
+            _init_progress = 37
+            await asyncio.sleep(0)
+            await _import_default_categorizations()
+            
             _init_status = "Checking priority changes..."
             _init_progress = 45
             await asyncio.sleep(0)
@@ -116,6 +162,7 @@ def create_app():
             logger.error(f"Initialization failed: {e}")
             _init_status = f"Error: {e}"
             raise
+
 
     # Note: Monitor service is now run as a standalone process (monitor_runner.py)
     # and is started by start_booru.sh. This prevents duplicate monitors when

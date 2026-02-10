@@ -677,7 +677,11 @@ def process_image_file(filepath, move_from_ingest=True):
             "sources": all_results
         }
         
-        # Insert into database
+        # Mark image_info if it should use merged sources
+        if should_merge_sources:
+            image_info['use_merged_source'] = True
+        
+        # Insert into database (only real booru sources in the list)
         success = models.add_image_with_metadata(
             image_info,
             list(all_results.keys()),

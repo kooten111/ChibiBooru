@@ -472,6 +472,49 @@ def setup_models():
     return config_changes
 
 
+def setup_default_tag_categorizations() -> bool:
+    """
+    Optionally import default tag categorizations during setup.
+    
+    Returns:
+        True if import was performed, False otherwise
+    """
+    print_section("🏷️  Default Tag Categorizations")
+    
+    default_cat_file = PROJECT_ROOT / "data" / "default_tag_categorizations.json"
+    
+    if not default_cat_file.exists():
+        print("  ℹ️  No default tag categorizations file found.")
+        print("     You can create one by exporting your categorizations later.")
+        return False
+    
+    print("  Found default tag categorizations file.")
+    print("  This contains common tag categories to help organize your tags.")
+    print()
+    
+    if not prompt_yes_no("Import default tag categorizations?", default=True):
+        print("  ℹ️  You can import categorizations later from the web UI.")
+        return False
+    
+    try:
+        import json
+        from pathlib import Path
+        
+        # This will be done asynchronously during app startup
+        # For now, just confirm the file exists
+        with open(default_cat_file, 'r') as f:
+            data = json.load(f)
+        
+        tag_count = len(data.get('tags', {}))
+        print(f"  ✓ Ready to import {tag_count} tag categorizations")
+        print("    (Will be imported when the app starts)")
+        return True
+        
+    except Exception as e:
+        print(f"  ⚠ Failed to validate categorizations file: {e}")
+        return False
+
+
 def is_first_run() -> bool:
     """Check if this is a fresh installation needing setup."""
     env_vars = read_env_file()
@@ -556,6 +599,9 @@ def main():
     # Apply model config changes
     if model_config_changes:
         write_config_yml(model_config_changes)
+    
+    # Default tag categorizations
+    setup_default_tag_categorizations()
     
     # Summary
     print_summary(env_changes, model_config_changes)

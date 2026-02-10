@@ -491,13 +491,14 @@ def export_tag_categorizations(categorized_only: bool = False) -> Dict:
         }
 
 
-def import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict:
+def import_tag_categorizations(data: Dict, mode: str = 'merge', create_missing: bool = False) -> Dict:
     """
     Import tag categorizations from exported data.
 
     Args:
         data: Exported categorization data
         mode: Import mode - 'merge' (keep existing), 'overwrite' (replace all), or 'update' (only update existing)
+        create_missing: If True, create non-existent tags in the database
 
     Returns:
         Dict with import statistics
@@ -509,6 +510,7 @@ def import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict:
     stats = {
         'total': len(tags_data),
         'updated': 0,
+        'created': 0,
         'skipped': 0,
         'errors': []
     }
@@ -529,10 +531,19 @@ def import_tag_categorizations(data: Dict, mode: str = 'merge') -> Dict:
                 row = cur.fetchone()
 
                 if not row:
-                    # Tag doesn't exist - skip it
-                    # New tags should only be created when images are imported from sources
-                    # that provide the correct base category (character, artist, etc.)
-                    stats['skipped'] += 1
+                    if create_missing:
+                        # Create new tag
+                        base_category = get_base_category_from_extended(category) if category else 'general'
+                        
+                        cur.execute(
+                            "INSERT INTO tags (name, category, extended_category) VALUES (?, ?, ?)",
+                            (tag_name, base_category, category)
+                        )
+                        stats['created'] += 1
+                    else:
+                        # Tag doesn't exist and we're not creating it - skip
+                        stats['skipped'] += 1
+                    
                     continue
 
                 existing_category = row['extended_category']

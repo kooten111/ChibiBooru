@@ -59,8 +59,8 @@ function updateStatsDisplay(data) {
         // Use meaningful counts if available (tags actually used in images)
         // Otherwise fall back to basic counts for faster loading
         const hasMeaningful = data.meaningful_categorized !== undefined &&
-                             data.meaningful_categorized > 0 ||
-                             data.meaningful_uncategorized > 0;
+            data.meaningful_categorized > 0 ||
+            data.meaningful_uncategorized > 0;
 
         const categorized = hasMeaningful ? data.meaningful_categorized : data.categorized;
         const uncategorized = hasMeaningful ? data.meaningful_uncategorized : data.uncategorized;
@@ -420,6 +420,7 @@ function closeImportModal() {
 
 async function confirmImport() {
     const mode = document.querySelector('input[name="importMode"]:checked').value;
+    const createMissing = document.getElementById('createMissingTags')?.checked || false;
 
     if (!importFileData) {
         showNotification('No import data available', 'error');
@@ -433,7 +434,7 @@ async function confirmImport() {
     try {
         showNotification('Importing tag categorizations...', 'info');
 
-        const response = await fetch(`/api/tag_categorize/import?mode=${mode}`, {
+        const response = await fetch(`/api/tag_categorize/import?mode=${mode}&create_missing=${createMissing}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -444,7 +445,8 @@ async function confirmImport() {
         const result = await response.json();
 
         if (result.success) {
-            showNotification(`Import completed! Updated: ${result.updated}, Skipped: ${result.skipped}`, 'success');
+            const createdMsg = result.created > 0 ? `, Created: ${result.created}` : '';
+            showNotification(`Import completed! Updated: ${result.updated}${createdMsg}, Skipped: ${result.skipped}`, 'success');
 
             // Reload tags and stats
             await loadStats();

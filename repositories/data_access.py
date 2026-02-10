@@ -199,6 +199,8 @@ def update_image_upscale_info(filepath, width=None, height=None):
     If width and height are None, it clears them (e.g. on deletion).
     """
     try:
+        # Debug print
+        # print(f"Updating upscale info for {filepath}: {width}x{height}")
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -207,6 +209,7 @@ def update_image_upscale_info(filepath, width=None, height=None):
                 WHERE filepath = ?
             """, (width, height, filepath))
             conn.commit()
+            # print(f"Rows affected: {cursor.rowcount}")
             return cursor.rowcount > 0
     except Exception as e:
         print(f"Database error updating upscale info for {filepath}: {e}")
@@ -536,12 +539,20 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            # Determine active_source based on BOORU_PRIORITY
+            # Determine active_source based on priority
+            # Check if this image should use merged source (passed via image_info)
+            use_merged = image_info.pop('use_merged_source', False)
+            
             active_source = None
-            for priority_source in config.BOORU_PRIORITY:
-                if priority_source in source_names:
-                    active_source = priority_source
-                    break
+            if use_merged:
+                active_source = 'merged'
+            else:
+                # Use BOORU_PRIORITY order
+                for priority_source in config.BOORU_PRIORITY:
+                    if priority_source in source_names:
+                        active_source = priority_source
+                        break
+            
             # If no priority match, use first available source
             if not active_source and source_names:
                 active_source = source_names[0]

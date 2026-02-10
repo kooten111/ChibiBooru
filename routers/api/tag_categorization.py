@@ -140,10 +140,12 @@ async def api_import_categorizations():
         raise ValueError("No data provided")
 
     mode = request.args.get('mode', 'merge')
+    create_missing = request.args.get('create_missing', 'false').lower() == 'true'
+    
     if mode not in ['merge', 'overwrite', 'update']:
         raise ValueError("Invalid mode. Must be one of: merge, overwrite, update")
 
-    stats = tag_cat.import_tag_categorizations(data, mode=mode)
+    stats = tag_cat.import_tag_categorizations(data, mode=mode, create_missing=create_missing)
 
     # Reload data to update in-memory cache (async to avoid blocking)
     from core.cache_manager import trigger_cache_reload_async
