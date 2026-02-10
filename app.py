@@ -97,9 +97,9 @@ def create_app():
                 data = json.load(f)
             
             from services import tag_categorization_service
-            stats = tag_categorization_service.import_tag_categorizations(data, mode='merge')
+            stats = tag_categorization_service.import_tag_categorizations(data, mode='merge', create_missing=True)
             
-            logger.info(f"Imported default tag categorizations: {stats['updated']} updated, {stats['skipped']} skipped")
+            logger.info(f"Imported default tag categorizations: {stats['created']} created, {stats['updated']} updated, {stats['skipped']} skipped")
             if stats.get('errors'):
                 logger.warning(f"Import errors: {stats['errors']}")
                 
