@@ -558,7 +558,7 @@
                         {% if filepath.endswith('.zip') %}data-animation-type="zip"
                         data-md5="{{ metadata.md5 if metadata else '' }}" data-fps="24"{% endif %}>
                         {% if filepath.endswith('.mp4') %}
-                        <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
+                        <video controls loop preload="auto" autoplay muted poster="/static/{{ thumbnail_path | urlencode_path }}"
                             onloadeddata="this.closest('.image-view').classList.add('has-image')">
                             <source
                                 src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
@@ -566,7 +566,7 @@
                             Your browser does not support the video tag.
                         </video>
                         {% elif filepath.endswith('.webm') %}
-                        <video controls loop preload="metadata" poster="/static/{{ thumbnail_path | urlencode_path }}"
+                        <video controls loop preload="auto" autoplay muted poster="/static/{{ thumbnail_path | urlencode_path }}"
                             onloadeddata="this.closest('.image-view').classList.add('has-image')">
                             <source
                                 src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
@@ -581,7 +581,7 @@
                         {% elif filepath.endswith(('.gif', '.webp', '.apng')) %}
                         {# Animated images - play natively with their own embedded FPS #}
                         <img src="/static/{% if not filepath.startswith('images/') %}images/{% endif %}{{ filepath | urlencode_path }}"
-                            alt="Animated Image" fetchpriority="high"
+                            alt="Animated Image" fetchpriority="high" decoding="async"
                             onload="this.closest('.image-view').classList.add('has-image')">
                         <span class="animation-badge">Animated</span>
                         {% else %}
