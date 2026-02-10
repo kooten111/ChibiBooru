@@ -98,6 +98,8 @@ def autocomplete(query: str = ''):
             ("has:child", "Images with children", "child"),
             ("has:upscaled", "Images with upscaled version", ("upscale", "upscaled", "4x")),
             ("has:upscale", "Images with upscaled version", ("upscale", "upscaled", "4x")),
+            (".gif", "GIF images", "gif"),
+            ("has:video", "Videos (mp4/webm)", ("video", "mp4", "webm")),
             ("is:favourite", "Favourited images", "favourite"),
             ("is:favourite", "Favourited images", "fav"),
             ("pool:", "Search pools", "pool"),

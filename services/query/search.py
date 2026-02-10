@@ -117,7 +117,7 @@ def _apply_filters(
     pool_filter,
     relationship_filter,
     source_filters,
-    extension_filter,
+    extension_filters,
     filename_filter,
     upscaled_filter,
     upscaled_filter_exclude,
@@ -201,9 +201,12 @@ def _apply_filters(
         where_clauses.append(f"s.name IN ({placeholders})")
         params.extend(source_filters)
 
-    if extension_filter:
-        where_clauses.append("LOWER(i.filepath) LIKE ?")
-        params.append(f"%.{extension_filter}")
+    if extension_filters:
+        extension_conditions = []
+        for ext in extension_filters:
+            extension_conditions.append("LOWER(i.filepath) LIKE ?")
+            params.append(f"%.{ext}")
+        where_clauses.append("(" + " OR ".join(extension_conditions) + ")")
 
     if filename_filter:
         where_clauses.append("LOWER(i.filepath) LIKE ?")
@@ -332,7 +335,7 @@ def _fts_search(
     negative_terms,
     source_filters,
     filename_filter,
-    extension_filter,
+    extension_filters,
     relationship_filter,
     pool_filter,
     upscaled_filter,
@@ -416,7 +419,7 @@ def _fts_search(
         pool_filter,
         relationship_filter,
         source_filters,
-        extension_filter,
+        extension_filters,
         filename_filter,
         upscaled_filter,
         upscaled_filter_exclude,
@@ -457,7 +460,7 @@ def perform_search(search_query):
     tokens = search_query.lower().split()
     source_filters = []
     filename_filter = None
-    extension_filter = None
+    extension_filters = []
     relationship_filter = None
     pool_filter = None
     metadata_filter = None
@@ -484,7 +487,7 @@ def perform_search(search_query):
         elif token.startswith("order:"):
             order_filter = token.split(":", 1)[1].strip()
         elif token.startswith("."):
-            extension_filter = token[1:]
+            extension_filters.append(token[1:])
         elif token.startswith("has:"):
             rel_type = token.split(":", 1)[1].strip()
             if rel_type in ["parent", "child", "relationship"]:
@@ -493,6 +496,8 @@ def perform_search(search_query):
                 pool_filter = "_ANY_"
             elif rel_type in ["upscaled", "upscale"]:
                 upscaled_filter = True
+            elif rel_type == "video":
+                extension_filters.extend(["mp4", "webm"])
         elif token.startswith("-has:"):
             rel_type = token.split(":", 1)[1].strip()
             if rel_type in ["upscaled", "upscale"]:
@@ -566,7 +571,7 @@ def perform_search(search_query):
             negative_terms,
             source_filters,
             filename_filter,
-            extension_filter,
+            extension_filters,
             relationship_filter,
             pool_filter,
             upscaled_filter,
@@ -627,11 +632,15 @@ def perform_search(search_query):
         if source_filters:
             results = models.search_images_by_multiple_sources(source_filters)
 
-        if extension_filter:
+        if extension_filters:
             results = [
                 img
                 for img in results
-                if img and img["filepath"].lower().endswith(f".{extension_filter}")
+                if img
+                and any(
+                    img["filepath"].lower().endswith(f".{ext}")
+                    for ext in extension_filters
+                )
             ]
 
         if filename_filter:
@@ -761,7 +770,7 @@ def perform_search(search_query):
             results = filtered_results
 
         should_shuffle = bool(general_terms) and not (
-            source_filters or filename_filter or extension_filter
+            source_filters or filename_filter or extension_filters
         )
 
     # Apply rating filter to both FTS and non-FTS paths

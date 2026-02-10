@@ -69,6 +69,8 @@
             { label: 'Has Children', query: 'has:child', icon: '↓' },
             { label: 'In Pool', query: 'has:pool', icon: '📚' },
             { label: 'Has Upscaled', query: 'has:upscaled', icon: '✨' },
+            { label: 'GIFs', query: '.gif', icon: '🖼️' },
+            { label: 'Videos', query: 'has:video', icon: '🎥' },
             { label: 'Favourites', query: 'is:favourite', icon: '⭐' }
         ]
     };
