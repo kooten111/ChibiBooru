@@ -390,6 +390,9 @@
    ============================================ */
 .filter-group {
     margin-bottom: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
 }
 
 .filter-label {

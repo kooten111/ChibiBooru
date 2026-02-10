@@ -67,6 +67,7 @@
 .image-page .image-view.skeleton.image-skeleton-sized:not(.has-image) {
     flex: 0 0 auto;
     align-self: center;
+    margin: auto;
     height: 100%;
     aspect-ratio: var(--img-w, 1) / var(--img-h, 1);
     max-width: 100%;

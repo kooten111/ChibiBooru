@@ -13,9 +13,10 @@ async def fetch_tags():
     limit = int(request.args.get('limit', 100))
     search = request.args.get('search', '').lower().strip()
     category = request.args.get('category', 'all')
+    hide_orphaned = request.args.get('hide_orphaned', 'true').lower() == 'true'
 
     # Use optimized SQL search
-    tags_page, total = models.search_tags(search, category, limit, offset)
+    tags_page, total = models.search_tags(search, category, limit, offset, hide_orphaned)
 
     return {
         'tags': tags_page,

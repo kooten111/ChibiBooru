@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tagsContainer = document.getElementById('tagsListContainer');
     const categoryButtons = document.querySelectorAll('.category-filter-btn');
     const loadingIndicator = document.getElementById('loadingIndicator');
+    const hideOrphanedToggle = document.getElementById('hideOrphanedToggle');
 
     // Configuration
     const INITIAL_BATCH_SIZE = 300;
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let hasMore = true;
     let isLoading = false;
     let currentSearch = '';
+    let hideOrphaned = true;
     let preloadedBatch = null; // Cache for preloaded tags
 
     if (!searchInput) return;
@@ -51,12 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
     observer.observe(sentinel);
 
     // Fetch tags from API
-    async function fetchTags(offset, limit, search = '', category = 'all') {
+    async function fetchTags(offset, limit, search = '', category = 'all', hideOrphanedTags = false) {
         const params = new URLSearchParams({
             offset: offset.toString(),
             limit: limit.toString(),
             search: search,
-            category: category
+            category: category,
+            hide_orphaned: hideOrphanedTags.toString()
         });
 
         const response = await fetch(`/api/tags/fetch?${params}`);
@@ -77,7 +80,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 nextOffset,
                 PRELOAD_BATCH_SIZE,
                 currentSearch,
-                activeCategory
+                activeCategory,
+                hideOrphaned
             );
         } catch (error) {
             console.error('Preload failed:', error);
@@ -134,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 // Fetch fresh data
                 const batchSize = currentOffset === 0 ? INITIAL_BATCH_SIZE : LOAD_MORE_BATCH_SIZE;
-                data = await fetchTags(currentOffset, batchSize, currentSearch, activeCategory);
+                data = await fetchTags(currentOffset, batchSize, currentSearch, activeCategory, hideOrphaned);
             }
 
             renderTags(data.tags);
@@ -252,6 +256,14 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(handleSearch, 300); // 300ms debounce
     });
+
+    // Hide orphaned toggle handler
+    if (hideOrphanedToggle) {
+        hideOrphanedToggle.addEventListener('change', () => {
+            hideOrphaned = hideOrphanedToggle.checked;
+            resetAndReload();
+        });
+    }
 
     // Initial load
     loadMoreTags();

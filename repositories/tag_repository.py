@@ -51,7 +51,7 @@ def get_all_tags_sorted():
         return [dict(row) for row in conn.execute(query).fetchall()]
 
 
-def search_tags(query=None, category=None, limit=100, offset=0):
+def search_tags(query=None, category=None, limit=100, offset=0, hide_orphaned=True):
     """
     Search for tags with pagination and filtering using SQL.
     
@@ -60,6 +60,7 @@ def search_tags(query=None, category=None, limit=100, offset=0):
         category: Category filter ('all' or specific category)
         limit: Max results
         offset: Pagination offset
+        hide_orphaned: If True, exclude tags with 0 images (default: True)
         
     Returns:
         Tuple (tags, total_count)
@@ -86,6 +87,10 @@ def search_tags(query=None, category=None, limit=100, offset=0):
             sql_parts.append("WHERE " + " AND ".join(where_clauses))
             
         sql_parts.append("GROUP BY t.id")
+        
+        if hide_orphaned:
+            sql_parts.append("HAVING COUNT(it.image_id) > 0")
+            
         sql_parts.append("ORDER BY t.name ASC")
         sql_parts.append("LIMIT ? OFFSET ?")
         params.extend([limit, offset])
@@ -93,13 +98,25 @@ def search_tags(query=None, category=None, limit=100, offset=0):
         full_query = " ".join(sql_parts)
         
         # Get total count for pagination
-        count_sql_parts = ["SELECT COUNT(*) FROM tags t"]
-        if where_clauses:
-            count_sql_parts.append("WHERE " + " AND ".join(where_clauses))
-            
-        count_query = " ".join(count_sql_parts)
-        # Use params excluding limit and offset for count query
-        total = conn.execute(count_query, params[:-2]).fetchone()[0]
+        if hide_orphaned:
+            # For count with hide_orphaned, we need to use the same subquery logic
+            count_sql_parts = ["""SELECT COUNT(*) FROM (
+                SELECT t.id
+                FROM tags t
+                LEFT JOIN image_tags it ON t.id = it.tag_id
+            """]
+            if where_clauses:
+                count_sql_parts.append("WHERE " + " AND ".join(where_clauses))
+            count_sql_parts.append("GROUP BY t.id HAVING COUNT(it.image_id) > 0)")
+            count_query = " ".join(count_sql_parts)
+            total = conn.execute(count_query, params[:-2]).fetchone()[0]
+        else:
+            count_sql_parts = ["SELECT COUNT(*) FROM tags t"]
+            if where_clauses:
+                count_sql_parts.append("WHERE " + " AND ".join(where_clauses))
+            count_query = " ".join(count_sql_parts)
+            # Use params excluding limit and offset for count query
+            total = conn.execute(count_query, params[:-2]).fetchone()[0]
         
         tags = [dict(row) for row in conn.execute(full_query, params).fetchall()]
         
