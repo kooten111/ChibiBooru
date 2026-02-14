@@ -179,10 +179,10 @@
             if (img) {
                 hasUpscaled = true;
                 showingUpscaled = true;
-                
+
                 // Create stack immediately to avoid layout shift
                 ensureStack();
-                
+
                 preloadOriginalForComparison();
 
                 // Fetch upscaled resolution data and cache it
@@ -293,19 +293,9 @@
         // Insert stack and move upscaled image into it
         upscaledImg.parentNode.insertBefore(stack, upscaledImg);
 
-        // Transfer zoom/pan state if exists (fix for double-zoom glitch)
-        if (upscaledImg.style.transform) {
-            stack.style.transform = upscaledImg.style.transform;
-            stack.style.cursor = upscaledImg.style.cursor;
-            stack.style.transformOrigin = upscaledImg.style.transformOrigin || '0 0';
-
-            upscaledImg.style.transform = '';
-            upscaledImg.style.cursor = '';
-            upscaledImg.style.transformOrigin = '';
-        } else {
-            // Ensure transform-origin is set even if no transform exists yet
-            stack.style.transformOrigin = '0 0';
-        }
+        // Image keeps its transform (transforms target the image directly now).
+        // Stack only needs transform-origin set for when comparison mode transfers transform to it.
+        stack.style.transformOrigin = '0 0';
 
         // Enforce overlay positioning (handled by CSS Grid in .image-stack)
         upscaledImg.style.position = '';
@@ -350,16 +340,16 @@
         originalImg.style.display = 'none';
         originalImg.style.opacity = '0';
         originalImg.style.pointerEvents = 'none';
-        
+
         // Insert original as the first child (behind upscaled in z-order)
         stack.insertBefore(originalImg, upscaledImg);
-        
+
         // Preload the original image to prevent stutter during comparison
         // This ensures smooth switching between original and upscaled
         const preloadImg = new Image();
         preloadImg.src = originalSrc;
         // No need to append to DOM, just let browser cache it
-        
+
         // If the upscaled image was already loaded when we set up the stack,
         // manually add the has-image class since the onload event already fired
         if (isAlreadyLoaded && imageContainer) {
@@ -716,7 +706,7 @@
             if (imageContainer) {
                 imageContainer.classList.add('has-image');
             }
-            
+
             // Only hide original if we are still showing upscaled
             if (showingUpscaled && originalImg) {
                 originalImg.style.visibility = 'hidden';
@@ -744,7 +734,7 @@
         let loadCheckAttempts = 0;
         const loadCheckInterval = setInterval(() => {
             loadCheckAttempts++;
-            
+
             // Check if image is actually loaded
             if (upscaledImg.complete && upscaledImg.naturalWidth > 0) {
                 // Image loaded! Manually trigger onload logic
@@ -787,7 +777,7 @@
             }
 
             showingUpscaled = true;
-            
+
             // Ensure skeleton is removed since we're showing a cached image
             if (imageContainer) {
                 imageContainer.classList.add('has-image');
@@ -1009,6 +999,40 @@
         const upscaledImg = stack.querySelector('img.upscaled');
         const originalImg = stack.querySelector('img:not(.upscaled)');
 
+        // Calculate image's centering offset within the stack (before layout changes)
+        const imgOffsetX = (stack.clientWidth - (upscaledImg?.clientWidth || 0)) / 2;
+        const imgOffsetY = (stack.clientHeight - (upscaledImg?.clientHeight || 0)) / 2;
+
+        // Transfer transform from image to stack, adjusting for centering offset
+        if (upscaledImg && upscaledImg.style.transform) {
+            const scaleMatch = upscaledImg.style.transform.match(/scale\(([^)]+)\)/);
+            const translateMatch = upscaledImg.style.transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+
+            const s = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+            const tx = translateMatch ? parseFloat(translateMatch[1]) : 0;
+            const ty = translateMatch ? parseFloat(translateMatch[2]) : 0;
+
+            // Convert from image-origin coords to stack-origin coords
+            const stackTX = tx + imgOffsetX * (1 - s);
+            const stackTY = ty + imgOffsetY * (1 - s);
+
+            stack.style.transform = `translate(${stackTX}px, ${stackTY}px) scale(${s})`;
+            stack.style.transformOrigin = '0 0';
+            upscaledImg.style.transform = '';
+            upscaledImg.style.transformOrigin = '';
+        }
+
+        // Add comparing class (changes images to position:absolute overlay)
+        stack.classList.add('comparing');
+
+        // Tell image-viewer to retarget to the stack
+        if (window.imageViewerAPI?.refreshTransformTarget) {
+            window.imageViewerAPI.refreshTransformTarget();
+        }
+        if (window.imageViewerAPI?.recalculateTransformForNewTarget) {
+            window.imageViewerAPI.recalculateTransformForNewTarget();
+        }
+
         // Hide upscaled, show original - use multiple properties to ensure visibility
         if (upscaledImg) {
             upscaledImg.style.visibility = 'hidden';
@@ -1057,6 +1081,40 @@
             originalImg.style.display = 'none';
             originalImg.style.opacity = '0';
             originalImg.style.pointerEvents = 'none';
+        }
+
+        // Remove comparing class (image returns to flex-sized layout)
+        stack.classList.remove('comparing');
+
+        // Calculate image's centering offset (after layout change back to flex)
+        const imgOffsetX = (stack.clientWidth - (upscaledImg?.clientWidth || 0)) / 2;
+        const imgOffsetY = (stack.clientHeight - (upscaledImg?.clientHeight || 0)) / 2;
+
+        // Transfer transform from stack back to image, adjusting for centering offset
+        if (stack.style.transform && upscaledImg) {
+            const scaleMatch = stack.style.transform.match(/scale\(([^)]+)\)/);
+            const translateMatch = stack.style.transform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+
+            const s = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+            const stx = translateMatch ? parseFloat(translateMatch[1]) : 0;
+            const sty = translateMatch ? parseFloat(translateMatch[2]) : 0;
+
+            // Convert from stack-origin coords back to image-origin coords
+            const imgTX = stx - imgOffsetX * (1 - s);
+            const imgTY = sty - imgOffsetY * (1 - s);
+
+            upscaledImg.style.transform = `translate(${imgTX}px, ${imgTY}px) scale(${s})`;
+            upscaledImg.style.transformOrigin = '0 0';
+            stack.style.transform = '';
+            stack.style.transformOrigin = '';
+        }
+
+        // Tell image-viewer to retarget to the image
+        if (window.imageViewerAPI?.refreshTransformTarget) {
+            window.imageViewerAPI.refreshTransformTarget();
+        }
+        if (window.imageViewerAPI?.recalculateTransformForNewTarget) {
+            window.imageViewerAPI.recalculateTransformForNewTarget();
         }
 
         // Restore metadata to upscaled

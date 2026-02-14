@@ -39,8 +39,9 @@ function initImageViewer() {
         return root?.querySelector('img');
     };
 
-    // Target the stack wrapper if it exists, otherwise the active upscaled image, or fallback to any image
-    let transformTarget = imageView?.querySelector('.image-stack') ||
+    // Target the visible image directly for transforms (not the stack wrapper).
+    // Stack is only used as target during comparison mode.
+    let transformTarget = getPreferredImgElement(imageView) ||
         imageView?.querySelector('img.upscaled-active') ||
         imageView?.querySelector('img');
 
@@ -58,7 +59,16 @@ function initImageViewer() {
         cachedStack = imageView?.querySelector('.image-stack');
         cachedUpscaledActive = imageView?.querySelector('img.upscaled-active');
         cachedImg = imageView?.querySelector('img');
-        transformTarget = cachedStack || cachedUpscaledActive || cachedImg;
+
+        // During comparison, target the stack so both images move together.
+        // Otherwise, target the visible image directly for correct zoom quality.
+        const isComparing = cachedStack?.classList.contains('comparing');
+        if (cachedStack && isComparing) {
+            transformTarget = cachedStack;
+        } else {
+            const visibleImg = getPreferredImgElement(imageView);
+            transformTarget = visibleImg || cachedUpscaledActive || cachedImg;
+        }
         imgElement = getPreferredImgElement(imageView);
     }
 
@@ -189,13 +199,6 @@ function initImageViewer() {
         body.classList.add('focus-mode');
         toggleFocus?.classList.add('active');
 
-        // Minimal GPU hint - avoid expensive contain property during transform
-        if (transformTarget) {
-            transformTarget.style.backfaceVisibility = 'hidden';
-            transformTarget.style.WebkitBackfaceVisibility = 'hidden';
-            // Skip perspective and contain - they cause expensive composition
-        }
-
         // Reset focus hint animation
         if (focusHint) {
             focusHint.style.animation = 'none';
@@ -211,12 +214,6 @@ function initImageViewer() {
         toggleFocus?.classList.remove('active');
         resetZoom();
         updateCursor();
-
-        // Clear GPU hints
-        if (transformTarget) {
-            transformTarget.style.backfaceVisibility = 'visible';
-            transformTarget.style.WebkitBackfaceVisibility = 'visible';
-        }
     }
 
     // ============================================================================
@@ -275,10 +272,12 @@ function initImageViewer() {
         if (!transformTarget) return;
         if (scale > 1) {
             transformTarget.style.cursor = isDragging ? 'grabbing' : 'grab';
-            transformTarget.style.willChange = 'transform';
+            // NOTE: Do NOT set will-change or backfaceVisibility here.
+            // These promote the element to a compositing layer, causing the browser
+            // to rasterize at layout size (e.g. 862px) and scale the cached texture.
+            // For high-res images (6372px), this makes zoom look blurry.
         } else {
             transformTarget.style.cursor = 'zoom-in';
-            transformTarget.style.willChange = '';
         }
     }
 
@@ -301,7 +300,7 @@ function initImageViewer() {
     // Mouse wheel to zoom (only in focus mode)
     const wheelHandler = function (event) {
         if (!body.classList.contains('focus-mode') || !transformTarget) return;
-        
+
         const delta = -Math.sign(event.deltaY);
         const zoomIntensity = 0.1;
         const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * (1 + delta * zoomIntensity)));
@@ -312,7 +311,7 @@ function initImageViewer() {
             const rect = transformTarget.getBoundingClientRect();
             const pointX = event.clientX;
             const pointY = event.clientY;
-            
+
             // rect already includes current transform, so just adjust based on scale change
             const scaleRatio = newScale / scale;
             translateX = translateX + (pointX - rect.left) * (1 - scaleRatio);
