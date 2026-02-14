@@ -7,11 +7,18 @@ from database import models
 from services import processing
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from utils.logging_config import get_logger
+
+logger = get_logger('MonitorService')
 
 # --- Shared Monitor State ---
 monitor_thread = None
 observer = None
 ingest_executor = None  # Global ThreadPoolExecutor (changed from ProcessPoolExecutor)
+
+# Thread-safe set of files currently queued/in-progress to prevent double-submission
+_files_in_progress = set()
+_files_lock = threading.Lock()
 monitor_status = {
     "running": False,
     "last_check": None,
@@ -160,7 +167,7 @@ class ImageFileHandler(FileSystemEventHandler):
         self.recently_processed[filepath] = now
         return True
         
-    def handle_file_completion(self, future, is_from_ingest, filename):
+    def handle_file_completion(self, future, is_from_ingest, filename, abs_filepath=None):
         """Callback for when file processing completes."""
         try:
             result = future.result()
@@ -179,6 +186,11 @@ class ImageFileHandler(FileSystemEventHandler):
                 
         except Exception as e:
             add_log(f"Error processing {filename}: {e}", 'error')
+        finally:
+            # Always release from tracking set when done
+            if abs_filepath:
+                with _files_lock:
+                    _files_in_progress.discard(abs_filepath)
 
     def on_created(self, event):
         """Called when a file is created."""
@@ -214,16 +226,27 @@ class ImageFileHandler(FileSystemEventHandler):
                 if rel_path in models.get_all_filepaths():
                     return
 
+            # Prevent double-submission: check if this file is already queued/in-progress
+            with _files_lock:
+                if abs_filepath in _files_in_progress:
+                    logger.debug(f"Watchdog skipping {filename} - already in progress")
+                    return
+                _files_in_progress.add(abs_filepath)
+
             add_log(f"Detected {filename}, queuing for processing...", 'info')
+            logger.debug(f"Watchdog queuing: {abs_filepath}")
             
             # Submit to global executor with unified processing function
             if ingest_executor:
                 future = ingest_executor.submit(processing.process_image_file, filepath, is_from_ingest)
                 # Use partial to pass extra args to callback
                 from functools import partial
-                future.add_done_callback(partial(self.handle_file_completion, is_from_ingest=is_from_ingest, filename=filename))
+                future.add_done_callback(partial(self.handle_file_completion, is_from_ingest=is_from_ingest, filename=filename, abs_filepath=abs_filepath))
             else:
                 add_log("Executor not ready, skipping processing.", 'error')
+                # Release from tracking set on failure
+                with _files_lock:
+                    _files_in_progress.discard(abs_filepath)
                 
         except Exception as e:
             # Log but don't crash the watchdog thread
@@ -254,14 +277,17 @@ def find_ingest_files():
 def find_unprocessed_images():
     """
     Finds image files on disk that are not in the database.
-    Also checks for MD5 duplicates and removes them automatically.
+    Also checks for MD5 duplicates and removes them automatically,
+    but only if the file is not currently being processed by another thread.
     """
     import hashlib
     from database import get_db_connection
+    from .processing.locks import acquire_processing_lock, release_processing_lock
     
     db_filepaths = models.get_all_filepaths()
     unprocessed_files = []
     duplicates_removed = 0
+    skipped_in_progress = 0
 
     # Check static/images directory
     for root, _, files in os.walk("static/images"):
@@ -279,10 +305,29 @@ def find_unprocessed_images():
                         with get_db_connection() as conn:
                             row = conn.execute('SELECT filepath FROM images WHERE md5 = ?', (md5,)).fetchone()
                             if row:
-                                # This is a duplicate file - same content, different name
-                                add_log(f"Auto-removing duplicate: {file} (same as {os.path.basename(row['filepath'])})", 'warning')
-                                os.remove(filepath)
-                                duplicates_removed += 1
+                                # Before deleting, check if another thread is actively processing this MD5
+                                lock_fd, acquired = acquire_processing_lock(md5)
+                                if not acquired:
+                                    # Another thread is actively processing this MD5 — do NOT delete
+                                    logger.debug(f"Skipping duplicate removal for {file} (MD5 {md5}) - currently being processed")
+                                    skipped_in_progress += 1
+                                    continue
+                                
+                                try:
+                                    # Re-verify inside lock that the DB entry still exists
+                                    row = conn.execute('SELECT filepath FROM images WHERE md5 = ?', (md5,)).fetchone()
+                                    if row:
+                                        # This is a duplicate file - same content, different name
+                                        logger.info(f"Auto-removing duplicate: {file} (MD5: {md5}, same as {row['filepath']})")
+                                        add_log(f"Auto-removing duplicate: {file} (same as {os.path.basename(row['filepath'])})", 'warning')
+                                        os.remove(filepath)
+                                        duplicates_removed += 1
+                                    else:
+                                        # DB entry disappeared between checks (another thread deleted it?)
+                                        logger.debug(f"MD5 {md5} no longer in DB after acquiring lock, treating {file} as unprocessed")
+                                        unprocessed_files.append(filepath)
+                                finally:
+                                    release_processing_lock(lock_fd)
                                 continue
                     except Exception as e:
                         add_log(f"Error checking MD5 for {file}: {e}", 'error')
@@ -294,6 +339,8 @@ def find_unprocessed_images():
     
     if duplicates_removed > 0:
         add_log(f"Cleaned up {duplicates_removed} duplicate file(s)", 'info')
+    if skipped_in_progress > 0:
+        logger.info(f"Skipped {skipped_in_progress} file(s) that are currently being processed")
 
     return unprocessed_files
 
@@ -329,19 +376,33 @@ def run_scan():
             add_log(f"Failed to create executor for scan: {e}", 'error')
             return 0, len(unprocessed_files)
 
-    # Submit all files for processing
+    # Submit all files for processing, skipping any already in-progress
     futures = {}
+    skipped = 0
     for filepath in unprocessed_files:
         abs_filepath = os.path.abspath(filepath)
         abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
         is_from_ingest = abs_filepath.startswith(abs_ingest)
+        
+        # Prevent double-submission: check if this file is already queued by watchdog
+        with _files_lock:
+            if abs_filepath in _files_in_progress:
+                logger.debug(f"Scan skipping {os.path.basename(filepath)} - already in progress (submitted by watchdog)")
+                skipped += 1
+                continue
+            _files_in_progress.add(abs_filepath)
+        
         future = executor.submit(processing.process_image_file, filepath, is_from_ingest)
-        futures[future] = filepath
+        futures[future] = (filepath, abs_filepath)
+    
+    if skipped > 0:
+        logger.info(f"Scan skipped {skipped} file(s) already being processed by watchdog")
+        add_log(f"Skipped {skipped} file(s) already being processed", 'info')
 
     processed_count = 0
     from concurrent.futures import as_completed
     for future in as_completed(futures):
-        filepath = futures[future]
+        filepath, abs_filepath = futures[future]
         try:
             success, msg = future.result()
             if success:
@@ -351,6 +412,10 @@ def run_scan():
                 add_log(f"Failed to process {os.path.basename(filepath)}: {msg}", 'error')
         except Exception as e:
             add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
+        finally:
+            # Release from tracking set
+            with _files_lock:
+                _files_in_progress.discard(abs_filepath)
 
     if one_off_executor:
         try:
