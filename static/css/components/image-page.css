@@ -204,12 +204,12 @@ body.image-page {
 
 .image-page .tag-category-title {
     font-weight: var(--font-weight-bold);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-md);
     color: var(--primary-blue);
-    margin-bottom: var(--spacing-xs);
+    margin-bottom: var(--spacing-sm);
     text-transform: uppercase;
     letter-spacing: 1px;
-    padding-bottom: 3px;
+    padding-bottom: 5px;
     border-bottom: var(--border-width-thick) solid var(--border-color-hover);
 }
 
@@ -248,12 +248,12 @@ body.image-page {
 
 .image-page .extended-category-title {
     font-weight: var(--font-weight-medium);
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     color: var(--text-muted);
-    margin-bottom: 3px;
+    margin-bottom: 5px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding-bottom: 1px;
+    padding-bottom: 2px;
     border-bottom: 1px solid var(--border-color);
     opacity: 0.8;
 }
@@ -418,7 +418,7 @@ body.image-page {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 2px 0;
+    padding: var(--spacing-xs) 0;
     transition: all var(--transition-normal);
     border-radius: var(--radius-sm);
 }
@@ -433,7 +433,6 @@ body.image-page {
     text-decoration: none;
     transition: all var(--transition-normal);
     font-weight: var(--font-weight-normal);
-    font-size: var(--font-size-sm);
 }
 
 .image-page .tag-item:hover a {
@@ -442,12 +441,12 @@ body.image-page {
 
 .image-page .tag-count {
     color: var(--primary-blue);
-    font-size: var(--font-size-xs);
-    margin-left: 8px;
+    font-size: var(--font-size-sm);
+    margin-left: 10px;
     white-space: nowrap;
     font-weight: var(--font-weight-medium);
     background: var(--primary-blue-light);
-    padding: 1px 6px;
+    padding: 2px var(--spacing-sm);
     border-radius: var(--radius-lg);
 }
 

@@ -62,6 +62,40 @@ function initImageViewer() {
         imgElement = getPreferredImgElement(imageView);
     }
 
+    /**
+     * Recalculate transform state for new target after DOM structure changes
+     * This preserves the visual viewport when switching from img to .image-stack wrapper
+     */
+    function recalculateTransformForNewTarget() {
+        if (!transformTarget) return;
+
+        // Parse current transform from the target
+        const currentTransform = transformTarget.style.transform;
+        if (!currentTransform || currentTransform === 'none' || !currentTransform.includes('scale')) {
+            return;
+        }
+
+        // Extract current transform values
+        const scaleMatch = currentTransform.match(/scale\(([^)]+)\)/);
+        const translateMatch = currentTransform.match(/translate\(([^,]+)px,\s*([^)]+)px\)/);
+
+        if (!scaleMatch) return;
+
+        const currentScale = parseFloat(scaleMatch[1]);
+        const currentTranslateX = translateMatch ? parseFloat(translateMatch[1]) : 0;
+        const currentTranslateY = translateMatch ? parseFloat(translateMatch[2]) : 0;
+
+        // Update internal state to match DOM
+        scale = currentScale;
+        translateX = currentTranslateX;
+        translateY = currentTranslateY;
+
+        // Ensure transform-origin is set for consistency
+        if (!transformTarget.style.transformOrigin) {
+            transformTarget.style.transformOrigin = '0 0';
+        }
+    }
+
     // Elements
     const sidebarLeft = document.getElementById('sidebarLeft');
     const sidebarRight = document.getElementById('sidebarRight');
@@ -204,6 +238,7 @@ function initImageViewer() {
 
     function updateTransform() {
         if (transformTarget) {
+            transformTarget.style.transformOrigin = '0 0';
             transformTarget.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
         }
     }
@@ -273,16 +308,15 @@ function initImageViewer() {
 
         if (newScale !== scale) {
             event.preventDefault();
-            // Use imgElement for rect calculation to pivot around the image center
-            const rect = (imgElement || transformTarget).getBoundingClientRect();
+            // For transform-origin: 0 0, zoom toward cursor position
+            const rect = transformTarget.getBoundingClientRect();
             const pointX = event.clientX;
             const pointY = event.clientY;
-            const imgCenterX = rect.left + rect.width / 2;
-            const imgCenterY = rect.top + rect.height / 2;
-            const scaleChange = newScale / scale;
-
-            translateX = pointX - imgCenterX - (pointX - imgCenterX - translateX) * scaleChange;
-            translateY = pointY - imgCenterY - (pointY - imgCenterY - translateY) * scaleChange;
+            
+            // rect already includes current transform, so just adjust based on scale change
+            const scaleRatio = newScale / scale;
+            translateX = translateX + (pointX - rect.left) * (1 - scaleRatio);
+            translateY = translateY + (pointY - rect.top) * (1 - scaleRatio);
 
             scale = newScale;
             scheduleTransformUpdate();
@@ -583,6 +617,12 @@ function initImageViewer() {
             updateImageResolution();
         }
     }, true);
+
+    // Expose API for external modules to handle DOM changes
+    window.imageViewerAPI = {
+        recalculateTransformForNewTarget,
+        refreshTransformTarget
+    };
 };
 
 document.addEventListener('DOMContentLoaded', initImageViewer);

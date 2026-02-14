@@ -173,13 +173,16 @@
 
         // Check if page was loaded with a pre-rendered upscaled image
         // The template marks upscaled images with data-original-src attribute
-        // Don't create the stack yet - it changes CSS layout and degrades rendering.
-        // Stack is created lazily on first comparison/toggle via ensureStack().
+        // Create stack eagerly to prevent layout shift on first C press
         if (imageContainer) {
             const img = imageContainer.querySelector('img[data-original-src]');
             if (img) {
                 hasUpscaled = true;
                 showingUpscaled = true;
+                
+                // Create stack immediately to avoid layout shift
+                ensureStack();
+                
                 preloadOriginalForComparison();
 
                 // Fetch upscaled resolution data and cache it
@@ -294,11 +297,14 @@
         if (upscaledImg.style.transform) {
             stack.style.transform = upscaledImg.style.transform;
             stack.style.cursor = upscaledImg.style.cursor;
-            stack.style.transformOrigin = upscaledImg.style.transformOrigin;
+            stack.style.transformOrigin = upscaledImg.style.transformOrigin || '0 0';
 
             upscaledImg.style.transform = '';
             upscaledImg.style.cursor = '';
             upscaledImg.style.transformOrigin = '';
+        } else {
+            // Ensure transform-origin is set even if no transform exists yet
+            stack.style.transformOrigin = '0 0';
         }
 
         // Enforce overlay positioning (handled by CSS Grid in .image-stack)
@@ -317,6 +323,14 @@
         upscaledImg.style.pointerEvents = 'auto';
 
         stack.appendChild(upscaledImg);
+
+        // Notify image-viewer to recalculate transform for new DOM structure
+        if (window.imageViewerAPI?.refreshTransformTarget) {
+            window.imageViewerAPI.refreshTransformTarget();
+        }
+        if (window.imageViewerAPI?.recalculateTransformForNewTarget) {
+            window.imageViewerAPI.recalculateTransformForNewTarget();
+        }
 
         // Create original image element (hidden by default when showing upscaled)
         const originalImg = document.createElement('img');
