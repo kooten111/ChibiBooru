@@ -263,25 +263,32 @@ def _apply_ordering(conn, results, order_filter):
     if not order_filter:
         return results
 
+    # Optimize by fetching all ordering data in a single query instead of N queries
+    filepaths = [img["filepath"] for img in results if img]
+    if not filepaths:
+        return results
+    
     if order_filter in ["score_desc", "score", "score_asc", "fav_desc", "fav", "fav_asc"]:
+        # Fetch all score/fav data in one query
+        placeholders = ",".join("?" * len(filepaths))
+        query = f"SELECT filepath, score, fav_count FROM images WHERE filepath IN ({placeholders})"
+        rows = conn.execute(query, filepaths).fetchall()
+        
         filepath_to_value = {}
-        for img in results:
-            cursor = conn.execute(
-                "SELECT score, fav_count FROM images WHERE filepath = ?",
-                (img["filepath"],),
-            )
-            row = cursor.fetchone()
-            if row:
-                if "score" in order_filter:
-                    filepath_to_value[img["filepath"]] = (
-                        row["score"] if row["score"] is not None else -999999
-                    )
-                else:
-                    filepath_to_value[img["filepath"]] = (
-                        row["fav_count"] if row["fav_count"] is not None else -999999
-                    )
+        for row in rows:
+            if "score" in order_filter:
+                filepath_to_value[row["filepath"]] = (
+                    row["score"] if row["score"] is not None else -999999
+                )
             else:
-                filepath_to_value[img["filepath"]] = -999999
+                filepath_to_value[row["filepath"]] = (
+                    row["fav_count"] if row["fav_count"] is not None else -999999
+                )
+        
+        # Set default for any missing filepaths
+        for filepath in filepaths:
+            if filepath not in filepath_to_value:
+                filepath_to_value[filepath] = -999999
 
         reverse = not order_filter.endswith("_asc")
         return sorted(
@@ -291,17 +298,22 @@ def _apply_ordering(conn, results, order_filter):
         )
 
     if order_filter in ["new", "ingested", "newest", "recent"]:
+        # Fetch all ingestion timestamps in one query
+        placeholders = ",".join("?" * len(filepaths))
+        query = f"SELECT filepath, ingested_at FROM images WHERE filepath IN ({placeholders})"
+        rows = conn.execute(query, filepaths).fetchall()
+        
         filepath_to_timestamp = {}
-        for img in results:
-            cursor = conn.execute(
-                "SELECT ingested_at FROM images WHERE filepath = ?",
-                (img["filepath"],),
-            )
-            row = cursor.fetchone()
-            if row and row["ingested_at"]:
-                filepath_to_timestamp[img["filepath"]] = row["ingested_at"]
+        for row in rows:
+            if row["ingested_at"]:
+                filepath_to_timestamp[row["filepath"]] = row["ingested_at"]
             else:
-                filepath_to_timestamp[img["filepath"]] = "0000-00-00 00:00:00"
+                filepath_to_timestamp[row["filepath"]] = "0000-00-00 00:00:00"
+        
+        # Set default for any missing filepaths
+        for filepath in filepaths:
+            if filepath not in filepath_to_timestamp:
+                filepath_to_timestamp[filepath] = "0000-00-00 00:00:00"
 
         return sorted(
             results,
@@ -310,17 +322,22 @@ def _apply_ordering(conn, results, order_filter):
         )
 
     if order_filter in ["old", "oldest"]:
+        # Fetch all ingestion timestamps in one query
+        placeholders = ",".join("?" * len(filepaths))
+        query = f"SELECT filepath, ingested_at FROM images WHERE filepath IN ({placeholders})"
+        rows = conn.execute(query, filepaths).fetchall()
+        
         filepath_to_timestamp = {}
-        for img in results:
-            cursor = conn.execute(
-                "SELECT ingested_at FROM images WHERE filepath = ?",
-                (img["filepath"],),
-            )
-            row = cursor.fetchone()
-            if row and row["ingested_at"]:
-                filepath_to_timestamp[img["filepath"]] = row["ingested_at"]
+        for row in rows:
+            if row["ingested_at"]:
+                filepath_to_timestamp[row["filepath"]] = row["ingested_at"]
             else:
-                filepath_to_timestamp[img["filepath"]] = "9999-12-31 23:59:59"
+                filepath_to_timestamp[row["filepath"]] = "9999-12-31 23:59:59"
+        
+        # Set default for any missing filepaths
+        for filepath in filepaths:
+            if filepath not in filepath_to_timestamp:
+                filepath_to_timestamp[filepath] = "9999-12-31 23:59:59"
 
         return sorted(
             results,
@@ -451,6 +468,38 @@ def _fts_search(
             return []
 
 
+def _simple_filter_query_with_ordering(order_filter):
+    """
+    Optimized query for simple order-only searches (e.g., 'order:new').
+    Returns all images with tags, efficiently ordered by the database.
+    """
+    with get_db_connection() as conn:
+        # Build ORDER BY clause
+        order_clause = "ORDER BY i.id"
+        if order_filter in ["new", "ingested", "newest", "recent"]:
+            order_clause = "ORDER BY i.ingested_at DESC"
+        elif order_filter in ["old", "oldest"]:
+            order_clause = "ORDER BY i.ingested_at ASC"
+        elif order_filter in ["score", "score_desc"]:
+            order_clause = "ORDER BY i.score DESC NULLS LAST"
+        elif order_filter == "score_asc":
+            order_clause = "ORDER BY i.score ASC NULLS LAST"
+        elif order_filter in ["fav", "fav_desc"]:
+            order_clause = "ORDER BY i.fav_count DESC NULLS LAST"
+        elif order_filter == "fav_asc":
+            order_clause = "ORDER BY i.fav_count ASC NULLS LAST"
+        
+        query = f"""
+        SELECT i.filepath, COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
+        FROM images i
+        LEFT JOIN image_tags it ON i.id = it.image_id
+        LEFT JOIN tags t ON it.tag_id = t.id
+        GROUP BY i.id
+        {order_clause}
+        """
+        return [dict(row) for row in conn.execute(query).fetchall()]
+
+
 def perform_search(search_query):
     """Perform a search using data from the database, handling special queries and combinations."""
     print(f"DEBUG: Perform Search with query '{search_query}'")
@@ -564,8 +613,30 @@ def perform_search(search_query):
     
     # Check if all general terms are exact tags (for non-FTS path)
     are_all_tags = general_terms and not _should_use_fts(general_terms)
-
-    if use_fts and (general_terms or negative_terms):
+    
+    # Optimize simple order-only queries (e.g., "order:new" with no search terms or other filters)
+    is_simple_order_query = (
+        order_filter
+        and not general_terms
+        and not rating_terms
+        and not category_filters
+        and not source_filters
+        and not filename_filter
+        and not extension_filters
+        and not relationship_filter
+        and not pool_filter
+        and not metadata_filter
+        and not favourite_filter
+        and not upscaled_filter
+        and not upscaled_filter_exclude
+        and not negative_terms
+    )
+    
+    if is_simple_order_query:
+        # Use optimized query that does ordering in SQL
+        results = _simple_filter_query_with_ordering(order_filter)
+        should_shuffle = False
+    elif use_fts and (general_terms or negative_terms):
         results = _fts_search(
             general_terms,
             negative_terms,
@@ -630,7 +701,11 @@ def perform_search(search_query):
             ]
 
         if source_filters:
-            results = models.search_images_by_multiple_sources(source_filters)
+            source_images = models.search_images_by_multiple_sources(source_filters)
+            source_filepaths = {img["filepath"] for img in source_images}
+            results = [
+                img for img in results if img and img["filepath"] in source_filepaths
+            ]
 
         if extension_filters:
             results = [
@@ -664,68 +739,81 @@ def perform_search(search_query):
                     ).fetchone()
                     local_tagger_id = local_tagger_id[0] if local_tagger_id else None
 
+                    # Bulk query - get all filepaths that have non-local_tagger sources
+                    filepaths = [img["filepath"] for img in results if img]
+                    if not filepaths:
+                        results = []
+                    else:
+                        placeholders = ",".join("?" * len(filepaths))
+                        if local_tagger_id:
+                            query = f"""
+                            SELECT DISTINCT i.filepath
+                            FROM images i
+                            JOIN image_sources isrc ON i.id = isrc.image_id
+                            WHERE i.filepath IN ({placeholders})
+                            AND isrc.source_id != ?
+                            """
+                            rows = conn.execute(query, (*filepaths, local_tagger_id)).fetchall()
+                        else:
+                            query = f"""
+                            SELECT DISTINCT i.filepath
+                            FROM images i
+                            JOIN image_sources isrc ON i.id = isrc.image_id
+                            WHERE i.filepath IN ({placeholders})
+                            """
+                            rows = conn.execute(query, filepaths).fetchall()
+                        
+                        has_sources = {row["filepath"] for row in rows}
+                        # Keep only images WITHOUT other sources (missing metadata)
+                        results = [img for img in results if img and img["filepath"] not in has_sources]
+
+        if category_filters:
+            with get_db_connection() as conn:
+                # Bulk query - get all category tags for all filepaths in one query
+                filepaths = [img["filepath"] for img in results if img]
+                if not filepaths:
+                    results = []
+                else:
+                    placeholders = ",".join("?" * len(filepaths))
+                    
+                    # Build SELECT for all needed category columns
+                    category_cols = ", ".join([f"tags_{cat}" for cat in category_filters.keys()])
+                    query = f"SELECT filepath, {category_cols} FROM images WHERE filepath IN ({placeholders})"
+                    rows = conn.execute(query, filepaths).fetchall()
+                    
+                    # Build lookup dict: filepath -> {category: tags_set}
+                    filepath_to_tags = {}
+                    for row in rows:
+                        filepath = row["filepath"]
+                        filepath_to_tags[filepath] = {}
+                        for category in category_filters.keys():
+                            tags_str = row[f"tags_{category}"] or ""
+                            filepath_to_tags[filepath][category] = set(tags_str.lower().split())
+                    
+                    # Filter results
                     filtered_results = []
                     for img in results:
                         if img is None:
                             continue
-                        img_row = conn.execute(
-                            "SELECT id FROM images WHERE filepath = ?",
-                            (img["filepath"],),
-                        ).fetchone()
-                        if not img_row:
+                        
+                        filepath = img["filepath"]
+                        if filepath not in filepath_to_tags:
                             continue
-
-                        image_id = img_row[0]
-
-                        has_other_sources = (
-                            conn.execute(
-                                "SELECT 1 FROM image_sources WHERE image_id = ? AND source_id != ? LIMIT 1",
-                                (image_id, local_tagger_id),
-                            ).fetchone()
-                            if local_tagger_id
-                            else conn.execute(
-                                "SELECT 1 FROM image_sources WHERE image_id = ? LIMIT 1",
-                                (image_id,),
-                            ).fetchone()
-                        )
-
-                        if not has_other_sources:
-                            filtered_results.append(img)
-
-                    results = filtered_results
-
-        if category_filters:
-            with get_db_connection() as conn:
-                filtered_results = []
-                for img in results:
-                    if img is None:
-                        continue
-                    match = True
-
-                    for category, required_tags in category_filters.items():
-                        cursor = conn.execute(
-                            f"SELECT tags_{category} FROM images WHERE filepath = ?",
-                            (img["filepath"],),
-                        )
-                        row = cursor.fetchone()
-
-                        if row:
-                            category_tags = set(
-                                (row[f"tags_{category}"] or "").lower().split()
-                            )
-
+                        
+                        match = True
+                        for category, required_tags in category_filters.items():
+                            category_tags = filepath_to_tags[filepath].get(category, set())
                             for tag in required_tags:
                                 if tag not in category_tags:
                                     match = False
                                     break
-
-                        if not match:
-                            break
-
-                    if match:
-                        filtered_results.append(img)
-
-                results = filtered_results
+                            if not match:
+                                break
+                        
+                        if match:
+                            filtered_results.append(img)
+                    
+                    results = filtered_results
 
         if general_terms:
             filtered_results = []
@@ -777,27 +865,29 @@ def perform_search(search_query):
     if rating_terms:
         print(f"DEBUG: Filtering {len(results)} results by rating terms: {rating_terms}")
         with get_db_connection() as conn:
-            filtered_results = []
-            for img in results:
-                if img is None:
-                    continue
-
-                placeholders = ",".join("?" for _ in rating_terms)
-                cursor = conn.execute(
-                    f"""
-                    SELECT COUNT(*) FROM image_tags it 
-                    JOIN tags t ON it.tag_id = t.id 
-                    JOIN images i ON it.image_id = i.id
-                    WHERE i.filepath = ?
-                    AND t.name IN ({placeholders})
-                """,
-                    (img["filepath"], *rating_terms),
-                )
-
-                count = cursor.fetchone()[0]
-                if count == len(rating_terms):
-                    filtered_results.append(img)
-            results = filtered_results
+            # Bulk query - get all images that have ALL the required rating tags
+            filepaths = [img["filepath"] for img in results if img]
+            if not filepaths:
+                results = []
+            else:
+                filepath_placeholders = ",".join("?" * len(filepaths))
+                rating_placeholders = ",".join("?" * len(rating_terms))
+                
+                query = f"""
+                SELECT i.filepath, COUNT(DISTINCT t.name) as tag_count
+                FROM images i
+                JOIN image_tags it ON i.id = it.image_id
+                JOIN tags t ON it.tag_id = t.id
+                WHERE i.filepath IN ({filepath_placeholders})
+                AND t.name IN ({rating_placeholders})
+                GROUP BY i.filepath
+                HAVING tag_count = ?
+                """
+                
+                rows = conn.execute(query, (*filepaths, *rating_terms, len(rating_terms))).fetchall()
+                matching_filepaths = {row["filepath"] for row in rows}
+                
+                results = [img for img in results if img and img["filepath"] in matching_filepaths]
         print(f"DEBUG: Results after rating filter: {len(results)}")
 
     if order_filter and order_filter in [
