@@ -151,46 +151,30 @@ class FamilyBadge {
 
 // Global initialization function that can be called after lazy loading
 function initializeFamilyBadge() {
-    console.log('[FamilyBadge] initializeFamilyBadge called');
     const familyDataEl = document.getElementById('familyImagesData');
     // Find the actions-row container to append the filmstrip beside the action bar
     const actionsRow = document.querySelector('.actions-row');
 
-    console.log('[FamilyBadge] familyDataEl:', familyDataEl);
-    console.log('[FamilyBadge] actionsRow:', actionsRow);
-
     if (familyDataEl && actionsRow) {
         try {
             const familyData = JSON.parse(familyDataEl.textContent || '[]');
-            console.log('[FamilyBadge] Parsed family data:', familyData.length, 'items');
             if (familyData.length > 0) {
                 // Remove existing family badge if present
                 const existingBadge = actionsRow.querySelector('.family-filmstrip');
                 if (existingBadge) {
-                    console.log('[FamilyBadge] Removing existing badge');
                     existingBadge.remove();
                 }
                 // Append filmstrip to the actions-row container (beside the action bar)
-                console.log('[FamilyBadge] Creating new FamilyBadge');
                 new FamilyBadge(actionsRow, familyData);
-            } else {
-                console.log('[FamilyBadge] No family data to display');
             }
         } catch (e) {
-            console.error('[FamilyBadge] Failed to parse family images data:', e);
+            console.error('Failed to parse family images data:', e);
         }
-    } else {
-        console.warn('[FamilyBadge] Missing required elements');
     }
 }
 
 // Export to global scope for lazy loader
-console.log('[FamilyBadge] Script loaded, exporting initializeFamilyBadge to window');
 window.initializeFamilyBadge = initializeFamilyBadge;
 
 // Initialize on DOM ready (for pages that have family data in initial load)
-console.log('[FamilyBadge] Adding DOMContentLoaded listener');
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('[FamilyBadge] DOMContentLoaded fired');
-    initializeFamilyBadge();
-});
+document.addEventListener('DOMContentLoaded', initializeFamilyBadge);

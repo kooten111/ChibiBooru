@@ -262,13 +262,9 @@ def process_image_file(filepath, move_from_ingest=True):
         logger.error(msg)
         return False, msg
     
-    import threading as _threading
-    logger.debug(f"MD5 for {filename}: {md5} (thread: {_threading.current_thread().name})")
-    
     # Check for duplicate in database (with lock)
     lock_fd, acquired = acquire_processing_lock(md5)
     if not acquired:
-        logger.debug(f"Lock NOT acquired for {filename} (MD5: {md5}) - another thread is processing")
         # Lock not acquired - another thread is processing this MD5
         # But we should still check if this specific file is a duplicate that can be removed
         if models.md5_exists(md5):
@@ -281,24 +277,22 @@ def process_image_file(filepath, move_from_ingest=True):
             
             # Check that we're not deleting the actual canonical file
             if existing_filepath and os.path.abspath(filepath) != os.path.abspath(os.path.join("static/images", existing_filepath)):
-                msg = f"[Processing] Duplicate detected (concurrent): {filename} (MD5: {md5}, same as {existing_filepath})"
-                logger.info(msg)
+                msg = f"[Processing] Duplicate detected (concurrent): {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
+                logger.error(msg)
                 
                 if os.path.exists(filepath):
                     try:
                         os.remove(filepath)
-                        logger.info(f"Removed duplicate ingest file: {filename}")
+                        print(f"[Processing] Removed duplicate file: {filename}")
                     except Exception as e:
-                        logger.warning(f"Could not remove duplicate file {filename}: {e}")
+                        print(f"[Processing] WARNING: Could not remove duplicate file {filename}: {e}")
                 
                 return False, msg
         
         # Not a duplicate, genuinely being processed by another thread
-        msg = f"[Processing] Skipped: {filename} (MD5: {md5}, already being processed by another thread)"
-        logger.info(msg)
+        msg = f"[Processing] Skipped: {filename} (already being processed by another thread)"
+        logger.error(msg)
         return False, msg
-    
-    logger.debug(f"Lock acquired for {filename} (MD5: {md5})")
     
     try:
         # Re-check duplicate inside lock
@@ -309,24 +303,24 @@ def process_image_file(filepath, move_from_ingest=True):
                 if row:
                     existing_filepath = row['filepath']
             
-            msg = f"[Processing] Duplicate detected: {filename} (MD5: {md5}, same as {existing_filepath})"
-            logger.info(msg)
+            msg = f"[Processing] Duplicate detected: {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
+            logger.error(msg)
 
             # If this is the canonical file already stored in the DB, do not delete it.
             if existing_filepath:
                 canonical_path = os.path.abspath(os.path.join("static/images", existing_filepath))
                 if os.path.abspath(filepath) == canonical_path:
                     msg = f"[Processing] Duplicate check hit canonical file, skipping deletion: {filename}"
-                    logger.info(msg)
+                    logger.error(msg)
                     return False, msg
             
             # Remove duplicate file if it exists (e.g., ingest copy or stray file)
             if os.path.exists(filepath):
                 try:
                     os.remove(filepath)
-                    logger.info(f"Removed duplicate file: {filename}")
+                    print(f"[Processing] Removed duplicate file: {filename}")
                 except Exception as e:
-                    logger.warning(f"Could not remove duplicate file {filename}: {e}")
+                    print(f"[Processing] WARNING: Could not remove duplicate file {filename}: {e}")
             
             return False, msg
         
@@ -557,7 +551,7 @@ def process_image_file(filepath, move_from_ingest=True):
                     try:
                         shutil.move(filepath, new_path)
                         file_dest = new_path
-                        logger.info(f"Moved: {filepath} -> {new_path}")
+                        print(f"[Processing] Moved to: {new_path}")
                         break
                     except Exception as e:
                         msg = f"[Processing] ERROR: Failed to move file to {new_path}: {e}"
@@ -696,11 +690,9 @@ def process_image_file(filepath, move_from_ingest=True):
         )
         
         if not success:
-            msg = f"[Processing] ERROR: Database insert failed for {filename} (MD5: {md5}, db_path: {db_path})"
+            msg = f"[Processing] ERROR: Database insert failed for {filename}"
             logger.error(msg)
             return False, msg
-        
-        logger.debug(f"DB commit successful for {filename} (MD5: {md5}, db_path: {db_path})")
 
         
         # ========== STAGE 6: POST-PROCESSING ==========
