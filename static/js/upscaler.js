@@ -753,6 +753,15 @@
 
         showingUpscaled = true;
         updateButtonState();
+
+        // Notify image-viewer to recalculate transform for new DOM structure
+        // This ensures zoom/pan works immediately after upscaling
+        if (window.imageViewerAPI?.refreshTransformTarget) {
+            window.imageViewerAPI.refreshTransformTarget();
+        }
+        if (window.imageViewerAPI?.recalculateTransformForNewTarget) {
+            window.imageViewerAPI.recalculateTransformForNewTarget();
+        }
     }
 
     /**
@@ -786,6 +795,14 @@
             // Update metadata to show both resolutions if cached
             updateMetadata(true, upscaledMetadata);
             updateButtonState();
+
+            // Notify image-viewer to refresh transform target for zoom/pan
+            if (window.imageViewerAPI?.refreshTransformTarget) {
+                window.imageViewerAPI.refreshTransformTarget();
+            }
+            if (window.imageViewerAPI?.recalculateTransformForNewTarget) {
+                window.imageViewerAPI.recalculateTransformForNewTarget();
+            }
             return;
         }
 
@@ -833,6 +850,14 @@
         showingUpscaled = false;
         updateMetadata(false);
         updateButtonState();
+
+        // Notify image-viewer to refresh transform target for zoom/pan
+        if (window.imageViewerAPI?.refreshTransformTarget) {
+            window.imageViewerAPI.refreshTransformTarget();
+        }
+        if (window.imageViewerAPI?.recalculateTransformForNewTarget) {
+            window.imageViewerAPI.recalculateTransformForNewTarget();
+        }
     }
 
     /**
