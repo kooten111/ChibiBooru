@@ -961,7 +961,8 @@ async function systemFindBrokenImages(event) {
                 </div>`;
             }).join('');
 
-            // Actions will process ALL broken images (not just displayed ones)
+            // Collect all broken image IDs (not just the displayed ones)
+            const allBrokenIds = data.all_ids || data.images.map(img => img.id);
             const totalCount = data.total_broken;
 
             const performAction = async (action) => {
@@ -975,11 +976,11 @@ async function systemFindBrokenImages(event) {
                 document.body.removeChild(overlay);
 
                 try {
-                    // Send empty image_ids to process ALL broken images
+                    // Send the actual broken image IDs
                     const res = await fetch(`/api/system/broken_images/cleanup?secret=${encodeURIComponent(SYSTEM_SECRET)}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action, image_ids: [] })
+                        body: JSON.stringify({ action, image_ids: allBrokenIds })
                     });
                     const result = await res.json();
 

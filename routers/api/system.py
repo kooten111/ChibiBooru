@@ -193,7 +193,7 @@ async def bulk_retag_local():
 @api_handler()
 async def find_broken_images():
     """Find images with missing tags, hashes, or embeddings."""
-    return await system_service.run_find_broken_images()
+    return system_service.run_find_broken_images()
 
 @api_blueprint.route('/system/broken_images/cleanup', methods=['POST'])
 @api_handler()

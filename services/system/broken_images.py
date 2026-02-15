@@ -140,6 +140,7 @@ def run_find_broken_images() -> Dict[str, Any]:
             "status": "success",
             "total_broken": len(broken_images),
             "images": broken_images[:100],
+            "all_ids": [img["id"] for img in broken_images],  # All IDs for processing
             "has_more": len(broken_images) > 100,
         }
     except Exception as e:
@@ -161,7 +162,9 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
     try:
         from database import get_db_connection
 
-        if not image_ids:
+        # Only auto-scan for broken images if action is 'scan'
+        # For destructive actions, require explicit image_ids
+        if not image_ids and action == "scan":
             from services import similarity_db
 
             embedding_ids = (
@@ -173,24 +176,33 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
             with get_db_connection() as conn:
                 cursor = conn.cursor()
 
+                # Find images with missing phash (excluding videos)
                 video_excl = " AND ".join(
-                    "LOWER(i.filepath) NOT LIKE '%{ext}'".format(ext=ext)
+                    "LOWER(filepath) NOT LIKE '%{ext}'".format(ext=ext)
                     for ext in config.SUPPORTED_VIDEO_EXTENSIONS
                 )
                 cursor.execute(
                     """
-                    SELECT DISTINCT i.id
-                    FROM images i
-                    LEFT JOIN image_tags it ON i.id = it.image_id
-                    WHERE ( (i.phash IS NULL OR i.phash = '') AND {video_excl} )
-                       OR it.tag_id IS NULL
-                    GROUP BY i.id
+                    SELECT id
+                    FROM images
+                    WHERE (phash IS NULL OR phash = '') AND {video_excl}
                 """.format(
                         video_excl=video_excl
                     )
                 )
-
                 broken_ids = set(row["id"] for row in cursor.fetchall())
+
+                # Find images with NO tags at all
+                cursor.execute(
+                    """
+                    SELECT i.id
+                    FROM images i
+                    LEFT JOIN image_tags it ON i.id = it.image_id
+                    GROUP BY i.id
+                    HAVING COUNT(it.tag_id) = 0
+                    """
+                )
+                broken_ids.update(row["id"] for row in cursor.fetchall())
 
                 if similarity_service.SEMANTIC_AVAILABLE:
                     cursor.execute("SELECT id FROM images")
@@ -219,10 +231,11 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
                 "count": len(image_ids),
             }
 
+        # For destructive actions, require explicit image_ids
         if not image_ids:
             return {
-                "status": "success",
-                "message": "No broken images found",
+                "status": "error",
+                "message": f"No image_ids provided for action '{action}'. You must specify which images to process.",
                 "processed": 0,
             }
 
