@@ -31,49 +31,18 @@ def register_routes(blueprint):
         # Check for upscaled version
         upscaled_image_url = upscaler_service.get_upscale_url(lookup_path)
 
-        stats = query_service.get_enhanced_stats()
+        # REMOVED: stats = query_service.get_enhanced_stats()
+        # Stats are now lazy-loaded via API endpoint for instant page rendering
 
         # Prepare all tag-related data using the tag display service
         tag_data = prepare_tags_for_display(data)
 
-        # Fetch family images first to exclude them from similarity results
-        parent_child_images = models.get_related_images(data.get('post_id'), data.get('parent_id'))
-        parent_child_paths = set()
-        for img in parent_child_images:
-            img['match_type'] = img['type']  # 'parent' or 'child'
-            img['thumb'] = get_thumbnail_path(img['path'])
-            
-            # Normalize path to include 'images/' prefix for consistency with similarity results
-            # DB usually stores bare filename, but similarity/query services return 'images/filename'
-            p = img['path']
-            if not p.startswith('images/'):
-                p = f"images/{p}"
-            parent_child_paths.add(p)
+        # REMOVED: Family images and similar images queries
+        # These are now lazy-loaded via API endpoint for instant page rendering
+        # The main image can start loading while these are fetched asynchronously
 
-        # Get similar images - load tag-based results immediately (fast)
-        # FAISS/semantic results will be loaded asynchronously via JavaScript
-        # This prevents page blocking while FAISS searches
-        similar_images = query_service.find_related_by_tags(filepath, limit=40)
-        
-        # Filter out self-match and family
-        similar_images = [
-            img for img in similar_images
-            if normalize_image_path(img['path']) != lookup_path and img['path'] not in parent_child_paths
-        ]
-        
-        # Tag-only results - ensure correct labeling
-        for img in similar_images:
-            img['primary_source'] = 'tag'
-        
-        # Filter similar images to remove any that are already in the parent/child list
-        # (Note: we already filtered them from 'mixed' lists above, but 'filtered_similar' variable is used for combination)
-        filtered_similar = [img for img in similar_images if img['path'] not in parent_child_paths]
-
-        # Combine the lists, parents/children first
-        combined_related = parent_child_images + filtered_similar
-
-        # Get tag deltas for this image
-        tag_deltas = models.get_image_deltas(lookup_path)
+        # REMOVED: tag_deltas = models.get_image_deltas(lookup_path)
+        # Tag deltas are now lazy-loaded via API endpoint
 
         # Get thumbnail path for progressive loading
         thumbnail_path = get_thumbnail_path(filepath)
@@ -100,16 +69,18 @@ def register_routes(blueprint):
             categorized_tags=tag_data['categorized_tags'],
             extended_grouped_tags=tag_data['extended_grouped_tags'],
             metadata=data.get('raw_metadata'),
-            family_images=parent_child_images,  # Parent/child for floating badge
-            related_images=filtered_similar,     # Only similar images in sidebar
-            stats=stats,
+            # REMOVED: family_images, related_images, stats, tag_deltas, image_pools
+            # These are now loaded asynchronously via API for instant page rendering
+            family_images=[],  # Loaded via JS from /api/image/.../similar
+            related_images=[],  # Loaded via JS from /api/image/.../similar
+            stats=None,  # Loaded via JS from /api/image/.../stats
             random_tags=[],
             data=data,
             app_name=config.APP_NAME,
-            tag_deltas=tag_deltas,
+            tag_deltas=[],  # Loaded via JS from /api/image/.../deltas
             merged_general_tags=tag_data['merged_general_tags'],  # Pass to template for potential styling
             upscaled_image_url=upscaled_image_url,
-            image_pools=models.get_pools_for_image(data['id']) if data and data.get('id') else [],
+            image_pools=[],  # Loaded via JS from /api/image/.../pools
             implied_tag_names=tag_data['implied_tag_names'],  # Tags implied by implication rules
             similar_sidebar_sources=sidebar_sources,
             similar_sidebar_show_chips=sidebar_show_chips,

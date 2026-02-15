@@ -6,8 +6,13 @@ from utils import get_thumbnail_path
 from .similarity import calculate_similarity
 
 
+@lru_cache(maxsize=1)
 def get_enhanced_stats():
-    """Get detailed statistics about the collection from the database."""
+    """Get detailed statistics about the collection from the database.
+    
+    Results are cached since stats change infrequently (only when images/tags are added/removed).
+    Cache is invalidated via cache_manager when collection changes.
+    """
     from core.tag_id_cache import get_tag_counts_as_dict
 
     tag_counts_by_id = models.get_tag_counts()

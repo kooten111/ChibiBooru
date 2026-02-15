@@ -327,11 +327,13 @@ def invalidate_image_cache(filepath: str = None):
     """
     from repositories.data_access import get_image_details
     from services.homepage_cache import invalidate as invalidate_homepage_cache
+    from services.query.stats import get_enhanced_stats
     
     if filepath:
         reload_single_image(filepath)
     reload_tag_counts()
     get_image_details.cache_clear()
+    get_enhanced_stats.cache_clear()
     invalidate_homepage_cache()
 
 
@@ -339,15 +341,20 @@ def invalidate_tag_cache():
     """Invalidate tag-related caches."""
     # Reload tag ID cache (new tags may have been added)
     from core.tag_id_cache import reload_tag_id_cache
+    from services.query.stats import get_enhanced_stats
+    
     reload_tag_id_cache()
     reload_tag_counts()
+    get_enhanced_stats.cache_clear()
 
 
 def invalidate_all_caches():
     """Invalidate all application caches."""
     from repositories.data_access import get_image_details
     from services.homepage_cache import invalidate as invalidate_homepage_cache
+    from services.query.stats import get_enhanced_stats
     
     load_data_from_db()
     get_image_details.cache_clear()
+    get_enhanced_stats.cache_clear()
     invalidate_homepage_cache()

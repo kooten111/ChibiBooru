@@ -7,6 +7,7 @@ import yaml
 import shutil
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
+from functools import lru_cache
 from utils.logging_config import get_logger
 
 logger = get_logger('ConfigService')
@@ -533,8 +534,13 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
 }
 
 
+@lru_cache(maxsize=1)
 def load_config() -> Dict[str, Any]:
-    """Load settings from config.yml"""
+    """Load settings from config.yml.
+    
+    Results are cached since config changes infrequently.
+    Cache is invalidated when save_config() is called or via invalidate_config_cache().
+    """
     if not CONFIG_YML_PATH.exists():
         logger.warning(f"config.yml not found at {CONFIG_YML_PATH}, using defaults")
         return {}
@@ -549,6 +555,12 @@ def load_config() -> Dict[str, Any]:
         return {}
 
 
+def invalidate_config_cache():
+    """Invalidate config cache after changes."""
+    load_config.cache_clear()
+    logger.debug("Config cache invalidated")
+
+
 def save_config(config: Dict[str, Any]) -> bool:
     """Save settings to config.yml with backup"""
     try:
@@ -560,6 +572,9 @@ def save_config(config: Dict[str, Any]) -> bool:
         # Write new config
         with open(CONFIG_YML_PATH, 'w', encoding='utf-8') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        
+        # Invalidate cache so next load reads the new values
+        invalidate_config_cache()
         
         logger.info(f"Saved config to {CONFIG_YML_PATH}")
         return True
