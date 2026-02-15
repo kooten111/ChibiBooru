@@ -188,9 +188,9 @@ def _apply_filters(
         if relationship_filter == "parent":
             where_clauses.append("i.parent_id IS NOT NULL")
         elif relationship_filter == "child":
-            where_clauses.append("i.has_children = 1")
+            where_clauses.append("EXISTS (SELECT 1 FROM images child WHERE child.parent_id = i.post_id)")
         elif relationship_filter == "any":
-            where_clauses.append("(i.parent_id IS NOT NULL OR i.has_children = 1)")
+            where_clauses.append("(i.parent_id IS NOT NULL OR EXISTS (SELECT 1 FROM images child WHERE child.parent_id = i.post_id))")
 
     if source_filters:
         placeholders = ",".join(["?"] * len(source_filters))
@@ -649,9 +649,9 @@ def perform_search(search_query):
                 if relationship_filter == "parent":
                     where_clauses.append("i.parent_id IS NOT NULL")
                 elif relationship_filter == "child":
-                    where_clauses.append("i.has_children = 1")
+                    where_clauses.append("EXISTS (SELECT 1 FROM images child WHERE child.parent_id = i.post_id)")
                 elif relationship_filter == "any":
-                    where_clauses.append("(i.parent_id IS NOT NULL OR i.has_children = 1)")
+                    where_clauses.append("(i.parent_id IS NOT NULL OR EXISTS (SELECT 1 FROM images child WHERE child.parent_id = i.post_id))")
             
             if upscaled_filter_exclude:
                 where_clauses.append("i.upscaled_width IS NULL AND i.upscaled_height IS NULL")
