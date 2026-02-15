@@ -614,27 +614,115 @@ def perform_search(search_query):
     # Check if all general terms are exact tags (for non-FTS path)
     are_all_tags = general_terms and not _should_use_fts(general_terms)
     
+    # Check if we have a simple filter-only query (no search terms, just filters)
+    has_search_terms = general_terms or rating_terms or category_filters or negative_terms
+    has_filters = (source_filters or filename_filter or extension_filters or 
+                   relationship_filter or pool_filter or metadata_filter or 
+                   favourite_filter or upscaled_filter or upscaled_filter_exclude)
+    
     # Optimize simple order-only queries (e.g., "order:new" with no search terms or other filters)
     is_simple_order_query = (
         order_filter
-        and not general_terms
-        and not rating_terms
-        and not category_filters
-        and not source_filters
-        and not filename_filter
-        and not extension_filters
-        and not relationship_filter
-        and not pool_filter
-        and not metadata_filter
-        and not favourite_filter
-        and not upscaled_filter
-        and not upscaled_filter_exclude
-        and not negative_terms
+        and not has_search_terms
+        and not has_filters
+    )
+    
+    # Optimize simple filter queries (e.g., "has:parent" or "source:danbooru" alone)
+    # These can query directly for matching images instead of fetching all 19k then filtering
+    is_simple_filter_query = (
+        not has_search_terms
+        and has_filters
+        and not metadata_filter  # metadata filter logic is complex, keep it in regular path
     )
     
     if is_simple_order_query:
         # Use optimized query that does ordering in SQL
         results = _simple_filter_query_with_ordering(order_filter)
+        should_shuffle = False
+    elif is_simple_filter_query:
+        # Start with a minimal base query - just filepaths, we'll add tags later if needed
+        with get_db_connection() as conn:
+            where_clauses = []
+            params = []
+            
+            if relationship_filter:
+                if relationship_filter == "parent":
+                    where_clauses.append("i.parent_id IS NOT NULL")
+                elif relationship_filter == "child":
+                    where_clauses.append("i.has_children = 1")
+                elif relationship_filter == "any":
+                    where_clauses.append("(i.parent_id IS NOT NULL OR i.has_children = 1)")
+            
+            if upscaled_filter_exclude:
+                where_clauses.append("i.upscaled_width IS NULL AND i.upscaled_height IS NULL")
+            elif upscaled_filter:
+                where_clauses.append("i.upscaled_width IS NOT NULL AND i.upscaled_height IS NOT NULL")
+            
+            joins = []
+            
+            if pool_filter:
+                joins.append("INNER JOIN pool_images pi ON i.id = pi.image_id")
+                joins.append("INNER JOIN pools p ON pi.pool_id = p.id")
+                if pool_filter != "_ANY_":
+                    where_clauses.append("LOWER(p.name) LIKE ?")
+                    params.append(f"%{pool_filter}%")
+            
+            if source_filters:
+                placeholders = ",".join(["?"] * len(source_filters))
+                joins.append("INNER JOIN image_sources isrc ON i.id = isrc.image_id")
+                joins.append("INNER JOIN sources s ON isrc.source_id = s.id")
+                where_clauses.append(f"s.name IN ({placeholders})")
+                params.extend(source_filters)
+            
+            if extension_filters:
+                ext_conditions = []
+                for ext in extension_filters:
+                    ext_conditions.append("LOWER(i.filepath) LIKE ?")
+                    params.append(f"%.{ext}")
+                where_clauses.append("(" + " OR ".join(ext_conditions) + ")")
+            
+            if filename_filter:
+                where_clauses.append("LOWER(i.filepath) LIKE ?")
+                params.append(f"%{filename_filter}%")
+            
+            # Build query
+            join_clause = " ".join(joins)
+            where_clause = " AND ".join(where_clauses) if where_clauses else "1=1"
+            
+            # Apply ordering if specified
+            order_clause = "ORDER BY i.id"
+            if order_filter in ["new", "ingested", "newest", "recent"]:
+                order_clause = "ORDER BY i.ingested_at DESC"
+            elif order_filter in ["old", "oldest"]:
+                order_clause = "ORDER BY i.ingested_at ASC"
+            elif order_filter in ["score", "score_desc"]:
+                order_clause = "ORDER BY i.score DESC NULLS LAST"
+            elif order_filter == "score_asc":
+                order_clause = "ORDER BY i.score ASC NULLS LAST"
+            elif order_filter in ["fav", "fav_desc"]:
+                order_clause = "ORDER BY i.fav_count DESC NULLS LAST"
+            elif order_filter == "fav_asc":
+                order_clause = "ORDER BY i.fav_count ASC NULLS LAST"
+            
+            query = f"""
+            SELECT DISTINCT i.filepath,
+                   COALESCE(GROUP_CONCAT(t.name, ' '), '') as tags
+            FROM images i
+            {join_clause}
+            LEFT JOIN image_tags it ON i.id = it.image_id
+            LEFT JOIN tags t ON it.tag_id = t.id
+            WHERE {where_clause}
+            GROUP BY i.id
+            {order_clause}
+            """
+            
+            results = [dict(row) for row in conn.execute(query, params).fetchall()]
+        
+        # Apply favourite filter if needed (can't easily do in SQL)
+        if favourite_filter:
+            favourite_filepaths = favourites_repository.get_favourite_filepaths()
+            results = [img for img in results if img["filepath"] in favourite_filepaths]
+        
         should_shuffle = False
     elif use_fts and (general_terms or negative_terms):
         results = _fts_search(

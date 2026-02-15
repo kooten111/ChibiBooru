@@ -157,13 +157,17 @@
      */
     async function loadSimilarImages() {
         try {
+            console.log('[LazyLoader] Fetching similar images for:', currentFilepath);
             const response = await fetch(`/api/image/${encodePathForUrl(currentFilepath)}/similar`);
+            console.log('[LazyLoader] Response status:', response.status, response.ok);
             if (!response.ok) return;
             
             const data = await response.json();
+            console.log('[LazyLoader] Similar data received:', data);
             const { parent_child_images = [], similar_images = [] } = data;
 
             // Update family images data for family badge
+            console.log('[LazyLoader] Parent/child images loaded:', parent_child_images.length);
             if (parent_child_images.length > 0) {
                 let familyDataEl = document.getElementById('familyImagesData');
                 if (!familyDataEl) {
@@ -172,12 +176,17 @@
                     familyDataEl.type = 'application/json';
                     familyDataEl.id = 'familyImagesData';
                     document.body.appendChild(familyDataEl);
+                    console.log('[LazyLoader] Created familyImagesData element');
                 }
                 familyDataEl.textContent = JSON.stringify(parent_child_images);
+                console.log('[LazyLoader] Updated familyImagesData content');
                 
                 // Trigger family badge initialization if it exists
                 if (window.initializeFamilyBadge && typeof window.initializeFamilyBadge === 'function') {
+                    console.log('[LazyLoader] Calling initializeFamilyBadge()');
                     window.initializeFamilyBadge();
+                } else {
+                    console.warn('[LazyLoader] initializeFamilyBadge not available', typeof window.initializeFamilyBadge);
                 }
             }
 
@@ -292,6 +301,7 @@
      * Initialize lazy loading
      */
     function init() {
+        console.log('[LazyLoader] Initializing lazy loading');
         // Load all data in parallel after DOM is ready
         // These will complete while the user is viewing the main image
         Promise.all([
@@ -307,6 +317,7 @@
     // Start lazy loading immediately
     // No need to wait for DOMContentLoaded since we're at the bottom of the page
     // and the main image has already started loading
+    console.log('[LazyLoader] Script loaded, readyState:', document.readyState);
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
