@@ -246,20 +246,6 @@
     }
 
     /**
-     * Initialize related images loader
-     */
-    function initRelatedImagesLoader() {
-        // Wait for DOM to be ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                initializeLoader();
-            });
-        } else {
-            initializeLoader();
-        }
-    }
-
-    /**
      * Initialize the loader
      */
     function initializeLoader() {
@@ -352,7 +338,28 @@
         }
     }
 
-    // Initialize on page load
-    initRelatedImagesLoader();
+    // Export to window for explicit initialization by image-lazy-loader.js
+    // This prevents race condition where this script runs before tag data is populated
+    window.initializeRelatedImages = initializeLoader;
+
+    // Fallback: auto-initialize if tag data is already present when script loads
+    // This handles cases where image-lazy-loader.js finishes before this script loads
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            // Only auto-init if not already called and tag data exists
+            const relatedDataEl = document.getElementById('relatedImagesData');
+            if (relatedDataEl && relatedDataEl.textContent.trim()) {
+                // Small delay to ensure image-lazy-loader has a chance to call it explicitly
+                setTimeout(() => {
+                    const container = document.getElementById('related-images-content');
+                    // Check if FAISS loading indicator is already present (means it was called)
+                    const alreadyLoading = container && container.querySelector('.faiss-loading-indicator');
+                    if (!alreadyLoading) {
+                        initializeLoader();
+                    }
+                }, 100);
+            }
+        });
+    }
 
 })();
