@@ -967,10 +967,20 @@ async function systemFindBrokenImages(event) {
 
             const performAction = async (action) => {
                 const actionNames = {
-                    'delete': 'Moving to ingest',
-                    'retry': 'Retrying',
-                    'delete_permanent': 'Deleting permanently'
+                    'delete': 'Move to ingest',
+                    'retry': 'Retry processing',
+                    'delete_permanent': 'Permanently delete'
                 };
+
+                const confirmMessages = {
+                    'delete': `Move ${totalCount} broken images to ingest folder?`,
+                    'retry': `Retry processing ${totalCount} broken images (regenerate hashes/embeddings)?`,
+                    'delete_permanent': `⚠️ PERMANENTLY DELETE ${totalCount} broken images?\n\nThis cannot be undone!`
+                };
+
+                if (!confirm(confirmMessages[action])) {
+                    return;  // User cancelled
+                }
 
                 showNotification(`${actionNames[action]} ${totalCount} images...`, 'info');
                 document.body.removeChild(overlay);
@@ -998,11 +1008,7 @@ async function systemFindBrokenImages(event) {
 
             btnMoveToIngest.onclick = () => performAction('delete');
             btnRetry.onclick = () => performAction('retry');
-            btnDelete.onclick = () => {
-                if (confirm('This will PERMANENTLY DELETE the files. Are you sure?')) {
-                    performAction('delete_permanent');
-                }
-            };
+            btnDelete.onclick = () => performAction('delete_permanent');
         }
     } catch (err) {
         loadingDiv.textContent = `Error: ${err.message}`;
