@@ -326,11 +326,13 @@ def invalidate_image_cache(filepath: str = None):
                   If None, invalidate all image caches.
     """
     from repositories.data_access import get_image_details
+    from services.homepage_cache import invalidate as invalidate_homepage_cache
     
     if filepath:
         reload_single_image(filepath)
     reload_tag_counts()
     get_image_details.cache_clear()
+    invalidate_homepage_cache()
 
 
 def invalidate_tag_cache():
@@ -344,6 +346,8 @@ def invalidate_tag_cache():
 def invalidate_all_caches():
     """Invalidate all application caches."""
     from repositories.data_access import get_image_details
+    from services.homepage_cache import invalidate as invalidate_homepage_cache
     
     load_data_from_db()
     get_image_details.cache_clear()
+    invalidate_homepage_cache()

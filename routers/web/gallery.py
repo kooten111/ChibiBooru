@@ -20,40 +20,35 @@ def register_routes(blueprint):
         search_query = request.args.get('query', '').strip().lower()
         seed = random.randint(1, 1_000_000)
 
-        # Run the heavy sync operations in a thread pool to avoid blocking the event loop
-        def prepare_home_data():
-            stats = query_service.get_enhanced_stats()
-            search_results, should_shuffle = query_service.perform_search(search_query)
+        if not search_query:
+            # Hot cache: pop a pre-assembled page instantly
+            from services.homepage_cache import get_homepage_images
+            images_to_show, total_results = await asyncio.to_thread(get_homepage_images)
+        else:
+            # Search query: run through perform_search
+            def prepare_search_data():
+                search_results, should_shuffle = query_service.perform_search(search_query)
 
-            if should_shuffle:
-                random.Random(seed).shuffle(search_results)
+                if should_shuffle:
+                    random.Random(seed).shuffle(search_results)
 
-            from core.cache_manager import get_image_tags_as_string
+                from core.cache_manager import get_image_tags_as_string
 
-            total_results = len(search_results)
-            images_to_show = [
-                {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": get_image_tags_as_string(img)}
-                for img in search_results[:50]
-            ]
+                total_results = len(search_results)
+                page_size = config.IMAGES_PER_PAGE
+                images_to_show = [
+                    {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": get_image_tags_as_string(img)}
+                    for img in search_results[:page_size]
+                ]
 
-            random_tags = []
-            if not search_query:
-                from core.tag_id_cache import get_tag_counts_as_dict
-                tag_counts_dict = get_tag_counts_as_dict()
-                if tag_counts_dict:
-                    available_tags = list(tag_counts_dict.items())
-                    random_tags = random.sample(available_tags, min(len(available_tags), 30))
+                return images_to_show, total_results
 
-            return stats, images_to_show, random_tags, total_results
-
-        stats, images_to_show, random_tags, total_results = await asyncio.to_thread(prepare_home_data)
+            images_to_show, total_results = await asyncio.to_thread(prepare_search_data)
 
         return await render_template(
             'index.html',
             images=images_to_show,
             query=search_query,
-            random_tags=random_tags,
-            stats=stats,
             total_results=total_results,
             seed=seed,
             app_name=config.APP_NAME
@@ -96,12 +91,11 @@ def register_routes(blueprint):
                 new_img['similarity'] = new_img.pop('score')
             similar_images.append(new_img)
         
-        stats = query_service.get_enhanced_stats()
+        
         return await render_template(
             'index.html',
             images=similar_images,
             query=f"similar:{filepath}",
-            stats=stats,
             total_results=len(similar_images),
             show_similarity=True,
             app_name=config.APP_NAME
