@@ -502,7 +502,6 @@ def _simple_filter_query_with_ordering(order_filter):
 
 def perform_search(search_query):
     """Perform a search using data from the database, handling special queries and combinations."""
-    print(f"DEBUG: Perform Search with query '{search_query}'")
     if not search_query:
         return models.get_all_images_with_tags(), True
 
@@ -581,7 +580,6 @@ def perform_search(search_query):
             general_terms.append(token)
 
     # Normalize rating tags and extract them
-    print(f"DEBUG: General terms before normalization: {general_terms}")
     normalized_general_terms = []
     rating_terms = []
 
@@ -599,7 +597,6 @@ def perform_search(search_query):
             normalized_general_terms.append(term)
             
     general_terms = normalized_general_terms
-    print(f"DEBUG: Rating terms: {rating_terms}, General terms: {general_terms}")
 
     for category in category_filters:
         normalized_tags = []
@@ -951,7 +948,6 @@ def perform_search(search_query):
 
     # Apply rating filter to both FTS and non-FTS paths
     if rating_terms:
-        print(f"DEBUG: Filtering {len(results)} results by rating terms: {rating_terms}")
         with get_db_connection() as conn:
             # Bulk query - get all images that have ALL the required rating tags
             filepaths = [img["filepath"] for img in results if img]
@@ -976,7 +972,6 @@ def perform_search(search_query):
                 matching_filepaths = {row["filepath"] for row in rows}
                 
                 results = [img for img in results if img and img["filepath"] in matching_filepaths]
-        print(f"DEBUG: Results after rating filter: {len(results)}")
 
     if order_filter and order_filter in [
         "score_desc",
