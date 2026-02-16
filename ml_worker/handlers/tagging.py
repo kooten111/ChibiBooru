@@ -75,27 +75,66 @@ def handle_tag_image(request_data: Dict[str, Any]) -> Dict[str, Any]:
     ])
 
     try:
-        with Image.open(image_path) as img:
-            if img.mode in ('RGBA', 'P'):
-                img = img.convert('RGB')
+        try:
+            with Image.open(image_path) as img:
+                if img.mode in ('RGBA', 'P'):
+                    img = img.convert('RGB')
 
-            width, height = img.size
-            aspect_ratio = width / height
+                width, height = img.size
+                aspect_ratio = width / height
 
-            if aspect_ratio > 1:
-                new_width = image_size
-                new_height = int(new_width / aspect_ratio)
+                if aspect_ratio > 1:
+                    new_width = image_size
+                    new_height = int(new_width / aspect_ratio)
+                else:
+                    new_height = image_size
+                    new_width = int(new_height * aspect_ratio)
+
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                pad_color = (124, 116, 104)
+                new_image = Image.new('RGB', (image_size, image_size), pad_color)
+                new_image.paste(img, ((image_size - new_width) // 2, (image_size - new_height) // 2))
+
+                img_numpy = transform(new_image).unsqueeze(0).numpy()
+        except OSError as e:
+            # Handle truncated or corrupted images by allowing PIL to load partial data
+            if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
+                logger.warning(f"Image file is truncated/corrupted, attempting recovery: {image_path}")
+                from PIL import ImageFile
+                ImageFile.LOAD_TRUNCATED_IMAGES = True
+                
+                try:
+                    with Image.open(image_path) as img:
+                        if img.mode in ('RGBA', 'P'):
+                            img = img.convert('RGB')
+
+                        width, height = img.size
+                        aspect_ratio = width / height
+
+                        if aspect_ratio > 1:
+                            new_width = image_size
+                            new_height = int(new_width / aspect_ratio)
+                        else:
+                            new_height = image_size
+                            new_width = int(new_height * aspect_ratio)
+
+                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+                        pad_color = (124, 116, 104)
+                        new_image = Image.new('RGB', (image_size, image_size), pad_color)
+                        new_image.paste(img, ((image_size - new_width) // 2, (image_size - new_height) // 2))
+
+                        img_numpy = transform(new_image).unsqueeze(0).numpy()
+                    
+                    logger.info(f"Successfully recovered tags from truncated image: {image_path}")
+                except Exception as recovery_error:
+                    logger.error(f"Failed to recover from truncated image {image_path}: {recovery_error}")
+                    raise ValueError(f"Failed to process image (truncated/corrupted): {recovery_error}")
+                finally:
+                    ImageFile.LOAD_TRUNCATED_IMAGES = False
             else:
-                new_height = image_size
-                new_width = int(new_height * aspect_ratio)
-
-            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-            pad_color = (124, 116, 104)
-            new_image = Image.new('RGB', (image_size, image_size), pad_color)
-            new_image.paste(img, ((image_size - new_width) // 2, (image_size - new_height) // 2))
-
-            img_numpy = transform(new_image).unsqueeze(0).numpy()
+                raise
     except Exception as e:
         logger.error(f"Error processing image {image_path}: {e}")
         raise ValueError(f"Failed to process image: {e}")

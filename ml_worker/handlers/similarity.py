@@ -108,20 +108,52 @@ def handle_compute_similarity(request_data: Dict[str, Any]) -> Dict[str, Any]:
                 except Exception as e:
                     logger.warning(f"Failed to extract frame from video {image_path}: {e}")
 
-        with Image.open(target_path) as img:
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
-            
-            # Transform to tensor
-            img_tensor = transform(img).unsqueeze(0)
-            
-            # Model input format depends on type
-            if model_type == 'siglip':
-                # SigLIP expects NCHW (standard PyTorch format)
-                img_numpy = img_tensor.numpy()
+        try:
+            with Image.open(target_path) as img:
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                
+                # Transform to tensor
+                img_tensor = transform(img).unsqueeze(0)
+                
+                # Model input format depends on type
+                if model_type == 'siglip':
+                    # SigLIP expects NCHW (standard PyTorch format)
+                    img_numpy = img_tensor.numpy()
+                else:
+                    # Legacy tagger expects NHWC
+                    img_numpy = img_tensor.permute(0, 2, 3, 1).numpy()
+        except OSError as e:
+            # Handle truncated or corrupted images by allowing PIL to load partial data
+            if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
+                logger.warning(f"Image file is truncated/corrupted, attempting recovery: {image_path}")
+                from PIL import ImageFile
+                ImageFile.LOAD_TRUNCATED_IMAGES = True
+                
+                try:
+                    with Image.open(target_path) as img:
+                        if img.mode != 'RGB':
+                            img = img.convert('RGB')
+                        
+                        img_tensor = transform(img).unsqueeze(0)
+                        
+                        if model_type == 'siglip':
+                            img_numpy = img_tensor.numpy()
+                        else:
+                            img_numpy = img_tensor.permute(0, 2, 3, 1).numpy()
+                    
+                    logger.info(f"Successfully recovered embedding from truncated image: {image_path}")
+                except Exception as recovery_error:
+                    logger.error(f"Failed to recover from truncated image {image_path}: {recovery_error}")
+                    if temp_frame_path and os.path.exists(temp_frame_path):
+                        os.unlink(temp_frame_path)
+                    raise ValueError(f"Failed to process image (truncated/corrupted): {recovery_error}")
+                finally:
+                    ImageFile.LOAD_TRUNCATED_IMAGES = False
             else:
-                # Legacy tagger expects NHWC
-                img_numpy = img_tensor.permute(0, 2, 3, 1).numpy()
+                if temp_frame_path and os.path.exists(temp_frame_path):
+                    os.unlink(temp_frame_path)
+                raise
             
         # Clean up temp file
         if temp_frame_path and os.path.exists(temp_frame_path):

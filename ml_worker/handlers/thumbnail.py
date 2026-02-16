@@ -47,15 +47,34 @@ def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
                 image_files = sorted(image_files, key=natural_sort_key)
                 first_frame = image_files[0]
                 
-                with zf.open(first_frame) as src:
-                    with Image.open(src) as img:
-                        if img.mode in ('RGBA', 'LA', 'P'):
-                            background = Image.new('RGB', img.size, (255, 255, 255))
-                            if img.mode == 'P': img = img.convert('RGBA')
-                            background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
-                            img = background
-                        img.thumbnail((size, size), Image.Resampling.LANCZOS)
-                        img.save(output_path, 'WEBP', quality=quality, method=6)
+                try:
+                    with zf.open(first_frame) as src:
+                        with Image.open(src) as img:
+                            if img.mode in ('RGBA', 'LA', 'P'):
+                                background = Image.new('RGB', img.size, (255, 255, 255))
+                                if img.mode == 'P': img = img.convert('RGBA')
+                                background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                                img = background
+                            img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                            img.save(output_path, 'WEBP', quality=quality, method=6)
+                except OSError as e:
+                    # Handle truncated images in zip
+                    if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
+                        logger.warning(f"Image in zip is truncated, attempting recovery: {first_frame}")
+                        from PIL import ImageFile
+                        ImageFile.LOAD_TRUNCATED_IMAGES = True
+                        try:
+                            with zf.open(first_frame) as src:
+                                with Image.open(src) as img:
+                                    if img.mode in ('RGBA', 'LA', 'P'):
+                                        background = Image.new('RGB', img.size, (255, 255, 255))
+                                        if img.mode == 'P': img = img.convert('RGBA')
+                                        background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                                        img = background
+                                    img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                                    img.save(output_path, 'WEBP', quality=quality, method=6)
+                        finally:
+                            ImageFile.LOAD_TRUNCATED_IMAGES = False
                         
         # Handle Video
         elif filepath.lower().endswith(('.mp4', '.webm')):
@@ -72,23 +91,54 @@ def handle_generate_thumbnail(request_data: Dict[str, Any]) -> Dict[str, Any]:
                     '-strict', 'unofficial', '-y', temp_frame_path
                 ], check=True, capture_output=True)
                 
-                with Image.open(temp_frame_path) as img:
-                    img.thumbnail((size, size), Image.Resampling.LANCZOS)
-                    img.save(output_path, 'WEBP', quality=quality, method=6)
+                try:
+                    with Image.open(temp_frame_path) as img:
+                        img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                        img.save(output_path, 'WEBP', quality=quality, method=6)
+                except OSError as e:
+                    # Handle truncated frame images
+                    if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
+                        logger.warning(f"Extracted frame is truncated, attempting recovery: {temp_frame_path}")
+                        from PIL import ImageFile
+                        ImageFile.LOAD_TRUNCATED_IMAGES = True
+                        try:
+                            with Image.open(temp_frame_path) as img:
+                                img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                                img.save(output_path, 'WEBP', quality=quality, method=6)
+                        finally:
+                            ImageFile.LOAD_TRUNCATED_IMAGES = False
             finally:
                 if os.path.exists(temp_frame_path):
                     os.unlink(temp_frame_path)
                     
         # Handle Regular Image
         else:
-            with Image.open(filepath) as img:
-                if img.mode in ('RGBA', 'LA', 'P'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    if img.mode == 'P': img = img.convert('RGBA')
-                    background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
-                    img = background
-                img.thumbnail((size, size), Image.Resampling.LANCZOS)
-                img.save(output_path, 'WEBP', quality=quality, method=6)
+            try:
+                with Image.open(filepath) as img:
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P': img = img.convert('RGBA')
+                        background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                        img = background
+                    img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                    img.save(output_path, 'WEBP', quality=quality, method=6)
+            except OSError as e:
+                # Handle truncated images
+                if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
+                    logger.warning(f"Image file is truncated, attempting recovery: {filepath}")
+                    from PIL import ImageFile
+                    ImageFile.LOAD_TRUNCATED_IMAGES = True
+                    try:
+                        with Image.open(filepath) as img:
+                            if img.mode in ('RGBA', 'LA', 'P'):
+                                background = Image.new('RGB', img.size, (255, 255, 255))
+                                if img.mode == 'P': img = img.convert('RGBA')
+                                background.paste(img, mask=img.split()[-1] if 'A' in img.mode else None)
+                                img = background
+                            img.thumbnail((size, size), Image.Resampling.LANCZOS)
+                            img.save(output_path, 'WEBP', quality=quality, method=6)
+                    finally:
+                        ImageFile.LOAD_TRUNCATED_IMAGES = False
                 
         return {"success": True, "output_path": output_path}
         

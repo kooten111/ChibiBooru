@@ -72,8 +72,19 @@ def handle_extract_animation(request_data: Dict[str, Any]) -> Dict[str, Any]:
                     try:
                         with Image.open(frame_path) as img:
                             width, height = img.size
-                    except Exception as e:
-                        logger.warning(f"Error reading first frame dimensions: {e}")
+                    except OSError as e:
+                        # Handle truncated images
+                        if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
+                            logger.warning(f"First frame is truncated, attempting recovery: {frame_path}")
+                            from PIL import ImageFile
+                            ImageFile.LOAD_TRUNCATED_IMAGES = True
+                            try:
+                                with Image.open(frame_path) as img:
+                                    width, height = img.size
+                            finally:
+                                ImageFile.LOAD_TRUNCATED_IMAGES = False
+                        else:
+                            logger.warning(f"Error reading first frame dimensions: {e}")
             
             # Save metadata
             metadata = {

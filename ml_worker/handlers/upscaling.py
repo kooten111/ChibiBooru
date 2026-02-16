@@ -128,18 +128,48 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
         models.upscaler_model.to(device)
 
     # 1. Load image
-    with Image.open(image_path) as img:
-        original_width, original_height = img.size
-        
-        if img.mode == 'P':
-            img = img.convert('RGB')
-        elif img.mode == 'RGBA':
-            img = img.convert('RGB')  # RealESRGAN usually expects RGB
+    try:
+        with Image.open(image_path) as img:
+            original_width, original_height = img.size
             
-        # Convert to tensor
-        img_np = np.array(img).transpose(2, 0, 1) # HWC -> CHW
-        img_np = img_np / 255.
-        img_tensor = torch.from_numpy(img_np).float().unsqueeze(0).to(device)
+            if img.mode == 'P':
+                img = img.convert('RGB')
+            elif img.mode == 'RGBA':
+                img = img.convert('RGB')  # RealESRGAN usually expects RGB
+                
+            # Convert to tensor
+            img_np = np.array(img).transpose(2, 0, 1) # HWC -> CHW
+            img_np = img_np / 255.
+            img_tensor = torch.from_numpy(img_np).float().unsqueeze(0).to(device)
+    except OSError as e:
+        # Handle truncated or corrupted images by allowing PIL to load partial data
+        if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
+            logger.warning(f"Image file is truncated/corrupted, attempting recovery: {image_path}")
+            from PIL import ImageFile
+            ImageFile.LOAD_TRUNCATED_IMAGES = True
+            
+            try:
+                with Image.open(image_path) as img:
+                    original_width, original_height = img.size
+                    
+                    if img.mode == 'P':
+                        img = img.convert('RGB')
+                    elif img.mode == 'RGBA':
+                        img = img.convert('RGB')  # RealESRGAN usually expects RGB
+                        
+                    # Convert to tensor
+                    img_np = np.array(img).transpose(2, 0, 1) # HWC -> CHW
+                    img_np = img_np / 255.
+                    img_tensor = torch.from_numpy(img_np).float().unsqueeze(0).to(device)
+                
+                logger.info(f"Successfully recovered upscaled image from truncated source: {image_path}")
+            except Exception as recovery_error:
+                logger.error(f"Failed to recover from truncated image {image_path}: {recovery_error}")
+                raise ValueError(f"Failed to process image (truncated/corrupted): {recovery_error}")
+            finally:
+                ImageFile.LOAD_TRUNCATED_IMAGES = False
+        else:
+            raise
 
     # 2. Run Inference
     try:
