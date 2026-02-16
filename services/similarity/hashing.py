@@ -38,6 +38,10 @@ def compute_phash(image_path: str, hash_size: int = 8) -> Optional[str]:
         Hex string representation of the hash, or None on error
     """
     try:
+        # Allow partial loading of truncated images (e.g., incomplete downloads)
+        from PIL import ImageFile
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        
         with Image.open(image_path) as img:
             # Convert to RGB if necessary (handles RGBA, P mode, etc.)
             if img.mode in ('RGBA', 'LA', 'P'):
@@ -57,6 +61,13 @@ def compute_phash(image_path: str, hash_size: int = 8) -> Optional[str]:
     except UnidentifiedImageError:
         _log(f"Cannot identify image: {image_path}", "warning")
         return None
+    except OSError as e:
+        # Catch truncated/corrupted image errors specifically
+        if "truncated" in str(e).lower() or "image file is truncated" in str(e).lower():
+            _log(f"Corrupted/incomplete image file (truncated): {os.path.basename(image_path)}", "error")
+        else:
+            _log(f"OS error reading image {os.path.basename(image_path)}: {e}", "error")
+        return None
     except Exception as e:
         _log(f"Error computing hash for {image_path}: {e}", "error")
         return None
@@ -74,6 +85,10 @@ def compute_colorhash(image_path: str, binbits: int = 3) -> Optional[str]:
         Hex string representation of the hash, or None on error
     """
     try:
+        # Allow partial loading of truncated images
+        from PIL import ImageFile
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        
         with Image.open(image_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
@@ -82,6 +97,13 @@ def compute_colorhash(image_path: str, binbits: int = 3) -> Optional[str]:
             return str(chash)
     except UnidentifiedImageError:
         _log(f"Cannot identify image for colorhash: {image_path}", "warning")
+        return None
+    except OSError as e:
+        # Catch truncated/corrupted image errors specifically
+        if "truncated" in str(e).lower():
+            _log(f"Corrupted/incomplete image file (truncated): {os.path.basename(image_path)}", "error")
+        else:
+            _log(f"OS error reading image for colorhash {os.path.basename(image_path)}: {e}", "error")
         return None
     except Exception as e:
         _log(f"Error computing colorhash for {image_path}: {e}", "error")

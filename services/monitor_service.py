@@ -171,18 +171,33 @@ class ImageFileHandler(FileSystemEventHandler):
         """Callback for when file processing completes."""
         try:
             result = future.result()
-            # process_image_file returns (success, msg) tuple
+            # process_image_file returns (success, msg, failure_type) tuple
             if isinstance(result, tuple):
-                success, msg = result
+                if len(result) == 3:
+                    success, msg, failure_type = result
+                elif len(result) == 2:
+                    # Backwards compatibility with 2-tuple returns
+                    success, msg = result
+                    failure_type = "unknown"
+                else:
+                    success = bool(result[0]) if result else False
+                    msg = ""
+                    failure_type = "unknown"
             else:
                 success = bool(result)
                 msg = ""
+                failure_type = "unknown"
             
             if success:
                 monitor_status["last_scan_found"] = 1
                 monitor_status["total_processed"] += 1
                 add_log(f"Successfully processed: {filename}", 'success')
-            # Note: duplicates/failures are already logged by process_image_file
+            elif failure_type in ('race_condition', 'duplicate'):
+                # These are expected in parallel processing - don't log as errors
+                logger.debug(f"Skipped {filename}: {msg}")
+            else:
+                # Only log real errors
+                add_log(f"Failed to process {filename}: {msg}", 'error')
                 
         except Exception as e:
             add_log(f"Error processing {filename}: {e}", 'error')
@@ -404,11 +419,27 @@ def run_scan():
     for future in as_completed(futures):
         filepath, abs_filepath = futures[future]
         try:
-            success, msg = future.result()
+            result = future.result()
+            # Handle 3-tuple (success, msg, failure_type) or 2-tuple (success, msg)
+            if isinstance(result, tuple):
+                if len(result) == 3:
+                    success, msg, failure_type = result
+                else:
+                    success, msg = result
+                    failure_type = "unknown"
+            else:
+                success = bool(result)
+                msg = ""
+                failure_type = "unknown"
+            
             if success:
                 processed_count += 1
                 add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
+            elif failure_type in ('race_condition', 'duplicate'):
+                # Expected in parallel processing - don't log as errors
+                logger.debug(f"Skipped {os.path.basename(filepath)}: {msg}")
             else:
+                # Only log real errors
                 add_log(f"Failed to process {os.path.basename(filepath)}: {msg}", 'error')
         except Exception as e:
             add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')

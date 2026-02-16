@@ -244,8 +244,8 @@ def process_image_file(filepath, move_from_ingest=True):
     # Check if file exists (race condition check for concurrent processing)
     if not os.path.exists(filepath):
         msg = f"[Processing] File not found (likely processed by another thread): {filepath}"
-        logger.error(msg)
-        return False, msg
+        logger.info(msg)
+        return False, msg, "race_condition"
     
     filename = os.path.basename(filepath)
     logger.info(f"Starting: {filename}")
@@ -256,11 +256,11 @@ def process_image_file(filepath, move_from_ingest=True):
         if md5 is None:
             msg = f"[Processing] ERROR: Failed to calculate MD5 for {filename} (File not found or unreadable)"
             logger.error(msg)
-            return False, msg
+            return False, msg, "error"
     except Exception as e:
         msg = f"[Processing] ERROR: Failed to calculate MD5 for {filename}: {e}"
         logger.error(msg)
-        return False, msg
+        return False, msg, "error"
     
     # Check for duplicate in database (with lock)
     lock_fd, acquired = acquire_processing_lock(md5)
@@ -278,7 +278,7 @@ def process_image_file(filepath, move_from_ingest=True):
             # Check that we're not deleting the actual canonical file
             if existing_filepath and os.path.abspath(filepath) != os.path.abspath(os.path.join("static/images", existing_filepath)):
                 msg = f"[Processing] Duplicate detected (concurrent): {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
-                logger.error(msg)
+                logger.info(msg)
                 
                 if os.path.exists(filepath):
                     try:
@@ -287,12 +287,12 @@ def process_image_file(filepath, move_from_ingest=True):
                     except Exception as e:
                         print(f"[Processing] WARNING: Could not remove duplicate file {filename}: {e}")
                 
-                return False, msg
+                return False, msg, "duplicate"
         
         # Not a duplicate, genuinely being processed by another thread
         msg = f"[Processing] Skipped: {filename} (already being processed by another thread)"
-        logger.error(msg)
-        return False, msg
+        logger.debug(msg)
+        return False, msg, "race_condition"
     
     try:
         # Re-check duplicate inside lock
@@ -304,15 +304,15 @@ def process_image_file(filepath, move_from_ingest=True):
                     existing_filepath = row['filepath']
             
             msg = f"[Processing] Duplicate detected: {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
-            logger.error(msg)
+            logger.info(msg)
 
             # If this is the canonical file already stored in the DB, do not delete it.
             if existing_filepath:
                 canonical_path = os.path.abspath(os.path.join("static/images", existing_filepath))
                 if os.path.abspath(filepath) == canonical_path:
                     msg = f"[Processing] Duplicate check hit canonical file, skipping deletion: {filename}"
-                    logger.error(msg)
-                    return False, msg
+                    logger.info(msg)
+                    return False, msg, "duplicate"
             
             # Remove duplicate file if it exists (e.g., ingest copy or stray file)
             if os.path.exists(filepath):
@@ -322,7 +322,7 @@ def process_image_file(filepath, move_from_ingest=True):
                 except Exception as e:
                     print(f"[Processing] WARNING: Could not remove duplicate file {filename}: {e}")
             
-            return False, msg
+            return False, msg, "duplicate"
         
         # ========== STAGE 2: METADATA FETCHING ==========
         is_video = filepath.lower().endswith(('.mp4', '.webm'))
@@ -346,7 +346,7 @@ def process_image_file(filepath, move_from_ingest=True):
                 # FAIL-FAST: Video tagging failed
                 msg = f"[Processing] ERROR: Video tagging failed for {filename}. File NOT ingested."
                 logger.error(msg)
-                return False, msg
+                return False, msg, "error"
         else:
             # Standard image processing
             if not all_results:
@@ -400,7 +400,7 @@ def process_image_file(filepath, move_from_ingest=True):
                     # FAIL-FAST: Local tagger was required but failed
                     msg = f"[Processing] ERROR: Local tagger failed for {filename}. File NOT ingested."
                     logger.error(msg)
-                    return False, msg
+                    return False, msg, "error"
         
         # Extract zip animation before hash computation (phash/colorhash/dimensions need frames)
         if is_zip_animation:
@@ -409,7 +409,7 @@ def process_image_file(filepath, move_from_ingest=True):
             if not extract_result:
                 msg = f"[Processing] ERROR: Failed to extract zip animation for {filename}. File NOT ingested."
                 logger.error(msg)
-                return False, msg
+                return False, msg, "error"
         
         # ========== STAGE 3: HASH COMPUTATION (ALL IN ONE PASS) ==========
         hashes = {}
@@ -423,7 +423,7 @@ def process_image_file(filepath, move_from_ingest=True):
             # FAIL-FAST: Hash computation is required
             msg = f"[Processing] ERROR: Failed to compute perceptual hash for {filename}. File NOT ingested."
             logger.error(msg)
-            return False, msg
+            return False, msg, "error"
         
         # Compute color hash
         colorhash = similarity_service.compute_colorhash_for_file(filepath)
@@ -437,7 +437,7 @@ def process_image_file(filepath, move_from_ingest=True):
             if not engine.load_model():
                 # FAIL-FAST: Similarity is enabled but model failed to load
                 print(f"[Processing] ERROR: Failed to load similarity model for {filename}. File NOT ingested.")
-                return False, "Failed to load similarity model"
+                return False, "Failed to load similarity model", "error"
             # For zip animations use first frame path (ML Worker expects an image file)
             embedding_path = filepath
             if is_zip_animation:
@@ -451,7 +451,7 @@ def process_image_file(filepath, move_from_ingest=True):
                 # FAIL-FAST: Similarity is enabled but embedding failed
                 msg = f"[Processing] ERROR: Failed to compute similarity embedding for {filename}. File NOT ingested."
                 logger.error(msg)
-                return False, msg
+                return False, msg, "error"
         
         # ========== STAGE 4: FILE OPERATIONS ==========
         # Determine strict filename (renaming if necessary)
@@ -545,7 +545,7 @@ def process_image_file(filepath, move_from_ingest=True):
                         if attempt > MAX_COLLISION_ATTEMPTS:
                             msg = f"[Processing] ERROR: Too many filename collisions for {filename} (gave up after {MAX_COLLISION_ATTEMPTS} attempts)"
                             logger.error(msg)
-                            return False, msg
+                            return False, msg, "error"
                 else:
                     # Found a free slot!
                     try:
@@ -556,7 +556,7 @@ def process_image_file(filepath, move_from_ingest=True):
                     except Exception as e:
                         msg = f"[Processing] ERROR: Failed to move file to {new_path}: {e}"
                         logger.error(msg)
-                        return False, msg
+                        return False, msg, "error"
         
         db_path = os.path.relpath(file_dest, "static/images").replace('\\', '/')
         
@@ -692,7 +692,7 @@ def process_image_file(filepath, move_from_ingest=True):
         if not success:
             msg = f"[Processing] ERROR: Database insert failed for {filename}"
             logger.error(msg)
-            return False, msg
+            return False, msg, "error"
 
         
         # ========== STAGE 6: POST-PROCESSING ==========
@@ -765,13 +765,13 @@ def process_image_file(filepath, move_from_ingest=True):
                 logger.warning(f"Failed to apply implications for {filename}: {e}")
         
         logger.info(f"Successfully processed: {filename}")
-        return True, "Successfully processed"
+        return True, "Successfully processed", "success"
         
     except Exception as e:
         msg = f"[Processing] ERROR processing {filename}: {e}"
         logger.error(msg)
         import traceback
         traceback.print_exc()
-        return False, msg
+        return False, msg, "error"
     finally:
         release_processing_lock(lock_fd)
