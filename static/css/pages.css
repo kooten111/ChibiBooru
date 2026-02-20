@@ -126,6 +126,118 @@
     padding: 0.5rem;
 }
 
+.review-grid-size-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+}
+
+.review-grid-size-controls .grid-size-btn {
+    width: 2rem;
+    height: 2rem;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.review-grid-size-controls .grid-size-btn:hover {
+    border-color: var(--primary-blue);
+    color: var(--text-primary);
+}
+
+.review-grid-size-controls .grid-size-btn.active {
+    border-color: var(--primary-blue);
+    background: var(--primary-blue-light);
+    color: var(--text-primary);
+}
+
+#reviewImageGrid.review-gallery {
+    grid-auto-rows: auto;
+    gap: 10px;
+}
+
+#reviewImageGrid.review-gallery.grid-small {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+#reviewImageGrid.review-gallery.grid-medium {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+#reviewImageGrid.review-gallery.grid-large {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+#reviewImageGrid .review-thumbnail {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    cursor: default;
+    border-radius: var(--radius-md);
+    background: var(--bg-panel);
+    border: var(--border-width) solid var(--border-color);
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+#reviewImageGrid .review-thumbnail:hover {
+    transform: translateY(-2px);
+}
+
+#reviewImageGrid .review-thumb-link {
+    display: block;
+    background: var(--bg-secondary);
+    height: auto;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+}
+
+#reviewImageGrid .review-thumb-link img {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    object-fit: cover;
+    display: block;
+}
+
+#reviewImageGrid .review-thumb-meta {
+    padding: var(--spacing-sm);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    border-top: var(--border-width) solid var(--border-color);
+    background: var(--bg-panel);
+}
+
+#reviewImageGrid .review-thumb-title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
+}
+
+#reviewImageGrid .review-thumb-subtitle {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+#reviewImageGrid .review-rating-badge {
+    position: absolute;
+    top: var(--spacing-sm);
+    right: var(--spacing-sm);
+    z-index: 2;
+}
+
+#reviewImageGrid .review-grid-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
 .badge {
     display: inline-block;
     padding: 0.25rem 0.75rem;

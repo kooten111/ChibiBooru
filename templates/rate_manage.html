@@ -211,6 +211,11 @@
                         <div class="review-header-controls">
                             <h3 class="panel-section-title">AI-Inferred Images</h3>
                             <div class="review-filter-controls">
+                                <div id="reviewGridSizeControls" class="review-grid-size-controls" role="group" aria-label="Review Grid Size">
+                                    <button type="button" class="grid-size-btn" data-size="small" title="Small grid">S</button>
+                                    <button type="button" class="grid-size-btn" data-size="medium" title="Medium grid">M</button>
+                                    <button type="button" class="grid-size-btn" data-size="large" title="Large grid">L</button>
+                                </div>
                                 <select id="reviewFilter" onchange="loadReviewImages()" class="filter-select">
                                     <option value="ai_predicted">AI-Inferred</option>
                                     <option value="unrated">Unrated</option>
@@ -222,7 +227,7 @@
                             </div>
                         </div>
 
-                        <div class="image-grid" id="reviewImageGrid">
+                        <div class="gallery grid-medium review-gallery" id="reviewImageGrid">
                             <!-- Will be populated by JavaScript -->
                         </div>
                     </div>

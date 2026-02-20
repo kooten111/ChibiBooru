@@ -3,6 +3,43 @@ import { showNotification } from '../utils/notifications.js';
 
 let currentStats = null;
 let currentConfig = null;
+const REVIEW_GRID_SIZE_KEY = 'rate_manage_review_grid_size';
+const REVIEW_GRID_SIZES = ['small', 'medium', 'large'];
+
+function getStoredReviewGridSize() {
+    const stored = localStorage.getItem(REVIEW_GRID_SIZE_KEY);
+    return REVIEW_GRID_SIZES.includes(stored) ? stored : 'medium';
+}
+
+function setReviewGridSize(size) {
+    const container = document.getElementById('reviewImageGrid');
+    if (!container || !REVIEW_GRID_SIZES.includes(size)) {
+        return;
+    }
+
+    container.classList.remove('grid-small', 'grid-medium', 'grid-large');
+    container.classList.add(`grid-${size}`);
+    localStorage.setItem(REVIEW_GRID_SIZE_KEY, size);
+
+    document.querySelectorAll('#reviewGridSizeControls .grid-size-btn').forEach(button => {
+        button.classList.toggle('active', button.dataset.size === size);
+    });
+}
+
+function initReviewGridSizeControls() {
+    const controls = document.getElementById('reviewGridSizeControls');
+    if (!controls) {
+        return;
+    }
+
+    controls.querySelectorAll('.grid-size-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            setReviewGridSize(button.dataset.size);
+        });
+    });
+
+    setReviewGridSize(getStoredReviewGridSize());
+}
 
 // Show/hide processing overlay
 function showProcessing(message, progress = '') {
@@ -537,13 +574,13 @@ window.loadReviewImages = async function () {
     const container = document.getElementById('reviewImageGrid');
 
     try {
-        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">Loading images...</div>';
+        container.innerHTML = '<div class="review-grid-message">Loading images...</div>';
 
         const response = await fetch(`/api/rate/images?filter=${filter}&limit=50`);
         const data = await response.json();
 
         if (!data.images || data.images.length === 0) {
-            container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">No images found</div>';
+            container.innerHTML = '<div class="review-grid-message">No images found</div>';
             return;
         }
 
@@ -551,27 +588,33 @@ window.loadReviewImages = async function () {
             const ratingClass = img.rating ? img.rating.replace('rating:', '') : '';
             const ratingLabel = img.rating ? img.rating.replace('rating:', '') : 'unrated';
             const source = img.rating_source || '';
+            const sourceLabel = source === 'ai_inference'
+                ? '🤖 AI'
+                : source === 'user'
+                    ? '👤 User'
+                    : '📦 Original';
 
             return `
-                <div class="image-card" onclick="window.location.href='/view/${img.filepath}'">
-                    <img src="/${img.thumb}" alt="Image ${img.id}" loading="lazy">
-                    ${img.rating ? `<div class="badge ${ratingClass}" style="position: absolute; top: 0.5rem; right: 0.5rem;">${ratingLabel}</div>` : ''}
-                    <div class="info">
-                        <div style="font-size: 0.85em; color: var(--text-muted);">
-                            Image #${img.id}
-                        </div>
-                        <div style="font-size: 0.75em; color: var(--text-muted); margin-top: 0.25rem;">
-                            ${source === 'ai_inference' ? '🤖 AI' : source === 'user' ? '👤 User' : '📦 Original'}
-                            · ${img.tag_count} tags
+                <article class="thumbnail review-thumbnail">
+                    <a class="review-thumb-link" href="/view/${img.filepath}" title="Open image #${img.id}">
+                        <img src="/${img.thumb}" alt="Image ${img.id}" loading="lazy" data-review-thumb>
+                    </a>
+                    ${img.rating ? `<div class="badge ${ratingClass} review-rating-badge">${ratingLabel}</div>` : ''}
+                    <div class="review-thumb-meta">
+                        <div class="review-thumb-title">Image #${img.id}</div>
+                        <div class="review-thumb-subtitle">
+                            ${sourceLabel} · ${img.tag_count} tags
                         </div>
                     </div>
-                </div>
+                </article>
             `;
         }).join('');
 
+        // grid-auto-rows: auto handles sizing — no JS masonry needed
+
     } catch (error) {
         console.error('Error loading images:', error);
-        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--rating-explicit);">Error loading images</div>';
+        container.innerHTML = '<div class="review-grid-message">Error loading images</div>';
     }
 };
 
@@ -688,5 +731,6 @@ window.toggleSettings = function () {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    initReviewGridSizeControls();
     loadStats();
 });
