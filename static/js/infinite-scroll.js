@@ -9,7 +9,9 @@ class InfiniteScroll {
         this.displayedPage = 1;
         this.hasMore = true;
         this.query = new URLSearchParams(window.location.search).get('query') || '';
-        this.perPage = parseInt(new URLSearchParams(window.location.search).get('per_page')) || 50;
+        const bodyPerPage = parseInt(document.body.dataset.perPage, 10);
+        this.perPage = parseInt(new URLSearchParams(window.location.search).get('per_page'), 10)
+            || (Number.isFinite(bodyPerPage) && bodyPerPage > 0 ? bodyPerPage : 50);
 
         // Cache for prefetched pages
         this.pageCache = new Map();
@@ -83,6 +85,7 @@ class InfiniteScroll {
         } else {
             url.searchParams.delete('query');
         }
+        url.searchParams.set('per_page', this.perPage);
         url.searchParams.delete('page'); // Reset to page 1
         history.pushState({ query: newQuery }, '', url);
 

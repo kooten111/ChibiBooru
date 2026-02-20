@@ -3,6 +3,7 @@ from . import api_blueprint
 from services import image_service, tag_service
 from services.switch_source_db import switch_metadata_source_db, merge_all_sources
 from database import models
+import config
 from utils import api_handler
 from utils.file_utils import normalize_image_path
 from utils.request_helpers import require_json_body
@@ -15,9 +16,12 @@ async def get_images():
     """Get paginated images for infinite scroll."""
     query = request.args.get('query', '').strip().lower()
     page = request.args.get('page', 1, type=int)
-    seed = request.args.get('seed', default=None, type=int)
+    per_page = request.args.get('per_page', config.IMAGES_PER_PAGE, type=int)
+
+    page = max(page or 1, 1)
+    per_page = max(1, min(per_page or config.IMAGES_PER_PAGE, 500))
     
-    data = await asyncio.to_thread(image_service.get_images_for_api, query, page, seed)
+    data = await asyncio.to_thread(image_service.get_images_for_api, query, page, per_page)
     return jsonify(data)
 
 @api_blueprint.route('/edit_tags', methods=['POST'])

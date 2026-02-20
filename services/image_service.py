@@ -1,4 +1,5 @@
 from quart import request, jsonify, url_for
+import config
 from database import models
 from database import get_db_connection
 from services import processing
@@ -18,17 +19,18 @@ import requests
 import asyncio
 import uuid
 
-def get_images_for_api(search_query: str, page: int, seed: Optional[int]) -> Dict[str, Any]:
+def get_images_for_api(search_query: str, page: int, per_page: Optional[int] = None) -> Dict[str, Any]:
     """Service for the infinite scroll API."""
     from services import query_service  # Import here to avoid circular import
-    
-    per_page = 50
+
+    page = max(page, 1)
+    per_page = per_page or config.IMAGES_PER_PAGE
 
     # Use the same search logic as the main page for consistency
     search_results, should_shuffle = query_service.perform_search(search_query)
 
-    if should_shuffle and seed is not None:
-        random.Random(seed).shuffle(search_results)
+    if should_shuffle:
+        random.shuffle(search_results)
 
     total_results = len(search_results)
     total_pages = (total_results + per_page - 1) // per_page

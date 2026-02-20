@@ -6,8 +6,7 @@ from quart import render_template, request
 import random
 import asyncio
 import config
-from services import query_service
-from utils import get_thumbnail_path
+from services import query_service, image_service
 from utils.decorators import login_required
 
 
@@ -18,39 +17,22 @@ def register_routes(blueprint):
     @login_required
     async def home():
         search_query = request.args.get('query', '').strip().lower()
-        seed = random.randint(1, 1_000_000)
+        first_page_data = await asyncio.to_thread(
+            image_service.get_images_for_api,
+            search_query,
+            1,
+            config.IMAGES_PER_PAGE,
+        )
 
-        if not search_query:
-            # Hot cache: pop a pre-assembled page instantly
-            from services.homepage_cache import get_homepage_images
-            images_to_show, total_results = await asyncio.to_thread(get_homepage_images)
-        else:
-            # Search query: run through perform_search
-            def prepare_search_data():
-                search_results, should_shuffle = query_service.perform_search(search_query)
-
-                if should_shuffle:
-                    random.Random(seed).shuffle(search_results)
-
-                from core.cache_manager import get_image_tags_as_string
-
-                total_results = len(search_results)
-                page_size = config.IMAGES_PER_PAGE
-                images_to_show = [
-                    {"path": f"images/{img['filepath']}", "thumb": get_thumbnail_path(f"images/{img['filepath']}"), "tags": get_image_tags_as_string(img)}
-                    for img in search_results[:page_size]
-                ]
-
-                return images_to_show, total_results
-
-            images_to_show, total_results = await asyncio.to_thread(prepare_search_data)
+        images_to_show = first_page_data["images"]
+        total_results = first_page_data["total_results"]
 
         return await render_template(
             'index.html',
             images=images_to_show,
             query=search_query,
             total_results=total_results,
-            seed=seed,
+            images_per_page=config.IMAGES_PER_PAGE,
             app_name=config.APP_NAME
         )
 
@@ -98,6 +80,7 @@ def register_routes(blueprint):
             query=f"similar:{filepath}",
             total_results=len(similar_images),
             show_similarity=True,
+            images_per_page=config.IMAGES_PER_PAGE,
             app_name=config.APP_NAME
         )
 

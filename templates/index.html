@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/gallery.css') + '?v=1' }}">
 </head>
 
-<body class="gallery-page">
+<body class="gallery-page" data-per-page="{{ images_per_page }}">
     <div id="global-drop-zone" class="global-drop-zone">
         <div class="drop-zone-content">
             <div class="drop-zone-icon">📤</div>
