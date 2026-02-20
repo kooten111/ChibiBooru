@@ -39,6 +39,9 @@ from .constants import (
 
 logger = get_logger('ProcessingService')
 
+BOORU_SOURCES = {'danbooru', 'e621', 'gelbooru', 'yandere'}
+LOCAL_TAGGER_SOURCES = {'local_tagger', 'camie_tagger'}
+
 # ML Worker client - always import (no fallback to local loading)
 try:
     from ml_worker.client import get_ml_worker_client
@@ -50,6 +53,27 @@ except ImportError:
 
 # Local tagger configuration
 tagger_config = config.get_local_tagger_config()
+
+
+def has_booru_source(source_results):
+    """Return True if any real booru source is present in source results."""
+    if not source_results:
+        return False
+    return any(source in source_results for source in BOORU_SOURCES)
+
+
+def has_local_tagger_source(source_results):
+    """Return True if any local tagger source is present in source results."""
+    if not source_results:
+        return False
+    return any(source in source_results for source in LOCAL_TAGGER_SOURCES)
+
+
+def is_pixiv_complemented(source_results):
+    """Pixiv is complementary-only: must have booru or local tagger alongside it."""
+    if not source_results or 'pixiv' not in source_results:
+        return True
+    return has_booru_source(source_results) or has_local_tagger_source(source_results)
 
 
 def tag_with_local_tagger(filepath):
@@ -384,12 +408,15 @@ def process_image_file(filepath, move_from_ingest=True):
                         if pixiv_result:
                             all_results[pixiv_result['source']] = pixiv_result['data']
             
-            # Local tagger logic: Only run if no online sources found or if always-on
+            # Local tagger logic: run if always-on, no online sources, or Pixiv needs complementation
             should_run_tagger = False
             if config.LOCAL_TAGGER_ALWAYS_RUN:
                 should_run_tagger = True
             elif not all_results:
                 should_run_tagger = True
+            elif 'pixiv' in all_results and not is_pixiv_complemented(all_results):
+                should_run_tagger = True
+                print(f"[Processing] Pixiv metadata found for {filename}; forcing local tagger complementation.")
             
             if should_run_tagger:
                 lt_res = tag_with_local_tagger(filepath)
@@ -401,6 +428,11 @@ def process_image_file(filepath, move_from_ingest=True):
                     msg = f"[Processing] ERROR: Local tagger failed for {filename}. File NOT ingested."
                     logger.error(msg)
                     return False, msg, "error"
+
+            if 'pixiv' in all_results and not is_pixiv_complemented(all_results):
+                msg = f"[Processing] ERROR: Pixiv metadata for {filename} requires booru or local tagger tags. File NOT ingested."
+                logger.error(msg)
+                return False, msg, "error"
         
         # Extract zip animation before hash computation (phash/colorhash/dimensions need frames)
         if is_zip_animation:
@@ -570,6 +602,11 @@ def process_image_file(filepath, move_from_ingest=True):
                 primary_source_data = all_results[src]
                 source_name = src
                 break
+
+        if not primary_source_data or not source_name:
+            msg = f"[Processing] ERROR: No valid primary source for {filename}. File NOT ingested."
+            logger.error(msg)
+            return False, msg, "error"
         
         # Check if we should merge multiple booru sources
         # Count how many "real" booru sources we have (excluding local_tagger which is AI-generated)

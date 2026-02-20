@@ -26,7 +26,8 @@ from .image_processor import (
     tag_video_with_frames,
     check_ffmpeg_available,
     extract_tag_data,
-    process_image_file
+    process_image_file,
+    is_pixiv_complemented
 )
 from .thumbnail_generator import ensure_thumbnail
 from . import constants
@@ -49,5 +50,6 @@ __all__ = [
     'check_ffmpeg_available',
     'extract_tag_data',
     'process_image_file',
+    'is_pixiv_complemented',
     'ensure_thumbnail',
 ]

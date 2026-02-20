@@ -359,6 +359,21 @@ def retry_tagging_service(data):
                 all_results[local_tagger_result['source']] = local_tagger_result['data']
                 print(f"[Retry Tagging] Tagged with Local Tagger.")
 
+        # Enforce policy: Pixiv cannot be a standalone source
+        if 'pixiv' in all_results and not processing.is_pixiv_complemented(all_results):
+            print("[Retry Tagging] Pixiv-only metadata is invalid; forcing local AI complementation...")
+            local_tagger_result = processing.tag_with_local_tagger(full_path)
+            used_local_tagger = True
+            if local_tagger_result:
+                all_results[local_tagger_result['source']] = local_tagger_result['data']
+                print("[Retry Tagging] Local AI complementation succeeded for Pixiv metadata.")
+
+        if 'pixiv' in all_results and not processing.is_pixiv_complemented(all_results):
+            return {
+                "error": "Pixiv metadata requires booru or local tagger tags. Current tags preserved.",
+                "status": "pixiv_needs_complement"
+            }, 200
+
         if not all_results:
             if skip_local_fallback:
                 return {
@@ -767,6 +782,21 @@ async def _process_bulk_retry_tagging_task(task_id: str, task_manager, skip_loca
                     if local_tagger_result:
                         all_results[local_tagger_result['source']] = local_tagger_result['data']
                         print(f"[Bulk Retry Tagging] Re-tagged with Local Tagger: {filepath}")
+
+            # Enforce policy: Pixiv cannot be a standalone source
+            if 'pixiv' in all_results and not processing.is_pixiv_complemented(all_results):
+                print("[Bulk Retry Tagging] Pixiv-only metadata is invalid; forcing local AI complementation...")
+                local_tagger_result = processing.tag_with_local_tagger(full_path)
+                used_local_tagger = True
+                if local_tagger_result:
+                    all_results[local_tagger_result['source']] = local_tagger_result['data']
+                    print("[Bulk Retry Tagging] Local AI complementation succeeded for Pixiv metadata.")
+
+            if 'pixiv' in all_results and not processing.is_pixiv_complemented(all_results):
+                print(f"[Bulk Retry Tagging] Pixiv-only still not complemented for {filepath}, preserving current tags")
+                still_local_count += 1
+                results.append({"filepath": filepath, "status": "pixiv_needs_complement"})
+                continue
 
             # If still no results, skip (keep as local)
             if not all_results:

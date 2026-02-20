@@ -532,6 +532,17 @@ def add_image_with_metadata(image_info, source_names, categorized_tags, raw_meta
     import sqlite3
     import config
 
+    booru_sources = {'danbooru', 'e621', 'gelbooru', 'yandere'}
+    local_tagger_sources = {'local_tagger', 'camie_tagger'}
+
+    has_pixiv = 'pixiv' in source_names
+    has_booru = any(source in booru_sources for source in source_names)
+    has_local_tagger = any(source in local_tagger_sources for source in source_names)
+
+    if has_pixiv and not has_booru and not has_local_tagger:
+        print(f"Database policy: refusing Pixiv-only insert for {image_info.get('filepath')}")
+        return False
+
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
