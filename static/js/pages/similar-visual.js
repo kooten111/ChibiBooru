@@ -40,6 +40,11 @@
     const resultCount = document.getElementById('resultCount');
     const resultsGridContainer = document.querySelector('.results-grid-container');
 
+    function encodePathForUrl(path) {
+        if (!path) return '';
+        return path.split('/').map(part => encodeURIComponent(part)).join('/');
+    }
+
     function updateUI() {
         if (blendNote) blendNote.style.display = selectedMethods.length > 1 ? 'inline' : 'none';
         if (weightsContainer) weightsContainer.classList.toggle('visible', selectedMethods.length > 1);
@@ -149,14 +154,14 @@
         const safePath = (img.path || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
         return `<div class="result-card" data-path="${safePath}">
             <div class="result-thumb">
-                <img src="/static/${img.thumb}" alt="Similar" loading="lazy">
+                <img src="/static/${encodePathForUrl(img.thumb)}" alt="Similar" loading="lazy">
                 <span class="distance-badge ${distanceClass}">${distance}</span>
                 <div class="result-overlay">
                     ${visualScore !== null ? `<div class="score-row"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg><span>${visualScore}%</span></div>` : ''}
                     ${tagScore !== null ? `<div class="score-row"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"></path><path d="M7 7h.01"></path></svg><span>${tagScore}%</span></div>` : ''}
                     ${semanticScore !== null ? `<div class="score-row"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path></svg><span>${semanticScore}%</span></div>` : ''}
                     <div class="actions">
-                        <a href="/view/${encodeURIComponent(img.path)}" class="action-btn btn-view"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>
+                        <a href="/view/${encodePathForUrl(img.path)}" class="action-btn btn-view"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a>
                         <button class="action-btn btn-delete" type="button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></button>
                     </div>
                 </div>

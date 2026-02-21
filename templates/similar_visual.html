@@ -820,9 +820,9 @@
             <!-- Reference Image -->
             <div class="control-section">
                 <div class="control-label">Reference</div>
-                <a href="/view/{{ filepath }}" class="reference-preview">
+                <a href="/view/{{ filepath | urlencode_path }}" class="reference-preview">
                     {% if thumbnail_path %}
-                    <img src="/static/{{ thumbnail_path }}" alt="Reference">
+                    <img src="/static/{{ thumbnail_path | urlencode_path }}" alt="Reference">
                     {% else %}
                     <div class="placeholder">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"

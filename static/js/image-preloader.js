@@ -1,5 +1,7 @@
 // Preload related images for instant navigation
 document.addEventListener('DOMContentLoaded', () => {
+    const encodePathForUrl = (path) => path.split('/').map(part => encodeURIComponent(part)).join('/');
+
     // Get all related image links
     const relatedLinks = document.querySelectorAll('.related-thumb');
 
@@ -22,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Preload the full-size image
         const preloadLink = document.createElement('link');
         preloadLink.rel = 'prefetch';
-        preloadLink.href = `/static/${imagePath}`;
+        preloadLink.href = `/static/${encodePathForUrl(imagePath)}`;
         preloadLink.as = 'image';
         document.head.appendChild(preloadLink);
     });

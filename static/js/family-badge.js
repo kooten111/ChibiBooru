@@ -57,13 +57,18 @@ class FamilyBadge {
         return html;
     }
 
+    encodePathForUrl(path) {
+        if (!path) return '';
+        return path.split('/').map(part => encodeURIComponent(part)).join('/');
+    }
+
     renderThumb(img, type) {
         const thumbPath = img.thumb.startsWith('thumbnails/') || img.thumb.startsWith('images/')
-            ? `/static/${img.thumb}`
-            : `/static/images/${img.thumb}`;
+            ? `/static/${this.encodePathForUrl(img.thumb)}`
+            : `/static/images/${this.encodePathForUrl(img.thumb)}`;
         const viewPath = img.path.startsWith('images/')
-            ? `/view/${img.path}`
-            : `/view/images/${img.path}`;
+            ? `/view/${this.encodePathForUrl(img.path)}`
+            : `/view/images/${this.encodePathForUrl(img.path)}`;
 
         return `
             <a href="${viewPath}" class="filmstrip-thumb filmstrip-thumb-${type}" title="${type === 'parent' ? 'Parent' : 'Child'}">

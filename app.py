@@ -185,19 +185,9 @@ def create_app():
     @app.after_request
     async def set_response_headers(response):
         """Set response headers for all responses."""
-        # Remove any problematic Permissions-Policy headers that might cause browser warnings
-        # Only set recognized features to avoid browser console warnings
-        if 'Permissions-Policy' in response.headers:
-            # If browsing-topics is in the header, remove it as it's not widely supported
-            current_policy = response.headers.get('Permissions-Policy', '')
-            if 'browsing-topics' in current_policy:
-                # Remove browsing-topics from the policy
-                features = [f.strip() for f in current_policy.split(',')]
-                features = [f for f in features if 'browsing-topics' not in f]
-                if features:
-                    response.headers['Permissions-Policy'] = ', '.join(features)
-                else:
-                    response.headers.pop('Permissions-Policy', None)
+        # Remove Permissions-Policy to avoid browser console warnings from
+        # unsupported directives (e.g., browsing-topics) across user agents.
+        response.headers.pop('Permissions-Policy', None)
         return response
 
     return app

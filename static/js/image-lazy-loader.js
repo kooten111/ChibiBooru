@@ -257,9 +257,9 @@
         const img = document.createElement('img');
         const thumbPath = image.thumb;
         if (thumbPath.startsWith('thumbnails/') || thumbPath.startsWith('images/')) {
-            img.src = `/static/${thumbPath}`;
+            img.src = `/static/${encodePathForUrl(thumbPath)}`;
         } else {
-            img.src = `/static/images/${thumbPath}`;
+            img.src = `/static/images/${encodePathForUrl(thumbPath)}`;
         }
         img.alt = 'Related';
         a.appendChild(img);
