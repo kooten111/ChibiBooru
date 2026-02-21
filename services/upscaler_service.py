@@ -194,6 +194,10 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
                 output_path=os.path.abspath(upscaled_path),
                 model_name=config.UPSCALER_MODEL,
                 device='auto',
+                tile_size=config.UPSCALER_TILE_SIZE,
+                tile_pad=config.UPSCALER_TILE_PAD,
+                min_tile_size=config.UPSCALER_MIN_TILE_SIZE,
+                allow_cpu_fallback=config.UPSCALER_ALLOW_CPU_FALLBACK,
                 progress_callback=progress_callback
             )
         

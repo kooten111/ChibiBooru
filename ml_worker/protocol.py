@@ -142,7 +142,9 @@ class Request:
 
     @staticmethod
     def upscale_image(request_id: str, image_path: str, model_name: str,
-                     output_path: str, device: str = "auto") -> Dict[str, Any]:
+                     output_path: str, device: str = "auto",
+                     tile_size: int = 256, tile_pad: int = 32,
+                     min_tile_size: int = 64, allow_cpu_fallback: bool = True) -> Dict[str, Any]:
         """Create an upscale_image request"""
         return Request.create(
             RequestType.UPSCALE_IMAGE,
@@ -151,7 +153,11 @@ class Request:
                 "image_path": image_path,
                 "model_name": model_name,
                 "output_path": output_path,
-                "device": device
+                "device": device,
+                "tile_size": tile_size,
+                "tile_pad": tile_pad,
+                "min_tile_size": min_tile_size,
+                "allow_cpu_fallback": allow_cpu_fallback,
             }
         )
 

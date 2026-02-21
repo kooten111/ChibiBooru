@@ -12,6 +12,31 @@ from ml_worker.backends import get_torch_device
 
 logger = logging.getLogger(__name__)
 
+
+def _is_recoverable_inference_error(error: RuntimeError) -> bool:
+    message = str(error).lower()
+    recoverable_markers = (
+        'out of memory',
+        'could not create a primitive',
+        'dnnl',
+        'oneapi',
+        'xpu',
+        'memory access',
+    )
+    return any(marker in message for marker in recoverable_markers)
+
+
+def _clear_device_cache(torch_module, device_name: str) -> None:
+    try:
+        if device_name == 'cuda' and torch_module.cuda.is_available():
+            torch_module.cuda.empty_cache()
+        elif device_name == 'xpu' and hasattr(torch_module, 'xpu') and torch_module.xpu.is_available():
+            torch_module.xpu.empty_cache()
+        elif device_name == 'mps' and hasattr(torch_module, 'mps') and hasattr(torch_module.mps, 'empty_cache'):
+            torch_module.mps.empty_cache()
+    except Exception as cache_error:
+        logger.debug(f"Cache clear skipped ({device_name}): {cache_error}")
+
 def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -> Dict[str, Any]:
     """
     Handle upscale_image request.
@@ -26,6 +51,10 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
     model_name = request_data.get('model_name', 'RealESRGAN_x4plus_anime')
     output_path = request_data['output_path']
     device = request_data.get('device', 'auto')
+    tile_size = max(32, int(request_data.get('tile_size', 256)))
+    tile_pad = max(0, int(request_data.get('tile_pad', 32)))
+    min_tile_size = max(32, int(request_data.get('min_tile_size', 64)))
+    allow_cpu_fallback = bool(request_data.get('allow_cpu_fallback', True))
 
     logger.info(f"Upscaling image: {os.path.basename(image_path)}")
 
@@ -126,6 +155,11 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
 
         models.upscaler_model.eval()
         models.upscaler_model.to(device)
+        models.upscaler_device = device
+    elif models.upscaler_device != device:
+        logger.info(f"Moving upscaler model from {models.upscaler_device} to {device}")
+        models.upscaler_model.to(device)
+        models.upscaler_device = device
 
     # 1. Load image
     try:
@@ -140,7 +174,7 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
             # Convert to tensor
             img_np = np.array(img).transpose(2, 0, 1) # HWC -> CHW
             img_np = img_np / 255.
-            img_tensor = torch.from_numpy(img_np).float().unsqueeze(0).to(device)
+            img_tensor_cpu = torch.from_numpy(img_np).float().unsqueeze(0)
     except OSError as e:
         # Handle truncated or corrupted images by allowing PIL to load partial data
         if 'truncated' in str(e).lower() or 'corrupted' in str(e).lower():
@@ -160,7 +194,7 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
                     # Convert to tensor
                     img_np = np.array(img).transpose(2, 0, 1) # HWC -> CHW
                     img_np = img_np / 255.
-                    img_tensor = torch.from_numpy(img_np).float().unsqueeze(0).to(device)
+                    img_tensor_cpu = torch.from_numpy(img_np).float().unsqueeze(0)
                 
                 logger.info(f"Successfully recovered upscaled image from truncated source: {image_path}")
             except Exception as recovery_error:
@@ -172,35 +206,81 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
             raise
 
     # 2. Run Inference
-    try:
-        from ml_worker.utils import tiled_inference
-        # Run inference (with tiling if needed)
-        # Using a conservative tile size to avoid OOM
-        output = tiled_inference(
-            models.upscaler_model, 
-            img_tensor, 
-            tile_size=256, 
-            tile_pad=32, 
-            scale=4, 
-            device=device,
-            progress_callback=progress_callback
-        )
-    except RuntimeError as e:
-        if "out of memory" in str(e):
-            torch.cuda.empty_cache() if torch.cuda.is_available() else None
-            # Retry with smaller tiles
-            logger.warning("OOM detected, retrying with smaller tiles...")
+    from ml_worker.utils import tiled_inference
+
+    current_device = device
+    current_tile_size = max(tile_size, min_tile_size)
+    output = None
+    last_error = None
+
+    while current_tile_size >= min_tile_size:
+        try:
+            if models.upscaler_device != current_device:
+                logger.info(f"Moving upscaler model from {models.upscaler_device} to {current_device}")
+                models.upscaler_model.to(current_device)
+                models.upscaler_device = current_device
+
+            img_tensor = img_tensor_cpu.to(current_device)
             output = tiled_inference(
-                models.upscaler_model, 
-                img_tensor, 
-                tile_size=128, 
-                tile_pad=32, 
-                scale=4, 
-                device=device,
-                progress_callback=progress_callback
+                models.upscaler_model,
+                img_tensor,
+                tile_size=current_tile_size,
+                tile_pad=tile_pad,
+                scale=4,
+                device=current_device,
+                progress_callback=progress_callback,
             )
-        else:
-            raise e
+            break
+        except RuntimeError as e:
+            last_error = e
+            if not _is_recoverable_inference_error(e):
+                raise
+
+            _clear_device_cache(torch, current_device)
+
+            if current_tile_size == min_tile_size:
+                break
+
+            next_tile_size = max(min_tile_size, current_tile_size // 2)
+            logger.warning(
+                f"Inference failed on {current_device} with tile size {current_tile_size}: {e}. "
+                f"Retrying with tile size {next_tile_size}."
+            )
+            current_tile_size = next_tile_size
+
+    if output is None and allow_cpu_fallback and current_device != 'cpu' and last_error is not None and _is_recoverable_inference_error(last_error):
+        logger.warning(
+            f"Recoverable inference failure on backend {current_device} after tile retries. "
+            "Falling back to CPU for this request."
+        )
+        current_device = 'cpu'
+        current_tile_size = max(min_tile_size, min(tile_size, 256))
+
+        while current_tile_size >= min_tile_size:
+            try:
+                if models.upscaler_device != current_device:
+                    models.upscaler_model.to(current_device)
+                    models.upscaler_device = current_device
+
+                img_tensor = img_tensor_cpu.to(current_device)
+                output = tiled_inference(
+                    models.upscaler_model,
+                    img_tensor,
+                    tile_size=current_tile_size,
+                    tile_pad=tile_pad,
+                    scale=4,
+                    device=current_device,
+                    progress_callback=progress_callback,
+                )
+                break
+            except RuntimeError as e:
+                last_error = e
+                if not _is_recoverable_inference_error(e) or current_tile_size == min_tile_size:
+                    break
+                current_tile_size = max(min_tile_size, current_tile_size // 2)
+
+    if output is None:
+        raise last_error if last_error is not None else RuntimeError("Upscaler inference failed")
 
     # 3. Post-process
     output = output.data.squeeze().float().cpu().clamp_(0, 1).numpy()

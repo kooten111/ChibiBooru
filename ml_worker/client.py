@@ -435,6 +435,10 @@ class MLWorkerClient:
     def upscale_image(self, image_path: str, output_path: str,
                      model_name: str = 'RealESRGAN_x4plus_anime',
                      device: str = 'auto',
+                     tile_size: int = 256,
+                     tile_pad: int = 32,
+                     min_tile_size: int = 64,
+                     allow_cpu_fallback: bool = True,
                      progress_callback=None) -> Dict[str, Any]:
         """
         Upscale an image using RealESRGAN.
@@ -444,6 +448,10 @@ class MLWorkerClient:
             output_path: Path to save upscaled image
             model_name: Name of upscaler model
             device: Device to use ('cuda', 'xpu', 'cpu', or 'auto')
+            tile_size: Initial tile size used for tiled inference
+            tile_pad: Tile padding used for seamless tile joins
+            min_tile_size: Smallest tile size allowed for retries
+            allow_cpu_fallback: If True, fallback to CPU after repeated backend failures
             progress_callback: Optional function(current, total, message)
 
         Returns:
@@ -463,7 +471,11 @@ class MLWorkerClient:
             image_path,
             model_name,
             output_path,
-            device
+            device,
+            tile_size,
+            tile_pad,
+            min_tile_size,
+            allow_cpu_fallback,
         )
 
         return self._send_request(request, progress_callback=progress_callback)

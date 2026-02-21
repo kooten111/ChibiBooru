@@ -390,8 +390,36 @@ UPSCALER_SCALE = int(_get_setting('UPSCALER_SCALE', 4))
 # Tile size for processing large images without running out of VRAM
 UPSCALER_TILE_SIZE = int(_get_setting('UPSCALER_TILE_SIZE', 512))
 
+# Tile padding for seamless tiled inference
+UPSCALER_TILE_PAD = int(_get_setting('UPSCALER_TILE_PAD', 32))
+
+# Minimum tile size allowed when retrying after runtime failures
+UPSCALER_MIN_TILE_SIZE = int(_get_setting('UPSCALER_MIN_TILE_SIZE', 64))
+
+# Fallback to CPU when accelerator backend repeatedly fails during inference
+_upscaler_cpu_fallback = _get_setting('UPSCALER_ALLOW_CPU_FALLBACK', True)
+UPSCALER_ALLOW_CPU_FALLBACK = _upscaler_cpu_fallback if isinstance(_upscaler_cpu_fallback, bool) else str(_upscaler_cpu_fallback).lower() in ('true', '1', 'yes')
+
 # Directory to store upscaled images (separate from originals)
 UPSCALED_IMAGES_DIR = str(_get_setting('UPSCALED_IMAGES_DIR', './static/upscaled'))
+
+# Bulk upscale maintenance thresholds
+# Images matching ANY enabled threshold are selected
+_um_use_filesize = _get_setting('UPSCALE_MAINTENANCE_USE_FILESIZE_KB', True)
+UPSCALE_MAINTENANCE_USE_FILESIZE_KB = _um_use_filesize if isinstance(_um_use_filesize, bool) else str(_um_use_filesize).lower() in ('true', '1', 'yes')
+UPSCALE_MAINTENANCE_MAX_FILESIZE_KB = int(_get_setting('UPSCALE_MAINTENANCE_MAX_FILESIZE_KB', 512))
+
+_um_use_megapixels = _get_setting('UPSCALE_MAINTENANCE_USE_MEGAPIXELS', True)
+UPSCALE_MAINTENANCE_USE_MEGAPIXELS = _um_use_megapixels if isinstance(_um_use_megapixels, bool) else str(_um_use_megapixels).lower() in ('true', '1', 'yes')
+UPSCALE_MAINTENANCE_MAX_MEGAPIXELS = float(_get_setting('UPSCALE_MAINTENANCE_MAX_MEGAPIXELS', 1.0))
+
+_um_use_dimensions = _get_setting('UPSCALE_MAINTENANCE_USE_DIMENSIONS', True)
+UPSCALE_MAINTENANCE_USE_DIMENSIONS = _um_use_dimensions if isinstance(_um_use_dimensions, bool) else str(_um_use_dimensions).lower() in ('true', '1', 'yes')
+UPSCALE_MAINTENANCE_MAX_WIDTH = int(_get_setting('UPSCALE_MAINTENANCE_MAX_WIDTH', 1280))
+UPSCALE_MAINTENANCE_MAX_HEIGHT = int(_get_setting('UPSCALE_MAINTENANCE_MAX_HEIGHT', 1280))
+
+_um_exclude_upscaled = _get_setting('UPSCALE_MAINTENANCE_EXCLUDE_UPSCALED', True)
+UPSCALE_MAINTENANCE_EXCLUDE_UPSCALED = _um_exclude_upscaled if isinstance(_um_exclude_upscaled, bool) else str(_um_exclude_upscaled).lower() in ('true', '1', 'yes')
 
 
 # ==================== ML WORKER (MEMORY OPTIMIZATION) ====================
