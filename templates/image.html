@@ -402,6 +402,33 @@
 
                         <!-- Sources Section -->
                         {% if metadata.sources %}
+                        {% set selected_source_name = data.active_source if data.active_source and data.active_source in metadata.sources else (metadata.sources.keys()|list|first) %}
+                        {% set selected_source_data = metadata.sources.get(selected_source_name, {}) %}
+                        {% set source_ns = namespace(url=none) %}
+
+                        {% if selected_source_data.source is defined and selected_source_data.source is string %}
+                        {% for source_token in selected_source_data.source.strip().split() %}
+                        {% if source_ns.url is none and (source_token.startswith('http://') or source_token.startswith('https://')) %}
+                        {% set source_ns.url = source_token %}
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+
+                        {% if source_ns.url is none and selected_source_data.sources is defined and selected_source_data.sources is iterable %}
+                        {% for source_candidate in selected_source_data.sources %}
+                        {% if source_ns.url is none and source_candidate is string %}
+                        {% set trimmed_source = source_candidate.strip() %}
+                        {% if trimmed_source.startswith('http://') or trimmed_source.startswith('https://') %}
+                        {% set source_ns.url = trimmed_source %}
+                        {% endif %}
+                        {% elif source_ns.url is none and source_candidate is mapping and source_candidate.url is defined and source_candidate.url is string %}
+                        {% set trimmed_source = source_candidate.url.strip() %}
+                        {% if trimmed_source.startswith('http://') or trimmed_source.startswith('https://') %}
+                        {% set source_ns.url = trimmed_source %}
+                        {% endif %}
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
 
                         <div class="info-section">
                             <div class="info-row">
@@ -477,6 +504,26 @@
                                 </div>
                             </div>
                         </div>
+
+                        {% if source_ns.url %}
+                        <div class="info-section">
+                            <div class="info-row">
+                                <div class="info-label">Source</div>
+                                <div class="source-links">
+                                    <a href="{{ source_ns.url }}" target="_blank" rel="noopener"
+                                        class="source-link">
+                                        <svg fill="currentColor" viewBox="0 0 20 20">
+                                            <path
+                                                d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" />
+                                            <path
+                                                d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" />
+                                        </svg>
+                                        <span>Original Upload</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                         {% else %}
                         <!-- No sources found - show Not Found with retry option -->
                         <div class="info-section">
@@ -498,7 +545,7 @@
                         {% if metadata.sources and metadata.sources|length > 1 %}
                         <div class="info-section">
                             <div class="info-row">
-                                <div class="info-label">Source</div>
+                                <div class="info-label">Metadata</div>
                                 <div class="info-value">
                                     <button class="source-toggle-btn" onclick="openSourceModal()">
                                         <span class="current-source-indicator">

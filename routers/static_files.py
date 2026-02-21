@@ -4,6 +4,11 @@ import os
 
 static_blueprint = Blueprint('static_files', __name__)
 
+@static_blueprint.route('/favicon.ico')
+async def serve_favicon():
+    """Serve favicon fallback for clients that request /favicon.ico."""
+    return await send_from_directory('static', 'favicon.svg')
+
 @static_blueprint.route('/thumbnails/<path:subpath>')
 async def serve_thumbnail(subpath):
     """
