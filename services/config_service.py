@@ -415,6 +415,58 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Directory to store upscaled images',
         'editable': True,
     },
+    'UPSCALE_MAINTENANCE_USE_FILESIZE_KB': {
+        'category': 'Feature Flags',
+        'type': 'bool',
+        'description': 'Bulk upscale maintenance: include file size threshold',
+        'editable': True,
+    },
+    'UPSCALE_MAINTENANCE_MAX_FILESIZE_KB': {
+        'category': 'Feature Flags',
+        'type': 'int',
+        'description': 'Bulk upscale maintenance: max file size in KB',
+        'editable': True,
+        'min': 1,
+    },
+    'UPSCALE_MAINTENANCE_USE_MEGAPIXELS': {
+        'category': 'Feature Flags',
+        'type': 'bool',
+        'description': 'Bulk upscale maintenance: include megapixel threshold',
+        'editable': True,
+    },
+    'UPSCALE_MAINTENANCE_MAX_MEGAPIXELS': {
+        'category': 'Feature Flags',
+        'type': 'float',
+        'description': 'Bulk upscale maintenance: max megapixels',
+        'editable': True,
+        'min': 0.01,
+    },
+    'UPSCALE_MAINTENANCE_USE_DIMENSIONS': {
+        'category': 'Feature Flags',
+        'type': 'bool',
+        'description': 'Bulk upscale maintenance: include width/height threshold',
+        'editable': True,
+    },
+    'UPSCALE_MAINTENANCE_MAX_WIDTH': {
+        'category': 'Feature Flags',
+        'type': 'int',
+        'description': 'Bulk upscale maintenance: max width in pixels',
+        'editable': True,
+        'min': 1,
+    },
+    'UPSCALE_MAINTENANCE_MAX_HEIGHT': {
+        'category': 'Feature Flags',
+        'type': 'int',
+        'description': 'Bulk upscale maintenance: max height in pixels',
+        'editable': True,
+        'min': 1,
+    },
+    'UPSCALE_MAINTENANCE_EXCLUDE_UPSCALED': {
+        'category': 'Feature Flags',
+        'type': 'bool',
+        'description': 'Bulk upscale maintenance: skip images already upscaled',
+        'editable': True,
+    },
     
     # ML Worker
     'ML_WORKER_IDLE_TIMEOUT': {

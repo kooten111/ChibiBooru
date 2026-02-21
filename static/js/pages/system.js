@@ -726,6 +726,146 @@ function systemRecountTags(event) {
     });
 }
 
+function systemUpscaleSmallImages(event) {
+    if (event) event.preventDefault();
+
+    const template = document.getElementById('upscale-small-modal-template');
+    if (!template) {
+        showNotification('Upscale modal template is missing', 'error');
+        return;
+    }
+
+    const clone = template.content.cloneNode(true);
+    const overlay = clone.querySelector('.custom-confirm-overlay');
+    const modal = overlay.querySelector('.custom-confirm-modal');
+
+    const useFileSizeInput = modal.querySelector('#upscaleUseFileSize');
+    const maxFileSizeInput = modal.querySelector('#upscaleMaxFileSizeKb');
+    const useMegapixelsInput = modal.querySelector('#upscaleUseMegapixels');
+    const maxMegapixelsInput = modal.querySelector('#upscaleMaxMegapixels');
+    const useDimensionsInput = modal.querySelector('#upscaleUseDimensions');
+    const maxWidthInput = modal.querySelector('#upscaleMaxWidth');
+    const maxHeightInput = modal.querySelector('#upscaleMaxHeight');
+    const excludeUpscaledInput = modal.querySelector('#upscaleExcludeUpscaled');
+    const previewStatus = modal.querySelector('#upscalePreviewStatus');
+    const previewBtn = modal.querySelector('#upscalePreviewBtn');
+    const queueBtn = modal.querySelector('#upscaleQueueBtn');
+    const cancelBtn = modal.querySelector('#upscaleCancelBtn');
+
+    const getSettingValue = (key, fallback) => {
+        for (const categoryName of Object.keys(settingsData || {})) {
+            const items = settingsData[categoryName];
+            if (!Array.isArray(items)) continue;
+            const found = items.find(item => item.key === key);
+            if (found && found.value !== undefined && found.value !== null) {
+                return found.value;
+            }
+        }
+        return fallback;
+    };
+
+    useFileSizeInput.checked = Boolean(getSettingValue('UPSCALE_MAINTENANCE_USE_FILESIZE_KB', true));
+    maxFileSizeInput.value = Number(getSettingValue('UPSCALE_MAINTENANCE_MAX_FILESIZE_KB', 512));
+    useMegapixelsInput.checked = Boolean(getSettingValue('UPSCALE_MAINTENANCE_USE_MEGAPIXELS', true));
+    maxMegapixelsInput.value = Number(getSettingValue('UPSCALE_MAINTENANCE_MAX_MEGAPIXELS', 1.0));
+    useDimensionsInput.checked = Boolean(getSettingValue('UPSCALE_MAINTENANCE_USE_DIMENSIONS', true));
+    maxWidthInput.value = Number(getSettingValue('UPSCALE_MAINTENANCE_MAX_WIDTH', 1280));
+    maxHeightInput.value = Number(getSettingValue('UPSCALE_MAINTENANCE_MAX_HEIGHT', 1280));
+    excludeUpscaledInput.checked = Boolean(getSettingValue('UPSCALE_MAINTENANCE_EXCLUDE_UPSCALED', true));
+
+    let previewResult = null;
+
+    const collectPayload = () => ({
+        use_filesize_kb: useFileSizeInput.checked,
+        max_filesize_kb: Number(maxFileSizeInput.value || 512),
+        use_megapixels: useMegapixelsInput.checked,
+        max_megapixels: Number(maxMegapixelsInput.value || 1.0),
+        use_dimensions: useDimensionsInput.checked,
+        max_width: Number(maxWidthInput.value || 1280),
+        max_height: Number(maxHeightInput.value || 1280),
+        exclude_upscaled: excludeUpscaledInput.checked,
+    });
+
+    const invalidatePreview = () => {
+        previewResult = null;
+        queueBtn.disabled = true;
+        previewStatus.textContent = 'Run preview to see how many images will be queued.';
+    };
+
+    [
+        useFileSizeInput,
+        maxFileSizeInput,
+        useMegapixelsInput,
+        maxMegapixelsInput,
+        useDimensionsInput,
+        maxWidthInput,
+        maxHeightInput,
+        excludeUpscaledInput,
+    ].forEach(input => {
+        input.addEventListener('change', invalidatePreview);
+        input.addEventListener('input', invalidatePreview);
+    });
+
+    previewBtn.onclick = async () => {
+        if (!SYSTEM_SECRET) {
+            showNotification('System secret not configured', 'error');
+            return;
+        }
+
+        const payload = collectPayload();
+
+        previewBtn.disabled = true;
+        previewStatus.textContent = 'Checking matching images...';
+        queueBtn.disabled = true;
+
+        try {
+            const response = await fetch(`/api/system/upscale_small/preview?secret=${encodeURIComponent(SYSTEM_SECRET)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+
+            if (data.status !== 'success') {
+                throw new Error(data.error || 'Preview failed');
+            }
+
+            previewResult = data;
+            queueBtn.disabled = false;
+
+            const missingPart = data.missing_files > 0 ? `, ${data.missing_files} missing files skipped` : '';
+            previewStatus.textContent = `${data.queued} images will be queued (from ${data.scanned} scanned${missingPart}).`;
+        } catch (err) {
+            previewResult = null;
+            queueBtn.disabled = true;
+            previewStatus.textContent = `Preview failed: ${err.message}`;
+            showNotification(`Preview failed: ${err.message}`, 'error');
+        } finally {
+            previewBtn.disabled = false;
+        }
+    };
+
+    queueBtn.onclick = () => {
+        if (!previewResult) {
+            showNotification('Run preview first to confirm queue size', 'error');
+            return;
+        }
+
+        const payload = collectPayload();
+        systemAction('/api/system/upscale_small', event.target, `Upscale Small Images (${previewResult.queued} queued)`, payload);
+        document.body.removeChild(overlay);
+    };
+
+    cancelBtn.onclick = () => document.body.removeChild(overlay);
+    overlay.onclick = (e) => {
+        if (e.target === overlay) {
+            document.body.removeChild(overlay);
+        }
+    };
+
+    document.body.appendChild(overlay);
+}
+
 function systemReindexDatabase(event) {
     if (event) event.preventDefault();
     window.showConfirm('This will optimize the database (VACUUM and REINDEX). This may take a few seconds. Continue?', () => {
@@ -1402,6 +1542,7 @@ window.systemDeduplicate = systemDeduplicate;
 window.systemCleanOrphans = systemCleanOrphans;
 window.systemApplyMergedSources = systemApplyMergedSources;
 window.systemRecountTags = systemRecountTags;
+window.systemUpscaleSmallImages = systemUpscaleSmallImages;
 window.systemReindexDatabase = systemReindexDatabase;
 window.systemBulkRetagLocal = systemBulkRetagLocal;
 window.systemBulkRetryTagging = systemBulkRetryTagging;

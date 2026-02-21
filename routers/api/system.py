@@ -189,6 +189,24 @@ async def bulk_retag_local():
     local_only = data.get("local_only", False)
     return await start_background_task(system_service.bulk_retag_local_task, "Bulk local retagging started in background", local_only=local_only)
 
+@api_blueprint.route('/system/upscale_small', methods=['POST'])
+@api_handler()
+async def bulk_upscale_small_images():
+    """Queue and process upscales for images matching maintenance thresholds."""
+    data = (await request.get_json(silent=True)) or {}
+    return await start_background_task(
+        system_service.bulk_upscale_small_images_task,
+        "Bulk upscale maintenance started in background",
+        settings=data,
+    )
+
+@api_blueprint.route('/system/upscale_small/preview', methods=['POST'])
+@api_handler()
+async def preview_bulk_upscale_small_images():
+    """Preview how many images match bulk upscale maintenance thresholds."""
+    data = (await request.get_json(silent=True)) or {}
+    return await asyncio.to_thread(system_service.preview_bulk_upscale_small_images, data)
+
 @api_blueprint.route('/system/broken_images', methods=['GET'])
 @api_handler()
 async def find_broken_images():

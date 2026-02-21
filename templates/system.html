@@ -4,12 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <title>System Settings - {{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=1' }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=2' }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/system.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/system.css') + '?v=2' }}">
 </head>
 
 <body>
@@ -209,6 +210,13 @@
                                         <span class="action-desc">Find missing data</span>
                                     </div>
                                 </button>
+                                <button class="action-btn" onclick="systemUpscaleSmallImages(event)">
+                                    <span class="action-icon">🖼️</span>
+                                    <div class="action-text">
+                                        <span class="action-label">Upscale Small Images</span>
+                                        <span class="action-desc">Uses settings thresholds</span>
+                                    </div>
+                                </button>
                             </div>
                         </section>
 
@@ -313,9 +321,60 @@
         </div>
     </div>
 
+    <template id="upscale-small-modal-template">
+        <div class="custom-confirm-overlay">
+            <div class="custom-confirm-modal upscale-modal">
+                <h3>Upscale Small Images</h3>
+                <p>Set thresholds, preview queue size, then start bulk upscaling.</p>
+
+                <div class="upscale-threshold-row">
+                    <label class="upscale-row-header" for="upscaleUseFileSize">
+                        <span class="upscale-row-label">File size (KB)</span>
+                        <input type="checkbox" id="upscaleUseFileSize">
+                    </label>
+                    <input type="number" id="upscaleMaxFileSizeKb" class="filter-input" min="1" step="1" placeholder="Max KB">
+                </div>
+
+                <div class="upscale-threshold-row">
+                    <label class="upscale-row-header" for="upscaleUseMegapixels">
+                        <span class="upscale-row-label">Megapixels (MP)</span>
+                        <input type="checkbox" id="upscaleUseMegapixels">
+                    </label>
+                    <input type="number" id="upscaleMaxMegapixels" class="filter-input" min="0.01" step="0.01" placeholder="Max MP">
+                </div>
+
+                <div class="upscale-threshold-row">
+                    <label class="upscale-row-header" for="upscaleUseDimensions">
+                        <span class="upscale-row-label">Dimensions (width OR height)</span>
+                        <input type="checkbox" id="upscaleUseDimensions">
+                    </label>
+                    <div class="upscale-dimension-grid">
+                        <input type="number" id="upscaleMaxWidth" class="filter-input" min="1" step="1" placeholder="Max width">
+                        <input type="number" id="upscaleMaxHeight" class="filter-input" min="1" step="1" placeholder="Max height">
+                    </div>
+                </div>
+
+                <div class="upscale-threshold-row">
+                    <label class="upscale-row-header" for="upscaleExcludeUpscaled">
+                        <span class="upscale-row-label">Exclude already upscaled images</span>
+                        <input type="checkbox" id="upscaleExcludeUpscaled">
+                    </label>
+                </div>
+
+                <div id="upscalePreviewStatus" class="warning-text upscale-preview-status">Run preview to see how many images will be queued.</div>
+
+                <div class="button-group upscale-button-group">
+                    <button class="btn-secondary" id="upscalePreviewBtn">Preview Queue</button>
+                    <button class="btn-primary" id="upscaleQueueBtn" disabled>Queue Upscales</button>
+                    <button class="btn-cancel" id="upscaleCancelBtn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <script src="{{ url_for('static', filename='js/header.js') }}"></script>
     <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
-    <script type="module" src="{{ url_for('static', filename='js/pages/system.js') + '?v=2' }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/system.js') + '?v=4' }}"></script>
     <script type="module" src="{{ url_for('static', filename='js/global-uploader.js') }}"></script>
 </body>
 
