@@ -111,7 +111,7 @@ def run_find_broken_images() -> Dict[str, Any]:
                     )
                     for emb_row in emb_cursor:
                         vec = np.frombuffer(emb_row["embedding"], dtype=np.float32)
-                        if len(vec) != 1024:
+                        if len(vec) != config.SEMANTIC_EMBEDDING_DIM:
                             cursor.execute(
                                 "SELECT id, filepath, md5 FROM images WHERE id = ?",
                                 (emb_row["image_id"],),
@@ -217,7 +217,7 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
                         for emb_row in emb_cursor:
                             try:
                                 vec = np.frombuffer(emb_row["embedding"], dtype=np.float32)
-                                if len(vec) != 1024:
+                                if len(vec) != config.SEMANTIC_EMBEDDING_DIM:
                                     broken_ids.add(emb_row["image_id"])
                             except Exception:
                                 broken_ids.add(emb_row["image_id"])
