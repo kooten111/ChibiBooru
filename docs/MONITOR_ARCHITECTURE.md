@@ -208,11 +208,13 @@ After starting, verify the architecture:
 
 **UVICORN_WORKERS** (default: 4)
 - Number of web workers to spawn
-- Set in `.env` or as environment variable
+- Set as environment variable or in `start_booru.sh`
+- Can be overridden at runtime: `UVICORN_WORKERS=8 ./start_booru.sh`
 
 **MONITOR_ENABLED** (default: True)
 - Controls whether monitor service starts
-- Set in `config.py` or `.env`
+- Loaded via config priority chain: `config.yml` → `.env` → Python default in `config.py`
+- Can be edited via web UI at `/system`
 
 ### Customizing Worker Count
 

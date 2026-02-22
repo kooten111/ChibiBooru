@@ -36,16 +36,15 @@ User/File → Router → Service → Repository → Database
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. Web Router (routers/web.py)                             │
-│    POST /upload                                             │
+│ 2. Web Router (routers/web/gallery.py)                     │                                             │
 │    • Receive multipart/form-data                           │
 │    • Save to temp location                                  │
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 3. Processing Service (services/processing_service.py)     │
+│ 3. Image Processor (services/processing/image_processor.py) │
 │    process_image_file()                                     │
-│    • Calculate MD5 hash                                     │
+│    • Calculate MD5 hash (utils/file_utils.get_file_md5)      │
 │    • Check for duplicates                                   │
 └─────────────────────────────────────────────────────────────┘
                           ↓
@@ -124,7 +123,7 @@ User/File → Router → Service → Repository → Database
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 12. Thumbnail Generation (services/processing_service.py)  │
+│ 12. Thumbnail Generation (services/processing/thumbnail_generator.py) │
 │     generate_thumbnail()                                    │
 │     • Load image with Pillow                                │
 │     • Resize to max dimension                               │
@@ -161,7 +160,7 @@ User/File → Router → Service → Repository → Database
 └─────────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. Web Router (routers/web.py)                             │
+│ 2. Web Router (routers/web/gallery.py)                      │
 │    GET /?query=1girl+blue_hair+source:danbooru              │
 └─────────────────────────────────────────────────────────────┘
                           ↓

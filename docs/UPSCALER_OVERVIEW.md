@@ -15,7 +15,7 @@ The system operates on a client-server model over a local Unix domain socket:
 
 ```mermaid
 graph TD
-    User[User Interface] -->|POST /api/upscale| API[Flask/Quart Web Server]
+    User[User Interface] -->|POST /api/upscale| API[Quart Web Server]
     API -->|Async Call| Service[Upscaler Service]
     Service -->|IPC Request| Client[ML Worker Client]
     
@@ -50,8 +50,8 @@ These components run within the main web application process.
 | **`services/upscaler_service.py`** | **Service Layer** | The primary entry point. Orchestrates the workflow, checks if upscaled images exist, manages file paths, and calls the worker client. |
 | **`routers/api/upscaler.py`** | **API Controller** | Exposes REST endpoints (`POST /api/upscale`, `DELETE /api/upscale`) for the frontend to consume. |
 | **`services/image_service.py`** | **Integration** | Ensures data consistency. Specifically handles **cleanup**, ensuring upscaled files are deleted when the original image is deleted. |
-| **`routers/web.py`** | **View Controller** | Injects the `upscaled_image_url` context into the image page template so the UI knows to show the button/badge. |
-| **`services/similarity_service.py`** | **Consumer** | Checks for `ML_WORKER_ENABLED` and attempts to import `ml_worker.client`. While primarily for similarity, it's a "customer" of the shared ML Worker infrastructure. |
+| **`routers/web/image_detail.py`** | **View Controller** | Injects the `upscaled_image_url` context into the image page template so the UI knows to show the button/badge. |
+| **`services/similarity_service.py`** | **Consumer** | Uses the shared ML Worker infrastructure for generating image embeddings for semantic similarity search. |
 
 ### 2. ML Worker (Subprocess)
 These components run in a separate, isolated process to manage memory and GPU resources.
@@ -59,7 +59,7 @@ These components run in a separate, isolated process to manage memory and GPU re
 | File Path | Component | Description |
 | :--- | :--- | :--- |
 | **`ml_worker/server.py`** | **Worker Server** | The "Brain". Listens for requests, manages job queues, and delegates to task-specific handlers. |
-| **`ml_worker/handlers/`** | **Task Handlers** | Specialized logic for different ML tasks (tagging, upscaling, similarity, etc.). |
+| **`ml_worker/handlers/`** | **Task Handlers** | Specialized logic for different ML tasks (tagging, upscaling, similarity, ratings, animation, thumbnail, system). |
 | **`ml_worker/client.py`** | **IPC Client** | The bridge. Handles spawning the worker process if it's dead, and sending JSON requests over the socket. |
 | **`ml_worker/protocol.py`** | **Protocol** | Defines the data contract (Request/Response schemas) for IPC communication. |
 | **`ml_worker/backends.py`** | **Backend Manager** | Handles hardware detection (Nvidia/Intel/Apple) and environment setup (PyTorch installation directives). |
@@ -94,10 +94,11 @@ The upscaler is controlled via `config.py` and Environment Variables (`.env`).
 | `UPSCALER_ENABLED` | `false` | Master toggle to enable the feature. |
 | `UPSCALER_MODEL` | `RealESRGAN_x4plus` | The specific model architecture to use. |
 | `UPSCALED_IMAGES_DIR` | `./static/upscaled` | Storage location for output files. |
-| `ML_WORKER_ENABLED` | `true` | Whether to use the subprocess architecture (Recommended). |
 | `ML_WORKER_IDLE_TIMEOUT`| `300` (5 mins) | How long the worker stays alive after the last request. |
-| `ML_WORKER_BACKEND` | `auto` | Forces a specific backend: `cuda`, `xpu`, `cpu`, or `auto`. |
+| `ML_WORKER_BACKEND` | `auto` | Forces a specific backend: `cuda`, `xpu`, `mps`, `cpu`, or `auto`. |
 | `ML_WORKER_SOCKET` | `/tmp/...` | Path to the Unix domain socket for IPC. |
+
+**Note**: The ML Worker is **always required** for all ML operations — there is no `ML_WORKER_ENABLED` toggle. It runs as a subprocess and auto-terminates when idle.
 
 ---
 

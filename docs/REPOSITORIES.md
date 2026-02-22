@@ -7,6 +7,8 @@
 - [Tag Repository](#tag-repository)
 - [Pool Repository](#pool-repository)
 - [Rating Repository](#rating-repository)
+- [Favourites Repository](#favourites-repository)
+- [Tagger Predictions Repository](#tagger-predictions-repository)
 - [Delta Tracker Repository](#delta-tracker-repository)
 
 ---
@@ -21,7 +23,7 @@ The Repositories layer provides an abstraction over database operations. It hand
 - Transaction management
 
 ### Design Principles
-- **Separation of Concerns**: Pure data access, no business logic
+- **Separation of Concerns**: Pure data access, no application logic
 - **Single Responsibility**: Each repository handles a specific domain
 - **Caching**: Uses `@lru_cache` for frequently accessed data
 - **Error Handling**: Graceful handling of database errors
@@ -841,6 +843,17 @@ Retrieve predictions above threshold.
 #### `get_merged_general_tags(image_id: int, existing_general_tags: set, min_confidence: float = None)`
 Get tags to be merged into display (excluding already present ones).
 
+---
+
+## Delta Tracker Repository
+
+**File**: `repositories/delta_tracker.py`
+
+### Purpose
+Track manual tag modifications to preserve user edits across database rebuilds.
+
+### Functions
+
 #### `compute_tag_deltas(filepath: str, old_tags: Dict, new_tags: Dict) -> List[Dict]`
 
 Compute deltas between old and new tag sets.
@@ -900,9 +913,48 @@ Clear all deltas for an image.
 
 ---
 
+#### `get_image_deltas(image_md5: str) -> List[Dict]`
+
+Get all recorded deltas for a specific image.
+
+**Parameters**:
+| Name | Type | Description |
+|------|------|-------------|
+| `image_md5` | `str` | MD5 hash of image |
+
+**Returns**: List of delta records for the image
+
+---
+
+#### `clear_all_deltas()`
+
+Clear all deltas for all images.
+
+**Use Case**: Full reset of manual modifications
+
+---
+
+### Additional Data Access Functions
+
+The following functions in `data_access.py` are also exported:
+
+#### `get_tags_with_extended_categories() -> List[Dict]`
+Get all tags that have extended category assignments.
+
+#### `update_image_dimensions(image_id: int, width: int, height: int)`
+Update the original width/height for an image.
+
+#### `update_image_upscale_info(image_id: int, width: int, height: int)`
+Update the upscaled width/height for an image.
+
+#### `get_implied_tags_for_image(image_id: int) -> List[str]`
+Get implied tags that should be added to an image based on active implications.
+
+---
+
 ## Related Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
 - [DATABASE.md](DATABASE.md) - Database schema
-- [SERVICES.md](SERVICES.md) - Business logic layer
+- [SERVICES.md](SERVICES.md) - Application logic layer
 - [ROUTERS.md](ROUTERS.md) - Web and API routes

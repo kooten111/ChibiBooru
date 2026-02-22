@@ -3,6 +3,8 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Cache Manager](#cache-manager)
+- [Cache Manager](#cache-manager)
+- [Tag ID Cache](#tag-id-cache)
 - [Cache Events](#cache-events)
 - [Utilities](#utilities)
 
@@ -11,9 +13,10 @@
 ## Overview
 
 The Core infrastructure provides cross-cutting functionality used throughout the application:
-- **Cache Manager**: In-memory caching with thread safety
+- **Cache Manager**: In-memory caching with thread safety and tag ID optimization
+- **Tag ID Cache**: Bidirectional tag name ↔ integer ID mapping for memory efficiency
 - **Cache Events**: Event-driven cache invalidation
-- **Utilities**: File operations, deduplication, helpers
+- **Utilities**: File operations, deduplication, API responses, decorators, and more
 
 ---
 
@@ -27,8 +30,8 @@ Manages in-memory caches for frequently accessed data to reduce database queries
 ### Global Caches
 
 ```python
-tag_counts = {}          # Dict[str, int]: tag name → usage count
-image_data = []          # List[Dict]: all images with tags
+tag_counts = {}          # Dict[int, int]: tag ID → usage count (integer IDs for memory efficiency)
+image_data = []          # List[Dict]: all images with tag_ids as array('i') of integer IDs
 post_id_to_md5 = {}     # Dict[int, str]: post ID → MD5 hash
 data_lock = threading.RLock()  # Thread-safe access (reentrant)
 _loading_in_progress = False   # Flag to prevent concurrent loads
@@ -37,7 +40,7 @@ _load_executor = ThreadPoolExecutor(max_workers=1)  # Background loading
 
 ### Functions
 
-#### `load_data_from_db() -> bool`
+#### `load_data_from_db(verbose=True) -> bool`
 
 Load or reload data from database into in-memory caches (synchronous).
 
@@ -198,6 +201,88 @@ Reload just tag counts without reloading all image data.
 
 ---
 
+#### `trigger_cache_reload_async()`
+
+Trigger an async cache reload from any context.
+
+**Use Case**: When cache needs refreshing from non-async code paths.
+
+---
+
+#### `get_image_tags_as_string(filepath: str) -> str`
+
+Get space-separated tag string for an image from cache.
+
+---
+
+#### `get_image_tags_as_set(filepath: str) -> set`
+
+Get tag names as a set for an image from cache.
+
+---
+
+#### `get_image_tags_as_ids(filepath: str) -> array`
+
+Get tag IDs as an int32 array for an image from cache.
+
+---
+
+#### `get_image_tag_count(filepath: str) -> int`
+
+Get the number of tags for an image from cache.
+
+---
+
+#### `invalidate_image_cache(filepath: str)`
+
+Invalidate cached data for a specific image.
+
+---
+
+#### `invalidate_tag_cache()`
+
+Invalidate all tag-related caches.
+
+---
+
+#### `invalidate_all_caches()`
+
+Invalidate all caches (images, tags, similarity, etc.).
+
+---
+
+## Tag ID Cache
+
+**File**: `core/tag_id_cache.py`
+
+### Purpose
+Provides bidirectional mapping between tag names (strings) and integer IDs for memory efficiency. All tag storage in ChibiBooru uses int32 IDs instead of strings, saving ~200-500 MB of RAM for large collections.
+
+### Class: `TagIDCache`
+
+#### `get_id(tag_name: str) -> int`
+Convert a tag name to its integer ID.
+
+#### `get_name(tag_id: int) -> str`
+Convert an integer ID to its tag name.
+
+#### `get_ids(tag_names: list) -> array('i')`
+Convert a list of tag names to an int32 array of IDs.
+
+#### `get_names(tag_ids: array) -> list`
+Convert an array of IDs to a list of tag name strings.
+
+#### `get_ids_from_string(tags_string: str) -> array('i')`
+Convert a space-separated tag string to an int32 array of IDs.
+
+#### `get_string_from_ids(tag_ids: array) -> str`
+Convert an int32 array of IDs to a space-separated tag string.
+
+#### `reload()`
+Refresh the bidirectional mappings from the database.
+
+---
+
 ### Thread Safety
 
 All cache operations use `data_lock` (RLock) for thread safety:
@@ -264,7 +349,7 @@ Event-driven system for coordinating cache invalidation across modules.
 ### Global State
 
 ```python
-_invalidation_callbacks = []  # List of registered callbacks
+_cache_invalidation_callbacks = []  # List of registered callbacks
 ```
 
 ### Functions
@@ -427,29 +512,50 @@ get_bucketed_path("image.jpg")  # Returns "ab/cd/image.jpg"
 
 ---
 
-#### `ensure_directory_exists(filepath: str)`
+#### `get_file_md5(filepath: str) -> str`
 
-Create directory structure if it doesn't exist.
+Calculate MD5 hash of a file.
 
 **Parameters**:
 | Name | Type | Description |
 |------|------|-------------|
-| `filepath` | `str` | Full file path |
+| `filepath` | `str` | Path to file |
 
-**Side Effects**: Creates all parent directories
+**Returns**: Hexadecimal MD5 string
 
 ---
 
-#### `safe_filename(filename: str) -> str`
+#### `sanitize_filename_for_fs(filename: str) -> str`
 
-Sanitize filename for safe storage.
+Sanitize filename for safe storage on the filesystem.
 
 **Process**:
 1. Remove/replace unsafe characters
 2. Limit length
-3. Ensure uniqueness if needed
+3. Ensure safe for filesystem use
 
 **Returns**: Safe filename string
+
+---
+
+### Additional Utility Modules
+
+The `utils/` directory contains these additional modules:
+
+| File | Purpose |
+|------|---------|
+| `api_responses.py` | Standardized JSON response helpers (`success_response`, `error_response`) |
+| `background_task_helpers.py` | Helpers for async background task management |
+| `decorators.py` | Shared decorators (`@api_handler`, `@require_secret`) |
+| `gpu_detection.py` | Hardware detection for ML backends (CUDA, XPU, MPS, CPU) |
+| `logging_config.py` | Centralized logging configuration |
+| `memory_utils.py` | Memory monitoring and optimization utilities |
+| `request_helpers.py` | Request validation helpers (`require_json_body()`) |
+| `rrdbnet_arch.py` | Standalone PyTorch RRDBNet architecture for RealESRGAN upscaling |
+| `tag_db.py` | Tag database utilities (imports from danbooru/e621 merged CSV) |
+| `tag_extraction.py` | Tag extraction and normalization from various source formats |
+| `validation.py` | Input validation utilities |
+| `video_utils.py` | Video file processing and metadata extraction |
 
 ---
 

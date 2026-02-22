@@ -51,7 +51,7 @@ ChibiBooru is a self-hosted image booru application built with a layered archite
          ↓
 ┌─────────────────────────────────────────────────────────────┐
 │                     Services Layer                          │
-│  (Business Logic)                                           │
+│  (Core Logic)                                               │
 │                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │
 │  │ Image        │  │ Processing   │  │ Query          │  │
@@ -89,10 +89,15 @@ ChibiBooru is a self-hosted image booru application built with a layered archite
 │  │ Repository   │  │ Repository   │  │ Repository     │  │
 │  └──────────────┘  └──────────────┘  └────────────────┘  │
 │                                                             │
-│  ┌──────────────┐  ┌──────────────┐                       │
-│  │ Rating       │  │ Delta        │                       │
-│  │ Repository   │  │ Tracker      │                       │
-│  └──────────────┘  └──────────────┘                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐  │
+│  │ Rating       │  │ Delta        │  │ Favourites     │  │
+│  │ Repository   │  │ Tracker      │  │ Repository     │  │
+│  └──────────────┘  └──────────────┘  └────────────────┘  │
+│                                                             │
+│  ┌──────────────┐                                          │
+│  │ Tagger       │                                          │
+│  │ Predictions  │                                          │
+│  └──────────────┘                                          │
 └────────┬────────────────────────────────────────────────────┘
          │
          ↓
@@ -139,9 +144,16 @@ ChibiBooru is a self-hosted image booru application built with a layered archite
 ### 1. Routers Layer (`routers/`)
 **Responsibility**: Handle HTTP requests and route to appropriate services
 
-- **Web Router** (`web.py`): Main UI routes, authentication, page rendering
+- **Web Router** (`web/`): Package with modular web UI routes
+  - `auth.py`: Login/logout, session management
+  - `gallery.py`: Gallery view, search, pagination
+  - `image_detail.py`: Image detail page, tag display
+  - `misc.py`: Tags browser, upload, system pages
+  - `pools.py`: Pool management pages
+  - `rating.py`: Rating review and management pages
 - **API Routers** (`api/`): RESTful endpoints for AJAX operations
-  - Images, Tags, Pools, Rating, System, SauceNao, Implications
+  - Images, Tags, Pools, Rating, System, SauceNao, Implications, Similarity, Animation, Favourites, Upscaler, Tag Categorization
+- **Static Files** (`static_files.py`): Static file serving blueprint
 
 **Key Features**:
 - Request validation
@@ -150,9 +162,9 @@ ChibiBooru is a self-hosted image booru application built with a layered archite
 - Error handling and status codes
 
 ### 2. Services Layer (`services/`)
-**Responsibility**: Business logic, orchestration, external integrations
+**Responsibility**: Core application logic, orchestration, external integrations
 
-Contains 14 specialized services (see [SERVICES.md](SERVICES.md)):
+Contains 16+ top-level services plus 6 sub-packages (see [SERVICES.md](SERVICES.md)):
 - Image CRUD and bulk operations
 - Metadata fetching from multiple sources
 - Search and modular similarity calculations (pHash, ColorHash, Semantic)
@@ -176,6 +188,8 @@ Contains 14 specialized services (see [SERVICES.md](SERVICES.md)):
 - **pool_repository.py**: Pool management
 - **rating_repository.py**: Rating model data access
 - **delta_tracker.py**: Track manual tag modifications
+- **favourites_repository.py**: User favourite management
+- **tagger_predictions_repository.py**: AI tagger raw prediction data
 
 **Key Features**:
 - SQL query construction
@@ -188,6 +202,7 @@ Contains 14 specialized services (see [SERVICES.md](SERVICES.md)):
 
 - **core.py**: Connection factory, initialization, migrations
 - **models.py**: SQLAlchemy-style models, schema definitions
+- **transaction_helpers.py**: Maintenance and autocommit connection helpers
 
 **Key Features**:
 - SQLite with WAL mode
@@ -199,9 +214,10 @@ Contains 14 specialized services (see [SERVICES.md](SERVICES.md)):
 ### 5. Core Infrastructure
 **Responsibility**: Cross-cutting concerns
 
-- **Cache Manager** (`core/cache_manager.py`): In-memory caches
+- **Cache Manager** (`core/cache_manager.py`): In-memory caches with tag ID optimization
+- **Tag ID Cache** (`core/tag_id_cache.py`): Bidirectional tag name ↔ integer ID mapping
 - **Events** (`events/cache_events.py`): Cache invalidation events
-- **Utils** (`utils/`): File operations, deduplication
+- **Utils** (`utils/`): File operations, deduplication, API responses, decorators, GPU detection, etc.
 
 ## Application Lifecycle
 
@@ -211,13 +227,16 @@ Contains 14 specialized services (see [SERVICES.md](SERVICES.md)):
 # app.py - Application entry point
 1. Load environment variables (.env)
 2. Create Quart application
-3. Initialize database (create tables, indexes)
-4. Repair orphaned image tags (data integrity)
-5. Run health checks (startup_health_check)
-6. Check priority changes (BOORU_PRIORITY_VERSION)
-7. Load data from DB into memory caches
-8. Register blueprints (web + API)
-9. Start Uvicorn server
+3. Register blueprints (web, API, static)
+4. @app.before_serving async initialization:
+   a. Initialize database (create tables, indexes)
+   b. Repair orphaned image tags (data integrity)
+   c. Run health checks (startup_health_check)
+   d. Import default tag categorizations
+   e. Check priority changes (BOORU_PRIORITY_VERSION)
+   f. Load data from DB into memory caches
+   g. Set _app_ready flag (redirects startup page to gallery)
+5. Start Uvicorn ASGI server
 ```
 
 **Startup Health Checks**:
@@ -231,9 +250,9 @@ Contains 14 specialized services (see [SERVICES.md](SERVICES.md)):
 
 ```
 1. Browser → HTTP Request → Uvicorn
-2. Uvicorn → Quart routing → Router (web.py)
+2. Uvicorn → Quart routing → Router (web/ package)
 3. Router → Authentication check (session)
-4. Router → Service layer (business logic)
+4. Router → Service layer (application logic)
 5. Service → Repository (data access)
 6. Repository → Database (SQL queries)
 7. Database → Repository (results)
@@ -264,7 +283,7 @@ Monitor Service (Optional)
 1. Watch filesystem (watchdog library)
 2. Detect new files in static/images/ or ingest/
 3. Queue files for processing
-4. Process in batches (batch_size=10, delay=3s)
+4. Process files as detected (watchdog real-time mode)
 5. Trigger metadata fetching
 6. Move files from ingest/ to static/images/
 7. Generate thumbnails
@@ -311,7 +330,7 @@ Clean separation between routers, services, repositories, and database.
 Abstract data access behind repository interfaces.
 
 ### 3. Service Layer Pattern
-Centralize business logic in service classes.
+Centralize application logic in service modules.
 
 ### 4. Event-Driven Cache Invalidation
 Services trigger cache invalidation events rather than directly managing caches.
@@ -335,13 +354,15 @@ Global cache instances managed by cache_manager.
 Database connection factory in `database/core.py`.
 
 ### 7. Strategy Pattern
-Similarity calculation methods (Jaccard vs. Weighted IDF).
+Similarity calculation methods (5 options: `jaccard`, `weighted`, `weighted_tfidf`, `asymmetric`, `asymmetric_tfidf`).
 
 ```python
-if config.SIMILARITY_METHOD == 'weighted':
-    return calculate_weighted_similarity(tags1, tags2)
-else:
-    return calculate_jaccard_similarity(tags1, tags2)
+# config.py SIMILARITY_METHOD options:
+# 'jaccard': Basic Jaccard (intersection/union)
+# 'weighted': Original IDF + category weights
+# 'weighted_tfidf': Enhanced TF-IDF formula
+# 'asymmetric': Prioritizes query coverage
+# 'asymmetric_tfidf': Asymmetric + enhanced TF-IDF (recommended)
 ```
 
 ### 8. Adapter Pattern
@@ -449,8 +470,8 @@ Base processing logic with customizable steps for different metadata sources.
 - Single-server deployment
 
 ### Scaling Strategies
-- Increase `MAX_WORKERS` for parallel processing
-- Adjust `IMAGES_PER_PAGE` for pagination
+- Increase `MAX_WORKERS` for parallel processing (default: 2)
+- Adjust `IMAGES_PER_PAGE` for pagination (default: 150)
 - Use larger `THUMB_SIZE` for better quality
 - Enable WAL mode for better concurrency
 

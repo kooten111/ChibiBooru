@@ -230,8 +230,8 @@ The following settings can still be set in `.env` for backward compatibility, bu
 ```python
 IMAGE_DIRECTORY = "./static/images"      # Main image storage
 THUMB_DIR = "./static/thumbnails"        # Thumbnail storage
-THUMB_SIZE = 600                         # Max thumbnail dimension (px)
-THUMBNAIL_QUALITY = 80                   # WebP thumbnail quality (1-100)
+THUMB_SIZE = 800                         # Max thumbnail dimension (px, 2x large grid for retina)
+THUMB_QUALITY = 85                       # WebP thumbnail quality (1-100)
 ```
 
 ---
@@ -341,13 +341,13 @@ MONITOR_INTERVAL = 300                   # Check interval (seconds) - only used 
 ### Processing Configuration
 
 ```python
-MAX_WORKERS = 4                          # Parallel threads for metadata fetching
+MAX_WORKERS = 2                          # Parallel threads for metadata fetching
 REQUEST_TIMEOUT = 10                     # API request timeout (seconds)
 RATE_LIMIT_DELAY = 0.5                   # Delay between requests (seconds)
 ```
 
-**MAX_WORKERS**: Higher = faster processing but more API load
-**Recommendation**: 4-8 workers for good balance
+**MAX_WORKERS**: Higher = faster processing but more API load and memory usage (~200-400MB per worker due to SQLite memory mapping)
+**Recommendation**: 2-4 workers for good balance
 
 ---
 
@@ -383,7 +383,7 @@ USE_MERGED_SOURCES_BY_DEFAULT = True     # Default to merged view for multi-sour
 ### Pagination
 
 ```python
-IMAGES_PER_PAGE = 100                    # Images per page in gallery
+IMAGES_PER_PAGE = 150                    # Images per page in gallery
 ```
 
 ---
@@ -398,6 +398,143 @@ ENABLE_DEDUPLICATION = True                    # MD5-based duplicate detection
 
 ---
 
+### Local Tagger Behavior
+
+```python
+LOCAL_TAGGER_ALWAYS_RUN = False                # If True, runs tagger on ALL images (even with online sources)
+LOCAL_TAGGER_STORAGE_THRESHOLD = 0.50          # Store predictions >= this confidence
+LOCAL_TAGGER_DISPLAY_THRESHOLD = 0.70          # Display predictions >= this confidence
+LOCAL_TAGGER_MERGE_CATEGORIES = ['general']    # Categories to merge into other sources
+```
+
+---
+
+### Tag Implications
+
+```python
+APPLY_IMPLICATIONS_ON_INGEST = True            # Auto-apply implications when images are ingested
+IMPLICATION_ALLOWED_EXTENDED_CATEGORIES = [     # Extended categories considered for implication detection
+    '01_Body_Physique',
+    '02_Body_Hair',
+    '03_Body_Face',
+]
+```
+
+---
+
+### Weight Loading
+
+```python
+WEIGHT_LOADING_MODE = 'shared'                 # Options: 'shared', 'lazy', 'full'
+MULTIPROCESSING_BATCH_SIZE = 200               # Batch size for multiprocessing operations
+```
+
+---
+
+### Visual & Semantic Similarity
+
+```python
+VISUAL_SIMILARITY_ENABLED = True               # Enable visual similarity in related sidebar
+VISUAL_SIMILARITY_WEIGHT = 0.3                 # Weight for visual vs tag similarity
+TAG_SIMILARITY_WEIGHT = 0.7                    # Weight for tag-based similarity
+VISUAL_SIMILARITY_THRESHOLD = 15               # Hamming distance threshold (0-64)
+ENABLE_SEMANTIC_SIMILARITY = True              # Enable vector-based similarity (requires RAM/CPU)
+USE_EXTENDED_SIMILARITY = True                 # Use 22 extended categories for finer weighting
+```
+
+---
+
+### Similarity Cache
+
+```python
+SIMILARITY_CACHE_ENABLED = True                # Pre-compute similarity results
+SIMILARITY_CACHE_SIZE = 50                     # Number of similar images to cache per image
+FAISS_IDLE_TIMEOUT = 300                       # Seconds before unloading idle FAISS index
+SIMILAR_SIDEBAR_SOURCES = 'both'               # 'both', 'tag', or 'faiss'
+SIMILAR_SIDEBAR_SHOW_CHIPS = True              # Show Tag/FAISS source chips on similar images
+```
+
+---
+
+### UI Settings
+
+```python
+INFORMATION_PANEL_DEFAULT_VISIBLE = False       # Image page info panel expanded by default
+```
+
+---
+
+### File Type Extensions
+
+```python
+SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')
+SUPPORTED_VIDEO_EXTENSIONS = ('.mp4', '.webm')
+SUPPORTED_ZIP_EXTENSIONS = ('.zip',)
+SUPPORTED_ANIMATION_EXTENSIONS = ('.gif', '.webp', '.apng')
+```
+
+---
+
+### Upscaler Settings
+
+```python
+UPSCALER_ENABLED = False                       # Master toggle for AI upscaling
+UPSCALER_MODEL = 'RealESRGAN_x4plus'           # Model architecture
+UPSCALER_SCALE = 4                             # Upscale factor
+UPSCALER_TILE_SIZE = 512                       # Tile size for large images
+UPSCALER_TILE_PAD = 32                         # Tile padding for seamless inference
+UPSCALER_MIN_TILE_SIZE = 64                    # Minimum tile size on retry
+UPSCALER_ALLOW_CPU_FALLBACK = True             # Fall back to CPU on GPU failure
+UPSCALED_IMAGES_DIR = './static/upscaled'      # Output directory
+```
+
+---
+
+### ML Worker Settings
+
+```python
+ML_WORKER_IDLE_TIMEOUT = 300                   # Auto-terminate after N seconds idle
+ML_WORKER_BACKEND = 'auto'                     # 'cuda', 'xpu', 'mps', 'cpu', or 'auto'
+ML_WORKER_SOCKET = '/tmp/chibibooru_ml_worker.sock'  # Unix socket path for IPC
+```
+
+**Note**: The ML Worker is **required** for all ML operations (tagging, similarity, upscaling). ML frameworks run in a separate process that auto-terminates when idle, saving ~2-3 GB RAM.
+
+---
+
+### ML Model Configuration
+
+```python
+CHARACTER_MODEL_CONFIG = {
+    'min_confidence': 0.3,
+    'max_predictions': 3,
+    'pair_weight_multiplier': 1.5,
+    'min_pair_cooccurrence': 10,
+    'min_tag_frequency': 10,
+    'max_pair_count': 10000,
+    'pruning_threshold': 0.0,
+}
+
+RATING_MODEL_CONFIG = {
+    'min_confidence': 0.4,
+    'pair_weight_multiplier': 1.5,
+    'min_tag_frequency': 10,
+    'min_pair_cooccurrence': 10,
+    'max_pair_count': 25000,
+}
+```
+
+---
+
+### Application Settings
+
+```python
+APP_NAME = 'ChibiBooru'                        # Shown in header and page titles
+LOG_LEVEL = 'INFO'                             # Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+```
+
+---
+
 ### Similarity Category Weights
 
 ```python
@@ -406,7 +543,7 @@ SIMILARITY_CATEGORY_WEIGHTS = {
     'copyright': 3.0,    # Same series/franchise important
     'artist': 2.0,       # Same artist style matters
     'species': 2.5,      # Species tags
-    'general': 1.0,      # Standard descriptive tags
+    'general': 3.0,      # Standard descriptive tags
     'meta': 0.5          # Less relevant for similarity
 }
 ```
@@ -456,7 +593,10 @@ Get local tagger configuration as a dictionary.
     "threshold": 0.6,
     "target_size": 512,
     "name": "CamieTagger",
-    "enabled": True
+    "enabled": True,
+    "storage_threshold": 0.50,
+    "display_threshold": 0.70,
+    "merge_categories": ["general"]
 }
 ```
 
@@ -464,21 +604,15 @@ Get local tagger configuration as a dictionary.
 
 ---
 
-### `get_booru_apis() -> Dict`
+### `reload_config()`
 
-Get configured booru API settings.
+Reload configuration from files (useful after updates via web UI).
 
-**Returns**:
-```python
-{
-    "gelbooru": {
-        "api_key": "...",
-        "user_id": "..."
-    }
-}
-```
+**Process**:
+1. Clears cached `config.yml` data
+2. Next access to any setting re-reads from disk
 
-**Use Case**: Authentication for API requests
+**Use Case**: Called after saving settings via web UI at `/system`
 
 ---
 

@@ -151,6 +151,8 @@ conn.row_factory = sqlite3.Row                # Dict-like row access
 | `colorhash` | TEXT | | Color hash for color similarity |
 | `image_width` | INTEGER | | Original image width |
 | `image_height` | INTEGER | | Original image height |
+| `upscaled_width` | INTEGER | | Upscaled image width (if upscaled) |
+| `upscaled_height` | INTEGER | | Upscaled image height (if upscaled) |
 
 **Indexes**:
 - `idx_images_filepath ON images(filepath)`
@@ -616,6 +618,15 @@ CREATE INDEX idx_implications_status ON tag_implications(status);
 -- Tag_deltas table
 CREATE INDEX idx_tag_deltas_md5 ON tag_deltas(image_md5);
 
+-- Local tagger predictions table
+CREATE INDEX idx_ltp_image_id ON local_tagger_predictions(image_id);
+CREATE INDEX idx_ltp_confidence ON local_tagger_predictions(confidence DESC);
+CREATE INDEX idx_ltp_tag_name ON local_tagger_predictions(tag_name);
+
+-- Similar images cache table
+CREATE INDEX idx_similar_lookup ON similar_images_cache(source_image_id, similarity_type);
+CREATE INDEX idx_computed_at ON similar_images_cache(computed_at);
+
 -- Rating tables
 CREATE INDEX idx_rating_weights_rating ON rating_tag_weights(rating);
 CREATE INDEX idx_rating_weights_weight ON rating_tag_weights(weight DESC);
@@ -711,17 +722,30 @@ images.has_children → TRUE if this image has children
 ### Connection Management
 
 ```python
-# database/core.py
-from database import get_db_connection
-
+# database/core.py - Thread-local connection pooling
 def get_db_connection():
-    """Create a database connection with optimized settings."""
-    conn = sqlite3.connect(DB_FILE)
+    """Get a thread-local database connection with optimized settings."""
+    # Uses _get_thread_local_connection() internally
+    # Connections are reused per-thread for efficiency
+    conn = sqlite3.connect(DB_FILE, check_same_thread=False, timeout=30.0)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
     conn.row_factory = sqlite3.Row
     return conn
+
+# Additional connection helpers:
+# _get_thread_local_connection() - Reuse connections per thread
+# _close_thread_local_connection() - Close thread-local connection
+# get_db_connection_direct() - Get a fresh (non-pooled) connection
+```
+
+#### Transaction Helpers (`database/transaction_helpers.py`)
+
+```python
+# For maintenance operations requiring autocommit:
+get_db_connection_autocommit()  # Connection with autocommit=True
+get_db_connection_for_maintenance()  # Optimized for bulk maintenance
 ```
 
 ### Common Patterns
@@ -791,5 +815,5 @@ with get_db_connection() as conn:
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - Overall system architecture
 - [REPOSITORIES.md](REPOSITORIES.md) - Data access layer using these tables
-- [SERVICES.md](SERVICES.md) - Business logic that reads/writes to DB
+- [SERVICES.md](SERVICES.md) - Application logic that reads/writes to DB
 - [DATA_FLOW.md](DATA_FLOW.md) - How data flows through the database

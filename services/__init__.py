@@ -1,7 +1,7 @@
 """
 Services package for ChibiBooru.
 
-This module provides centralized business logic services for:
+This module provides centralized application services for:
 - Image processing and management
 - Tag management and categorization
 - Query and search operations

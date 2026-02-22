@@ -296,7 +296,7 @@ Images dropped here will be automatically detected, processed, and moved to the 
 
 ChibiBooru uses a **two-process architecture** for production deployment:
 
-- **Web Workers (uvicorn):** Handle HTTP requests with multiple workers for scalability (default: 4 workers)
+- **Web Workers (uvicorn):** Handle HTTP requests with multiple workers for scalability
 - **Monitor Service (standalone):** Single background process that watches for new files and processes them automatically
 
 This design ensures only one monitor runs regardless of how many web workers are active, preventing duplicate processing and resource waste. Both processes start together via `./start_booru.sh` and shut down gracefully on Ctrl+C.
@@ -378,7 +378,7 @@ For detailed technical documentation, see the [`docs/`](docs/) directory:
 
 - **[Architecture](docs/ARCHITECTURE.md)** - System architecture, design patterns, and technology stack
 - **[Database](docs/DATABASE.md)** - Complete database schema, tables, indexes, and relationships
-- **[Services](docs/SERVICES.md)** - Business logic layer with all 14 services documented
+- **[Services](docs/SERVICES.md)** - Core application logic and all services documented
 - **[Repositories](docs/REPOSITORIES.md)** - Data access layer and repository patterns
 - **[Routers](docs/ROUTERS.md)** - Web UI and API endpoint documentation
 - **[Core](docs/CORE.md)** - Cache management, events, and utilities
@@ -398,7 +398,7 @@ Contributions are welcome! Please read the documentation in [`docs/`](docs/) to 
 
 1. Review the architecture documentation:
    - [Architecture Overview](docs/ARCHITECTURE.md) for system design
-   - [Services Documentation](docs/SERVICES.md) for business logic
+   - [Services Documentation](docs/SERVICES.md) for application logic
    - [Database Schema](docs/DATABASE.md) for data models
    - [Data Flow](docs/DATA_FLOW.md) for understanding system workflows
 
@@ -406,7 +406,7 @@ Contributions are welcome! Please read the documentation in [`docs/`](docs/) to 
 
 See [Architecture Documentation](docs/ARCHITECTURE.md#layer-architecture) for a detailed explanation of the layered architecture:
 
-- **Services Layer** (`services/`) - Business logic (14 services)
+- **Services Layer** (`services/`) - Core application logic (16+ top-level services with sub-packages)
 - **Routers Layer** (`routers/`) - Web and API endpoints
 - **Repositories Layer** (`repositories/`) - Data access
 - **Database Layer** (`database/`) - Schema and models

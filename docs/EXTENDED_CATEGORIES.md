@@ -413,7 +413,7 @@ Tags are organized into collapsible sections by extended category:
 
 ### Color Coding
 
-Each extended category has a unique color for easy identification. Colors are defined in `static/css/components.css`:
+Each extended category has a unique color for easy identification. Colors are defined in `static/css/components-bundle.css`:
 
 | Category | Color | Hex |
 |----------|-------|-----|

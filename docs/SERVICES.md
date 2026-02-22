@@ -22,7 +22,7 @@
 
 ## Overview
 
-The Services layer contains the business logic for ChibiBooru. Services orchestrate operations between routers, repositories, and external APIs. They handle complex workflows, coordinate multiple data sources, and implement core application features.
+The Services layer contains the core application logic for ChibiBooru. Services orchestrate operations between routers, repositories, and external APIs. They handle complex workflows, coordinate multiple data sources, and implement the main features.
 
 ### Design Principles
 - **Single Responsibility**: Each service handles a specific domain
@@ -44,7 +44,7 @@ The Services layer contains the business logic for ChibiBooru. Services orchestr
 | ML Worker | `ml_worker/` | Standalone machine learning service for tagging/upscaling |
 | Monitor | `monitor_service.py` | Background file monitoring and processing |
 | Priority | `priority_service.py` | Source priority change detection |
-| Processing | `processing_service.py` | Metadata fetching and image processing |
+| Processing | `processing/` | Metadata fetching and image processing (package) |
 | Query | `query_service.py` | Search, filtering, and tag-based similarity |
 | Rating | `rating_service.py` | AI-based rating inference |
 | SauceNao | `saucenao_service.py` | Reverse image search integration |
@@ -683,7 +683,18 @@ BOORU_PRIORITY = [
 
 ## Processing Service
 
-**File**: `services/processing_service.py`
+**Package**: `services/processing/`
+
+The processing service has been refactored into a modular package:
+
+| Module | Purpose |
+|--------|--------|
+| `image_processor.py` | Core image processing, tagging, and metadata orchestration |
+| `metadata_fetchers.py` | Multi-source metadata fetching (Danbooru, e621, Gelbooru, Yandere) |
+| `thumbnail_generator.py` | WebP thumbnail generation |
+| `rate_limiter.py` | Adaptive rate limiting for external APIs |
+| `locks.py` | Processing locks to prevent concurrent operations |
+| `constants.py` | Shared constants |
 
 ### Purpose
 Core metadata fetching and image processing engine. Handles:
@@ -695,10 +706,7 @@ Core metadata fetching and image processing engine. Handles:
 
 ### Dependencies
 
-```python
-import onnxruntime as ort  # Optional, for AI tagging
-import torchvision.transforms  # Optional, for AI tagging
-```
+**Note**: All ML inference (tagging, embeddings) is delegated to the ML Worker subprocess. The processing service does not directly import or load ML frameworks (ONNX Runtime, PyTorch, etc.).
 
 ### Rate Limiting
 
@@ -765,26 +773,11 @@ else:
 
 ### Local AI Tagger
 
-#### `initialize_local_tagger()`
+All tagger inference is delegated to the ML Worker subprocess. The processing service sends requests via `ml_worker.client` and receives tag results.
 
-Initialize the local ONNX tagger model.
+#### `tag_with_local_tagger(image_path: str) -> Dict`
 
-**Process**:
-1. Check if ONNX Runtime available
-2. Load model from `config.LOCAL_TAGGER_MODEL_PATH`
-3. Load metadata from `config.LOCAL_TAGGER_METADATA_PATH`
-4. Build tag index and category mappings
-
-**Side Effects**:
-- Sets global `local_tagger_session`
-- Sets global `local_tagger_metadata`
-- Sets global `idx_to_tag_map` and `tag_to_category_map`
-
----
-
-#### `tag_image_locally(image_path: str) -> Dict`
-
-Tag an image using local ONNX model.
+Tag an image using the local AI model via ML Worker.
 
 **Parameters**:
 | Name | Type | Description |
@@ -820,7 +813,7 @@ Tag an image using local ONNX model.
 
 ### Metadata Fetching
 
-#### `calculate_md5(filepath: str) -> str`
+#### `get_file_md5(filepath: str) -> str`
 
 Calculate MD5 hash of a file.
 
@@ -828,9 +821,9 @@ Calculate MD5 hash of a file.
 
 ---
 
-#### `fetch_by_md5(md5_hash: str) -> Optional[Dict]`
+#### `search_all_sources(md5_hash: str) -> Optional[Dict]`
 
-Fetch metadata using MD5 hash lookup.
+Search all metadata sources using MD5 hash lookup.
 
 **Sources Checked** (in order):
 1. Danbooru
@@ -982,7 +975,7 @@ Generate thumbnail for an image.
 
 **Thumbnail Settings**:
 - Format: WebP
-- Max dimension: `config.THUMB_SIZE` (default 600px)
+- Max dimension: `config.THUMB_SIZE` (default 800px)
 - Preserves aspect ratio
 - Quality: 85
 
@@ -1793,15 +1786,128 @@ A standalone, socket-based service that handles heavy machine learning tasks lik
 ### Architecture
 - **Server** (`ml_worker/server.py`): Handles incoming socket requests and manages job queues.
 - **Handlers** (`ml_worker/handlers/`): Specialized logic for different ML tasks.
-    - `animation`: Processes GIF/Video metadata.
-    - `tagging`: Runs tagger models.
-    - `upscaling`: Runs RealESRGAN models.
+    - `animation.py`: Processes GIF/Video/Zip animation metadata and frame extraction.
+    - `ratings.py`: Runs AI rating inference models.
+    - `similarity.py`: Generates image embeddings for semantic similarity.
+    - `system.py`: System-level ML operations (health checks, model management).
+    - `tagging.py`: Runs tagger models (CamieTagger, WD14, etc.).
+    - `thumbnail.py`: ML-assisted thumbnail generation.
+    - `upscaling.py`: Runs RealESRGAN upscaling models.
 - **Client** (`ml_worker/client.py`): Persistent connection handler used by the main application.
 
 ### Key Components
 - **`MLWorkerClient`**: Manages the persistent socket connection, handling retries and concurrent job submissions.
 - **`JobManager`**: Tracks active and pending ML jobs.
 - **`ModelManager`**: Handles lazy loading and unloading of ONNX/PyTorch models to manage VRAM.
+
+---
+
+## Additional Services
+
+The following services are also part of the services layer:
+
+### Config Service
+**File**: `services/config_service.py`
+
+Manages runtime configuration via the web UI at `/system`. Handles reading/writing `config.yml`, validating settings, and supporting live config reload without restart.
+
+### Homepage Cache
+**File**: `services/homepage_cache.py`
+
+Pre-assembles and caches homepage data (image grids, stats, random tags) for faster initial page loads.
+
+### Tag Display Service
+**File**: `services/tag_display_service.py`
+
+Prepares tag display data for image detail pages, including extended category grouping, tag counts, and visual organization.
+
+### Model Weights Loader
+**File**: `services/model_weights_loader.py`
+
+Handles shared memory loading of model weights for multiprocessing scenarios. Supports `shared`, `lazy`, and `full` loading modes.
+
+### Similarity Cache
+**File**: `services/similarity_cache.py`
+
+Pre-computes and stores similarity results in SQLite for fast sidebar lookups. Saves ~300-400 MB RAM by avoiding persistent FAISS index loading.
+
+### Similarity DB
+**File**: `services/similarity_db.py`
+
+Storage and retrieval of image embeddings for semantic similarity search.
+
+### Upscaler Service
+**File**: `services/upscaler_service.py`
+
+Orchestrates AI image upscaling via the ML Worker. Manages upscaled file paths, checks for existing upscales, and handles cleanup.
+
+### Zip Animation Service
+**File**: `services/zip_animation_service.py`
+
+Handles zip-based animation files — frame extraction, metadata, and playback support.
+
+---
+
+## Service Sub-Packages
+
+Several services have been refactored into sub-packages for better organization:
+
+### Implication Sub-Package (`services/implication/`)
+
+| Module | Purpose |
+|--------|---------|
+| `api.py` | Public API functions for implication operations |
+| `application.py` | Core implication application logic |
+| `approval.py` | Approval workflow management |
+| `detection.py` | Pattern-based and statistical implication detection |
+| `helpers.py` | Shared helper functions |
+| `management.py` | CRUD operations for implications |
+| `models.py` | Data models for implications |
+| `suggestions.py` | Suggestion generation and ranking |
+
+### Query Sub-Package (`services/query/`)
+
+| Module | Purpose |
+|--------|---------|
+| `api.py` | Public API for search operations |
+| `search.py` | Search query parsing and execution |
+| `similarity.py` | Tag-based similarity calculations |
+| `stats.py` | Query statistics and analytics |
+
+### Rating Sub-Package (`services/rating/`)
+
+| Module | Purpose |
+|--------|---------|
+| `config.py` | Rating model configuration |
+| `data.py` | Training data preparation |
+| `inference.py` | Rating inference engine |
+| `stats.py` | Rating statistics |
+| `training.py` | Model training logic |
+
+### System Sub-Package (`services/system/`)
+
+| Module | Purpose |
+|--------|---------|
+| `api.py` | Public API for system operations |
+| `broken_images.py` | Detect and handle broken/corrupt images |
+| `bulk_retag.py` | Bulk re-tagging operations |
+| `dedup.py` | Deduplication management |
+| `health.py` | Health check operations |
+| `maintenance.py` | Database maintenance tasks |
+| `orphans.py` | Orphaned file detection and cleanup |
+| `rebuild.py` | Database rebuild from raw metadata |
+| `scan.py` | Filesystem scanning for new images |
+| `status.py` | System status tracking |
+| `task_helpers.py` | Background task coordination |
+| `thumbnails.py` | Thumbnail regeneration |
+| `upscale_maintenance.py` | Bulk upscale maintenance operations |
+
+### Similarity Sub-Package (`services/similarity/`)
+
+| Module | Purpose |
+|--------|---------|
+| `hashing.py` | Perceptual hash (pHash) and color hash similarity |
+| `semantic.py` | Semantic similarity using FAISS and ML embeddings |
 
 ---
 

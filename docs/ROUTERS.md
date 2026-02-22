@@ -13,18 +13,28 @@
 The Routers layer handles HTTP request routing and response formatting. It connects the frontend to services and renders templates or returns JSON.
 
 ### Architecture
-- **Web Routes** (`routers/web.py`): Server-side rendered HTML pages
+- **Web Routes** (`routers/web/`): Package with modular server-side rendered HTML pages
+  - `auth.py`: Login/logout, session management
+  - `gallery.py`: Gallery view, search, pagination
+  - `image_detail.py`: Image detail page with tag display
+  - `misc.py`: Tags browser, upload page, system management
+  - `pools.py`: Pool management pages
+  - `rating.py`: Rating review and management pages
 - **API Routes** (`routers/api/`): JSON API endpoints for AJAX requests
+- **Static Files** (`routers/static_files.py`): Static file serving blueprint
 
 ### Blueprints
 - `main_blueprint`: Main web UI routes (registered at `/`)
 - `api_blueprint`: API routes (registered at `/api`)
+- `static_blueprint`: Static file serving
 
 ---
 
 ## Web Routes
 
-**File**: `routers/web.py`
+**Package**: `routers/web/`
+
+The web routes are split across multiple modules:
 
 ### Authentication
 
@@ -518,6 +528,27 @@ Delete implication.
 
 ---
 
+### Tag Categorization API (`/api/tag_categorize`)
+
+**File**: `routers/api/tag_categorization.py`
+
+#### `GET /api/tag_categorize/stats`
+Get categorization statistics.
+
+#### `GET /api/tag_categorize/tags`
+Get uncategorized tags for the categorization interface.
+
+#### `POST /api/tag_categorize/save`
+Save tag category assignments.
+
+#### `POST /api/tag_categorize/import`
+Import categorizations from JSON file.
+
+#### `GET /api/tag_categorize/export`
+Export all categorizations as JSON.
+
+---
+
 ### Upscaler API (`/api/upscale`)
 
 **File**: `routers/api/upscaler.py`
@@ -562,5 +593,5 @@ async def protected():
 ## Related Documentation
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
-- [SERVICES.md](SERVICES.md) - Business logic called by routers
+- [SERVICES.md](SERVICES.md) - Application logic called by routers
 - [DATABASE.md](DATABASE.md) - Database schema

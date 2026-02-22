@@ -1,7 +1,7 @@
 """
 Data Access Layer Module
 
-This module contains pure database query functions with no business logic.
+This module contains pure database query functions with no application logic.
 Functions here perform simple CRUD operations and data retrieval.
 
 Extracted from models.py to improve code organization and separation of concerns.
