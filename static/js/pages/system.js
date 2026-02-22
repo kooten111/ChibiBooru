@@ -1584,6 +1584,7 @@ window.systemCleanOrphans = systemCleanOrphans;
 window.systemApplyMergedSources = systemApplyMergedSources;
 window.systemRecountTags = systemRecountTags;
 window.systemUpscaleSmallImages = systemUpscaleSmallImages;
+window.systemConvertUpscaledFormat = systemConvertUpscaledFormat;
 window.systemReindexDatabase = systemReindexDatabase;
 window.systemBulkRetagLocal = systemBulkRetagLocal;
 window.systemBulkRetryTagging = systemBulkRetryTagging;
