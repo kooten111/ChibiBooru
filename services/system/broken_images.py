@@ -27,17 +27,18 @@ def run_find_broken_images() -> Dict[str, Any]:
         with get_db_connection() as conn:
             cursor = conn.cursor()
 
-            video_excl = " AND ".join(
+            non_hashable_exts = config.SUPPORTED_VIDEO_EXTENSIONS + config.SUPPORTED_ZIP_EXTENSIONS
+            excl_clause = " AND ".join(
                 "LOWER(filepath) NOT LIKE '%{ext}'".format(ext=ext)
-                for ext in config.SUPPORTED_VIDEO_EXTENSIONS
+                for ext in non_hashable_exts
             )
             cursor.execute(
                 """
                 SELECT id, filepath, phash, colorhash, md5
                 FROM images
-                WHERE (phash IS NULL OR phash = '') AND {video_excl}
+                WHERE (phash IS NULL OR phash = '') AND {excl_clause}
             """.format(
-                    video_excl=video_excl
+                    excl_clause=excl_clause
                 )
             )
             missing_phash = cursor.fetchall()
@@ -81,11 +82,14 @@ def run_find_broken_images() -> Dict[str, Any]:
                 from services import similarity_db
 
                 embedding_ids = set(similarity_db.get_all_embedding_ids())
+                skip_exts = config.SUPPORTED_VIDEO_EXTENSIONS + config.SUPPORTED_ZIP_EXTENSIONS
 
                 cursor.execute("SELECT id, filepath, md5 FROM images")
                 all_images = cursor.fetchall()
 
                 for row in all_images:
+                    if any(row["filepath"].lower().endswith(ext) for ext in skip_exts):
+                        continue
                     if row["id"] not in embedding_ids:
                         existing = next(
                             (b for b in broken_images if b["id"] == row["id"]), None
@@ -176,18 +180,19 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
             with get_db_connection() as conn:
                 cursor = conn.cursor()
 
-                # Find images with missing phash (excluding videos)
-                video_excl = " AND ".join(
+                # Find images with missing phash (excluding videos and zips)
+                non_hashable_exts = config.SUPPORTED_VIDEO_EXTENSIONS + config.SUPPORTED_ZIP_EXTENSIONS
+                excl_clause = " AND ".join(
                     "LOWER(filepath) NOT LIKE '%{ext}'".format(ext=ext)
-                    for ext in config.SUPPORTED_VIDEO_EXTENSIONS
+                    for ext in non_hashable_exts
                 )
                 cursor.execute(
                     """
                     SELECT id
                     FROM images
-                    WHERE (phash IS NULL OR phash = '') AND {video_excl}
+                    WHERE (phash IS NULL OR phash = '') AND {excl_clause}
                 """.format(
-                        video_excl=video_excl
+                        excl_clause=excl_clause
                     )
                 )
                 broken_ids = set(row["id"] for row in cursor.fetchall())
@@ -205,10 +210,13 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
                 broken_ids.update(row["id"] for row in cursor.fetchall())
 
                 if similarity_service.SEMANTIC_AVAILABLE:
-                    cursor.execute("SELECT id FROM images")
-                    all_ids = set(row["id"] for row in cursor.fetchall())
-                    missing_embeddings = all_ids - embedding_ids
-                    broken_ids.update(missing_embeddings)
+                    skip_exts = config.SUPPORTED_VIDEO_EXTENSIONS + config.SUPPORTED_ZIP_EXTENSIONS
+                    cursor.execute("SELECT id, filepath FROM images")
+                    for row in cursor.fetchall():
+                        if any(row["filepath"].lower().endswith(ext) for ext in skip_exts):
+                            continue
+                        if row["id"] not in embedding_ids:
+                            broken_ids.add(row["id"])
 
                     with similarity_db.get_db_connection() as emb_conn:
                         emb_cursor = emb_conn.execute(
@@ -339,13 +347,34 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
                         if not os.path.exists(full_path):
                             continue
 
+                        # For zip animations, use the thumbnail for hash/embedding
+                        hash_path = full_path
+                        if config.is_zip_animation(filepath):
+                            from utils.file_utils import get_thumbnail_path
+                            thumb_rel = get_thumbnail_path(filepath)
+                            if thumb_rel != filepath:
+                                hash_path = os.path.join("static", thumb_rel)
+                            if not os.path.exists(hash_path):
+                                # Fall back to first frame
+                                from services import zip_animation_service
+                                first_frame = zip_animation_service.get_frame_path(md5, 0)
+                                if first_frame and os.path.exists(first_frame):
+                                    hash_path = first_frame
+                                else:
+                                    errors += 1
+                                    if errors <= 5:
+                                        monitor_service.add_log(
+                                            f"No thumbnail or frame for zip {filepath}", "error"
+                                        )
+                                    continue
+
                         try:
                             cursor.execute(
                                 "SELECT phash FROM images WHERE id = ?", (image_id,)
                             )
                             if not cursor.fetchone()["phash"]:
                                 phash = similarity_service.compute_phash_for_file(
-                                    full_path, md5
+                                    hash_path, md5
                                 )
                                 if phash:
                                     cursor.execute(
@@ -358,7 +387,7 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
                             )
                             if not cursor.fetchone()["colorhash"]:
                                 colorhash = similarity_service.compute_colorhash_for_file(
-                                    full_path
+                                    hash_path
                                 )
                                 if colorhash:
                                     cursor.execute(
@@ -373,7 +402,7 @@ async def run_cleanup_broken_images(action: str, image_ids: List[int]) -> Dict[s
                                 if existing_embedding is None:
                                     engine = similarity_service.get_semantic_engine()
                                     if engine.load_model():
-                                        embedding = engine.get_embedding(full_path)
+                                        embedding = engine.get_embedding(hash_path)
                                         if embedding is not None:
                                             similarity_service.store_embedding(
                                                 image_id, embedding
