@@ -24,6 +24,9 @@ monitor_status = {
     "last_check": None,
     "last_scan_found": 0,
     "total_processed": 0,
+    "total_skipped_duplicate": 0,
+    "total_skipped_race": 0,
+    "total_failed": 0,
     "interval_seconds": 300, # 5 minutes (fallback, not used with watchdog)
     "logs": [],
     "mode": "watchdog",  # "watchdog" for real-time or "polling" for legacy
@@ -192,11 +195,15 @@ class ImageFileHandler(FileSystemEventHandler):
                 monitor_status["last_scan_found"] = 1
                 monitor_status["total_processed"] += 1
                 add_log(f"Successfully processed: {filename}", 'success')
-            elif failure_type in ('race_condition', 'duplicate'):
-                # These are expected in parallel processing - don't log as errors
-                logger.debug(f"Skipped {filename}: {msg}")
+            elif failure_type == 'duplicate':
+                monitor_status["total_skipped_duplicate"] += 1
+                add_log(f"Skipped duplicate: {filename}", 'warning')
+            elif failure_type == 'race_condition':
+                monitor_status["total_skipped_race"] += 1
+                add_log(f"Skipped (already being processed): {filename}", 'info')
             else:
                 # Only log real errors
+                monitor_status["total_failed"] += 1
                 add_log(f"Failed to process {filename}: {msg}", 'error')
                 
         except Exception as e:
@@ -435,11 +442,15 @@ def run_scan():
             if success:
                 processed_count += 1
                 add_log(f"Successfully processed: {os.path.basename(filepath)}", 'success')
-            elif failure_type in ('race_condition', 'duplicate'):
-                # Expected in parallel processing - don't log as errors
-                logger.debug(f"Skipped {os.path.basename(filepath)}: {msg}")
+            elif failure_type == 'duplicate':
+                monitor_status["total_skipped_duplicate"] += 1
+                add_log(f"Skipped duplicate: {os.path.basename(filepath)}", 'warning')
+            elif failure_type == 'race_condition':
+                monitor_status["total_skipped_race"] += 1
+                add_log(f"Skipped (already being processed): {os.path.basename(filepath)}", 'info')
             else:
                 # Only log real errors
+                monitor_status["total_failed"] += 1
                 add_log(f"Failed to process {os.path.basename(filepath)}: {msg}", 'error')
         except Exception as e:
             add_log(f"Error processing {os.path.basename(filepath)}: {e}", 'error')
