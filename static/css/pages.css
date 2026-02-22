@@ -471,13 +471,3 @@
             transparent);
     animation: shimmer 1.5s infinite;
 }
-
-@keyframes shimmer {
-    from {
-        transform: translateX(-100%);
-    }
-
-    to {
-        transform: translateX(100%);
-    }
-}

@@ -17,11 +17,11 @@
 
 /* Modal Content Container */
 .saucenao-modal-content {
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(40, 40, 60, 0.95) 100%);
-    backdrop-filter: blur(15px);
-    border-radius: 16px;
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.8);
+    background: var(--gradient-panel-solid);
+    backdrop-filter: var(--blur-lg);
+    border-radius: var(--radius-2xl);
+    border: 1px solid var(--tag-general-border);
+    box-shadow: var(--shadow-2xl);
     max-width: 900px;
     width: 90%;
     max-height: 90vh;
@@ -39,16 +39,16 @@
 
 .saucenao-modal-header h2 {
     margin: 0;
-    color: #87ceeb;
+    color: var(--primary-blue);
     font-size: 1.5em;
 }
 
 .saucenao-close-btn {
     background: rgba(255, 107, 107, 0.2);
-    border: 1px solid rgba(255, 107, 107, 0.5);
-    color: #ff6b6b;
+    border: 1px solid var(--danger);
+    color: var(--danger);
     padding: 8px 16px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     font-weight: 600;
 }
@@ -57,7 +57,7 @@
 .saucenao-loading {
     text-align: center;
     padding: 40px;
-    color: #87ceeb;
+    color: var(--primary-blue);
 }
 
 .saucenao-loading-icon {
@@ -82,12 +82,12 @@
 }
 
 .saucenao-no-results-text {
-    color: #b0b0b0;
+    color: var(--text-muted);
     font-size: 1.1em;
 }
 
 .saucenao-no-results-hint {
-    color: #87ceeb;
+    color: var(--primary-blue);
     margin-top: 10px;
     font-size: 0.9em;
 }
@@ -96,7 +96,7 @@
 .saucenao-error {
     text-align: center;
     padding: 40px;
-    color: #ff6b6b;
+    color: var(--danger);
 }
 
 .saucenao-error-icon {
@@ -113,19 +113,19 @@
 .saucenao-success-banner {
     margin-bottom: 20px;
     padding: 15px;
-    background: rgba(74, 158, 255, 0.1);
-    border-radius: 10px;
-    border: 1px solid rgba(135, 206, 235, 0.3);
+    background: var(--primary-blue-light);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--tag-general-border);
 }
 
 .saucenao-success-title {
-    color: #87ceeb;
+    color: var(--primary-blue);
     font-weight: 600;
     margin-bottom: 5px;
 }
 
 .saucenao-success-subtitle {
-    color: #b0b0b0;
+    color: var(--text-muted);
     font-size: 0.9em;
 }
 
@@ -137,16 +137,16 @@
 
 /* Result Item */
 .saucenao-result {
-    background: rgba(30, 30, 45, 0.5);
-    border: 2px solid rgba(135, 206, 235, 0.2);
-    border-radius: 12px;
+    background: var(--bg-panel);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-xl);
     padding: 15px;
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .saucenao-result:hover {
-    border-color: rgba(135, 206, 235, 0.5);
+    border-color: var(--primary-blue-strong);
     transform: translateX(5px);
 }
 
@@ -160,8 +160,8 @@
     width: 100px;
     height: 100px;
     object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
 }
 
 .saucenao-result-info {
@@ -171,7 +171,7 @@
 .saucenao-result-similarity {
     font-size: 1.2em;
     font-weight: 700;
-    color: #87ceeb;
+    color: var(--primary-blue);
     margin-bottom: 8px;
 }
 
@@ -182,27 +182,27 @@
 }
 
 .saucenao-source-badge {
-    background: rgba(74, 158, 255, 0.2);
+    background: var(--blue-accent-light);
     padding: 4px 12px;
-    border-radius: 12px;
-    color: #87ceeb;
+    border-radius: var(--radius-xl);
+    color: var(--primary-blue);
     font-size: 0.9em;
     font-weight: 600;
     text-transform: capitalize;
 }
 
 .saucenao-result-arrow {
-    color: #87ceeb;
+    color: var(--primary-blue);
     font-size: 1.5em;
 }
 
 /* Back Button */
 .saucenao-back-btn {
-    background: rgba(74, 74, 74, 0.5);
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    color: #87ceeb;
+    background: var(--bg-hover);
+    border: 1px solid var(--tag-general-border);
+    color: var(--primary-blue);
     padding: 8px 16px;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     cursor: pointer;
     font-weight: 600;
 }
@@ -218,15 +218,15 @@
 }
 
 .saucenao-panel {
-    background: rgba(30, 30, 45, 0.5);
-    border: 1px solid rgba(135, 206, 235, 0.2);
-    border-radius: 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-xl);
     padding: 20px;
 }
 
 .saucenao-panel h3 {
     margin: 0 0 15px 0;
-    color: #87ceeb;
+    color: var(--primary-blue);
     font-size: 1.1em;
 }
 
@@ -244,11 +244,11 @@
 }
 
 .saucenao-source-btn {
-    background: rgba(74, 74, 74, 0.5);
-    border: 2px solid rgba(135, 206, 235, 0.2);
-    color: #e8e8e8;
+    background: var(--bg-hover);
+    border: 2px solid var(--border-color);
+    color: var(--text-primary);
     padding: 12px;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
     font-weight: 600;
     text-transform: capitalize;
@@ -261,20 +261,20 @@
 
 .saucenao-source-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
+    box-shadow: var(--shadow-md);
 }
 
 .saucenao-source-btn.active {
-    background: rgba(74, 158, 255, 0.3);
-    border-color: rgba(135, 206, 235, 0.5);
+    background: var(--primary-blue-medium);
+    border-color: var(--primary-blue-strong);
 }
 
 .saucenao-source-preview {
     width: 100%;
     height: 150px;
     object-fit: cover;
-    border-radius: 8px;
-    border: 1px solid rgba(135, 206, 235, 0.2);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
 }
 
 .saucenao-source-text {
@@ -289,22 +289,22 @@
 
 .saucenao-source-resolution {
     font-size: 0.85em;
-    color: #87ceeb;
+    color: var(--primary-blue);
 }
 
 .saucenao-source-filesize {
     font-size: 0.8em;
-    color: #b0b0b0;
+    color: var(--text-muted);
     margin-top: 2px;
 }
 
 .saucenao-source-link {
     padding: 6px 12px;
-    background: rgba(74, 158, 255, 0.2);
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    color: #87ceeb;
+    background: var(--blue-accent-light);
+    border: 1px solid var(--tag-general-border);
+    color: var(--primary-blue);
     text-decoration: none;
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     font-size: 0.85em;
     font-weight: 600;
     text-align: center;
@@ -316,7 +316,7 @@
 }
 
 .saucenao-source-link:hover {
-    background: rgba(74, 158, 255, 0.3);
+    background: var(--primary-blue-medium);
     transform: translateY(-2px);
 }
 
@@ -329,8 +329,8 @@
 .saucenao-preview-image {
     max-width: 300px;
     max-height: 300px;
-    border-radius: 8px;
-    border: 1px solid rgba(135, 206, 235, 0.3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--tag-general-border);
 }
 
 .saucenao-image-link-container {
@@ -338,7 +338,7 @@
 }
 
 .saucenao-image-link {
-    color: #87ceeb;
+    color: var(--primary-blue);
     text-decoration: none;
     font-weight: 600;
     display: inline-flex;
@@ -352,14 +352,14 @@
 }
 
 .saucenao-tag-category-title {
-    color: #87ceeb;
+    color: var(--primary-blue);
     font-weight: 600;
     font-size: 0.9em;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
     padding-bottom: 5px;
-    border-bottom: 1px solid rgba(135, 206, 235, 0.2);
+    border-bottom: 1px solid var(--border-color);
 }
 
 .saucenao-tag-list {
@@ -369,44 +369,44 @@
 }
 
 .saucenao-tag {
-    background: rgba(74, 158, 255, 0.15);
-    border: 1px solid rgba(135, 206, 235, 0.3);
+    background: var(--primary-blue-light);
+    border: 1px solid var(--tag-general-border);
     padding: 4px 10px;
-    border-radius: 12px;
-    color: #e8e8e8;
+    border-radius: var(--radius-xl);
+    color: var(--text-primary);
     font-size: 0.85em;
     font-weight: 500;
 }
 
 .saucenao-tag-more {
-    color: #87ceeb;
+    color: var(--primary-blue);
     font-size: 0.85em;
     padding: 4px;
 }
 
 /* Warning Section */
 .saucenao-warning {
-    background: rgba(255, 165, 0, 0.1);
-    border: 1px solid rgba(255, 165, 0, 0.3);
-    border-radius: 10px;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-lg);
     padding: 15px;
     margin-bottom: 20px;
 }
 
 .saucenao-warning-title {
-    color: #ffa500;
+    color: var(--warning);
     font-weight: 600;
     margin-bottom: 8px;
 }
 
 .saucenao-warning-text {
-    color: #b0b0b0;
+    color: var(--text-muted);
     font-size: 0.9em;
 }
 
 /* Failed Sources */
 .saucenao-failed-source {
-    color: #ff6b6b;
+    color: var(--danger);
     padding: 8px;
     background: rgba(255, 107, 107, 0.1);
     border-radius: 6px;
@@ -420,8 +420,8 @@
     gap: 10px;
     cursor: pointer;
     padding: 12px;
-    background: rgba(40, 40, 60, 0.5);
-    border-radius: 8px;
+    background: var(--bg-hover);
+    border-radius: var(--radius-md);
     margin-bottom: 15px;
 }
 
@@ -432,12 +432,12 @@
 }
 
 .saucenao-checkbox-text-title {
-    color: #e8e8e8;
+    color: var(--text-primary);
     font-weight: 600;
 }
 
 .saucenao-checkbox-text-subtitle {
-    color: #b0b0b0;
+    color: var(--text-muted);
     font-size: 0.85em;
     margin-top: 4px;
 }
@@ -450,11 +450,11 @@
 
 .saucenao-apply-btn {
     flex: 1;
-    background: linear-gradient(135deg, #4a9e6f 0%, #358a5f 100%);
+    background: var(--gradient-success);
     border: none;
-    color: #fff;
+    color: var(--text-primary);
     padding: 12px 24px;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
     font-weight: 600;
     font-size: 1em;
@@ -468,11 +468,11 @@
 }
 
 .saucenao-cancel-btn {
-    background: rgba(74, 74, 74, 0.5);
-    border: 1px solid rgba(135, 206, 235, 0.3);
-    color: #e8e8e8;
+    background: var(--bg-hover);
+    border: 1px solid var(--tag-general-border);
+    color: var(--text-primary);
     padding: 12px 24px;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
     cursor: pointer;
     font-weight: 600;
     transition: all 0.3s ease;
@@ -498,8 +498,8 @@
     font-size: 1.2em;
     font-weight: 600;
     padding: 30px 50px;
-    background: linear-gradient(135deg, rgba(30, 30, 45, 0.95) 0%, rgba(40, 40, 60, 0.95) 100%);
-    border-radius: 16px;
+    background: var(--gradient-panel-solid);
+    border-radius: var(--radius-2xl);
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
     text-align: center;
 }
@@ -511,6 +511,6 @@
 
 .saucenao-loading-overlay-download {
     font-size: 0.9em;
-    color: #87ceeb;
+    color: var(--primary-blue);
     margin-top: 10px;
 }

@@ -399,14 +399,3 @@ body.gallery-page .page-footer.rate-review-footer {
     display: flex;
     justify-content: flex-end;
 }
-
-@keyframes modalSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}

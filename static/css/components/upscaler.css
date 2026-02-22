@@ -24,18 +24,8 @@
 }
 
 .action-btn#upscaleBtn.upscale-done {
-    background: var(--color-success-bg, rgba(76, 175, 80, 0.2));
-    border-color: var(--color-success, #4caf50);
-}
-
-@keyframes spin {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
+    background: var(--success-bg);
+    border-color: var(--success);
 }
 
 /* Hover Menu */
@@ -44,8 +34,8 @@
     bottom: calc(100% + 8px);
     left: 50%;
     transform: translateX(-50%);
-    background: var(--color-surface, #1e1e1e);
-    border: 1px solid var(--color-border, #444);
+    background: var(--bg-panel-dark);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 6px;
     min-width: 160px;
@@ -80,7 +70,7 @@
     cursor: pointer;
     transition: background 0.15s ease;
     font-size: 13px;
-    color: var(--color-text, #fff);
+    color: var(--text-primary);
     white-space: nowrap;
 }
 
@@ -89,8 +79,8 @@
 }
 
 .upscale-menu-item.active {
-    background: var(--color-primary-bg, rgba(100, 181, 246, 0.2));
-    color: var(--color-primary, #64b5f6);
+    background: var(--blue-accent-light);
+    color: var(--primary-blue);
 }
 
 .upscale-menu-item.active::after {
@@ -101,7 +91,7 @@
 
 .upscale-menu-item.danger:hover {
     background: rgba(244, 67, 54, 0.2);
-    color: var(--color-danger, #f44336);
+    color: var(--danger);
 }
 
 .menu-icon {
@@ -117,7 +107,7 @@
 /* Menu Divider */
 .upscale-menu-divider {
     height: 1px;
-    background: var(--color-border, #444);
+    background: var(--border-color);
     margin: 6px 0;
 }
 
@@ -130,7 +120,7 @@
     transform: translateX(-50%);
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
-    border-top: 6px solid var(--color-surface, #1e1e1e);
+    border-top: 6px solid var(--bg-panel-dark);
 }
 
 .upscale-hover-menu::before {
@@ -141,7 +131,7 @@
     transform: translateX(-50%);
     border-left: 7px solid transparent;
     border-right: 7px solid transparent;
-    border-top: 7px solid var(--color-border, #444);
+    border-top: 7px solid var(--border-color);
 }
 
 /* Dependency Modal */
@@ -159,7 +149,7 @@
 }
 
 .upscale-dep-modal-content {
-    background: var(--color-surface, #1e1e1e);
+    background: var(--bg-panel-dark);
     border-radius: 16px;
     padding: 24px;
     max-width: 400px;
@@ -169,18 +159,18 @@
 
 .upscale-dep-modal-content h3 {
     margin: 0 0 16px 0;
-    color: var(--color-text, #fff);
+    color: var(--text-primary);
     font-size: 1.25rem;
 }
 
 .upscale-dep-modal-content p {
     margin: 0 0 12px 0;
-    color: var(--color-text-secondary, #aaa);
+    color: var(--text-muted);
     line-height: 1.5;
 }
 
 .upscale-dep-modal-content .warning {
-    color: var(--color-warning, #ffa726);
+    color: var(--warning);
     font-size: 0.9rem;
 }
 
@@ -202,8 +192,8 @@
 
 .btn-cancel {
     background: transparent;
-    color: var(--color-text-secondary, #aaa);
-    border: 1px solid var(--color-border, #444) !important;
+    color: var(--text-muted);
+    border: 1px solid var(--border-color) !important;
 }
 
 .btn-cancel:hover {
@@ -211,38 +201,17 @@
 }
 
 .btn-install {
-    background: var(--color-primary, #64b5f6);
-    color: var(--color-bg, #121212);
+    background: var(--primary-blue);
+    color: var(--bg-gradient-start);
 }
 
 .btn-install:hover {
-    background: var(--color-primary-hover, #42a5f5);
+    background: var(--primary-blue-dark);
 }
 
 .btn-install:disabled {
     opacity: 0.6;
     cursor: wait;
-}
-
-/* Animations */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes fadeOut {
-    from {
-        opacity: 1;
-    }
-
-    to {
-        opacity: 0;
-    }
 }
 
 /* Responsive */

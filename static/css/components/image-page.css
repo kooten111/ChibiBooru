@@ -886,19 +886,6 @@ body:is(.ui-hidden, .focus-mode)::after {
     animation: fadeInOut 4s ease-in-out;
 }
 
-@keyframes fadeInOut {
-
-    0%,
-    100% {
-        opacity: 0;
-    }
-
-    10%,
-    90% {
-        opacity: 1;
-    }
-}
-
 /* Responsive */
 
 /* Right sidebar content - constrain to viewport height, inner Similar panel scrolls */

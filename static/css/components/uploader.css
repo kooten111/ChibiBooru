@@ -86,62 +86,27 @@
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
 }
 
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(100px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
-
-@keyframes slideOutRight {
-    from {
-        opacity: 1;
-        transform: translateX(0);
-    }
-
-    to {
-        opacity: 0;
-        transform: translateX(100px);
-    }
-}
-
 /* Custom scrollbar for modal */
 #saucenaoModal>div::-webkit-scrollbar {
     width: 8px;
 }
 
 #saucenaoModal>div::-webkit-scrollbar-track {
-    background: rgba(20, 20, 30, 0.3);
+    background: var(--bg-black-trans);
     border-radius: 4px;
 }
 
 #saucenaoModal>div::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #4a9eff 0%, #357abd 100%);
+    background: var(--gradient-scrollbar);
     border-radius: 4px;
 }
 
 #saucenaoModal>div::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #5aaeff 0%, #4585cd 100%);
+    background: var(--gradient-scrollbar-hover);
 }
 
 .saucenao-full-image-link {
-    color: #87ceeb;
+    color: var(--primary-blue);
     text-decoration: none;
     font-weight: 600;
     display: inline-flex;
@@ -150,6 +115,6 @@
 }
 
 .saucenao-full-image-link:hover {
-    color: #5aaeff;
+    color: var(--primary-blue-dark);
 }
 
