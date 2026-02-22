@@ -144,6 +144,10 @@
 
         currentFilepath = filepathInput.value;
 
+        // Don't offer upscaling for animated images and videos
+        const nonUpscalableExts = ['.gif', '.apng', '.mp4', '.webm'];
+        if (nonUpscalableExts.some(ext => currentFilepath.toLowerCase().endsWith(ext))) return;
+
         // Find or create upscale button
         const actionsBar = document.querySelector('.actions-bar.pill');
         if (!actionsBar) return;
@@ -438,6 +442,45 @@
         iconSpan.innerHTML = '✨';
     }
 
+    /** Timer handle used to debounce hide so the mouse can cross the gap */
+    let hoverHideTimer = null;
+
+    /**
+     * Position the hover menu above the upscale button using fixed coords.
+     */
+    function positionHoverMenu() {
+        if (!hoverMenu || !upscaleBtn) return;
+        const btnRect = upscaleBtn.getBoundingClientRect();
+        // Temporarily show for measurement (off-screen is fine, visibility is hidden)
+        hoverMenu.style.left = '-9999px';
+        hoverMenu.style.top = '-9999px';
+        const menuRect = hoverMenu.getBoundingClientRect();
+
+        let left = btnRect.left + btnRect.width / 2 - menuRect.width / 2;
+        let top = btnRect.top - menuRect.height - 8;
+
+        // Clamp so the menu doesn't overflow the viewport
+        left = Math.max(4, Math.min(left, window.innerWidth - menuRect.width - 4));
+        top = Math.max(4, top);
+
+        hoverMenu.style.left = `${left}px`;
+        hoverMenu.style.top = `${top}px`;
+    }
+
+    function showHoverMenu() {
+        clearTimeout(hoverHideTimer);
+        if (!hoverMenu) return;
+        positionHoverMenu();
+        hoverMenu.classList.add('visible');
+    }
+
+    function scheduleHideHoverMenu() {
+        clearTimeout(hoverHideTimer);
+        hoverHideTimer = setTimeout(() => {
+            if (hoverMenu) hoverMenu.classList.remove('visible');
+        }, 80);
+    }
+
     /**
      * Create hover menu for upscale options
      */
@@ -447,6 +490,7 @@
         hoverMenu = document.createElement('div');
         hoverMenu.className = 'upscale-hover-menu';
         hoverMenu.innerHTML = `
+            <span class="menu-arrow"></span>
             <div class="upscale-menu-item view-original" data-view="original">
                 <span class="menu-icon">📷</span>
                 <span class="menu-label">Original</span>
@@ -462,9 +506,14 @@
             </div>
         `;
 
-        // Position relative to button
-        upscaleBtn.style.position = 'relative';
-        upscaleBtn.appendChild(hoverMenu);
+        // Append to body so it escapes all ancestor overflow/stacking contexts
+        document.body.appendChild(hoverMenu);
+
+        // Show / hide via mouseenter / mouseleave on both button and menu
+        upscaleBtn.addEventListener('mouseenter', showHoverMenu);
+        upscaleBtn.addEventListener('mouseleave', scheduleHideHoverMenu);
+        hoverMenu.addEventListener('mouseenter', showHoverMenu);
+        hoverMenu.addEventListener('mouseleave', scheduleHideHoverMenu);
 
         // Event listeners for menu items
         hoverMenu.querySelector('.view-original').addEventListener('click', (e) => {

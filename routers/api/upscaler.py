@@ -100,6 +100,10 @@ async def upscale_image():
     data = await require_json_body(request)
     filepath = validate_string(data.get('filepath'), 'filepath', min_length=1)
     filepath = normalize_image_path(filepath)
+
+    if not config.is_upscalable(filepath):
+        raise ValueError("Animated images and videos (.gif, .apng, .mp4, .webm) cannot be upscaled.")
+
     force = data.get('force', False)
 
     result = await do_upscale(filepath, force=force)

@@ -28,12 +28,9 @@
     border-color: var(--success);
 }
 
-/* Hover Menu */
+/* Hover Menu — fixed-positioned, appended to <body> via JS */
 .upscale-hover-menu {
-    position: absolute;
-    bottom: calc(100% + 8px);
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
     background: var(--bg-panel-dark);
     border: 1px solid var(--border-color);
     border-radius: 12px;
@@ -43,16 +40,27 @@
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
-    transform: translateX(-50%) translateY(4px);
-    z-index: 1000;
+    transform: translateY(4px);
+    z-index: 10001;
+    pointer-events: none;
 }
 
-/* Show menu on button hover */
-.action-btn#upscaleBtn:hover .upscale-hover-menu,
-.upscale-hover-menu:hover {
+/* Invisible bridge below the menu so the mouse can cross the gap */
+.upscale-hover-menu.visible::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    height: 12px; /* covers the 8px gap + a little extra */
+}
+
+/* Show menu via JS-toggled class */
+.upscale-hover-menu.visible {
     opacity: 1;
     visibility: visible;
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
+    pointer-events: auto;
 }
 
 /* Hide entire menu when no upscaled version exists */
@@ -111,18 +119,7 @@
     margin: 6px 0;
 }
 
-/* Arrow pointer */
-.upscale-hover-menu::after {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 6px solid var(--bg-panel-dark);
-}
-
+/* Arrow pointer (outer border) */
 .upscale-hover-menu::before {
     content: '';
     position: absolute;
@@ -132,6 +129,20 @@
     border-left: 7px solid transparent;
     border-right: 7px solid transparent;
     border-top: 7px solid var(--border-color);
+    pointer-events: none;
+}
+
+/* Arrow pointer (inner fill) — uses a dedicated child span injected by JS
+   because ::after is now the invisible hover-bridge */
+.upscale-hover-menu .menu-arrow {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--bg-panel-dark);
+    pointer-events: none;
 }
 
 /* Dependency Modal */

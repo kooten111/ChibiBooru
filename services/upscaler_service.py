@@ -17,44 +17,68 @@ import config
 logger = logging.getLogger(__name__)
 
 
+def _normalize_relative_path(filepath: str) -> str:
+    """Normalize a filepath to a relative path under images/."""
+    if filepath.startswith('images/'):
+        return filepath
+    elif filepath.startswith('./static/images/'):
+        return filepath.replace('./static/', '')
+    elif filepath.startswith('/static/images/'):
+        return filepath.replace('/static/', '')
+    else:
+        return f"images/{filepath}"
+
+
+def _find_upscaled_file(filepath: str) -> Optional[str]:
+    """
+    Find an existing upscaled file for the given image, regardless of extension.
+    Returns the actual path on disk if found, or None.
+    """
+    relative_path = _normalize_relative_path(filepath)
+    base_path = os.path.join(config.UPSCALED_IMAGES_DIR, relative_path)
+    stem = os.path.splitext(base_path)[0]
+
+    # Fast path: check the configured format first
+    preferred = f"{stem}.{config.UPSCALER_OUTPUT_FORMAT}"
+    if os.path.exists(preferred):
+        return preferred
+
+    # Check other common formats (handles files saved before a format change)
+    for ext in ('png', 'webp', 'jpg', 'jpeg'):
+        candidate = f"{stem}.{ext}"
+        if candidate != preferred and os.path.exists(candidate):
+            return candidate
+
+    return None
+
+
 def get_upscaled_path(filepath: str) -> str:
     """
-    Get the path where the upscaled version would be stored.
-    Mirrors the original path structure under the upscaled directory.
+    Get the target path where a new upscaled version should be saved.
+    Uses the configured output format extension.
     """
-    # Normalize the filepath
-    if filepath.startswith('images/'):
-        relative_path = filepath
-    elif filepath.startswith('./static/images/'):
-        relative_path = filepath.replace('./static/', '')
-    elif filepath.startswith('/static/images/'):
-        relative_path = filepath.replace('/static/', '')
-    else:
-        relative_path = f"images/{filepath}"
-    
-    # Create upscaled path
-    upscaled_path = os.path.join(config.UPSCALED_IMAGES_DIR, relative_path)
-    return upscaled_path
+    relative_path = _normalize_relative_path(filepath)
+    base_path = os.path.join(config.UPSCALED_IMAGES_DIR, relative_path)
+    stem = os.path.splitext(base_path)[0]
+    return f"{stem}.{config.UPSCALER_OUTPUT_FORMAT}"
 
 
 def check_upscale_exists(filepath: str) -> bool:
-    """Check if an upscaled version exists for the given image."""
-    upscaled_path = get_upscaled_path(filepath)
-    return os.path.exists(upscaled_path)
+    """Check if an upscaled version exists for the given image (any format)."""
+    return _find_upscaled_file(filepath) is not None
 
 
 def get_upscale_url(filepath: str) -> Optional[str]:
-    """Get the URL for the upscaled version if it exists."""
-    if not check_upscale_exists(filepath):
+    """Get the URL for the upscaled version if it exists (any format)."""
+    actual_path = _find_upscaled_file(filepath)
+    if actual_path is None:
         return None
     
     from urllib.parse import quote
     
-    upscaled_path = get_upscaled_path(filepath)
-    
     # We need to preserve the slashes but encode the path components
     # Especially for files with spaces, parentheses, etc.
-    parts = upscaled_path.split('/')
+    parts = actual_path.split('/')
     encoded_parts = [quote(part) for part in parts]
     encoded_path = '/'.join(encoded_parts)
     
@@ -75,13 +99,12 @@ def get_upscale_etag(filepath: str) -> str:
     Generate an ETag for cache invalidation based on upscale status.
     Changes whenever upscale is added/removed.
     """
-    upscaled_path = get_upscaled_path(filepath)
-    upscale_exists = os.path.exists(upscaled_path)
+    actual_path = _find_upscaled_file(filepath)
     
-    if upscale_exists:
+    if actual_path:
         # Include modification time in ETag if upscale exists
         try:
-            mtime = os.path.getmtime(upscaled_path)
+            mtime = os.path.getmtime(actual_path)
             etag_string = f"{filepath}-upscaled-{mtime}"
         except OSError:
             etag_string = f"{filepath}-upscaled"
@@ -125,6 +148,10 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
     
     if not config.UPSCALER_ENABLED:
         result['error'] = 'Upscaler is disabled. Enable it in config.'
+        return result
+    
+    if not config.is_upscalable(filepath):
+        result['error'] = 'Animated images and videos cannot be upscaled.'
         return result
     
     # Check if already upscaled
@@ -198,6 +225,8 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
                 tile_pad=config.UPSCALER_TILE_PAD,
                 min_tile_size=config.UPSCALER_MIN_TILE_SIZE,
                 allow_cpu_fallback=config.UPSCALER_ALLOW_CPU_FALLBACK,
+                output_format=config.UPSCALER_OUTPUT_FORMAT,
+                output_quality=config.UPSCALER_OUTPUT_QUALITY,
                 progress_callback=progress_callback
             )
         
@@ -293,7 +322,7 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
 
 
 def delete_upscaled_image(filepath: str) -> Dict:
-    """Delete the upscaled version of an image."""
+    """Delete the upscaled version of an image (any format)."""
     result = {
         'success': False,
         'filepath': filepath,
@@ -301,13 +330,14 @@ def delete_upscaled_image(filepath: str) -> Dict:
         'error': None
     }
     
-    upscaled_path = get_upscaled_path(filepath)
+    actual_path = _find_upscaled_file(filepath)
     
-    if not os.path.exists(upscaled_path):
+    if actual_path is None:
         result['error'] = 'No upscaled version exists'
         return result
     
     try:
+        upscaled_path = actual_path
         os.remove(upscaled_path)
         result['success'] = True
         result['deleted_path'] = upscaled_path

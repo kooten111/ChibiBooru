@@ -207,6 +207,21 @@ async def preview_bulk_upscale_small_images():
     data = (await request.get_json(silent=True)) or {}
     return await asyncio.to_thread(system_service.preview_bulk_upscale_small_images, data)
 
+@api_blueprint.route('/system/convert_upscaled_format', methods=['POST'])
+@api_handler()
+async def convert_upscaled_format():
+    """Convert existing upscaled images to the configured output format."""
+    return await start_background_task(
+        system_service.convert_upscaled_format_task,
+        "Upscale format conversion started in background",
+    )
+
+@api_blueprint.route('/system/convert_upscaled_format/preview', methods=['POST'])
+@api_handler()
+async def preview_convert_upscaled_format():
+    """Preview how many upscaled files would be converted to the configured format."""
+    return await asyncio.to_thread(system_service.preview_upscale_format_conversion)
+
 @api_blueprint.route('/system/broken_images', methods=['GET'])
 @api_handler()
 async def find_broken_images():

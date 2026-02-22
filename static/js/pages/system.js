@@ -873,6 +873,47 @@ function systemReindexDatabase(event) {
     });
 }
 
+function systemConvertUpscaledFormat(event) {
+    if (event) event.preventDefault();
+    if (!SYSTEM_SECRET) {
+        showNotification('System secret not configured', 'error');
+        return;
+    }
+
+    const btn = event.target.closest('.action-btn') || event.target;
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+
+    fetch(`/api/system/convert_upscaled_format/preview?secret=${encodeURIComponent(SYSTEM_SECRET)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="action-icon">🔄</span><div class="action-text"><span class="action-label">Convert Upscale Format</span><span class="action-desc">Convert to configured format</span></div>';
+
+            if (data.count === 0) {
+                showNotification(`No files need conversion — all upscaled files are already ${data.target_format.toUpperCase()}.`, 'info');
+                return;
+            }
+
+            const qualityNote = data.quality ? ` at quality ${data.quality}` : '';
+            window.showConfirm(
+                `Convert ${data.count} upscaled files to ${data.target_format.toUpperCase()}${qualityNote}? ` +
+                `Current total size: ${data.total_size_mb} MB. This may take a while.`,
+                () => {
+                    systemAction('/api/system/convert_upscaled_format', btn, `Convert Upscaled Format (${data.count} files)`);
+                }
+            );
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="action-icon">🔄</span><div class="action-text"><span class="action-label">Convert Upscale Format</span><span class="action-desc">Convert to configured format</span></div>';
+            showNotification(`Preview failed: ${err.message}`, 'error');
+        });
+}
+
 function systemReprocessImages(event) {
     if (event) event.preventDefault();
 

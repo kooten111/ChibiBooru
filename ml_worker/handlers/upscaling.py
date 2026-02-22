@@ -48,6 +48,12 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
         Dict with success status and output path
     """
     image_path = request_data['image_path']
+
+    # Reject animated images and videos — upscaling only works on static images
+    _non_upscalable = ('.gif', '.apng', '.mp4', '.webm')
+    if image_path.lower().endswith(_non_upscalable):
+        raise ValueError(f"Cannot upscale animated/video file: {os.path.basename(image_path)}")
+
     model_name = request_data.get('model_name', 'RealESRGAN_x4plus_anime')
     output_path = request_data['output_path']
     device = request_data.get('device', 'auto')
@@ -297,8 +303,16 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
     # Ensure dir
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
-    # Save as PNG (lossless for upscale result)
-    output_pil.save(output_path)
+    # Save with configured format
+    output_format = request_data.get('output_format', 'png').lower().strip()
+    output_quality = max(1, min(100, int(request_data.get('output_quality', 95))))
+    
+    if output_format == 'webp':
+        output_pil.save(output_path, format='WEBP', quality=output_quality, method=4)
+        logger.info(f"Saved upscaled image as WebP (quality={output_quality}): {os.path.basename(output_path)}")
+    else:
+        output_pil.save(output_path, format='PNG')
+        logger.info(f"Saved upscaled image as PNG: {os.path.basename(output_path)}")
     
     return {
         "success": True, 

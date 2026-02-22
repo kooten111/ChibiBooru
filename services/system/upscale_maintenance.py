@@ -121,6 +121,8 @@ def _collect_matching_filepaths(normalized_settings: Dict[str, Any]) -> Dict[str
         filepath = row['filepath']
         if not config.is_supported_image(filepath):
             continue
+        if not config.is_upscalable(filepath):
+            continue
 
         scanned += 1
         width = int(row['image_width'])

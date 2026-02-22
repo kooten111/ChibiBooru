@@ -373,6 +373,7 @@ SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', 
 SUPPORTED_VIDEO_EXTENSIONS = ('.mp4', '.webm')
 SUPPORTED_ZIP_EXTENSIONS = ('.zip',)
 SUPPORTED_ANIMATION_EXTENSIONS = ('.gif', '.webp', '.apng')
+NON_UPSCALABLE_EXTENSIONS = ('.gif', '.apng') + SUPPORTED_VIDEO_EXTENSIONS
 SUPPORTED_MEDIA_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS + SUPPORTED_VIDEO_EXTENSIONS + SUPPORTED_ZIP_EXTENSIONS
 
 # ==================== UPSCALER (AI IMAGE UPSCALING) ====================
@@ -399,6 +400,13 @@ UPSCALER_MIN_TILE_SIZE = int(_get_setting('UPSCALER_MIN_TILE_SIZE', 64))
 # Fallback to CPU when accelerator backend repeatedly fails during inference
 _upscaler_cpu_fallback = _get_setting('UPSCALER_ALLOW_CPU_FALLBACK', True)
 UPSCALER_ALLOW_CPU_FALLBACK = _upscaler_cpu_fallback if isinstance(_upscaler_cpu_fallback, bool) else str(_upscaler_cpu_fallback).lower() in ('true', '1', 'yes')
+
+# Output format for upscaled images (png or webp)
+_upscaler_format = str(_get_setting('UPSCALER_OUTPUT_FORMAT', 'png')).lower().strip()
+UPSCALER_OUTPUT_FORMAT = _upscaler_format if _upscaler_format in ('png', 'webp') else 'png'
+
+# Quality level for lossy WebP output (1-100, only used when format is webp)
+UPSCALER_OUTPUT_QUALITY = max(1, min(100, int(_get_setting('UPSCALER_OUTPUT_QUALITY', 95))))
 
 # Directory to store upscaled images (separate from originals)
 UPSCALED_IMAGES_DIR = str(_get_setting('UPSCALED_IMAGES_DIR', './static/upscaled'))
@@ -491,6 +499,11 @@ def is_animated(filepath: str) -> bool:
 def is_zip_animation(filepath: str) -> bool:
     """Check if a file is a zip-based animation."""
     return filepath.lower().endswith(SUPPORTED_ZIP_EXTENSIONS)
+
+
+def is_upscalable(filepath: str) -> bool:
+    """Check if a file can be upscaled. GIFs, APNGs, and videos cannot."""
+    return not filepath.lower().endswith(NON_UPSCALABLE_EXTENSIONS)
 
 
 # ==================== FIRST-RUN DETECTION ====================

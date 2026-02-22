@@ -439,6 +439,8 @@ class MLWorkerClient:
                      tile_pad: int = 32,
                      min_tile_size: int = 64,
                      allow_cpu_fallback: bool = True,
+                     output_format: str = 'png',
+                     output_quality: int = 95,
                      progress_callback=None) -> Dict[str, Any]:
         """
         Upscale an image using RealESRGAN.
@@ -452,6 +454,8 @@ class MLWorkerClient:
             tile_pad: Tile padding used for seamless tile joins
             min_tile_size: Smallest tile size allowed for retries
             allow_cpu_fallback: If True, fallback to CPU after repeated backend failures
+            output_format: Image format for output ('png' or 'webp')
+            output_quality: Quality level for lossy formats (1-100)
             progress_callback: Optional function(current, total, message)
 
         Returns:
@@ -476,6 +480,8 @@ class MLWorkerClient:
             tile_pad,
             min_tile_size,
             allow_cpu_fallback,
+            output_format,
+            output_quality,
         )
 
         return self._send_request(request, progress_callback=progress_callback)

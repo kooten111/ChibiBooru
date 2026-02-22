@@ -20,12 +20,14 @@ from .scan import run_scan_and_process, scan_and_process_task
 from .status import get_system_status, get_task_status_by_id, run_reload_data, validate_secret_string
 from .thumbnails import run_thumbnail_generation_task, start_thumbnail_generation
 from .upscale_maintenance import bulk_upscale_small_images_task, preview_bulk_upscale_small_images
+from .upscale_format_convert import convert_upscaled_format_task, preview_upscale_format_conversion
 
 __all__ = [
     "apply_merged_sources_task",
     "bulk_retag_local_task",
     "bulk_upscale_small_images_task",
     "clean_orphans_task",
+    "convert_upscaled_format_task",
     "deduplicate_task",
     "get_system_status",
     "get_task_status_by_id",
@@ -48,6 +50,7 @@ __all__ = [
     "run_reload_data",
     "run_scan_and_process",
     "preview_bulk_upscale_small_images",
+    "preview_upscale_format_conversion",
     "run_thumbnail_generation_task",
     "scan_and_process_task",
     "start_thumbnail_generation",

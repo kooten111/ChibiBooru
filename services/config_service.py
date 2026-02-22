@@ -409,6 +409,20 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Tile size for processing large images',
         'editable': True,
     },
+    'UPSCALER_OUTPUT_FORMAT': {
+        'category': 'Feature Flags',
+        'type': 'string',
+        'description': 'Output format for upscaled images (png or webp)',
+        'editable': True,
+    },
+    'UPSCALER_OUTPUT_QUALITY': {
+        'category': 'Feature Flags',
+        'type': 'int',
+        'description': 'WebP quality level (1-100, only used when format is webp)',
+        'editable': True,
+        'min': 1,
+        'max': 100,
+    },
     'UPSCALED_IMAGES_DIR': {
         'category': 'Feature Flags',
         'type': 'string',
