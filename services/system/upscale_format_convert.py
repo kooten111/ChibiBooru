@@ -78,95 +78,107 @@ async def convert_upscaled_format_task(
 
     target_format = config.UPSCALER_OUTPUT_FORMAT
     target_quality = config.UPSCALER_OUTPUT_QUALITY
+    convert_max_pixels = int(getattr(config, 'UPSCALER_CONVERT_MAX_IMAGE_PIXELS', 0))
+    original_max_pixels = Image.MAX_IMAGE_PIXELS
+
+    if convert_max_pixels <= 0:
+        Image.MAX_IMAGE_PIXELS = None
+        logger.info('Upscale conversion: Pillow MAX_IMAGE_PIXELS disabled (trusted local files)')
+    else:
+        Image.MAX_IMAGE_PIXELS = convert_max_pixels
+        logger.info(f'Upscale conversion: Pillow MAX_IMAGE_PIXELS set to {convert_max_pixels}')
 
     monitor_service.add_log(
         f'Upscale format conversion started (target: {target_format})',
         'info',
     )
 
-    await task_manager_instance.update_progress(task_id, 0, 1, 'Scanning files...')
-    files = _scan_convertible_files()
-    total = len(files)
+    try:
+        await task_manager_instance.update_progress(task_id, 0, 1, 'Scanning files...')
+        files = _scan_convertible_files()
+        total = len(files)
 
-    if total == 0:
-        message = 'No upscaled files need conversion.'
-        monitor_service.add_log(message, 'info')
-        await task_manager_instance.update_progress(task_id, 1, 1, message)
+        if total == 0:
+            message = 'No upscaled files need conversion.'
+            monitor_service.add_log(message, 'info')
+            await task_manager_instance.update_progress(task_id, 1, 1, message)
+            return {
+                'status': 'success',
+                'message': message,
+                'converted': 0,
+                'failed': 0,
+                'space_saved_mb': 0,
+            }
+
+        monitor_service.add_log(f'Found {total} upscaled files to convert to {target_format}', 'info')
+
+        converted = 0
+        failed = 0
+        bytes_before = 0
+        bytes_after = 0
+        error_samples: List[str] = []
+
+        for index, entry in enumerate(files, 1):
+            src_path = entry['path']
+            stem = os.path.splitext(src_path)[0]
+            dst_path = f"{stem}.{target_format}"
+
+            await task_manager_instance.update_progress(
+                task_id,
+                index - 1,
+                total,
+                f'Converting {index}/{total}',
+                current_item=os.path.basename(src_path),
+            )
+
+            try:
+                with Image.open(src_path) as img:
+                    if img.mode == 'RGBA' and target_format == 'webp':
+                        # WebP supports RGBA natively
+                        pass
+                    elif img.mode not in ('RGB', 'RGBA'):
+                        img = img.convert('RGB')
+
+                    if target_format == 'webp':
+                        img.save(dst_path, format='WEBP', quality=target_quality, method=4)
+                    else:
+                        img.save(dst_path, format='PNG')
+
+                new_size = os.path.getsize(dst_path)
+                bytes_before += entry['size']
+                bytes_after += new_size
+
+                # Remove old file (only if dst differs from src)
+                if os.path.abspath(dst_path) != os.path.abspath(src_path):
+                    os.remove(src_path)
+
+                converted += 1
+            except Exception as e:
+                failed += 1
+                if len(error_samples) < 5:
+                    error_samples.append(f"{os.path.basename(src_path)}: {e}")
+                logger.warning(f"Failed to convert {src_path}: {e}")
+
+        space_saved_mb = round((bytes_before - bytes_after) / (1024 * 1024), 2)
+
+        await task_manager_instance.update_progress(task_id, total, total, 'Conversion complete')
+
+        message = (
+            f'Format conversion complete: {converted} converted, {failed} failed. '
+            f'Space saved: {space_saved_mb} MB'
+        )
+        if failed > 0:
+            monitor_service.add_log(f'{message} Errors: {"; ".join(error_samples)}', 'warning')
+        else:
+            monitor_service.add_log(message, 'success')
+
         return {
             'status': 'success',
             'message': message,
-            'converted': 0,
-            'failed': 0,
-            'space_saved_mb': 0,
+            'converted': converted,
+            'failed': failed,
+            'space_saved_mb': space_saved_mb,
+            'errors': error_samples,
         }
-
-    monitor_service.add_log(f'Found {total} upscaled files to convert to {target_format}', 'info')
-
-    converted = 0
-    failed = 0
-    bytes_before = 0
-    bytes_after = 0
-    error_samples: List[str] = []
-
-    for index, entry in enumerate(files, 1):
-        src_path = entry['path']
-        stem = os.path.splitext(src_path)[0]
-        dst_path = f"{stem}.{target_format}"
-
-        await task_manager_instance.update_progress(
-            task_id,
-            index - 1,
-            total,
-            f'Converting {index}/{total}',
-            current_item=os.path.basename(src_path),
-        )
-
-        try:
-            with Image.open(src_path) as img:
-                if img.mode == 'RGBA' and target_format == 'webp':
-                    # WebP supports RGBA natively
-                    pass
-                elif img.mode not in ('RGB', 'RGBA'):
-                    img = img.convert('RGB')
-
-                if target_format == 'webp':
-                    img.save(dst_path, format='WEBP', quality=target_quality, method=4)
-                else:
-                    img.save(dst_path, format='PNG')
-
-            new_size = os.path.getsize(dst_path)
-            bytes_before += entry['size']
-            bytes_after += new_size
-
-            # Remove old file (only if dst differs from src)
-            if os.path.abspath(dst_path) != os.path.abspath(src_path):
-                os.remove(src_path)
-
-            converted += 1
-        except Exception as e:
-            failed += 1
-            if len(error_samples) < 5:
-                error_samples.append(f"{os.path.basename(src_path)}: {e}")
-            logger.warning(f"Failed to convert {src_path}: {e}")
-
-    space_saved_mb = round((bytes_before - bytes_after) / (1024 * 1024), 2)
-
-    await task_manager_instance.update_progress(task_id, total, total, 'Conversion complete')
-
-    message = (
-        f'Format conversion complete: {converted} converted, {failed} failed. '
-        f'Space saved: {space_saved_mb} MB'
-    )
-    if failed > 0:
-        monitor_service.add_log(f'{message} Errors: {"; ".join(error_samples)}', 'warning')
-    else:
-        monitor_service.add_log(message, 'success')
-
-    return {
-        'status': 'success',
-        'message': message,
-        'converted': converted,
-        'failed': failed,
-        'space_saved_mb': space_saved_mb,
-        'errors': error_samples,
-    }
+    finally:
+        Image.MAX_IMAGE_PIXELS = original_max_pixels

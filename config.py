@@ -408,6 +408,11 @@ UPSCALER_OUTPUT_FORMAT = _upscaler_format if _upscaler_format in ('png', 'webp')
 # Quality level for lossy WebP output (1-100, only used when format is webp)
 UPSCALER_OUTPUT_QUALITY = max(1, min(100, int(_get_setting('UPSCALER_OUTPUT_QUALITY', 95))))
 
+# Max pixel guard for "Convert all upscales" task.
+# Set to 0 to disable Pillow's DecompressionBombWarning for trusted local upscaled files.
+# Set to a positive integer to enforce a limit.
+UPSCALER_CONVERT_MAX_IMAGE_PIXELS = int(_get_setting('UPSCALER_CONVERT_MAX_IMAGE_PIXELS', 0))
+
 # Directory to store upscaled images (separate from originals)
 UPSCALED_IMAGES_DIR = str(_get_setting('UPSCALED_IMAGES_DIR', './static/upscaled'))
 
