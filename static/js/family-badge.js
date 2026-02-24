@@ -1,6 +1,6 @@
 // static/js/family-badge.js
-// Filmstrip-style floating badge for displaying parent/child image relationships
-// Compact design with hover enlargement
+// Floating card badges for parent/child image relationships
+// Glass-card design with hover preview
 
 class FamilyBadge {
     constructor(container, familyData, insertAfterElement = null) {
@@ -23,7 +23,7 @@ class FamilyBadge {
         this.strip = document.createElement('div');
         this.strip.className = `family-filmstrip ${this.visible ? 'visible' : 'hidden'}`;
 
-        const toggleLabel = this.visible ? '×' : `🔗 ${this.familyData.length}`;
+        const toggleLabel = this.visible ? '✕' : `${this.familyData.length} linked`;
         const toggleTitle = this.visible ? 'Hide family images' : 'Show family images';
 
         this.strip.innerHTML = `
@@ -50,8 +50,8 @@ class FamilyBadge {
             html += this.renderThumb(img, 'parent');
         });
 
-        // Current image marker
-        html += `<div class="filmstrip-current" title="Current image">●</div>`;
+        // Current image divider
+        html += `<div class="filmstrip-current" title="Current"></div>`;
 
         // Child thumbnails
         this.children.forEach(img => {
@@ -76,9 +76,7 @@ class FamilyBadge {
 
         return `
             <a href="${viewPath}" class="filmstrip-thumb filmstrip-thumb-${type}" title="${type === 'parent' ? 'Parent' : 'Child'}">
-                <div class="filmstrip-perfs top"></div>
                 <img src="${thumbPath}" alt="${type}" loading="lazy">
-                <div class="filmstrip-perfs bottom"></div>
                 <span class="filmstrip-type-badge">${type === 'parent' ? 'P' : 'C'}</span>
             </a>
         `;
@@ -115,7 +113,7 @@ class FamilyBadge {
         this.strip.classList.add('visible');
         this.strip.classList.remove('hidden');
         const toggleBtn = this.strip.querySelector('.filmstrip-toggle');
-        toggleBtn.innerHTML = '×';
+        toggleBtn.innerHTML = '✕';
         toggleBtn.title = 'Hide family images';
     }
 
@@ -125,7 +123,7 @@ class FamilyBadge {
         this.strip.classList.remove('visible');
         this.strip.classList.add('hidden');
         const toggleBtn = this.strip.querySelector('.filmstrip-toggle');
-        toggleBtn.innerHTML = `🔗 ${this.familyData.length}`;
+        toggleBtn.innerHTML = `${this.familyData.length} linked`;
         toggleBtn.title = 'Show family images';
     }
 
