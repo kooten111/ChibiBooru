@@ -7,7 +7,7 @@ class FamilyBadge {
         this.container = container;
         this.familyData = familyData;
         this.insertAfterElement = insertAfterElement;
-        this.visible = true;
+        this.visible = localStorage.getItem('familyFilmstripVisible') === 'true';
 
         this.parents = familyData.filter(img => img.type === 'parent');
         this.children = familyData.filter(img => img.type === 'child');
@@ -21,12 +21,16 @@ class FamilyBadge {
     render() {
         // Create the filmstrip container
         this.strip = document.createElement('div');
-        this.strip.className = 'family-filmstrip visible';
+        this.strip.className = `family-filmstrip ${this.visible ? 'visible' : 'hidden'}`;
+
+        const toggleLabel = this.visible ? '×' : `🔗 ${this.familyData.length}`;
+        const toggleTitle = this.visible ? 'Hide family images' : 'Show family images';
+
         this.strip.innerHTML = `
             <div class="filmstrip-content">
                 ${this.renderFilmstrip()}
             </div>
-            <button class="filmstrip-toggle" title="Hide family images">×</button>
+            <button class="filmstrip-toggle" title="${toggleTitle}">${toggleLabel}</button>
         `;
 
         // Insert as sibling after the specified element, or append to container
@@ -107,6 +111,7 @@ class FamilyBadge {
 
     show() {
         this.visible = true;
+        localStorage.setItem('familyFilmstripVisible', 'true');
         this.strip.classList.add('visible');
         this.strip.classList.remove('hidden');
         const toggleBtn = this.strip.querySelector('.filmstrip-toggle');
@@ -116,6 +121,7 @@ class FamilyBadge {
 
     hide() {
         this.visible = false;
+        localStorage.setItem('familyFilmstripVisible', 'false');
         this.strip.classList.remove('visible');
         this.strip.classList.add('hidden');
         const toggleBtn = this.strip.querySelector('.filmstrip-toggle');

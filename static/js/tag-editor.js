@@ -28,10 +28,20 @@ class TagEditor {
         // Transform the display
         this.renderEditMode();
 
+        const toolbar = document.getElementById('imageToolbar');
+        if (toolbar) {
+            toolbar.classList.add('image-toolbar--editing');
+        }
+
+        const imageViewWrapper = document.querySelector('.image-page .image-view-wrapper');
+        if (imageViewWrapper) {
+            imageViewWrapper.classList.add('image-view-wrapper--toolbar-lock');
+        }
+
         // Update button
-        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
+        const editBtn = document.querySelector('.toolbar-btn.primary') || document.querySelector('.actions-grid .action-btn.primary');
         if (editBtn) {
-            editBtn.textContent = '💾';
+            editBtn.innerHTML = '<span class="toolbar-icon">💾</span>';
             editBtn.title = 'Save Tags';
             editBtn.classList.add('editing-mode');
         }
@@ -40,8 +50,8 @@ class TagEditor {
         let cancelBtn = document.getElementById('cancelEditBtn');
         if (!cancelBtn) {
             cancelBtn = document.createElement('button');
-            cancelBtn.className = 'action-btn danger';
-            cancelBtn.textContent = '❌'; // Cross mark
+            cancelBtn.className = 'toolbar-btn toolbar-btn--text danger';
+            cancelBtn.innerHTML = '<span class="toolbar-btn__icon toolbar-icon">❌</span><span class="toolbar-btn__label">Cancel</span>';
             cancelBtn.id = 'cancelEditBtn';
             cancelBtn.title = 'Cancel Editing';
             editBtn.after(cancelBtn);
@@ -51,29 +61,10 @@ class TagEditor {
         let clearDeltasBtn = document.getElementById('clearDeltasBtn');
         if (!clearDeltasBtn) {
             clearDeltasBtn = document.createElement('button');
-            clearDeltasBtn.className = 'action-btn success'; // Use success for now as we don't have warning variant in snippet, or stick to default
-            // Actually, let's use a custom style or just action-btn if warning isn't defined, but I saw success/danger/primary/favourite.
-            // Let's try to stick to what we saw. I didn't see warning. I'll use success for "cleaning" or just base action-btn.
-            // Let's use base action-btn with a specific color via style if needed, but for now just action-btn is safe.
-            // Better yet, I'll check if I can check for warning class existence. I didn't see it in grep.
-            // I'll use 'action-btn' and maybe add a style or just leave it.
-            // Wait, previous code used 'btn-warning'.
-            // I'll usage 'action-btn' and add a inline style for color if needed, or just let it be default.
-            // Actually, let's look at the grep output again.
-            // I saw primary, success, danger, favourite. No warning.
-            // So I will use 'action-btn' and maybe add a class 'warning' assuming I might add it to CSS later or it inherits something,
-            // but to be safe and consistent with the plan, I will use 'action-btn' and maybe 'danger' isn't right for cleaning.
-            // Let's use 'action-btn' and let the icon speak for itself, or reusing 'primary'.
-            // 'Clear Deltas' is kind of specific.
-            // I'll make it 'action-btn' and adding a specific class for potential future styling.
-            cancelBtn.after(clearDeltasBtn);
-
-            clearDeltasBtn = document.createElement('button');
-            clearDeltasBtn.className = 'action-btn';
-            clearDeltasBtn.textContent = '🧹';
+            clearDeltasBtn.className = 'toolbar-btn toolbar-btn--text';
+            clearDeltasBtn.innerHTML = '<span class="toolbar-btn__icon toolbar-icon">🧹</span><span class="toolbar-btn__label">Clear Deltas</span>';
             clearDeltasBtn.id = 'clearDeltasBtn';
             clearDeltasBtn.title = 'Clear manual modification markers';
-            // Add a little margin or specific style if needed, but pills usually handle themselves.
             cancelBtn.after(clearDeltasBtn);
         }
     }
@@ -107,16 +98,14 @@ class TagEditor {
 
             if (!categoryKey || !this.tags[categoryKey]) return;
 
-            const tagItems = categoryDiv.querySelectorAll('.tag-item a');
+            const tagItems = categoryDiv.querySelectorAll('.tag-chip:not(.delta-added):not(.delta-removed)');
             tagItems.forEach(link => {
-                // Skip delta items (manual modifications)
-                if (link.closest('.delta-added') || link.closest('.delta-removed')) {
-                    return;
+                // Extract tag name from text nodes only (excluding count span)
+                let tagText = '';
+                for (const node of link.childNodes) {
+                    if (node.nodeType === Node.TEXT_NODE) tagText += node.textContent;
                 }
-
-                const tag = link.textContent.trim();
-                // Remove any leading + or - that might be from delta display
-                const cleanTag = tag.replace(/^[+-]+/, '');
+                const cleanTag = tagText.trim().replace(/^[⚡+-]+\s*/, '');
                 if (cleanTag && !this.tags[categoryKey].includes(cleanTag)) {
                     this.tags[categoryKey].push(cleanTag);
                 }
@@ -125,9 +114,9 @@ class TagEditor {
     }
 
     renderEditMode() {
-        const tagsList = document.querySelector('.tags-list');
+        const tagsList = document.querySelector('.tags-scroll');
         if (!tagsList) {
-            console.error('tags-list not found');
+            console.error('tags-scroll not found');
             return;
         }
 
@@ -135,18 +124,13 @@ class TagEditor {
         const sidebarLeft = document.getElementById('sidebarLeft');
         if (sidebarLeft) {
             sidebarLeft.classList.add('editing-mode');
-            // Hide all other sections in sidebar (including information/metadata)
-            const sections = sidebarLeft.querySelectorAll('.section-content');
+            // Hide all other sections in sidebar except tags and actions
+            const sections = sidebarLeft.querySelectorAll('.sidebar-section');
             sections.forEach(section => {
-                if (section.id !== 'tags-content') {
+                if (section.id !== 'tags-content' && section.id !== 'actions-content') {
                     section.style.display = 'none';
                 }
             });
-            // Also hide metadata panel specifically
-            const metadataPanel = sidebarLeft.querySelector('#metadata-content');
-            if (metadataPanel) {
-                metadataPanel.style.display = 'none';
-            }
         }
 
         // Add class to container to adjust grid layout
@@ -233,12 +217,17 @@ class TagEditor {
 
     getTagCount(tag) {
         // Try to find the tag count from the original page display
-        const tagItems = document.querySelectorAll('.tag-item a');
-        for (let item of tagItems) {
-            if (item.textContent.trim() === tag) {
-                const countSpan = item.parentElement.querySelector('.tag-count');
-                if (countSpan) {
-                    return countSpan.textContent;
+        const tagChips = document.querySelectorAll('.tag-chip');
+        for (let chip of tagChips) {
+            // Extract tag name from text nodes only
+            let tagText = '';
+            for (const node of chip.childNodes) {
+                if (node.nodeType === Node.TEXT_NODE) tagText += node.textContent;
+            }
+            if (tagText.trim().replace(/^[⚡+-]+\s*/, '') === tag) {
+                const cntSpan = chip.querySelector('.cnt');
+                if (cntSpan) {
+                    return cntSpan.textContent;
                 }
             }
         }
@@ -499,9 +488,9 @@ class TagEditor {
             editContainer.remove();
         }
 
-        const tagsList = document.querySelector('.tags-list');
+        const tagsList = document.querySelector('.tags-scroll');
         if (tagsList) {
-            tagsList.style.display = 'block';
+            tagsList.style.display = '';
         }
 
         // Restore left sidebar panels
@@ -509,7 +498,7 @@ class TagEditor {
         if (sidebarLeft) {
             sidebarLeft.classList.remove('editing-mode');
             // Show all sections in sidebar again
-            const sections = sidebarLeft.querySelectorAll('.section-content');
+            const sections = sidebarLeft.querySelectorAll('.sidebar-section');
             sections.forEach(section => {
                 section.style.display = '';
             });
@@ -521,6 +510,16 @@ class TagEditor {
             container.classList.remove('tag-editor-expanded');
         }
 
+        const toolbar = document.getElementById('imageToolbar');
+        if (toolbar) {
+            toolbar.classList.remove('image-toolbar--editing');
+        }
+
+        const imageViewWrapper = document.querySelector('.image-page .image-view-wrapper');
+        if (imageViewWrapper) {
+            imageViewWrapper.classList.remove('image-view-wrapper--toolbar-lock');
+        }
+
         // Restore right sidebar
         const sidebarRight = document.getElementById('sidebarRight');
         if (sidebarRight) {
@@ -528,9 +527,9 @@ class TagEditor {
         }
 
         // Reset button
-        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
+        const editBtn = document.querySelector('.toolbar-btn.primary') || document.querySelector('.actions-grid .action-btn.primary');
         if (editBtn) {
-            editBtn.textContent = '📝';
+            editBtn.innerHTML = '<span class="toolbar-icon">📝</span>';
             editBtn.title = 'Edit Tags';
             editBtn.classList.remove('editing-mode');
         }
@@ -559,9 +558,9 @@ class TagEditor {
             return;
         }
 
-        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
+        const editBtn = document.querySelector('.toolbar-btn.primary') || document.querySelector('.actions-grid .action-btn.primary');
         if (editBtn) {
-            editBtn.textContent = '💾'; // Keep icon
+            editBtn.innerHTML = '<span class="toolbar-icon">💾</span>';
             editBtn.disabled = true;
         }
 
@@ -607,7 +606,8 @@ class TagEditor {
                 console.error('Save error:', err);
                 showNotification('Failed to save: ' + err.message, 'error');
                 if (editBtn) {
-                    editBtn.textContent = '💾';
+                    editBtn.innerHTML = '<span class="toolbar-icon">💾</span>';
+                    editBtn.title = 'Save Tags';
                     editBtn.disabled = false;
                 }
             });
@@ -699,7 +699,7 @@ window.tagEditor = new TagEditor();
 // Global function for the button
 function toggleTagEditor() {
     if (window.tagEditor.isEditing) {
-        const editBtn = document.querySelector('.actions-bar .action-btn.primary');
+        const editBtn = document.querySelector('.toolbar-btn.primary') || document.querySelector('.actions-grid .action-btn.primary');
         if (editBtn && editBtn.classList.contains('editing-mode')) {
             window.tagEditor.saveTags();
         } else {
@@ -712,9 +712,14 @@ function toggleTagEditor() {
 
 // Attach cancel and clear deltas handlers
 document.addEventListener('click', (e) => {
-    if (e.target.id === 'cancelEditBtn') {
+    const cancelButton = e.target.closest('#cancelEditBtn');
+    if (cancelButton) {
         window.tagEditor.cancelEdit();
-    } else if (e.target.id === 'clearDeltasBtn') {
+        return;
+    }
+
+    const clearDeltasButton = e.target.closest('#clearDeltasBtn');
+    if (clearDeltasButton) {
         window.tagEditor.clearDeltas();
     }
 });

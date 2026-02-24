@@ -19,6 +19,7 @@
     --bg-hover: rgba(40, 40, 50, 0.6);
     --bg-overlay: rgba(0, 0, 0, 0.8);
     --bg-black-trans: rgba(20, 20, 30, 0.3);
+    --bg-secondary: rgba(20, 20, 30, 0.95);
 
     --text-primary: #e8e8e8;
     --text-secondary: #d0d0d0;
@@ -32,6 +33,8 @@
     --danger: #ff6b6b;
     --danger-hover: #ff4444;
     --info: #87ceeb;
+    --favourite-pink: #ff6b9d;
+    --favourite-pink-bg: rgba(255, 100, 150, 0.15);
 
     --tag-character: #90ee90;
     --tag-character-bg: rgba(144, 238, 144, 0.2);
@@ -53,29 +56,73 @@
     --tag-general-border: rgba(135, 206, 235, 0.3);
     --tag-uncategorized: #a0a0a0;
 
-    /* Extended Category Colors */
+    /* Extended Category Colors (text, bg, border) */
     --tag-ext-subject: #87ceeb;
+    --tag-ext-subject-bg: rgba(135, 206, 235, 0.1);
+    --tag-ext-subject-border: rgba(135, 206, 235, 0.22);
     --tag-ext-physique: #5ca3d6;
+    --tag-ext-physique-bg: rgba(92, 163, 214, 0.1);
+    --tag-ext-physique-border: rgba(92, 163, 214, 0.22);
     --tag-ext-hair: #4a90c4;
+    --tag-ext-hair-bg: rgba(74, 144, 196, 0.1);
+    --tag-ext-hair-border: rgba(74, 144, 196, 0.22);
     --tag-ext-face: #3b7eb3;
+    --tag-ext-face-bg: rgba(59, 126, 179, 0.1);
+    --tag-ext-face-border: rgba(59, 126, 179, 0.22);
     --tag-ext-genitalia: #ff69b4;
+    --tag-ext-genitalia-bg: rgba(255, 105, 180, 0.1);
+    --tag-ext-genitalia-border: rgba(255, 105, 180, 0.22);
     --tag-ext-attire-main: #90ee90;
+    --tag-ext-attire-main-bg: rgba(144, 238, 144, 0.1);
+    --tag-ext-attire-main-border: rgba(144, 238, 144, 0.22);
     --tag-ext-attire-inner: #7cdb7c;
+    --tag-ext-attire-inner-bg: rgba(124, 219, 124, 0.1);
+    --tag-ext-attire-inner-border: rgba(124, 219, 124, 0.22);
     --tag-ext-attire-legwear: #69c969;
+    --tag-ext-attire-legwear-bg: rgba(105, 201, 105, 0.1);
+    --tag-ext-attire-legwear-border: rgba(105, 201, 105, 0.22);
     --tag-ext-attire-acc: #56b656;
+    --tag-ext-attire-acc-bg: rgba(86, 182, 86, 0.1);
+    --tag-ext-attire-acc-border: rgba(86, 182, 86, 0.22);
     --tag-ext-action: #ffd700;
+    --tag-ext-action-bg: rgba(255, 215, 0, 0.1);
+    --tag-ext-action-border: rgba(255, 215, 0, 0.22);
     --tag-ext-pose: #ffc700;
+    --tag-ext-pose-bg: rgba(255, 199, 0, 0.1);
+    --tag-ext-pose-border: rgba(255, 199, 0, 0.22);
     --tag-ext-expression: #ffb700;
+    --tag-ext-expression-bg: rgba(255, 183, 0, 0.1);
+    --tag-ext-expression-border: rgba(255, 183, 0, 0.22);
     --tag-ext-sexual: #ff1493;
+    --tag-ext-sexual-bg: rgba(255, 20, 147, 0.1);
+    --tag-ext-sexual-border: rgba(255, 20, 147, 0.22);
     --tag-ext-object: #dda0dd;
+    --tag-ext-object-bg: rgba(221, 160, 221, 0.1);
+    --tag-ext-object-border: rgba(221, 160, 221, 0.22);
     --tag-ext-setting: #98fb98;
+    --tag-ext-setting-bg: rgba(152, 251, 152, 0.1);
+    --tag-ext-setting-border: rgba(152, 251, 152, 0.22);
     --tag-ext-status: #ffa07a;
+    --tag-ext-status-bg: rgba(255, 160, 122, 0.1);
+    --tag-ext-status-border: rgba(255, 160, 122, 0.22);
     --tag-ext-framing: #ba55d3;
+    --tag-ext-framing-bg: rgba(186, 85, 211, 0.1);
+    --tag-ext-framing-border: rgba(186, 85, 211, 0.22);
     --tag-ext-focus: #9370db;
+    --tag-ext-focus-bg: rgba(147, 112, 219, 0.1);
+    --tag-ext-focus-border: rgba(147, 112, 219, 0.22);
     --tag-ext-style-art: #8b7ec8;
+    --tag-ext-style-art-bg: rgba(139, 126, 200, 0.1);
+    --tag-ext-style-art-border: rgba(139, 126, 200, 0.22);
     --tag-ext-style-tech: #7a6fb5;
+    --tag-ext-style-tech-bg: rgba(122, 111, 181, 0.1);
+    --tag-ext-style-tech-border: rgba(122, 111, 181, 0.22);
     --tag-ext-meta-attr: #40e0d0;
+    --tag-ext-meta-attr-bg: rgba(64, 224, 208, 0.1);
+    --tag-ext-meta-attr-border: rgba(64, 224, 208, 0.22);
     --tag-ext-meta-text: #48d1cc;
+    --tag-ext-meta-text-bg: rgba(72, 209, 204, 0.1);
+    --tag-ext-meta-text-border: rgba(72, 209, 204, 0.22);
 
     /* Rating Colors */
     --rating-general: #22c55e;
@@ -98,6 +145,7 @@
     --spacing-xl: 30px;
     --spacing-2xl: 40px;
 
+    --radius-xs: 3px;
     --radius-sm: 6px;
     --radius-md: 8px;
     --radius-lg: 10px;
@@ -159,6 +207,7 @@
     --font-size-3xl: 2em;
     --font-weight-normal: 500;
     --font-weight-medium: 600;
+    --font-weight-semibold: 600;
     --font-weight-bold: 700;
     --font-weight-extra-bold: 800;
 

@@ -251,28 +251,7 @@
 }
 
 /* Tags section gets most space */
-.image-page #tags-content {
-    flex: 3 1 0;
-    min-height: 80px;
-}
-
-/* Pools section - fixed height, auto-shrink */
-.image-page #pools-content {
-    flex: 0 0 auto;
-    max-height: 150px;
-}
-
-/* Metadata section gets remaining space */
-.image-page #metadata-content {
-    flex: 2 1 0;
-    min-height: 100px;
-}
-
-/* Panels inside section-content fill their container */
-.image-page .section-content>.panel {
-    flex: 1;
-    min-height: 0;
-}
+/* Note: #tags-content in left sidebar uses .sidebar-section.tags-section rules from image-page.css */
 
 /* Right sidebar - Similar panel fills space */
 .image-page #sidebar-right-content {

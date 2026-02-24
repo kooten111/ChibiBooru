@@ -4,26 +4,26 @@
  */
 
 /* Upscale Button States */
-.action-btn#upscaleBtn {
+#upscaleBtn {
     transition: all 0.2s ease;
     position: relative;
 }
 
-.action-btn#upscaleBtn.disabled {
+#upscaleBtn.disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.action-btn#upscaleBtn.upscale-loading {
+#upscaleBtn.upscale-loading {
     pointer-events: none;
 }
 
-.action-btn#upscaleBtn.upscale-loading .spinner {
+#upscaleBtn.upscale-loading .spinner {
     display: inline-block;
     animation: spin 1s linear infinite;
 }
 
-.action-btn#upscaleBtn.upscale-done {
+#upscaleBtn.upscale-done {
     background: var(--success-bg);
     border-color: var(--success);
 }

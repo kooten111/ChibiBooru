@@ -217,12 +217,12 @@
 
 /* Editing mode - expand tag editor horizontally and push image aside */
 .image-page .container.tag-editor-expanded {
-    grid-template-columns: 800px 1fr 350px;
+    grid-template-columns: 800px 1fr 320px;
     transition: grid-template-columns var(--transition-smooth);
 }
 
-/* Hide information section when editing */
-.sidebar-left.editing-mode #metadata-content {
+/* Hide actions+info panel when editing */
+.sidebar-left.editing-mode #actions-info-content {
     display: none !important;
 }
 
@@ -314,18 +314,18 @@
 /* Responsive adjustments */
 @media (max-width: 1800px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 700px 1fr 350px;
+        grid-template-columns: 700px 1fr 320px;
     }
 }
 
 @media (max-width: 1600px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 600px 1fr 350px;
+        grid-template-columns: 600px 1fr 320px;
     }
 }
 
 @media (max-width: 1200px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 500px 1fr 350px;
+        grid-template-columns: 500px 1fr 320px;
     }
 }

@@ -18,14 +18,17 @@ function copyImageTags(button) {
         tags = allTagsInput.value.trim().split(/\s+/).filter(t => t.length > 0);
     } else {
         // Fallback: gather tags from the page DOM
-        const tagElements = document.querySelectorAll('.tag-item a');
+        const tagElements = document.querySelectorAll('.tag-chip:not(.delta-added):not(.delta-removed)');
         tags = Array.from(tagElements)
             .map(el => {
-                let text = el.textContent.trim();
-                // Strip implied tag arrow prefix "→ "
-                if (text.startsWith('→')) {
-                    text = text.substring(1).trim();
+                // Extract tag name from text nodes only (excluding count span)
+                let text = '';
+                for (const node of el.childNodes) {
+                    if (node.nodeType === Node.TEXT_NODE) text += node.textContent;
                 }
+                text = text.trim();
+                // Strip implied tag prefix "⚡ "
+                text = text.replace(/^⚡\s*/, '');
                 return text;
             })
             .filter(tag => tag.length > 0 && !tag.startsWith('+') && !tag.startsWith('-'));
@@ -651,6 +654,7 @@ function initSwipeNavigation() {
         setTimeout(() => {
             initSwipeNavigation();
             initCollapsibleSections();
+            initToolbarProximity();
 
             const deleteBtn = document.getElementById('deleteImageBtn') || document.getElementById('floatingDeleteBtn');
             if (deleteBtn) {
@@ -695,9 +699,44 @@ function initSwipeNavigation() {
 }
 
 
+/* ═══ Toolbar proximity detection ═══ */
+function initToolbarProximity() {
+    const wrapper = document.querySelector('.image-page .image-view-wrapper');
+    if (!wrapper) return;
+
+    const TRIGGER_ZONE = 0.30; // bottom 30% of the wrapper
+    let hideTimer = null;
+
+    wrapper.addEventListener('mousemove', (e) => {
+        const rect = wrapper.getBoundingClientRect();
+        const relativeY = (e.clientY - rect.top) / rect.height;
+        const nearBottom = relativeY >= (1 - TRIGGER_ZONE);
+
+        if (nearBottom) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+            wrapper.classList.add('toolbar-near');
+        } else if (wrapper.classList.contains('toolbar-near') && !hideTimer) {
+            hideTimer = setTimeout(() => {
+                wrapper.classList.remove('toolbar-near');
+                hideTimer = null;
+            }, 300);
+        }
+    });
+
+    wrapper.addEventListener('mouseleave', () => {
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+            wrapper.classList.remove('toolbar-near');
+            hideTimer = null;
+        }, 300);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     initCollapsibleSections();
     initSwipeNavigation();
+    initToolbarProximity();
 
     // Click to Zoom
     const mediaContainer = document.getElementById('imageViewContainer');

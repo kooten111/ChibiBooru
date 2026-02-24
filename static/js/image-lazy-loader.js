@@ -54,25 +54,24 @@
             }
 
             // Find the meta section
-            const metaSection = document.querySelector('.tag-category.meta');
+            const metaSection = document.querySelector('.tag-category[data-category="meta"]');
             if (!metaSection) return;
 
-            // Create delta content
+            // Create delta content using chip-style tags
             let deltaHtml = `
                 <div class="tag-category-subtitle mt-10" 
                      style="padding-top: 10px; border-top: 1px solid rgba(255, 165, 0, 0.2);">
                     Manual modifications
                 </div>
+                <div class="tag-list">
             `;
 
             if (tagDeltas.added?.length) {
                 tagDeltas.added.forEach(tag_info => {
                     deltaHtml += `
-                        <div class="tag-item delta-added">
-                            <a href="/?query=${encodeURIComponent(tag_info.name)}" class="link-primary">
-                                +${tag_info.name}
-                            </a>
-                        </div>
+                        <a class="tag-chip delta-added" href="/?query=${encodeURIComponent(tag_info.name)}">
+                            +${tag_info.name}
+                        </a>
                     `;
                 });
             }
@@ -80,14 +79,14 @@
             if (tagDeltas.removed?.length) {
                 tagDeltas.removed.forEach(tag_info => {
                     deltaHtml += `
-                        <div class="tag-item delta-removed">
-                            <a href="/?query=${encodeURIComponent(tag_info.name)}" class="link-danger">
-                                -${tag_info.name}
-                            </a>
-                        </div>
+                        <a class="tag-chip delta-removed" href="/?query=${encodeURIComponent(tag_info.name)}">
+                            -${tag_info.name}
+                        </a>
                     `;
                 });
             }
+
+            deltaHtml += `</div>`;
 
             // Append to meta section
             metaSection.insertAdjacentHTML('beforeend', deltaHtml);
@@ -113,17 +112,36 @@
             const sidebarLeft = document.getElementById('sidebarLeft');
             if (!sidebarLeft) return;
 
-            // Create pools section HTML
-            const poolsHtml = `
-                <div class="section-content" id="pools-content">
-                    <div class="pool-management panel">
-                        <button class="panel-header mobile-toggle collapsed" data-section="pools-panel-content">
-                            <span class="section-icon">📁</span>
-                            <span class="section-title">Pools</span>
-                            <span class="text-muted-tiny">${pools.length} pool${pools.length !== 1 ? 's' : ''}</span>
-                            <span class="section-arrow">▼</span>
+            // Check if pools section already exists in HTML (server-rendered)
+            let poolsSection = document.getElementById('pools-content');
+            
+            if (poolsSection) {
+                // Populate existing section
+                const poolsList = poolsSection.querySelector('#poolsList');
+                if (poolsList) {
+                    poolsList.innerHTML = pools.map(pool => `
+                        <div class="pool-item">
+                            <a href="/pool/${pool.id}" class="pool-link">
+                                <span class="pool-name">${pool.name}</span>
+                            </a>
+                        </div>
+                    `).join('');
+                }
+                const countBadge = poolsSection.querySelector('#poolCountBadge');
+                if (countBadge) {
+                    countBadge.textContent = `${pools.length} pool${pools.length !== 1 ? 's' : ''}`;
+                }
+                // Make section visible
+                poolsSection.style.display = '';
+            } else {
+                // Create new pools section matching unified sidebar structure
+                const poolsHtml = `
+                    <div class="sidebar-section pools-section" id="pools-content">
+                        <button class="sec-hdr collapsed mobile-toggle" data-section="pools-panel-content">
+                            📁 Pools <span style="color:var(--text-muted);margin-left:4px;font-size:9px;text-transform:none;letter-spacing:0;font-weight:400">${pools.length} pool${pools.length !== 1 ? 's' : ''}</span>
+                            <i class="arrow">▾</i>
                         </button>
-                        <div class="panel-collapsible-content" id="pools-panel-content">
+                        <div class="sec-body collapsed pools-body" id="pools-panel-content">
                             ${pools.map(pool => `
                                 <div class="pool-item">
                                     <a href="/pool/${pool.id}" class="pool-link">
@@ -133,18 +151,18 @@
                             `).join('')}
                         </div>
                     </div>
-                </div>
-            `;
+                `;
 
-            // Insert pools after tags section
-            const tagsContent = document.getElementById('tags-content');
-            if (tagsContent) {
-                tagsContent.insertAdjacentHTML('afterend', poolsHtml);
-                
-                // Re-attach mobile toggle event listeners if needed
-                if (window.attachMobileToggleListeners && typeof window.attachMobileToggleListeners === 'function') {
-                    window.attachMobileToggleListeners();
+                // Insert pools at the end of sidebar-panel (after info section)
+                const sidebarPanel = document.querySelector('.sidebar-panel');
+                if (sidebarPanel) {
+                    sidebarPanel.insertAdjacentHTML('beforeend', poolsHtml);
                 }
+            }
+
+            // Re-init collapsible sections for newly added pool section
+            if (typeof initCollapsibleSections === 'function') {
+                initCollapsibleSections();
             }
 
         } catch (error) {

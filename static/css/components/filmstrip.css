@@ -2,15 +2,18 @@
    FAMILY FILMSTRIP - Compact filmstrip-style Parent/Child Indicator
    ============================================================================ */
 
-/* Main container - positioned beside action bar */
+/* Main container - always overlaid on image area, never takes layout space */
 .family-filmstrip {
-
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    z-index: 20;
     display: flex;
     align-items: center;
     gap: 0;
     transition: all 0.25s ease-out;
     flex-shrink: 0;
-    margin-left: var(--spacing-md, 12px);
+    margin: 0;
 }
 
 /* Hidden state - shrinks to just the toggle button */
@@ -19,6 +22,13 @@
     opacity: 0;
     padding: 0;
     overflow: hidden;
+}
+
+/* actions-row always collapsed - filmstrip is absolutely positioned */
+.actions-row:has(.family-filmstrip) {
+    margin: 0;
+    height: 0;
+    overflow: visible;
 }
 
 /* Filmstrip content container - matches action bar theming */
