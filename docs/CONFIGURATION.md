@@ -485,8 +485,12 @@ UPSCALER_TILE_SIZE = 512                       # Tile size for large images
 UPSCALER_TILE_PAD = 32                         # Tile padding for seamless inference
 UPSCALER_MIN_TILE_SIZE = 64                    # Minimum tile size on retry
 UPSCALER_ALLOW_CPU_FALLBACK = True             # Fall back to CPU on GPU failure
+UPSCALER_OUTPUT_FORMAT = 'png'                 # 'png' or 'webp'
+UPSCALER_OUTPUT_QUALITY = 95                   # WEBP quality (1-100)
 UPSCALED_IMAGES_DIR = './static/upscaled'      # Output directory
 ```
+
+**WEBP dimension limit behavior**: WEBP encoding is limited to a maximum side length of 16383 pixels. When `UPSCALER_OUTPUT_FORMAT = 'webp'` and a generated upscale exceeds this limit, the output is automatically clamped proportionally to fit within WEBP limits, and a warning is returned in the API response/logs.
 
 ---
 

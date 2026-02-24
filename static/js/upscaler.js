@@ -149,21 +149,22 @@
         if (nonUpscalableExts.some(ext => currentFilepath.toLowerCase().endsWith(ext))) return;
 
         // Find or create upscale button
-        const actionsBar = document.querySelector('.actions-bar.pill');
-        if (!actionsBar) return;
-
-        // Check existing button or create new one
+        // First check for the button in the sidebar actions grid
         upscaleBtn = document.getElementById('upscaleBtn');
+
         if (!upscaleBtn) {
-            // Create button after the download button
-            const downloadBtn = actionsBar.querySelector('a[download]');
-            if (downloadBtn) {
-                upscaleBtn = document.createElement('button');
-                upscaleBtn.id = 'upscaleBtn';
-                upscaleBtn.className = 'action-btn';
-                upscaleBtn.title = 'Upscale Image (AI 4x)';
-                upscaleBtn.innerHTML = '<span class="upscale-icon">✨</span>';
-                downloadBtn.insertAdjacentElement('afterend', upscaleBtn);
+            // Fallback: try the old actions bar layout
+            const actionsBar = document.querySelector('.actions-bar.pill');
+            if (actionsBar) {
+                const downloadBtn = actionsBar.querySelector('a[download]');
+                if (downloadBtn) {
+                    upscaleBtn = document.createElement('button');
+                    upscaleBtn.id = 'upscaleBtn';
+                    upscaleBtn.className = 'action-btn';
+                    upscaleBtn.title = 'Upscale Image (AI 4x)';
+                    upscaleBtn.innerHTML = '<span class="upscale-icon">✨</span>';
+                    downloadBtn.insertAdjacentElement('afterend', upscaleBtn);
+                }
             }
         }
 
@@ -649,6 +650,9 @@
             showUpscaledImage(data.upscaled_url, data);
 
             showToast(`Upscaled in ${data.processing_time?.toFixed(1) || '?'}s`, 'success');
+            if (data.warning?.message) {
+                showToast(data.warning.message, 'warning');
+            }
 
             // Update menu
             createHoverMenu();

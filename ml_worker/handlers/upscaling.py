@@ -12,6 +12,8 @@ from ml_worker.backends import get_torch_device
 
 logger = logging.getLogger(__name__)
 
+WEBP_MAX_DIMENSION = 16383
+
 
 def _is_recoverable_inference_error(error: RuntimeError) -> bool:
     message = str(error).lower()
@@ -36,6 +38,17 @@ def _clear_device_cache(torch_module, device_name: str) -> None:
             torch_module.mps.empty_cache()
     except Exception as cache_error:
         logger.debug(f"Cache clear skipped ({device_name}): {cache_error}")
+
+
+def _clamp_size_to_max_dimension(width: int, height: int, max_dimension: int) -> tuple[int, int]:
+    """Clamp dimensions proportionally so neither side exceeds max_dimension."""
+    if width <= max_dimension and height <= max_dimension:
+        return width, height
+
+    scale = min(max_dimension / width, max_dimension / height)
+    clamped_width = max(1, int(round(width * scale)))
+    clamped_height = max(1, int(round(height * scale)))
+    return clamped_width, clamped_height
 
 def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -> Dict[str, Any]:
     """
@@ -297,7 +310,7 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
     output_img = (output * 255.0).round().astype(np.uint8)
     output_pil = Image.fromarray(output_img)
     
-    # Get upscaled dimensions
+    # Get upscaled dimensions before output-format constraints
     upscaled_width, upscaled_height = output_pil.size
     
     # Ensure dir
@@ -307,7 +320,31 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
     output_format = request_data.get('output_format', 'png').lower().strip()
     output_quality = max(1, min(100, int(request_data.get('output_quality', 95))))
     
+    warning = None
+
     if output_format == 'webp':
+        clamped_width, clamped_height = _clamp_size_to_max_dimension(
+            upscaled_width,
+            upscaled_height,
+            WEBP_MAX_DIMENSION,
+        )
+
+        if (clamped_width, clamped_height) != (upscaled_width, upscaled_height):
+            output_pil = output_pil.resize((clamped_width, clamped_height), resample=Image.Resampling.LANCZOS)
+            warning = {
+                "code": "webp_dimension_clamped",
+                "message": (
+                    f"Requested upscaled size {upscaled_width}x{upscaled_height} exceeds WEBP max "
+                    f"dimension {WEBP_MAX_DIMENSION}. Output was clamped to {clamped_width}x{clamped_height}."
+                ),
+                "requested_size": [upscaled_width, upscaled_height],
+                "final_size": [clamped_width, clamped_height],
+                "max_dimension": WEBP_MAX_DIMENSION,
+                "output_format": "webp",
+            }
+            logger.warning(warning["message"])
+            upscaled_width, upscaled_height = clamped_width, clamped_height
+
         output_pil.save(output_path, format='WEBP', quality=output_quality, method=4)
         logger.info(f"Saved upscaled image as WebP (quality={output_quality}): {os.path.basename(output_path)}")
     else:
@@ -318,5 +355,6 @@ def handle_upscale_image(request_data: Dict[str, Any], progress_callback=None) -
         "success": True, 
         "output_path": output_path,
         "original_size": [original_width, original_height],
-        "upscaled_size": [upscaled_width, upscaled_height]
+        "upscaled_size": [upscaled_width, upscaled_height],
+        "warning": warning,
     }

@@ -142,6 +142,7 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
         'upscaled_url': None,
         'original_size': None,
         'upscaled_size': None,
+        'warning': None,
         'processing_time': 0,
         'error': None
     }
@@ -231,22 +232,25 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
             )
         
         worker_result = await loop.run_in_executor(None, do_upscale)
-        
+
         result['success'] = worker_result.get('success', False)
-        result['upscaled_path'] = upscaled_path
+        result['upscaled_path'] = worker_result.get('output_path', upscaled_path)
         result['upscaled_url'] = get_upscale_url(filepath)
         result['original_size'] = worker_result.get('original_size')
         result['upscaled_size'] = worker_result.get('upscaled_size')
-        
+        result['warning'] = worker_result.get('warning')
+
         # Get file size
         try:
-             result['upscaled_filesize'] = os.path.getsize(upscaled_path)
+            result['upscaled_filesize'] = os.path.getsize(result['upscaled_path'])
         except OSError:
-             result['upscaled_filesize'] = 0
+            result['upscaled_filesize'] = 0
 
         result['processing_time'] = time.time() - start_time
         
         logger.info(f"Upscaled {filepath}: {result['original_size']} -> {result['upscaled_size']} in {result['processing_time']:.2f}s")
+        if result['warning']:
+            logger.warning(f"Upscale warning for {filepath}: {result['warning'].get('message', result['warning'])}")
         
         # Update database with new dimensions
         try:
@@ -267,7 +271,7 @@ async def upscale_image(filepath: str, force: bool = False) -> Dict:
         active_upscales[filepath] = {
             'status': 'completed',
             'percentage': 100,
-            'message': 'Upscale complete',
+            'message': result['warning'].get('message', 'Upscale complete') if isinstance(result['warning'], dict) else 'Upscale complete',
             'updated_at': time.time()
         }
         
