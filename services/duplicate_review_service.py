@@ -79,6 +79,8 @@ def get_cache_stats() -> Dict[str, Any]:
         row = cur.fetchone()
         cur.execute("SELECT COUNT(*) as cnt FROM images WHERE phash IS NOT NULL")
         hashed_images = cur.fetchone()['cnt']
+        cur.execute("SELECT MAX(threshold) as t FROM duplicate_pairs")
+        scan_threshold = cur.fetchone()['t'] or 0
     return {
         'cached_pairs': total,
         'oldest': row['oldest'],
@@ -86,6 +88,7 @@ def get_cache_stats() -> Dict[str, Any]:
         'hashed_images': hashed_images,
         'phash_size': config.PHASH_SIZE,
         'phash_bits': config.PHASH_BITS,
+        'scan_threshold': scan_threshold,
     }
 
 
@@ -96,6 +99,18 @@ def clear_duplicate_cache() -> int:
         cur.execute("DELETE FROM duplicate_pairs")
         conn.commit()
         return cur.rowcount
+
+
+def _remove_pair_from_cache(id_a: int, id_b: int) -> None:
+    """Remove a specific pair from the duplicate_pairs cache (normalised to min/max)."""
+    lo, hi = min(id_a, id_b), max(id_a, id_b)
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM duplicate_pairs WHERE image_id_a = ? AND image_id_b = ?",
+            (lo, hi),
+        )
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +328,14 @@ def get_duplicate_queue(
     with get_db_connection() as conn:
         cur = conn.cursor()
 
+        # Retrieve the scan threshold used during the last scan — this is the
+        # natural "maximum interesting distance" and gives a much better
+        # confidence spread than dividing by the full PHASH_BITS (256).
+        cur.execute("SELECT MAX(threshold) as t FROM duplicate_pairs")
+        scan_threshold = cur.fetchone()['t']
+        if not scan_threshold:
+            scan_threshold = max(config.PHASH_BITS // 4, 1)
+
         # Total unreviewed count at this threshold
         cur.execute(
             "SELECT COUNT(*) as cnt FROM duplicate_pairs WHERE distance <= ?",
@@ -332,18 +355,23 @@ def get_duplicate_queue(
         )
         rows = cur.fetchall()
 
-    # Filter out reviewed pairs
+    # Filter out reviewed pairs and defend against any reversed duplicates
     pairs = []
     skipped = 0
+    seen = set()
     for row in rows:
-        pk = (row['image_id_a'], row['image_id_b'])
-        if pk in reviewed:
+        pk = (min(row['image_id_a'], row['image_id_b']),
+              max(row['image_id_a'], row['image_id_b']))
+        if pk in reviewed or pk in seen:
             skipped += 1
             continue
+        seen.add(pk)
         if len(pairs) >= limit:
             break
         distance = row['distance']
-        confidence = max(0, round((1 - distance / config.PHASH_BITS) * 100, 1))
+        # Scale confidence against scan_threshold (not full PHASH_BITS)
+        # so the 0-100% range spans the distances we actually store.
+        confidence = max(0, round((1 - distance / scan_threshold) * 100, 1))
         pairs.append({
             'image_a': _enrich_image_by_id(row['image_id_a']),
             'image_b': _enrich_image_by_id(row['image_id_b']),
@@ -361,6 +389,7 @@ def get_duplicate_queue(
         'offset': offset,
         'limit': limit,
         'phash_bits': config.PHASH_BITS,
+        'scan_threshold': scan_threshold,
     }
 
 
@@ -417,7 +446,10 @@ def _get_image_metadata(image_id: int) -> Dict[str, Any]:
 # Batch commit (unchanged from Phase 1)
 # ---------------------------------------------------------------------------
 
-def commit_actions(actions: List[Dict[str, Any]]) -> Dict[str, Any]:
+def commit_actions(
+    actions: List[Dict[str, Any]],
+    progress_callback: Optional[Callable] = None,
+) -> Dict[str, Any]:
     """
     Execute a batch of staged actions from the duplicate review UI.
 
@@ -427,6 +459,7 @@ def commit_actions(actions: List[Dict[str, Any]]) -> Dict[str, Any]:
             - image_id_b (int)
             - action (str): 'delete_a', 'delete_b', 'non_duplicate', 'related'
             - detail (str, optional): for 'related' — 'parent_child_ab', 'parent_child_ba', 'sibling'
+        progress_callback: Optional (current, total, message) callable for progress.
 
     Returns:
         Summary dict with success_count, error_count, errors list
@@ -436,8 +469,9 @@ def commit_actions(actions: List[Dict[str, Any]]) -> Dict[str, Any]:
         'error_count': 0,
         'errors': []
     }
+    total = len(actions)
 
-    for action_item in actions:
+    for idx, action_item in enumerate(actions):
         try:
             _execute_action(action_item)
             results['success_count'] += 1
@@ -449,6 +483,8 @@ def commit_actions(actions: List[Dict[str, Any]]) -> Dict[str, Any]:
                 'action': action_item.get('action'),
                 'error': str(e)
             })
+        if progress_callback:
+            progress_callback(idx + 1, total)
 
     return results
 
@@ -485,6 +521,9 @@ def _execute_action(action_item: Dict[str, Any]) -> None:
     else:
         raise ValueError(f"Unknown action: {action}")
 
+    # Always remove the pair from the cache so it won't reappear in the queue
+    _remove_pair_from_cache(id_a, id_b)
+
 
 def _get_filepath_for_id(image_id: int) -> str:
     """Look up filepath from image ID."""
@@ -493,3 +532,41 @@ def _get_filepath_for_id(image_id: int) -> str:
         cur.execute("SELECT filepath FROM images WHERE id = ?", (image_id,))
         row = cur.fetchone()
         return row['filepath'] if row else ''
+
+
+# ---------------------------------------------------------------------------
+# Background task wrapper for commit (follows run_duplicate_scan_task pattern)
+# ---------------------------------------------------------------------------
+
+async def run_commit_task(
+    task_id: str,
+    manager,
+    actions: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Async bg task that calls commit_actions in a thread with progress."""
+    loop = asyncio.get_running_loop()
+    last_update = 0
+
+    def progress_cb(current, total):
+        nonlocal last_update
+        now = time.time()
+        if now - last_update > 0.15 or current >= total:
+            last_update = now
+            asyncio.run_coroutine_threadsafe(
+                manager.update_progress(
+                    task_id, current, total,
+                    f"Committing {current}/{total}…"
+                ),
+                loop,
+            )
+
+    result = await asyncio.to_thread(
+        commit_actions,
+        actions,
+        progress_callback=progress_cb,
+    )
+
+    await manager.update_progress(
+        task_id, len(actions), len(actions), "Commit complete"
+    )
+    return result

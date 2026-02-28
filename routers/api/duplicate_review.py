@@ -66,10 +66,11 @@ async def get_duplicate_review_queue():
 @api_handler()
 async def commit_duplicate_review_actions():
     """
-    Commit a batch of staged actions from the duplicate review UI.
+    Commit a batch of staged actions as a background task with progress.
 
     POST /api/duplicate-review/commit
     Body: { "actions": [ { "image_id_a": int, "image_id_b": int, "action": str, "detail": str? }, ... ] }
+    Returns: { "status": "started", "task_id": "..." }
     """
     data = await request.get_json()
     if not data or 'actions' not in data:
@@ -79,8 +80,9 @@ async def commit_duplicate_review_actions():
     if not isinstance(actions, list) or len(actions) == 0:
         raise ValueError("'actions' must be a non-empty array")
 
-    results = await asyncio.to_thread(
-        duplicate_review_service.commit_actions,
-        actions
+    return await start_background_task(
+        duplicate_review_service.run_commit_task,
+        message=f"Committing {len(actions)} action(s)",
+        task_id_prefix="dup_commit",
+        actions=actions,
     )
-    return results

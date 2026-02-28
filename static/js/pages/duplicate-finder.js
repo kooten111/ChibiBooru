@@ -32,14 +32,18 @@ let isLoading    = false;
 let isDraggingSlider = false;
 let isComparing  = false;
 let scanTaskId   = null;
+let commitTaskId = null;
 let pollTimer    = null;
+let commitPollTimer = null;
 let phashBits    = 256;         // default for hash_size=16; updated from server
+let scanThreshold = 64;         // scan-time max distance; updated from server
 
 // DOM refs
 let $content, $actionBar, $keyboardHints;
 let $progressText, $progressFill, $pendingBadge;
 let $thresholdSlider, $thresholdValue;
 let $reviewOverlay, $reviewList;
+let $rescanBtn;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -53,9 +57,15 @@ function formatBytes(bytes) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function cmpClass(valA, valB, side) {
+    const a = Number(valA) || 0, b = Number(valB) || 0;
+    if (a === b) return 'dup-tie';
+    return (side === 'a') === (a > b) ? 'dup-win' : 'dup-lose';
+}
+
 function confidenceClass(c) {
-    if (c >= 90) return 'high';
-    if (c >= 75) return 'medium';
+    if (c >= 85) return 'high';
+    if (c >= 60) return 'medium';
     return 'low';
 }
 
@@ -113,6 +123,16 @@ async function commitToServer(actions) {
 }
 
 // ---------------------------------------------------------------------------
+// Re-scan helpers
+// ---------------------------------------------------------------------------
+function setRescanEnabled(enabled) {
+    if ($rescanBtn) {
+        $rescanBtn.disabled = !enabled;
+        $rescanBtn.title = enabled ? 'Re-scan all images for duplicates' : 'Scan in progress…';
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Boot: check cache → scan or load
 // ---------------------------------------------------------------------------
 async function boot() {
@@ -120,10 +140,11 @@ async function boot() {
 
     try {
         const stats = await fetchCacheStats();
-        // Adapt slider to server's hash size
-        if (stats.phash_bits) {
-            phashBits = stats.phash_bits;
-            const maxThreshold = Math.min(Math.round(phashBits / 4), 64);
+        // Adapt slider to server's hash size / scan threshold
+        if (stats.phash_bits) phashBits = stats.phash_bits;
+        if (stats.scan_threshold) scanThreshold = stats.scan_threshold;
+        {
+            const maxThreshold = scanThreshold || Math.min(Math.round(phashBits / 4), 64);
             $thresholdSlider.max = maxThreshold;
             if (parseInt($thresholdSlider.value) > maxThreshold) {
                 $thresholdSlider.value = Math.min(20, maxThreshold);
@@ -131,7 +152,8 @@ async function boot() {
             }
         }
         if (stats.cached_pairs > 0) {
-            // Cache exists — go straight to loading
+            // Cache exists — show re-scan button and load pairs
+            if ($rescanBtn) $rescanBtn.style.display = '';
             await loadPage(0);
         } else {
             // Empty cache — show scan prompt
@@ -162,12 +184,14 @@ function renderScanPrompt(stats) {
 async function startScan() {
     try {
         showLoadingSpinner('Starting scan…');
-        const scanThreshold = Math.min(Math.round(phashBits / 4), 64);
-        const resp = await triggerScan(scanThreshold);
+        setRescanEnabled(false);
+        const computedThreshold = Math.min(Math.round(phashBits / 4), 64);
+        const resp = await triggerScan(computedThreshold);
         scanTaskId = resp.task_id;
         showNotification('Duplicate scan started — this may take a while.', 'info');
         startPolling();
     } catch (err) {
+        setRescanEnabled(true);
         renderError(`Scan failed: ${err.message}`);
     }
 }
@@ -191,13 +215,16 @@ async function pollProgress() {
         } else if (s.status === 'completed') {
             stopPolling();
             scanTaskId = null;
+            setRescanEnabled(true);
             const r = s.result || {};
             showNotification(`Scan complete — ${r.pair_count ?? 0} pairs found in ${r.elapsed_seconds ?? '?'}s`, 'success');
+            if ($rescanBtn) $rescanBtn.style.display = '';
             await loadPage(0);
         } else {
             // failed / cancelled
             stopPolling();
             scanTaskId = null;
+            setRescanEnabled(true);
             renderError(s.error || s.message || 'Scan failed');
         }
     } catch (err) {
@@ -217,6 +244,7 @@ async function loadPage(offset) {
     try {
         const data = await fetchQueue(threshold, offset, PAGE_SIZE);
         if (data.phash_bits) phashBits = data.phash_bits;
+        if (data.scan_threshold) scanThreshold = data.scan_threshold;
         pairs = data.pairs;
         totalPairs = data.total;
         pageOffset = offset;
@@ -298,6 +326,8 @@ function renderPair() {
     const pair = pairs[currentIndex];
     const a = pair.image_a;
     const b = pair.image_b;
+    const pixA = (a.width || 0) * (a.height || 0);
+    const pixB = (b.width || 0) * (b.height || 0);
     const key = pairKey(a.id, b.id);
     const staged = stagedActions.get(key);
 
@@ -335,6 +365,7 @@ function renderPair() {
                          onclick="window.open('/view/${encodeURIComponent(b.filepath)}', '_blank')">
                 </div>
             </div>
+            <span class="dup-overlay-label" id="overlayLabel">A</span>
             <div class="dup-overlay-hint" id="overlayHint">Hold <kbd>C</kbd> to compare</div>
             <div class="dup-slider-handle" id="sliderHandle"></div>
         </div>
@@ -342,11 +373,11 @@ function renderPair() {
         <div class="dup-info-row">
             <div class="dup-info-card">
                 <a href="/view/${encodeURIComponent(a.filepath)}" target="_blank">${a.filepath}</a>
-                <span class="dup-info-detail">${a.width || '?'}×${a.height || '?'} · ${formatBytes(a.file_size)} · ${a.tag_count} tags</span>
+                <span class="dup-info-detail"><span class="${cmpClass(pixA, pixB, 'a')}">${a.width || '?'}×${a.height || '?'}</span> <span class="dup-sep">·</span> <span class="${cmpClass(a.file_size, b.file_size, 'a')}">${formatBytes(a.file_size)}</span> <span class="dup-sep">·</span> <span class="${cmpClass(a.tag_count, b.tag_count, 'a')}">${a.tag_count} tags</span></span>
             </div>
             <div class="dup-info-card">
                 <a href="/view/${encodeURIComponent(b.filepath)}" target="_blank">${b.filepath}</a>
-                <span class="dup-info-detail">${b.width || '?'}×${b.height || '?'} · ${formatBytes(b.file_size)} · ${b.tag_count} tags</span>
+                <span class="dup-info-detail"><span class="${cmpClass(pixA, pixB, 'b')}">${b.width || '?'}×${b.height || '?'}</span> <span class="dup-sep">·</span> <span class="${cmpClass(a.file_size, b.file_size, 'b')}">${formatBytes(b.file_size)}</span> <span class="dup-sep">·</span> <span class="${cmpClass(a.tag_count, b.tag_count, 'b')}">${b.tag_count} tags</span></span>
             </div>
         </div>
 
@@ -355,7 +386,7 @@ function renderPair() {
                 <div class="dup-confidence-fill ${confidenceClass(pair.confidence)}"
                      style="width: ${pair.confidence}%"></div>
             </div>
-            <span class="dup-confidence-text">${pair.confidence}% match · distance ${pair.distance}</span>
+            <span class="dup-confidence-text">${pair.distance === 0 ? 'Identical' : pair.confidence + '% match'} · distance ${pair.distance}</span>
         </div>
     `;
 
@@ -506,6 +537,8 @@ function startComparison() {
     document.getElementById('comparison')?.classList.add('comparing');
     const hint = document.getElementById('overlayHint');
     if (hint) hint.textContent = 'Showing B';
+    const olbl = document.getElementById('overlayLabel');
+    if (olbl) olbl.textContent = 'B';
 }
 
 function stopComparison() {
@@ -514,6 +547,8 @@ function stopComparison() {
     document.getElementById('comparison')?.classList.remove('comparing');
     const hint = document.getElementById('overlayHint');
     if (hint) hint.textContent = 'Hold C to compare';
+    const olbl = document.getElementById('overlayLabel');
+    if (olbl) olbl.textContent = 'A';
 }
 
 function updateSlider(pct) {
@@ -604,30 +639,97 @@ async function commitAll() {
 
     try {
         isLoading = true;
-        showNotification(`Committing ${actions.length} action(s)…`, 'info');
-        const result = await commitToServer(actions);
-
-        const msg = `Done: ${result.success_count} succeeded` +
-                    (result.error_count > 0 ? `, ${result.error_count} failed` : '');
-
-        if (result.error_count > 0) {
-            showNotification(msg, 'warning', 6000);
-            const failedKeys = new Set(
-                (result.errors || []).map(e => pairKey(e.image_id_a, e.image_id_b))
-            );
-            for (const key of [...stagedActions.keys()]) {
-                if (!failedKeys.has(key)) stagedActions.delete(key);
-            }
-        } else {
-            showNotification(msg, 'success');
-            stagedActions.clear();
-        }
-
-        closeReview();
-        await loadPage(0);
+        showCommitProgress('Starting commit…', 0, actions.length);
+        const resp = await commitToServer(actions);
+        commitTaskId = resp.task_id;
+        startCommitPolling();
     } catch (err) {
+        isLoading = false;
         showNotification(`Commit failed: ${err.message}`, 'error', 6000);
-    } finally {
+    }
+}
+
+function showCommitProgress(msg, current, total) {
+    const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+    const $footer = document.querySelector('.dup-review-footer');
+    if ($footer) {
+        $footer.innerHTML = `
+            <div class="dup-commit-progress-wrap">
+                <span class="dup-commit-progress-text">${msg}</span>
+                <div class="dup-scan-progress">
+                    <div class="dup-scan-progress-fill" style="width:${pct}%"></div>
+                </div>
+                <span class="dup-commit-progress-count">${current} / ${total}</span>
+            </div>`;
+    }
+}
+
+function restoreReviewFooter() {
+    const $footer = document.querySelector('.dup-review-footer');
+    if ($footer) {
+        $footer.innerHTML = `
+            <button class="dup-clear-btn" id="reviewClear">Clear All</button>
+            <button class="dup-commit-btn" id="reviewCommit">Commit All</button>`;
+        document.getElementById('reviewClear')?.addEventListener('click', clearAll);
+        document.getElementById('reviewCommit')?.addEventListener('click', commitAll);
+    }
+}
+
+function startCommitPolling() {
+    stopCommitPolling();
+    commitPollTimer = setInterval(pollCommitProgress, 500);
+}
+
+function stopCommitPolling() {
+    if (commitPollTimer) { clearInterval(commitPollTimer); commitPollTimer = null; }
+}
+
+async function pollCommitProgress() {
+    if (!commitTaskId) { stopCommitPolling(); return; }
+    try {
+        const s = await pollTaskStatus(commitTaskId);
+        if (s.status === 'running' || s.status === 'pending') {
+            showCommitProgress(
+                s.message || 'Committing…',
+                s.progress || 0,
+                s.total || 0
+            );
+        } else if (s.status === 'completed') {
+            stopCommitPolling();
+            commitTaskId = null;
+            const result = s.result || {};
+            const msg = `Done: ${result.success_count} succeeded` +
+                        (result.error_count > 0 ? `, ${result.error_count} failed` : '');
+
+            if (result.error_count > 0) {
+                showNotification(msg, 'warning', 6000);
+                const failedKeys = new Set(
+                    (result.errors || []).map(e => pairKey(e.image_id_a, e.image_id_b))
+                );
+                for (const key of [...stagedActions.keys()]) {
+                    if (!failedKeys.has(key)) stagedActions.delete(key);
+                }
+            } else {
+                showNotification(msg, 'success');
+                stagedActions.clear();
+            }
+
+            restoreReviewFooter();
+            closeReview();
+            await loadPage(0);
+            isLoading = false;
+        } else {
+            stopCommitPolling();
+            commitTaskId = null;
+            restoreReviewFooter();
+            showNotification(s.error || s.message || 'Commit failed', 'error', 6000);
+            isLoading = false;
+        }
+    } catch (err) {
+        stopCommitPolling();
+        commitTaskId = null;
+        restoreReviewFooter();
+        showNotification(`Commit poll error: ${err.message}`, 'error', 6000);
         isLoading = false;
     }
 }
@@ -704,6 +806,13 @@ function init() {
     $thresholdValue = document.getElementById('thresholdValue');
     $reviewOverlay  = document.getElementById('reviewOverlay');
     $reviewList     = document.getElementById('reviewList');
+    $rescanBtn      = document.getElementById('btnRescanToolbar');
+
+    // Re-scan button (hidden until cache exists)
+    if ($rescanBtn) {
+        $rescanBtn.style.display = 'none';
+        $rescanBtn.addEventListener('click', startScan);
+    }
 
     // Mode buttons
     document.querySelectorAll('.dup-mode-btn').forEach(btn => {

@@ -217,6 +217,28 @@
             height: 100%;
         }
 
+        .dup-comparison.mode-overlay .dup-label {
+            display: none;
+        }
+
+        .dup-overlay-label {
+            display: none;
+            position: absolute;
+            top: var(--spacing-sm);
+            left: var(--spacing-sm);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            z-index: 10;
+        }
+
+        .dup-comparison.mode-overlay .dup-overlay-label {
+            display: block;
+        }
+
         .dup-comparison.mode-overlay.comparing .dup-image-panel:first-child {
             visibility: hidden;
             opacity: 0;
@@ -426,6 +448,11 @@
             font-family: 'JetBrains Mono', monospace;
             font-size: var(--font-size-xs);
         }
+
+        .dup-info-detail .dup-win  { color: #4ade80; }
+        .dup-info-detail .dup-lose { color: #f87171; }
+        .dup-info-detail .dup-tie  { color: var(--text-tertiary); }
+        .dup-info-detail .dup-sep  { color: var(--text-tertiary); }
 
         /* Confidence bar */
         .dup-confidence {
@@ -876,6 +903,72 @@
                 display: none;
             }
         }
+
+        /* ---- Scan / Commit progress bars ---- */
+        .dup-scan-progress {
+            width: 100%;
+            max-width: 400px;
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: var(--spacing-xs);
+        }
+
+        .dup-scan-progress-fill {
+            height: 100%;
+            background: var(--primary-blue);
+            border-radius: 4px;
+            transition: width 0.2s ease;
+        }
+
+        .dup-scan-btn {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: var(--font-size-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .dup-scan-btn:hover:not(:disabled) {
+            opacity: 0.9;
+        }
+
+        .dup-scan-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Re-scan button in toolbar */
+        .dup-rescan-toolbar-btn {
+            padding: var(--spacing-xs) var(--spacing-sm);
+            font-size: var(--font-size-xs);
+        }
+
+        /* Commit progress in review footer */
+        .dup-commit-progress-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            gap: var(--spacing-xs);
+        }
+
+        .dup-commit-progress-text {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .dup-commit-progress-count {
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+            font-variant-numeric: tabular-nums;
+        }
     </style>
 </head>
 
@@ -912,7 +1005,9 @@
                 </div>
             </div>
 
-            <div style="margin-left: auto;">
+            <div style="margin-left: auto; display: flex; gap: 0.5rem; align-items: center;">
+                <button id="btnRescanToolbar" class="dup-scan-btn dup-rescan-toolbar-btn" style="display:none;"
+                        title="Re-scan all images for duplicates">⟳ Re-scan</button>
                 <button id="pendingBtn" class="dup-pending-btn" title="Review pending actions (Enter)">
                     Review
                     <span id="pendingBadge" class="badge"></span>
