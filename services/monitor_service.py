@@ -154,7 +154,8 @@ class ImageFileHandler(FileSystemEventHandler):
 
     def is_image_file(self, filepath):
         """Check if file is an image, video, or zip animation."""
-        return filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.zip'))
+        import config
+        return filepath.lower().endswith(config.SUPPORTED_MEDIA_EXTENSIONS)
 
     def should_process(self, filepath):
         """Check if we should process this file (debouncing)."""
@@ -214,13 +215,9 @@ class ImageFileHandler(FileSystemEventHandler):
                 with _files_lock:
                     _files_in_progress.discard(abs_filepath)
 
-    def on_created(self, event):
-        """Called when a file is created."""
+    def _handle_new_file(self, filepath):
+        """Shared logic for processing a newly detected file (created or moved)."""
         try:
-            if event.is_directory:
-                return
-
-            filepath = event.src_path
             if not self.is_image_file(filepath):
                 return
 
@@ -277,6 +274,21 @@ class ImageFileHandler(FileSystemEventHandler):
             except:
                 print(f"[Monitor] Error in file handler: {e}")
 
+    def on_created(self, event):
+        """Called when a file is created (e.g. copy, download, cross-filesystem move)."""
+        if not event.is_directory:
+            self._handle_new_file(event.src_path)
+
+    def on_moved(self, event):
+        """Called when a file is moved/renamed into a watched directory.
+        
+        On Linux, cut-paste (Ctrl+X / Ctrl+V) on the same filesystem executes
+        a rename() syscall which watchdog dispatches as on_moved, not on_created.
+        We treat the destination as a new file.
+        """
+        if not event.is_directory:
+            self._handle_new_file(event.dest_path)
+
 
 # --- Core Monitor Logic ---
 
@@ -291,7 +303,7 @@ def find_ingest_files():
     if os.path.exists(config.INGEST_DIRECTORY):
         for root, _, files in os.walk(config.INGEST_DIRECTORY):
             for file in files:
-                if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.zip')):
+                if file.lower().endswith(config.SUPPORTED_MEDIA_EXTENSIONS):
                     filepath = os.path.join(root, file)
                     ingest_files.append(filepath)
     return ingest_files
@@ -302,6 +314,7 @@ def find_unprocessed_images():
     Also checks for MD5 duplicates and removes them automatically,
     but only if the file is not currently being processed by another thread.
     """
+    import config
     import hashlib
     from database import get_db_connection
     from .processing.locks import acquire_processing_lock, release_processing_lock
@@ -314,7 +327,7 @@ def find_unprocessed_images():
     # Check static/images directory
     for root, _, files in os.walk("static/images"):
         for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.zip')):
+            if file.lower().endswith(config.SUPPORTED_MEDIA_EXTENSIONS):
                 filepath = os.path.join(root, file)
                 rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
                 
@@ -551,7 +564,7 @@ def start_monitor():
     return True
 
 def initial_scan_then_idle():
-    """Do an initial scan for existing files, then idle."""
+    """Do an initial scan for existing files, then periodically re-scan as a safety net."""
     add_log("Running initial scan...")
     try:
         processed_count, _ = run_scan()
@@ -561,10 +574,21 @@ def initial_scan_then_idle():
     except Exception as e:
         add_log(f"Error during initial scan: {e}", 'error')
 
-    # Now just idle - the monitor doesn't need to maintain a cache
-    # The web server handles its own cache in a separate process
+    # Periodic re-scan as a safety net for events watchdog can miss
+    # (e.g. files moved on same filesystem, network mounts, NFS, etc.)
+    rescan_interval = monitor_status["interval_seconds"]  # default 300s = 5 min
     while monitor_status["running"]:
-        time.sleep(1)
+        for _ in range(rescan_interval):
+            if not monitor_status["running"]:
+                return
+            time.sleep(1)
+        try:
+            processed_count, _ = run_scan()
+            if processed_count > 0:
+                monitor_status["total_processed"] += processed_count
+                add_log(f"Periodic re-scan found {processed_count} new image(s).", 'info')
+        except Exception as e:
+            add_log(f"Error during periodic re-scan: {e}", 'error')
 
 def stop_monitor():
     """

@@ -118,7 +118,7 @@ def saucenao_apply(data: dict) -> dict:
             redirect_path = os.path.join("images", original_filepath)
 
         # Step 3: Process the image file
-        success, msg = processing.process_image_file(path_to_process)
+        success, msg, *_ = processing.process_image_file(path_to_process)
         if not success:
             raise RuntimeError(f"Failed to process and save the new image: {msg}")
 

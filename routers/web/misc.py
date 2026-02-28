@@ -75,7 +75,7 @@ def register_routes(blueprint):
                     await file.save(filepath)
 
                     # Process the file (already in bucketed location, so don't move)
-                    success, msg = processing.process_image_file(filepath, move_from_ingest=False)
+                    success, msg, *_ = processing.process_image_file(filepath, move_from_ingest=False)
                     if success:
                         processed_count += 1
                         # Keep track of the last successfully processed image's path
