@@ -301,13 +301,21 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'min': 0.0,
         'max': 1.0,
     },
+    'PHASH_SIZE': {
+        'category': 'Similarity',
+        'type': 'int',
+        'description': 'Perceptual hash grid size (8 = 64-bit, 16 = 256-bit). Larger = fewer false 100%% matches. Requires re-hash after change.',
+        'editable': True,
+        'min': 8,
+        'max': 32,
+    },
     'VISUAL_SIMILARITY_THRESHOLD': {
         'category': 'Similarity',
         'type': 'int',
-        'description': 'Hamming distance threshold (0-64)',
+        'description': 'Hamming distance threshold for visual similarity',
         'editable': True,
         'min': 0,
-        'max': 64,
+        'max': 256,
     },
     'ENABLE_SEMANTIC_SIMILARITY': {
         'category': 'Similarity',

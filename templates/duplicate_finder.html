@@ -528,6 +528,22 @@
             color: var(--danger);
         }
 
+        .dup-action-btn.btn-sibling {
+            border-color: color-mix(in srgb, #2dd4bf 40%, transparent);
+        }
+
+        .dup-action-btn.btn-sibling:hover {
+            background: color-mix(in srgb, #2dd4bf 15%, var(--bg-secondary));
+            border-color: #2dd4bf;
+            color: #5eead4;
+        }
+
+        .dup-action-btn.btn-sibling.active {
+            background: color-mix(in srgb, #2dd4bf 20%, var(--bg-secondary));
+            border-color: #2dd4bf;
+            color: #5eead4;
+        }
+
         .dup-action-btn.btn-info {
             border-color: color-mix(in srgb, var(--primary-blue) 40%, transparent);
         }
@@ -872,8 +888,8 @@
             <div class="dup-toolbar-group">
                 <label>Threshold</label>
                 <input type="range" id="thresholdSlider" class="dup-threshold-slider"
-                       min="1" max="20" value="5" step="1">
-                <span id="thresholdValue" class="dup-threshold-value">5</span>
+                       min="1" max="64" value="20" step="1">
+                <span id="thresholdValue" class="dup-threshold-value">20</span>
             </div>
 
             <div class="dup-toolbar-separator"></div>
@@ -930,14 +946,17 @@
                 <kbd>N</kbd> Not Duplicate
             </button>
 
+            <button class="dup-action-btn btn-sibling" id="btnSiblings" title="Stage: Mark as siblings">
+                <kbd>S</kbd> Siblings
+            </button>
+
             <div class="dup-related-wrap">
-                <button class="dup-action-btn btn-info" id="btnRelated" title="Stage: Related images">
+                <button class="dup-action-btn btn-info" id="btnRelated" title="Stage: Parent/Child relation">
                     <kbd>R</kbd> Related ▾
                 </button>
                 <div class="dup-related-menu" id="relatedMenu">
                     <div class="dup-related-item" data-detail="parent_child_ab">A is parent of B</div>
                     <div class="dup-related-item" data-detail="parent_child_ba">B is parent of A</div>
-                    <div class="dup-related-item" data-detail="sibling">Siblings</div>
                 </div>
             </div>
 
@@ -956,6 +975,7 @@
             <span><kbd>A</kbd> Del A</span>
             <span><kbd>B</kbd> Del B</span>
             <span><kbd>N</kbd> Not Dup</span>
+            <span><kbd>S</kbd> Siblings</span>
             <span><kbd>R</kbd> Related</span>
             <span><kbd>U</kbd> Unstage</span>
             <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Mode</span>

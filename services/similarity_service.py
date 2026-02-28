@@ -566,6 +566,199 @@ async def run_hash_generation_task(task_id: str, manager) -> Dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Re-hash workers (module-level for pickling by ProcessPoolExecutor)
+# ---------------------------------------------------------------------------
+
+def _rehash_worker(args):
+    """
+    Process-pool worker: compute pHash for one image.
+
+    Runs in a child process — no GIL contention.
+    Receives (image_id, full_path, md5, hash_size) and returns the hex hash
+    string or None on failure.
+    """
+    import os
+    from PIL import Image, ImageFile, UnidentifiedImageError
+    import imagehash
+
+    _img_id, full_path, _md5, hash_size = args
+    if not os.path.exists(full_path):
+        return None
+    try:
+        ImageFile.LOAD_TRUNCATED_IMAGES = True
+        with Image.open(full_path) as img:
+            if img.mode in ('RGBA', 'LA', 'P'):
+                bg = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                if 'A' in img.mode:
+                    bg.paste(img, mask=img.split()[-1])
+                else:
+                    bg.paste(img)
+                img = bg
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            return str(imagehash.phash(img, hash_size=hash_size))
+    except (UnidentifiedImageError, OSError, Exception):
+        return None
+
+
+def _bulk_save_phashes(pairs):
+    """Save a list of (image_id, phash_hex) pairs in one transaction."""
+    if not pairs:
+        return
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.executemany(
+            "UPDATE images SET phash = ? WHERE id = ?",
+            [(h, i) for i, h in pairs],
+        )
+        conn.commit()
+
+
+async def run_rehash_all_task(task_id: str, manager) -> Dict:
+    """
+    Async background task: clear ALL phashes then regenerate at current PHASH_SIZE.
+
+    Uses ProcessPoolExecutor for true parallelism (bypasses GIL).
+
+    Steps:
+        1. NULL-out every phash in the images table
+        2. Clear the duplicate_pairs cache (old distances are invalid)
+        3. Regenerate all phashes using multiprocessing
+    """
+    import asyncio
+    import time
+    import config
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    from services import monitor_service
+
+    phash_size = config.PHASH_SIZE
+
+    monitor_service.add_log(
+        f"Re-hash ALL: clearing existing hashes, will regenerate at PHASH_SIZE={phash_size}",
+        "info",
+    )
+
+    # Step 1 — wipe existing phashes
+    def _clear_phashes():
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("UPDATE images SET phash = NULL WHERE phash IS NOT NULL")
+            cleared = cur.rowcount
+            conn.commit()
+        return cleared
+
+    cleared = await asyncio.to_thread(_clear_phashes)
+    monitor_service.add_log(f"Re-hash ALL: cleared {cleared} phashes", "info")
+
+    # Step 2 — wipe duplicate_pairs cache (distances are stale)
+    def _clear_dup_cache():
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM duplicate_pairs")
+            conn.commit()
+
+    await asyncio.to_thread(_clear_dup_cache)
+
+    # Step 3 — load all image rows, regenerate with ProcessPoolExecutor
+    def _load_all_images():
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT id, filepath, md5 FROM images")
+            return [dict(r) for r in cur.fetchall()]
+
+    all_images = await asyncio.to_thread(_load_all_images)
+    total = len(all_images)
+
+    if total == 0:
+        await manager.update_progress(task_id, 0, 0, "No images to hash")
+        return {'success': 0, 'failed': 0, 'total': 0, 'cleared': cleared,
+                'message': "No images to re-hash"}
+
+    # Build work items: (id, full_path, md5, hash_size)
+    work_items = []
+    for row in all_images:
+        fp = row['filepath']
+        if fp.lower().endswith(('.zip',)):
+            from utils.file_utils import get_thumbnail_path
+            thumb = get_thumbnail_path(fp)
+            full_path = os.path.join("static", thumb) if thumb != fp else os.path.join("static/images", fp)
+        else:
+            full_path = os.path.join("static/images", fp)
+        work_items.append((row['id'], full_path, row['md5'], phash_size))
+
+    # Run in process pool — true parallelism, no GIL
+    loop = asyncio.get_running_loop()
+    last_update_time = [0.0]
+    num_workers = max(1, min(os.cpu_count() or 4, 8))
+
+    def _do_rehash():
+        success = 0
+        failed = 0
+        done = 0
+        results_buffer = []
+
+        with ProcessPoolExecutor(max_workers=num_workers) as executor:
+            futures = {
+                executor.submit(_rehash_worker, item): item[0]
+                for item in work_items
+            }
+            for future in as_completed(futures):
+                img_id = futures[future]
+                done += 1
+                try:
+                    result = future.result()
+                    if result is not None:
+                        results_buffer.append((img_id, result))
+                        success += 1
+                    else:
+                        failed += 1
+                except Exception:
+                    failed += 1
+
+                # Bulk save every 500 results to avoid huge memory use
+                if len(results_buffer) >= 500:
+                    _bulk_save_phashes(results_buffer)
+                    results_buffer.clear()
+
+                # Throttled progress
+                now = time.time()
+                if (now - last_update_time[0] > 0.25) or done >= total:
+                    last_update_time[0] = now
+                    asyncio.run_coroutine_threadsafe(
+                        manager.update_progress(
+                            task_id, done, total,
+                            f"Re-hashing… {done}/{total} ({success} ok, {failed} fail)"
+                        ),
+                        loop,
+                    )
+
+            # Save remaining
+            if results_buffer:
+                _bulk_save_phashes(results_buffer)
+
+        return success, failed
+
+    success, failed = await asyncio.to_thread(_do_rehash)
+
+    result_msg = (
+        f"✓ Re-hash complete (PHASH_SIZE={phash_size}): "
+        f"{success} generated, {failed} failed"
+    )
+    monitor_service.add_log(result_msg, "success")
+    await manager.update_progress(task_id, total, total, "Complete")
+
+    return {
+        'success': success,
+        'failed': failed,
+        'total': total,
+        'cleared': cleared,
+        'message': f"Re-hashed {success} images at size {phash_size} ({failed} failed)",
+    }
+
+
 def generate_missing_hashes(batch_size: int = 100, progress_callback=None) -> Dict:
     """
     Generate perceptual hashes and semantic embeddings for images that don't have them.

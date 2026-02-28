@@ -26,17 +26,19 @@ def _log(message: str, level: str = "info"):
 # Hash Computation
 # ============================================================================
 
-def compute_phash(image_path: str, hash_size: int = 8) -> Optional[str]:
+def compute_phash(image_path: str, hash_size: int = None) -> Optional[str]:
     """
     Compute perceptual hash for an image.
     
     Args:
         image_path: Path to the image file
-        hash_size: Size of the hash (8 = 64-bit hash, 16 = 256-bit)
+        hash_size: Size of the hash (8 = 64-bit hash, 16 = 256-bit). Defaults to config.PHASH_SIZE.
     
     Returns:
         Hex string representation of the hash, or None on error
     """
+    if hash_size is None:
+        hash_size = config.PHASH_SIZE
     try:
         # Allow partial loading of truncated images (e.g., incomplete downloads)
         from PIL import ImageFile
@@ -127,8 +129,10 @@ def compute_colorhash_for_video(video_path: str) -> Optional[str]:
         return None
 
 
-def compute_phash_for_video(video_path: str, hash_size: int = 8) -> Optional[str]:
+def compute_phash_for_video(video_path: str, hash_size: int = None) -> Optional[str]:
     """Compute perceptual hash from the first frame of a video."""
+    if hash_size is None:
+        hash_size = config.PHASH_SIZE
     from utils.video_utils import extract_first_frame
     
     frame = extract_first_frame(video_path)
@@ -207,26 +211,24 @@ def hamming_distance(hash1: str, hash2: str) -> int:
     """
     Calculate Hamming distance between two hex hash strings.
     
-    Lower distance = more similar:
-    - 0-5: Near identical
-    - 6-10: Very similar
-    - 11-15: Somewhat similar
-    - 16+: Different images
+    Lower distance = more similar. Max distance = PHASH_SIZE² (config-dependent).
     """
     try:
         h1 = imagehash.hex_to_hash(hash1)
         h2 = imagehash.hex_to_hash(hash2)
         return int(h1 - h2)
     except Exception:
-        return 64
+        return config.PHASH_BITS
 
 
-def hash_similarity_score(hash1: str, hash2: str, max_distance: int = 64) -> float:
+def hash_similarity_score(hash1: str, hash2: str, max_distance: int = None) -> float:
     """
     Convert Hamming distance to a similarity score (0.0 to 1.0).
     
     Returns:
         1.0 = identical, 0.0 = completely different
     """
+    if max_distance is None:
+        max_distance = config.PHASH_BITS
     distance = hamming_distance(hash1, hash2)
     return float(max(0.0, 1.0 - (distance / max_distance)))

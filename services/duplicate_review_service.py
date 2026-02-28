@@ -9,13 +9,60 @@ pagination and filters by the user's chosen threshold.
 import os
 import time
 import asyncio
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Callable
+from typing import List, Dict, Any, Optional, Callable, Tuple
+import config
 from database import get_db_connection
 from services.similarity.hashing import hamming_distance
 from services.image_service import delete_image_service
 from repositories import relations_repository
 from utils import get_thumbnail_path
+
+
+# ---------------------------------------------------------------------------
+# Parallel scan workers (module-level for pickling by ProcessPoolExecutor)
+# ---------------------------------------------------------------------------
+
+_worker_ids: Optional[List[int]] = None
+_worker_hashes: Optional[List[int]] = None
+
+# Below this image count we skip multiprocessing to avoid spawn overhead
+_MP_THRESHOLD = 200
+
+
+def _init_scan_worker(ids: List[int], hashes: List[int]):
+    """Initializer for each pool worker — stores shared readonly data."""
+    global _worker_ids, _worker_hashes
+    _worker_ids = ids
+    _worker_hashes = hashes
+
+
+def _scan_chunk(args: Tuple[int, int, int]) -> List[Tuple[int, int, int]]:
+    """
+    Worker function: compare images[start:end] against all subsequent images.
+
+    Uses bitwise XOR + popcount on pre-computed integer hashes — roughly
+    50-100x faster than round-tripping through imagehash objects.
+
+    Returns list of (id_a, id_b, distance) within threshold.
+    """
+    start_idx, end_idx, threshold = args
+    ids = _worker_ids
+    hashes = _worker_hashes
+    n = len(ids)
+    found: list = []
+    append = found.append          # micro-opt: avoid attr lookup in hot loop
+
+    for i in range(start_idx, end_idx):
+        h_a = hashes[i]
+        id_a = ids[i]
+        for j in range(i + 1, n):
+            dist = bin(h_a ^ hashes[j]).count('1')
+            if dist <= threshold:
+                append((id_a, ids[j], dist))
+
+    return found
 
 
 # ---------------------------------------------------------------------------
@@ -37,6 +84,8 @@ def get_cache_stats() -> Dict[str, Any]:
         'oldest': row['oldest'],
         'newest': row['newest'],
         'hashed_images': hashed_images,
+        'phash_size': config.PHASH_SIZE,
+        'phash_bits': config.PHASH_BITS,
     }
 
 
@@ -60,6 +109,9 @@ def compute_duplicate_pairs(
     """
     O(n²) pHash comparison — writes results into the duplicate_pairs table.
 
+    Parallelized across CPU cores via ProcessPoolExecutor so the heavy work
+    runs in child processes and does NOT block the main app's event loop.
+
     Args:
         threshold: Max hamming distance to store (15 covers the full slider).
         progress_callback: Optional (current, total) callable for progress.
@@ -79,25 +131,31 @@ def compute_duplicate_pairs(
 
     n = len(images)
     total_comparisons = n * (n - 1) // 2
-    found_pairs = []
 
-    done = 0
-    for i in range(n):
-        id_a = images[i]['id']
-        hash_a = images[i]['phash']
-        for j in range(i + 1, n):
-            id_b = images[j]['id']
-            hash_b = images[j]['phash']
-            dist = hamming_distance(hash_a, hash_b)
-            if dist <= threshold:
-                found_pairs.append((id_a, id_b, dist, threshold))
-            done += 1
+    if n == 0:
+        return {
+            'pair_count': 0, 'image_count': 0,
+            'comparisons': 0, 'elapsed_seconds': 0,
+        }
 
-        # Throttle progress updates to once per outer-loop iteration
-        if progress_callback and (i % 50 == 0 or i == n - 1):
-            progress_callback(done, total_comparisons)
+    # 2. Convert hex hashes to integers once — makes each comparison a
+    #    single XOR + popcount instead of creating imagehash objects.
+    image_ids = [img['id'] for img in images]
+    hash_ints = [int(img['phash'], 16) for img in images]
 
-    # 2. Write to cache in a single transaction (replace old data)
+    # 3. Run comparisons
+    if n < _MP_THRESHOLD:
+        found_pairs = _scan_single_thread(
+            image_ids, hash_ints, threshold, n,
+            total_comparisons, progress_callback,
+        )
+    else:
+        found_pairs = _scan_parallel(
+            image_ids, hash_ints, threshold, n,
+            total_comparisons, progress_callback,
+        )
+
+    # 4. Write to cache in a single transaction (replace old data)
     now = datetime.utcnow().isoformat()
     with get_db_connection() as conn:
         cur = conn.cursor()
@@ -106,7 +164,7 @@ def compute_duplicate_pairs(
             """INSERT INTO duplicate_pairs
                (image_id_a, image_id_b, distance, threshold, computed_at)
                VALUES (?, ?, ?, ?, ?)""",
-            [(a, b, d, t, now) for a, b, d, t in found_pairs],
+            [(a, b, d, threshold, now) for a, b, d in found_pairs],
         )
         conn.commit()
 
@@ -117,6 +175,87 @@ def compute_duplicate_pairs(
         'comparisons': total_comparisons,
         'elapsed_seconds': elapsed,
     }
+
+
+def _scan_single_thread(
+    image_ids: List[int],
+    hash_ints: List[int],
+    threshold: int,
+    n: int,
+    total_comparisons: int,
+    progress_callback: Optional[Callable],
+) -> List[Tuple[int, int, int]]:
+    """Fast single-threaded scan (small datasets, avoids process-spawn overhead)."""
+    found: list = []
+    done = 0
+    for i in range(n):
+        h_a = hash_ints[i]
+        id_a = image_ids[i]
+        for j in range(i + 1, n):
+            dist = bin(h_a ^ hash_ints[j]).count('1')
+            if dist <= threshold:
+                found.append((id_a, image_ids[j], dist))
+            done += 1
+        if progress_callback and (i % 50 == 0 or i == n - 1):
+            progress_callback(done, total_comparisons)
+    return found
+
+
+def _scan_parallel(
+    image_ids: List[int],
+    hash_ints: List[int],
+    threshold: int,
+    n: int,
+    total_comparisons: int,
+    progress_callback: Optional[Callable],
+) -> List[Tuple[int, int, int]]:
+    """
+    Parallel scan across CPU cores using ProcessPoolExecutor.
+
+    The heavy comparison work runs in *child processes*, so it:
+      - uses all available cores (no GIL limitation)
+      - does NOT compete with the main app's async event loop
+    """
+    num_workers = max(1, min(os.cpu_count() or 4, 8))  # cap at 8
+
+    # More chunks than workers → better load balancing (early indices
+    # have more comparisons than late ones).
+    num_chunks = num_workers * 4
+    chunk_size = max(1, n // num_chunks)
+
+    chunks: List[Tuple[int, int, int]] = []
+    for c in range(num_chunks):
+        start = c * chunk_size
+        end = min((c + 1) * chunk_size, n) if c < num_chunks - 1 else n
+        if start >= n:
+            break
+        chunks.append((start, end, threshold))
+
+    found_pairs: list = []
+    done_comparisons = 0
+
+    with ProcessPoolExecutor(
+        max_workers=num_workers,
+        initializer=_init_scan_worker,
+        initargs=(image_ids, hash_ints),
+    ) as executor:
+        futures = {
+            executor.submit(_scan_chunk, chunk): chunk
+            for chunk in chunks
+        }
+        for future in as_completed(futures):
+            chunk_start, chunk_end, _ = futures[future]
+            # Number of comparisons this chunk performed
+            chunk_comps = sum(n - j - 1 for j in range(chunk_start, chunk_end))
+
+            pairs = future.result()
+            found_pairs.extend(pairs)
+            done_comparisons += chunk_comps
+
+            if progress_callback:
+                progress_callback(done_comparisons, total_comparisons)
+
+    return found_pairs
 
 
 # ---------------------------------------------------------------------------
@@ -204,7 +343,7 @@ def get_duplicate_queue(
         if len(pairs) >= limit:
             break
         distance = row['distance']
-        confidence = max(0, round((1 - distance / 64) * 100, 1))
+        confidence = max(0, round((1 - distance / config.PHASH_BITS) * 100, 1))
         pairs.append({
             'image_a': _enrich_image_by_id(row['image_id_a']),
             'image_b': _enrich_image_by_id(row['image_id_b']),
@@ -221,6 +360,7 @@ def get_duplicate_queue(
         'total': total_unreviewed,
         'offset': offset,
         'limit': limit,
+        'phash_bits': config.PHASH_BITS,
     }
 
 

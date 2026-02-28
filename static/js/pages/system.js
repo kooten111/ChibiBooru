@@ -700,6 +700,17 @@ function systemGenerateHashes(event) {
     });
 }
 
+function systemRehashAll(event) {
+    if (event) event.preventDefault();
+    window.showConfirm(
+        'This will clear ALL existing perceptual hashes and regenerate them at the current PHASH_SIZE setting. ' +
+        'This can take a while for large collections. You will need to re-scan duplicates afterward. Continue?',
+        () => {
+            systemAction('/api/similarity/rehash-all', event.target, 'Re-hash All Images');
+        }
+    );
+}
+
 function systemDeduplicate(event) {
     if (event) event.preventDefault();
     systemAction('/api/system/deduplicate', event.target, 'Deduplicate', { dry_run: false });
@@ -1579,6 +1590,7 @@ window.systemRebuildCategorized = systemRebuildCategorized;
 window.systemRecategorizeTags = systemRecategorizeTags;
 window.systemGenerateThumbnails = systemGenerateThumbnails;
 window.systemGenerateHashes = systemGenerateHashes;
+window.systemRehashAll = systemRehashAll;
 window.systemDeduplicate = systemDeduplicate;
 window.systemCleanOrphans = systemCleanOrphans;
 window.systemApplyMergedSources = systemApplyMergedSources;

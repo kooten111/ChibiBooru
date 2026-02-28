@@ -33,6 +33,7 @@ let isDraggingSlider = false;
 let isComparing  = false;
 let scanTaskId   = null;
 let pollTimer    = null;
+let phashBits    = 256;         // default for hash_size=16; updated from server
 
 // DOM refs
 let $content, $actionBar, $keyboardHints;
@@ -119,6 +120,16 @@ async function boot() {
 
     try {
         const stats = await fetchCacheStats();
+        // Adapt slider to server's hash size
+        if (stats.phash_bits) {
+            phashBits = stats.phash_bits;
+            const maxThreshold = Math.min(Math.round(phashBits / 4), 64);
+            $thresholdSlider.max = maxThreshold;
+            if (parseInt($thresholdSlider.value) > maxThreshold) {
+                $thresholdSlider.value = Math.min(20, maxThreshold);
+                $thresholdValue.textContent = $thresholdSlider.value;
+            }
+        }
         if (stats.cached_pairs > 0) {
             // Cache exists — go straight to loading
             await loadPage(0);
@@ -151,7 +162,8 @@ function renderScanPrompt(stats) {
 async function startScan() {
     try {
         showLoadingSpinner('Starting scan…');
-        const resp = await triggerScan(15);
+        const scanThreshold = Math.min(Math.round(phashBits / 4), 64);
+        const resp = await triggerScan(scanThreshold);
         scanTaskId = resp.task_id;
         showNotification('Duplicate scan started — this may take a while.', 'info');
         startPolling();
@@ -204,6 +216,7 @@ async function loadPage(offset) {
 
     try {
         const data = await fetchQueue(threshold, offset, PAGE_SIZE);
+        if (data.phash_bits) phashBits = data.phash_bits;
         pairs = data.pairs;
         totalPairs = data.total;
         pageOffset = offset;
@@ -421,7 +434,13 @@ function updateActionHighlights(staged) {
         case 'delete_a': document.getElementById('btnDeleteA')?.classList.add('active'); break;
         case 'delete_b': document.getElementById('btnDeleteB')?.classList.add('active'); break;
         case 'non_duplicate': document.getElementById('btnNotDup')?.classList.add('active'); break;
-        case 'related': document.getElementById('btnRelated')?.classList.add('active'); break;
+        case 'related':
+            if (staged.detail === 'sibling') {
+                document.getElementById('btnSiblings')?.classList.add('active');
+            } else {
+                document.getElementById('btnRelated')?.classList.add('active');
+            }
+            break;
     }
 }
 
@@ -635,6 +654,7 @@ function setupKeyboard() {
             case 'a': stageAction('delete_a'); break;
             case 'b': stageAction('delete_b'); break;
             case 'n': stageAction('non_duplicate'); break;
+            case 's': stageAction('related', 'sibling'); break;
             case 'r': toggleRelatedMenu(); break;
             case 'u': unstage(); break;
             case '1': setMode('side'); break;
@@ -704,6 +724,7 @@ function init() {
     document.getElementById('btnDeleteA').addEventListener('click', () => stageAction('delete_a'));
     document.getElementById('btnDeleteB').addEventListener('click', () => stageAction('delete_b'));
     document.getElementById('btnNotDup').addEventListener('click', () => stageAction('non_duplicate'));
+    document.getElementById('btnSiblings').addEventListener('click', () => stageAction('related', 'sibling'));
     document.getElementById('btnRelated').addEventListener('click', toggleRelatedMenu);
     document.getElementById('btnUnstage').addEventListener('click', unstage);
 

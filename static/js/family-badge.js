@@ -11,6 +11,7 @@ class FamilyBadge {
 
         this.parents = familyData.filter(img => img.type === 'parent');
         this.children = familyData.filter(img => img.type === 'child');
+        this.siblings = familyData.filter(img => img.type === 'sibling');
 
         if (this.familyData.length === 0) return;
 
@@ -42,7 +43,7 @@ class FamilyBadge {
     }
 
     renderFilmstrip() {
-        // Order: parents -> current marker -> children
+        // Order: parents -> current marker -> children -> siblings
         let html = '';
 
         // Parent thumbnails
@@ -57,6 +58,14 @@ class FamilyBadge {
         this.children.forEach(img => {
             html += this.renderThumb(img, 'child');
         });
+
+        // Sibling thumbnails
+        if (this.siblings.length > 0) {
+            html += `<div class="filmstrip-current" title="Siblings"></div>`;
+            this.siblings.forEach(img => {
+                html += this.renderThumb(img, 'sibling');
+            });
+        }
 
         return html;
     }
@@ -74,10 +83,13 @@ class FamilyBadge {
             ? `/view/${this.encodePathForUrl(img.path)}`
             : `/view/images/${this.encodePathForUrl(img.path)}`;
 
+        const labels = { parent: 'Parent', child: 'Child', sibling: 'Sibling' };
+        const badges = { parent: 'P', child: 'C', sibling: 'S' };
+
         return `
-            <a href="${viewPath}" class="filmstrip-thumb filmstrip-thumb-${type}" title="${type === 'parent' ? 'Parent' : 'Child'}">
+            <a href="${viewPath}" class="filmstrip-thumb filmstrip-thumb-${type}" title="${labels[type] || type}">
                 <img src="${thumbPath}" alt="${type}" loading="lazy">
-                <span class="filmstrip-type-badge">${type === 'parent' ? 'P' : 'C'}</span>
+                <span class="filmstrip-type-badge">${badges[type] || type[0].toUpperCase()}</span>
             </a>
         `;
     }

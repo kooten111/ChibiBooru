@@ -330,9 +330,15 @@ VISUAL_SIMILARITY_ENABLED = visual_sim if isinstance(visual_sim, bool) else str(
 VISUAL_SIMILARITY_WEIGHT = float(_get_setting('VISUAL_SIMILARITY_WEIGHT', 0.3))
 TAG_SIMILARITY_WEIGHT = float(_get_setting('TAG_SIMILARITY_WEIGHT', 0.7))
 
+# Perceptual hash size (8 = 64-bit hash, 16 = 256-bit hash)
+# Larger = fewer false-positive "100% match" collisions, negligible perf cost.
+# Changing this requires re-hashing all images.
+PHASH_SIZE = int(_get_setting('PHASH_SIZE', 16))
+PHASH_BITS = PHASH_SIZE ** 2  # derived: 64 for size 8, 256 for size 16
+
 # Hamming distance threshold for considering images similar
-# Lower = stricter matching (0-64 scale, 64-bit hash)
-# 0-5: Near identical, 6-10: Very similar, 11-15: Somewhat similar
+# Lower = stricter matching (scale depends on PHASH_SIZE: 0-64 for 8, 0-256 for 16)
+# For hash_size 16: 0-20 near identical, 21-40 very similar, 41-60 somewhat similar
 VISUAL_SIMILARITY_THRESHOLD = int(_get_setting('VISUAL_SIMILARITY_THRESHOLD', 15))
 
 # Enable semantic (vector-based) similarity

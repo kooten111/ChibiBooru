@@ -169,6 +169,29 @@ async def generate_hashes():
     )
 
 
+@api_blueprint.route('/similarity/rehash-all', methods=['POST'])
+@api_handler()
+@require_secret
+async def rehash_all_images():
+    """
+    Clear all existing perceptual hashes and regenerate at current PHASH_SIZE.
+
+    POST /api/similarity/rehash-all
+    Requires secret authorization.
+    Returns a task_id for polling progress.
+    """
+    from services import monitor_service
+    import config
+    monitor_service.add_log(
+        f"Re-hash ALL started (PHASH_SIZE={config.PHASH_SIZE})...", "info"
+    )
+    return await start_background_task(
+        similarity_service.run_rehash_all_task,
+        f"Re-hashing all images at hash_size={config.PHASH_SIZE}",
+        task_id_prefix="rehash_all",
+    )
+
+
 @api_blueprint.route('/similarity/stats')
 @api_handler()
 async def get_hash_stats():

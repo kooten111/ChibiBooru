@@ -149,6 +149,27 @@
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 12px rgba(192, 132, 252, 0.15);
 }
 
+/* ── Sibling accent — sky-blue tint ── */
+.filmstrip-thumb-sibling {
+    border-color: rgba(56, 189, 248, 0.25);
+}
+
+.filmstrip-thumb-sibling::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 3px;
+    right: 3px;
+    height: 2px;
+    background: rgba(56, 189, 248, 0.7);
+    border-radius: 1px;
+}
+
+.filmstrip-thumb-sibling:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45), 0 0 12px rgba(56, 189, 248, 0.15);
+}
+
 /* ── Type label — tiny bottom-center pill ── */
 .filmstrip-type-badge {
     position: absolute;
@@ -178,6 +199,11 @@
 .filmstrip-thumb-child .filmstrip-type-badge {
     background: rgba(192, 132, 252, 0.85);
     color: #1a0a2a;
+}
+
+.filmstrip-thumb-sibling .filmstrip-type-badge {
+    background: rgba(56, 189, 248, 0.85);
+    color: #0a1a2a;
 }
 
 /* ── Current-image divider ── */
