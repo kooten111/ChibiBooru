@@ -90,7 +90,7 @@ def run_scan_and_process() -> Dict[str, Any]:
             )
         )
     else:
-        messages.append("No new images found")
+        pass  # skip noisy "no new images" message
 
     if cleaned_count > 0:
         messages.append(f"cleaned {cleaned_count} orphaned image records")

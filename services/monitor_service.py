@@ -389,7 +389,6 @@ def run_scan():
 
     unprocessed_files = find_unprocessed_images()
     if not unprocessed_files:
-        add_log("No new images found.")
         return 0, 0
 
     add_log(f"Found {len(unprocessed_files)} new images. Starting parallel processing...", 'info')
