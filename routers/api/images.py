@@ -150,6 +150,7 @@ async def get_image_similar(filepath):
     from services import query_service
     from utils import get_thumbnail_path
     from repositories.data_access import get_image_details_with_merged_tags
+    from repositories import relations_repository
     
     lookup_path = normalize_image_path(filepath)
     
@@ -158,16 +159,17 @@ async def get_image_similar(filepath):
     if not data:
         return jsonify({'parent_child_images': [], 'similar_images': []})
     
-    # Fetch family images to exclude from similarity results
+    image_id = data.get('id')
+    
+    # Fetch family images from image_relations table (canonical source)
     parent_child_images = await asyncio.to_thread(
-        models.get_related_images,
-        data.get('post_id'),
-        data.get('parent_id')
-    )
+        relations_repository.get_related_images_from_relations,
+        image_id
+    ) if image_id else []
     
     parent_child_paths = set()
     for img in parent_child_images:
-        img['match_type'] = img['type']  # 'parent' or 'child'
+        img['match_type'] = img['type']  # 'parent', 'child', or 'sibling'
         img['thumb'] = get_thumbnail_path(img['path'])
         
         # Normalize path to include 'images/' prefix for consistency

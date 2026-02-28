@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Duplicate Finder - {{ app_name }}</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variables.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') + '?v=2' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components-bundle.css') + '?v=1' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') + '?v=4' }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page-layout.css') + '?v=2' }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ============================================================
+           Duplicate Finder Layout
+           ============================================================ */
+        .dup-page {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+        }
+
+        .dup-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 1600px;
+            width: 100%;
+            margin: 0 auto;
+            padding: var(--spacing-md) var(--spacing-lg);
+            gap: var(--spacing-md);
+        }
+
+        /* ---- Toolbar ---- */
+        .dup-toolbar {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-primary);
+            flex-wrap: wrap;
+        }
+
+        .dup-toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .dup-toolbar-group label {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .dup-toolbar-separator {
+            width: 1px;
+            height: 24px;
+            background: var(--border-primary);
+        }
+
+        .dup-threshold-slider {
+            width: 120px;
+            accent-color: var(--primary-blue);
+        }
+
+        .dup-threshold-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: var(--font-size-sm);
+            color: var(--text-primary);
+            min-width: 24px;
+            text-align: center;
+        }
+
+        .dup-progress-text {
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .dup-progress-bar {
+            width: 140px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-round);
+            overflow: hidden;
+        }
+
+        .dup-progress-fill {
+            height: 100%;
+            background: var(--primary-blue);
+            border-radius: var(--radius-round);
+            transition: width var(--transition-normal);
+        }
+
+        .dup-pending-btn {
+            position: relative;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .dup-pending-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .dup-pending-btn .badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: var(--primary-blue);
+            color: white;
+            font-size: 10px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .dup-pending-btn .badge:empty {
+            display: none;
+        }
+
+        .dup-mode-btns {
+            display: flex;
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--border-primary);
+        }
+
+        .dup-mode-btn {
+            padding: var(--spacing-xs) var(--spacing-sm);
+            background: var(--bg-tertiary);
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            transition: all var(--transition-fast);
+            border-right: 1px solid var(--border-primary);
+        }
+
+        .dup-mode-btn:last-child {
+            border-right: none;
+        }
+
+        .dup-mode-btn.active {
+            background: var(--primary-blue);
+            color: white;
+        }
+
+        .dup-mode-btn:hover:not(.active) {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* ---- Comparison Viewport ---- */
+        .dup-viewport {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .dup-comparison {
+            flex: 1;
+            display: flex;
+            gap: var(--spacing-md);
+            min-height: 300px;
+            position: relative;
+        }
+
+        /* Side-by-side mode */
+        .dup-comparison.mode-side {
+            flex-direction: row;
+        }
+
+        .dup-comparison.mode-side .dup-image-panel {
+            flex: 1;
+            min-width: 0;
+        }
+
+        /* Overlay mode */
+        .dup-comparison.mode-overlay {
+            flex-direction: row;
+        }
+
+        .dup-comparison.mode-overlay .dup-image-panel {
+            position: absolute;
+            inset: 0;
+        }
+
+        .dup-comparison.mode-overlay .dup-image-panel:first-child {
+            z-index: 2;
+        }
+
+        .dup-comparison.mode-overlay .dup-image-panel:last-child {
+            z-index: 1;
+        }
+
+        .dup-comparison.mode-overlay .dup-image-panel .dup-img-wrap {
+            height: 100%;
+        }
+
+        .dup-comparison.mode-overlay.comparing .dup-image-panel:first-child {
+            visibility: hidden;
+            opacity: 0;
+        }
+
+        .dup-comparison.mode-overlay.comparing .dup-image-panel:last-child {
+            z-index: 2;
+        }
+
+        .dup-overlay-hint {
+            display: none;
+            position: absolute;
+            bottom: var(--spacing-md);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: var(--radius-md);
+            font-size: var(--font-size-sm);
+            pointer-events: none;
+        }
+
+        .dup-comparison.mode-overlay .dup-overlay-hint {
+            display: block;
+        }
+
+        /* Slider mode */
+        .dup-comparison.mode-slider {
+            flex-direction: row;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dup-comparison.mode-slider .dup-image-panel {
+            position: absolute;
+            inset: 0;
+        }
+
+        .dup-comparison.mode-slider .dup-image-panel:first-child {
+            z-index: 2;
+            clip-path: inset(0 var(--slider-clip-right, 50%) 0 0);
+        }
+
+        .dup-comparison.mode-slider .dup-image-panel:last-child {
+            z-index: 1;
+        }
+
+        .dup-comparison.mode-slider .dup-image-panel .dup-img-wrap {
+            height: 100%;
+        }
+
+        .dup-slider-handle {
+            display: none;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: var(--primary-blue);
+            cursor: ew-resize;
+            z-index: 10;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .dup-slider-handle::after {
+            content: '⋮';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--primary-blue);
+            color: white;
+            width: 28px;
+            height: 40px;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .dup-comparison.mode-slider .dup-slider-handle {
+            display: block;
+        }
+
+        /* Image panels */
+        .dup-image-panel {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .dup-img-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            border-radius: var(--radius-lg);
+            border: 2px solid var(--border-primary);
+            overflow: hidden;
+            position: relative;
+            min-height: 250px;
+            cursor: pointer;
+        }
+
+        .dup-img-wrap img {
+            max-width: 100%;
+            max-height: 60vh;
+            object-fit: contain;
+        }
+
+        .dup-img-wrap .dup-label {
+            position: absolute;
+            top: var(--spacing-sm);
+            left: var(--spacing-sm);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            z-index: 3;
+        }
+
+        .dup-img-wrap.staged {
+            border-color: var(--warning);
+        }
+
+        .dup-img-wrap.staged::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 160, 0, 0.1);
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .dup-img-wrap.staged-delete {
+            border-color: var(--danger);
+        }
+
+        .dup-img-wrap.staged-delete::after {
+            background: rgba(255, 50, 50, 0.15);
+        }
+
+        .dup-staged-badge {
+            display: none;
+            position: absolute;
+            top: var(--spacing-sm);
+            right: var(--spacing-sm);
+            background: var(--warning);
+            color: var(--bg-primary);
+            padding: 2px var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-size: var(--font-size-xs);
+            font-weight: 700;
+            z-index: 3;
+            text-transform: uppercase;
+        }
+
+        .dup-img-wrap.staged .dup-staged-badge,
+        .dup-img-wrap.staged-delete .dup-staged-badge {
+            display: block;
+        }
+
+        .dup-img-wrap.staged-delete .dup-staged-badge {
+            background: var(--danger);
+            color: white;
+        }
+
+        /* Image info cards */
+        .dup-info-row {
+            display: flex;
+            gap: var(--spacing-lg);
+            justify-content: center;
+        }
+
+        .dup-info-card {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-primary);
+            font-size: var(--font-size-sm);
+            flex: 1;
+            max-width: 460px;
+        }
+
+        .dup-info-card a {
+            color: var(--primary-blue-light);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .dup-info-card a:hover {
+            text-decoration: underline;
+        }
+
+        .dup-info-detail {
+            color: var(--text-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: var(--font-size-xs);
+        }
+
+        /* Confidence bar */
+        .dup-confidence {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-xs) 0;
+        }
+
+        .dup-confidence-bar {
+            width: 200px;
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-round);
+            overflow: hidden;
+        }
+
+        .dup-confidence-fill {
+            height: 100%;
+            border-radius: var(--radius-round);
+            transition: width var(--transition-normal);
+        }
+
+        .dup-confidence-fill.high {
+            background: var(--success);
+        }
+
+        .dup-confidence-fill.medium {
+            background: var(--warning);
+        }
+
+        .dup-confidence-fill.low {
+            background: var(--danger);
+        }
+
+        .dup-confidence-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: var(--font-size-sm);
+            font-weight: 600;
+            min-width: 70px;
+        }
+
+        /* ---- Action Bar ---- */
+        .dup-actions {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-sm) 0;
+            flex-wrap: wrap;
+        }
+
+        .dup-action-btn {
+            padding: var(--spacing-xs) var(--spacing-md);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-primary);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+        }
+
+        .dup-action-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--border-active);
+        }
+
+        .dup-action-btn.active {
+            ring: 2px solid var(--primary-blue);
+        }
+
+        .dup-action-btn kbd {
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: var(--bg-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            border: 1px solid var(--border-primary);
+        }
+
+        .dup-action-btn.btn-danger {
+            border-color: color-mix(in srgb, var(--danger) 40%, transparent);
+        }
+
+        .dup-action-btn.btn-danger:hover {
+            background: color-mix(in srgb, var(--danger) 15%, var(--bg-secondary));
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .dup-action-btn.btn-danger.active {
+            background: color-mix(in srgb, var(--danger) 20%, var(--bg-secondary));
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .dup-action-btn.btn-info {
+            border-color: color-mix(in srgb, var(--primary-blue) 40%, transparent);
+        }
+
+        .dup-action-btn.btn-info:hover {
+            background: color-mix(in srgb, var(--primary-blue) 15%, var(--bg-secondary));
+            border-color: var(--primary-blue);
+            color: var(--primary-blue-light);
+        }
+
+        .dup-action-btn.btn-info.active {
+            background: color-mix(in srgb, var(--primary-blue) 20%, var(--bg-secondary));
+            border-color: var(--primary-blue);
+            color: var(--primary-blue-light);
+        }
+
+        .dup-action-btn.btn-success {
+            border-color: color-mix(in srgb, var(--success) 40%, transparent);
+        }
+
+        .dup-action-btn.btn-success:hover {
+            background: color-mix(in srgb, var(--success) 15%, var(--bg-secondary));
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .dup-action-btn.btn-success.active {
+            background: color-mix(in srgb, var(--success) 20%, var(--bg-secondary));
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .dup-action-btn.btn-nav {
+            background: var(--bg-tertiary);
+        }
+
+        /* Related dropdown */
+        .dup-related-wrap {
+            position: relative;
+        }
+
+        .dup-related-menu {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: var(--spacing-xs);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            z-index: var(--z-dropdown);
+            overflow: hidden;
+            min-width: 200px;
+        }
+
+        .dup-related-menu.open {
+            display: block;
+        }
+
+        .dup-related-item {
+            padding: var(--spacing-sm) var(--spacing-md);
+            cursor: pointer;
+            font-size: var(--font-size-sm);
+            color: var(--text-secondary);
+            transition: background var(--transition-fast);
+            white-space: nowrap;
+        }
+
+        .dup-related-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* ---- Review Panel (slide-out) ---- */
+        .dup-review-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: var(--z-modal);
+        }
+
+        .dup-review-overlay.open {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .dup-review-panel {
+            width: 420px;
+            max-width: 90vw;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border-primary);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            animation: slideInRight 0.2s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .dup-review-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .dup-review-header h2 {
+            font-size: var(--font-size-lg);
+            margin: 0;
+        }
+
+        .dup-review-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 20px;
+            padding: var(--spacing-xs);
+        }
+
+        .dup-review-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-sm);
+        }
+
+        .dup-review-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-sm);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-primary);
+            margin-bottom: var(--spacing-sm);
+            cursor: pointer;
+            transition: background var(--transition-fast);
+        }
+
+        .dup-review-item:hover {
+            background: var(--bg-hover);
+        }
+
+        .dup-review-thumbs {
+            display: flex;
+            gap: 2px;
+        }
+
+        .dup-review-thumbs img {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: var(--radius-sm);
+        }
+
+        .dup-review-action-badge {
+            font-size: var(--font-size-xs);
+            padding: 2px var(--spacing-sm);
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .dup-review-action-badge.delete {
+            background: color-mix(in srgb, var(--danger) 20%, transparent);
+            color: var(--danger);
+        }
+
+        .dup-review-action-badge.non-dup {
+            background: color-mix(in srgb, var(--success) 20%, transparent);
+            color: var(--success);
+        }
+
+        .dup-review-action-badge.related {
+            background: color-mix(in srgb, var(--primary-blue) 20%, transparent);
+            color: var(--primary-blue-light);
+        }
+
+        .dup-review-remove {
+            margin-left: auto;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 16px;
+            padding: var(--spacing-xs);
+        }
+
+        .dup-review-remove:hover {
+            color: var(--danger);
+        }
+
+        .dup-review-footer {
+            display: flex;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-top: 1px solid var(--border-primary);
+        }
+
+        .dup-review-footer button {
+            flex: 1;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-primary);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: var(--font-size-sm);
+            transition: all var(--transition-fast);
+        }
+
+        .dup-commit-btn {
+            background: var(--success);
+            color: white;
+            border-color: var(--success) !important;
+        }
+
+        .dup-commit-btn:hover {
+            opacity: 0.9;
+        }
+
+        .dup-clear-btn {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .dup-clear-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        /* ---- Empty / Complete States ---- */
+        .dup-state-message {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-md);
+            color: var(--text-secondary);
+            padding: var(--spacing-2xl);
+        }
+
+        .dup-state-message .icon {
+            font-size: 48px;
+            opacity: 0.6;
+        }
+
+        .dup-state-message h2 {
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .dup-state-message p {
+            text-align: center;
+            max-width: 400px;
+        }
+
+        /* ---- Loading ---- */
+        .dup-loading {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-md);
+            color: var(--text-secondary);
+        }
+
+        .dup-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border-primary);
+            border-top-color: var(--primary-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ---- Keyboard hint bar ---- */
+        .dup-keyboard-hints {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: var(--spacing-md);
+            padding: var(--spacing-xs) 0;
+            font-size: var(--font-size-xs);
+            color: var(--text-tertiary);
+            flex-wrap: wrap;
+        }
+
+        .dup-keyboard-hints kbd {
+            padding: 1px 5px;
+            border-radius: 3px;
+            background: var(--bg-tertiary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            border: 1px solid var(--border-primary);
+            margin: 0 2px;
+        }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 900px) {
+            .dup-comparison.mode-side {
+                flex-direction: column;
+            }
+
+            .dup-info-row {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .dup-actions {
+                gap: var(--spacing-xs);
+            }
+
+            .dup-action-btn kbd {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body class="dup-page">
+    {% include 'header.html' %}
+
+    <div class="dup-main">
+        <!-- Toolbar -->
+        <div class="dup-toolbar">
+            <div class="dup-toolbar-group">
+                <label>Threshold</label>
+                <input type="range" id="thresholdSlider" class="dup-threshold-slider"
+                       min="1" max="20" value="5" step="1">
+                <span id="thresholdValue" class="dup-threshold-value">5</span>
+            </div>
+
+            <div class="dup-toolbar-separator"></div>
+
+            <div class="dup-toolbar-group">
+                <label>Mode</label>
+                <div class="dup-mode-btns">
+                    <button class="dup-mode-btn active" data-mode="side" title="Side by side (1)">Side</button>
+                    <button class="dup-mode-btn" data-mode="overlay" title="Overlay - hold C (2)">Overlay</button>
+                    <button class="dup-mode-btn" data-mode="slider" title="Slider (3)">Slider</button>
+                </div>
+            </div>
+
+            <div class="dup-toolbar-separator"></div>
+
+            <div class="dup-toolbar-group">
+                <span id="progressText" class="dup-progress-text">0 / 0</span>
+                <div class="dup-progress-bar">
+                    <div id="progressFill" class="dup-progress-fill" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div style="margin-left: auto;">
+                <button id="pendingBtn" class="dup-pending-btn" title="Review pending actions (Enter)">
+                    Review
+                    <span id="pendingBadge" class="badge"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Content area: loading, empty, comparison, or complete -->
+        <div id="contentArea" class="dup-viewport">
+            <div class="dup-loading" id="loadingState">
+                <div class="dup-spinner"></div>
+                <span>Loading duplicate pairs…</span>
+            </div>
+        </div>
+
+        <!-- Action Bar (hidden until loaded) -->
+        <div id="actionBar" class="dup-actions" style="display: none;">
+            <button class="dup-action-btn btn-nav" id="btnPrev" title="Previous pair">
+                <kbd>←</kbd> Prev
+            </button>
+
+            <button class="dup-action-btn btn-danger" id="btnDeleteA" title="Stage: Delete image A">
+                <kbd>A</kbd> Delete A
+            </button>
+
+            <button class="dup-action-btn btn-danger" id="btnDeleteB" title="Stage: Delete image B">
+                <kbd>B</kbd> Delete B
+            </button>
+
+            <button class="dup-action-btn btn-success" id="btnNotDup" title="Stage: Not a duplicate">
+                <kbd>N</kbd> Not Duplicate
+            </button>
+
+            <div class="dup-related-wrap">
+                <button class="dup-action-btn btn-info" id="btnRelated" title="Stage: Related images">
+                    <kbd>R</kbd> Related ▾
+                </button>
+                <div class="dup-related-menu" id="relatedMenu">
+                    <div class="dup-related-item" data-detail="parent_child_ab">A is parent of B</div>
+                    <div class="dup-related-item" data-detail="parent_child_ba">B is parent of A</div>
+                    <div class="dup-related-item" data-detail="sibling">Siblings</div>
+                </div>
+            </div>
+
+            <button class="dup-action-btn btn-nav" id="btnUnstage" title="Remove staged action for this pair" style="display: none;">
+                <kbd>U</kbd> Unstage
+            </button>
+
+            <button class="dup-action-btn btn-nav" id="btnNext" title="Next pair">
+                Next <kbd>→</kbd>
+            </button>
+        </div>
+
+        <!-- Keyboard hints -->
+        <div class="dup-keyboard-hints" id="keyboardHints" style="display: none;">
+            <span><kbd>←</kbd><kbd>→</kbd> Navigate</span>
+            <span><kbd>A</kbd> Del A</span>
+            <span><kbd>B</kbd> Del B</span>
+            <span><kbd>N</kbd> Not Dup</span>
+            <span><kbd>R</kbd> Related</span>
+            <span><kbd>U</kbd> Unstage</span>
+            <span><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Mode</span>
+            <span><kbd>C</kbd> Compare (Overlay)</span>
+            <span><kbd>Enter</kbd> Review</span>
+        </div>
+    </div>
+
+    <!-- Review Panel Overlay -->
+    <div id="reviewOverlay" class="dup-review-overlay">
+        <div class="dup-review-panel">
+            <div class="dup-review-header">
+                <h2>Pending Actions</h2>
+                <button class="dup-review-close" id="reviewClose" title="Close (Esc)">✕</button>
+            </div>
+            <div class="dup-review-list" id="reviewList">
+                <div class="dup-state-message" style="padding: var(--spacing-lg);">
+                    <p>No actions staged yet. Navigate through pairs and use the action buttons to stage decisions.</p>
+                </div>
+            </div>
+            <div class="dup-review-footer">
+                <button class="dup-clear-btn" id="reviewClear">Clear All</button>
+                <button class="dup-commit-btn" id="reviewCommit">Commit All</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/header.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/pages/duplicate-finder.js') }}"></script>
+    <script type="module">
+        import { showNotification } from "{{ url_for('static', filename='js/utils/notifications.js') }}";
+        window.showNotification = showNotification;
+    </script>
+</body>
+
+</html>

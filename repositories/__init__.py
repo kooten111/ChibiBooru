@@ -41,6 +41,17 @@ from .tag_repository import (
     update_image_tags_categorized,
 )
 
+from .relations_repository import (
+    add_relation,
+    bulk_add_relations,
+    has_any_relation,
+    get_all_reviewed_pairs,
+    get_relations_for_image,
+    delete_relation,
+    get_related_images_from_relations,
+    create_relations_on_ingest,
+)
+
 __all__ = [
     # Pool repository
     'create_pool',
@@ -72,4 +83,13 @@ __all__ = [
     'apply_implications_for_image',
     'update_image_tags',
     'update_image_tags_categorized',
+    # Relations repository
+    'add_relation',
+    'bulk_add_relations',
+    'has_any_relation',
+    'get_all_reviewed_pairs',
+    'get_relations_for_image',
+    'delete_relation',
+    'get_related_images_from_relations',
+    'create_relations_on_ingest',
 ]

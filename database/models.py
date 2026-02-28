@@ -219,7 +219,12 @@ def repopulate_from_database():
 
 @lru_cache(maxsize=10000)
 def get_related_images(post_id, parent_id):
-    """Find parent and child images using pre-computed cross-source mapping."""
+    """Find parent and child images using pre-computed cross-source mapping.
+    
+    DEPRECATED: Use repositories.relations_repository.get_related_images_from_relations()
+    instead, which reads from the image_relations table. This function is kept
+    as a fallback during the transition period.
+    """
     from repositories.data_access import get_related_images as _get_related_images
     return _get_related_images(post_id, parent_id, post_id_to_md5)
 

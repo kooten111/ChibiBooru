@@ -15,5 +15,6 @@ from . import (
     animation,
     favourites,
     similarity,
-    upscaler
+    upscaler,
+    duplicate_review
 )

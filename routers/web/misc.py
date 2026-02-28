@@ -1,5 +1,5 @@
 """
-Miscellaneous routes: startup, tag categorization, implications, system, upload.
+Miscellaneous routes: startup, tag categorization, implications, system, upload, duplicates.
 """
 
 from quart import render_template, request, jsonify, url_for
@@ -107,3 +107,9 @@ def register_routes(blueprint):
             random_tags=[],
             app_name=config.APP_NAME
         )
+
+    @blueprint.route('/duplicates')
+    @login_required
+    async def duplicate_finder():
+        """Duplicate image review interface."""
+        return await render_template('duplicate_finder.html', app_name=config.APP_NAME)

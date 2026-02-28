@@ -483,6 +483,42 @@ def initialize_database():
         """)
 
         # ===================================================================
+        # Image Relations Table
+        # ===================================================================
+        # Manual and ingested relationships between images
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS image_relations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id_a INTEGER NOT NULL,
+            image_id_b INTEGER NOT NULL,
+            relation_type TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'manual',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(image_id_a, image_id_b, relation_type),
+            FOREIGN KEY (image_id_a) REFERENCES images(id) ON DELETE CASCADE,
+            FOREIGN KEY (image_id_b) REFERENCES images(id) ON DELETE CASCADE
+        )
+        """)
+
+        # ===================================================================
+        # Pre-computed Duplicate Pairs Table
+        # ===================================================================
+        # Background-computed pHash duplicate pairs for fast queue reads
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS duplicate_pairs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            image_id_a INTEGER NOT NULL,
+            image_id_b INTEGER NOT NULL,
+            distance INTEGER NOT NULL,
+            threshold INTEGER NOT NULL,
+            computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(image_id_a, image_id_b),
+            FOREIGN KEY (image_id_a) REFERENCES images(id) ON DELETE CASCADE,
+            FOREIGN KEY (image_id_b) REFERENCES images(id) ON DELETE CASCADE
+        )
+        """)
+
+        # ===================================================================
         # Similarity Cache Table
         # ===================================================================
         # Pre-computed similarity results for fast sidebar lookups
@@ -538,6 +574,18 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_rating ON rating_tag_pair_weights(rating)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_weight ON rating_tag_pair_weights(weight DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_rating_pair_weights_tags ON rating_tag_pair_weights(tag1, tag2)")
+
+        # Image relations indexes
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_relations_image_a ON image_relations(image_id_a)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_relations_image_b ON image_relations(image_id_b)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_relations_type ON image_relations(relation_type)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_relations_pair ON image_relations(image_id_a, image_id_b)")
+
+        # Duplicate pairs cache indexes
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_pairs_distance ON duplicate_pairs(distance)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_pairs_threshold ON duplicate_pairs(threshold, distance)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_pairs_image_a ON duplicate_pairs(image_id_a)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_pairs_image_b ON duplicate_pairs(image_id_b)")
 
         # Similarity cache indexes
         cur.execute("CREATE INDEX IF NOT EXISTS idx_similar_lookup ON similar_images_cache(source_image_id, similarity_type, rank)")

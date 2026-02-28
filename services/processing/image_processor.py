@@ -733,6 +733,29 @@ def process_image_file(filepath, move_from_ingest=True):
 
         
         # ========== STAGE 6: POST-PROCESSING ==========
+        # Create image relations (parent/child/sibling) from booru metadata
+        if image_info.get('parent_id') or image_info.get('post_id'):
+            try:
+                from repositories import relations_repository
+                with get_db_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT id FROM images WHERE filepath = ?", (db_path,))
+                    row = cursor.fetchone()
+                    if row:
+                        stats = relations_repository.create_relations_on_ingest(
+                            new_image_id=row['id'],
+                            parent_id=image_info.get('parent_id'),
+                            post_id=image_info.get('post_id'),
+                        )
+                        if stats['parent_found'] or stats['children_found'] or stats['siblings_created']:
+                            logger.info(
+                                f"Relations for {filename}: parent={stats['parent_found']}, "
+                                f"children={stats['children_found']}, siblings={stats['siblings_created']}"
+                            )
+            except Exception as e:
+                # Don't fail ingestion if relation creation fails
+                logger.warning(f"Failed to create relations for {filename}: {e}")
+
         # Save semantic embedding if computed
         if 'embedding' in hashes:
             try:
