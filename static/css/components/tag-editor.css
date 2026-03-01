@@ -131,6 +131,83 @@
     flex-shrink: 0;
 }
 
+.edit-relations-help {
+    margin-bottom: var(--spacing-sm);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+}
+
+.edit-relation-row {
+    align-items: stretch;
+}
+
+.relation-summary {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.relation-target {
+    color: var(--primary-blue);
+    font-weight: var(--font-weight-bold);
+}
+
+.relation-path {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.relation-source {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.relation-type-select,
+.new-relation-type-select,
+.new-relation-id-input {
+    background: rgba(0, 0, 0, 0.35);
+    border: var(--border-width) solid var(--border-color-hover);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    padding: 6px 8px;
+    font: inherit;
+}
+
+.relation-type-select {
+    flex: 0 0 110px;
+}
+
+.relation-add-fields {
+    display: flex;
+    flex: 1;
+    gap: var(--spacing-sm);
+}
+
+.new-relation-id-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.new-relation-type-select {
+    flex: 0 0 110px;
+}
+
+.edit-empty-state {
+    padding: var(--spacing-sm);
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    border: var(--border-width) dashed var(--border-color);
+    border-radius: var(--radius-md);
+    text-align: center;
+}
+
 /* Add tag button */
 .add-tag-btn {
     width: 100%;
@@ -217,7 +294,7 @@
 
 /* Editing mode - expand tag editor horizontally and push image aside */
 .image-page .container.tag-editor-expanded {
-    grid-template-columns: 800px 1fr 320px;
+    grid-template-columns: minmax(420px, 760px) 1fr 360px;
     transition: grid-template-columns var(--transition-smooth);
 }
 
@@ -255,6 +332,76 @@
     width: 100%;
     max-width: 100%;
     min-height: 0;
+}
+
+.sidebar-right.editing-mode {
+    display: flex !important;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.sidebar-right.editing-mode #sidebar-right-content {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.inline-relations-editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.inline-relations-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    width: 100%;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-color);
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+
+.inline-relations-body {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    padding: 12px 14px;
+    box-sizing: border-box;
+}
+
+.edit-relations-list {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+    margin: 0 0 var(--spacing-sm) 0;
+}
+
+.inline-relations-editor .edit-relation-row {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.inline-relations-editor .relation-summary {
+    width: 100%;
+}
+
+.inline-relations-editor .relation-type-select {
+    width: 100%;
+    flex: 0 0 auto;
+}
+
+.inline-relations-editor .relation-path {
+    max-width: 100%;
 }
 
 .sidebar-left.editing-mode .editable-categories-list {
@@ -314,18 +461,42 @@
 /* Responsive adjustments */
 @media (max-width: 1800px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 700px 1fr 320px;
+        grid-template-columns: minmax(380px, 680px) 1fr 340px;
     }
 }
 
 @media (max-width: 1600px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 600px 1fr 320px;
+        grid-template-columns: minmax(340px, 580px) 1fr 320px;
     }
 }
 
 @media (max-width: 1200px) {
     .image-page .container.tag-editor-expanded {
-        grid-template-columns: 500px 1fr 320px;
+        grid-template-columns: minmax(300px, 1fr) 1fr 280px;
+    }
+}
+
+@media (max-width: 768px) {
+    .image-page .container.tag-editor-expanded {
+        grid-template-columns: 1fr;
+    }
+
+    .edit-relation-row {
+        flex-direction: column;
+    }
+
+    .relation-type-select,
+    .new-relation-type-select,
+    .new-relation-id-input {
+        width: 100%;
+    }
+
+    .relation-add-fields {
+        flex-direction: column;
+    }
+
+    .sidebar-right.editing-mode {
+        margin-top: var(--spacing-md);
     }
 }

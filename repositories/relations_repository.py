@@ -6,6 +6,7 @@ Ordering convention:
 - sibling, non_duplicate: (min(id), max(id)) for consistency
 """
 
+import sqlite3
 from database import get_db_connection
 from typing import List, Dict, Optional, Set, Tuple
 
@@ -122,6 +123,75 @@ def get_relations_for_image(image_id: int) -> List[Dict]:
         return [dict(row) for row in cur.fetchall()]
 
 
+def get_relation_for_image(relation_id: int, image_id: int) -> Optional[Dict]:
+    """Get a single relation involving a specific image."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT ir.*,
+                   ia.filepath as filepath_a,
+                   ib.filepath as filepath_b
+            FROM image_relations ir
+            JOIN images ia ON ia.id = ir.image_id_a
+            JOIN images ib ON ib.id = ir.image_id_b
+            WHERE ir.id = ?
+              AND (ir.image_id_a = ? OR ir.image_id_b = ?)
+            LIMIT 1
+        """, (relation_id, image_id, image_id))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def get_image_by_id(image_id: int) -> Optional[Dict]:
+    """Get minimal image metadata by local image ID."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, filepath
+            FROM images
+            WHERE id = ?
+            LIMIT 1
+        """, (image_id,))
+        row = cur.fetchone()
+        return dict(row) if row else None
+
+
+def get_editable_relations_for_image(image_id: int) -> List[Dict]:
+    """Get relations formatted for editing from the perspective of one image."""
+    relations = [
+        relation for relation in get_relations_for_image(image_id)
+        if relation['relation_type'] in {'parent_child', 'sibling'}
+    ]
+    editable = []
+
+    for relation in relations:
+        if relation['relation_type'] == 'parent_child':
+            if relation['image_id_a'] == image_id:
+                other_image_id = relation['image_id_b']
+                other_filepath = relation['filepath_b']
+                display_type = 'child'
+            else:
+                other_image_id = relation['image_id_a']
+                other_filepath = relation['filepath_a']
+                display_type = 'parent'
+        else:
+            other_image_id = relation['image_id_b'] if relation['image_id_a'] == image_id else relation['image_id_a']
+            other_filepath = relation['filepath_b'] if relation['image_id_a'] == image_id else relation['filepath_a']
+            display_type = relation['relation_type']
+
+        editable.append({
+            'id': relation['id'],
+            'source': relation['source'],
+            'created_at': relation['created_at'],
+            'relation_type': relation['relation_type'],
+            'display_type': display_type,
+            'other_image_id': other_image_id,
+            'other_filepath': other_filepath,
+        })
+
+    return editable
+
+
 def delete_relation(id_a: int, id_b: int, relation_type: Optional[str] = None) -> bool:
     """
     Delete a relation between two images.
@@ -145,6 +215,213 @@ def delete_relation(id_a: int, id_b: int, relation_type: Optional[str] = None) -
             """, (id_a, id_b, id_b, id_a))
         conn.commit()
         return cur.rowcount > 0
+
+
+def delete_relation_by_id(relation_id: int) -> Optional[Dict]:
+    """Delete a relation by ID and return the deleted row metadata if found."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT ir.id, ir.image_id_a, ir.image_id_b, ir.relation_type,
+                   ia.filepath as filepath_a,
+                   ib.filepath as filepath_b
+            FROM image_relations ir
+            JOIN images ia ON ia.id = ir.image_id_a
+            JOIN images ib ON ib.id = ir.image_id_b
+            WHERE ir.id = ?
+            LIMIT 1
+        """, (relation_id,))
+        row = cur.fetchone()
+        if not row:
+            return None
+
+        cur.execute("DELETE FROM image_relations WHERE id = ?", (relation_id,))
+        conn.commit()
+        return dict(row)
+
+
+def _manual_parent_child_exists(parent_id: int, child_id: int, exclude_relation_id: Optional[int] = None) -> bool:
+    """Check whether a specific parent -> child edge already exists."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        if exclude_relation_id is None:
+            cur.execute("""
+                SELECT 1
+                FROM image_relations
+                WHERE relation_type = 'parent_child'
+                  AND image_id_a = ?
+                  AND image_id_b = ?
+                LIMIT 1
+            """, (parent_id, child_id))
+        else:
+            cur.execute("""
+                SELECT 1
+                FROM image_relations
+                WHERE relation_type = 'parent_child'
+                  AND image_id_a = ?
+                  AND image_id_b = ?
+                  AND id != ?
+                LIMIT 1
+            """, (parent_id, child_id, exclude_relation_id))
+        return cur.fetchone() is not None
+
+
+def _manual_parent_child_would_create_cycle(
+    parent_id: int,
+    child_id: int,
+    exclude_relation_id: Optional[int] = None,
+) -> bool:
+    """Check if adding parent -> child would create a cycle in the current graph."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        params = [child_id]
+        exclude_filter_root = ""
+        exclude_filter_recursive = ""
+        if exclude_relation_id is not None:
+            exclude_filter_root = "AND id != ?"
+            exclude_filter_recursive = "AND ir.id != ?"
+            params.append(exclude_relation_id)
+            params.append(exclude_relation_id)
+        params.append(parent_id)
+
+        cur.execute(f"""
+            WITH RECURSIVE descendants(id) AS (
+                SELECT image_id_b
+                FROM image_relations
+                WHERE relation_type = 'parent_child'
+                  AND image_id_a = ?
+                  {exclude_filter_root}
+                UNION
+                SELECT ir.image_id_b
+                FROM image_relations ir
+                JOIN descendants d ON ir.image_id_a = d.id
+                WHERE ir.relation_type = 'parent_child'
+                  {exclude_filter_recursive}
+            )
+            SELECT 1
+            FROM descendants
+            WHERE id = ?
+            LIMIT 1
+        """, params)
+        return cur.fetchone() is not None
+
+
+def validate_manual_parent_child(
+    parent_id: int,
+    child_id: int,
+    exclude_relation_id: Optional[int] = None,
+) -> None:
+    """Validate a manual parent -> child mutation against graph rules."""
+    if parent_id == child_id:
+        raise ValueError("An image cannot be its own parent")
+
+    parent_image = get_image_by_id(parent_id)
+    child_image = get_image_by_id(child_id)
+    if not parent_image or not child_image:
+        raise ValueError("One or both image IDs do not exist")
+
+    if _manual_parent_child_exists(parent_id, child_id, exclude_relation_id=exclude_relation_id):
+        raise ValueError("That parent/child relation already exists")
+
+    if _manual_parent_child_exists(child_id, parent_id, exclude_relation_id=exclude_relation_id):
+        raise ValueError("Cannot set both images as parent of each other")
+
+    if _manual_parent_child_would_create_cycle(parent_id, child_id, exclude_relation_id=exclude_relation_id):
+        raise ValueError("That parent/child relation would create a cycle")
+
+
+def _validate_manual_relation_target(image_id: int, other_image_id: int) -> None:
+    """Shared validation for manual relation writes."""
+    if image_id == other_image_id:
+        raise ValueError("An image cannot have a relation to itself")
+
+    if not get_image_by_id(image_id) or not get_image_by_id(other_image_id):
+        raise ValueError("One or both image IDs do not exist")
+
+
+def create_manual_relation(image_id: int, other_image_id: int, display_type: str) -> Dict:
+    """Create a manual relation from the perspective of one image."""
+    _validate_manual_relation_target(image_id, other_image_id)
+
+    if display_type == 'parent':
+        parent_id, child_id = other_image_id, image_id
+        validate_manual_parent_child(parent_id, child_id)
+        added = add_relation(parent_id, child_id, 'parent_child', 'manual')
+    elif display_type == 'child':
+        parent_id, child_id = image_id, other_image_id
+        validate_manual_parent_child(parent_id, child_id)
+        added = add_relation(parent_id, child_id, 'parent_child', 'manual')
+    elif display_type == 'sibling':
+        added = add_relation(image_id, other_image_id, 'sibling', 'manual')
+    else:
+        raise ValueError("display_type must be one of: parent, child, sibling")
+
+    if not added:
+        raise ValueError("That relation already exists")
+
+    relation = get_latest_relation_between(image_id, other_image_id)
+    if not relation:
+        raise ValueError("Relation was created but could not be loaded")
+    return relation
+
+
+def update_manual_relation(relation_id: int, image_id: int, other_image_id: int, display_type: str) -> Dict:
+    """Update a relation and mark the result as manual."""
+    existing = get_relation_for_image(relation_id, image_id)
+    if not existing:
+        raise ValueError("Relation not found")
+
+    _validate_manual_relation_target(image_id, other_image_id)
+
+    new_relation_type = 'parent_child' if display_type in {'parent', 'child'} else 'sibling' if display_type == 'sibling' else None
+    if not new_relation_type:
+        raise ValueError("display_type must be one of: parent, child, sibling")
+
+    if display_type == 'parent':
+        new_a, new_b = other_image_id, image_id
+        validate_manual_parent_child(new_a, new_b, exclude_relation_id=relation_id)
+    elif display_type == 'child':
+        new_a, new_b = image_id, other_image_id
+        validate_manual_parent_child(new_a, new_b, exclude_relation_id=relation_id)
+    else:
+        new_a, new_b = _normalize_pair(image_id, other_image_id, 'sibling')
+
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute("""
+                UPDATE image_relations
+                SET image_id_a = ?, image_id_b = ?, relation_type = ?, source = 'manual'
+                WHERE id = ?
+            """, (new_a, new_b, new_relation_type, relation_id))
+            conn.commit()
+        except sqlite3.IntegrityError as exc:
+            raise ValueError("That relation already exists") from exc
+
+    updated = get_relation_for_image(relation_id, image_id)
+    if not updated:
+        raise ValueError("Updated relation could not be loaded")
+    return updated
+
+
+def get_latest_relation_between(image_id: int, other_image_id: int) -> Optional[Dict]:
+    """Load the latest relation between two images for refresh after mutation."""
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT ir.*,
+                   ia.filepath as filepath_a,
+                   ib.filepath as filepath_b
+            FROM image_relations ir
+            JOIN images ia ON ia.id = ir.image_id_a
+            JOIN images ib ON ib.id = ir.image_id_b
+            WHERE (ir.image_id_a = ? AND ir.image_id_b = ?)
+               OR (ir.image_id_a = ? AND ir.image_id_b = ?)
+            ORDER BY ir.created_at DESC, ir.id DESC
+            LIMIT 1
+        """, (image_id, other_image_id, other_image_id, image_id))
+        row = cur.fetchone()
+        return dict(row) if row else None
 
 
 def get_related_images_from_relations(image_id: int) -> List[Dict]:

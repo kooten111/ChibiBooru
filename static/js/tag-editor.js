@@ -4,11 +4,14 @@ import { showNotification } from './utils/notifications.js';
 class TagEditor {
     constructor() {
         this.tags = {}; // Organized by category
+        this.relations = [];
         this.isEditing = false;
         this.originalTags = {};
+        this.originalRelations = [];
         this.debounceTimer = null;
         this.categories = ['artist', 'copyright', 'character', 'species', 'general', 'meta'];
         this.activeInputCategory = null;
+        this.nextTempRelationId = 1;
     }
 
     toggleEditMode() {
@@ -22,7 +25,9 @@ class TagEditor {
     startEditing() {
         // Get current tags from the page
         this.loadCurrentTags();
+        this.loadCurrentRelations();
         this.originalTags = JSON.parse(JSON.stringify(this.tags)); // Deep copy
+        this.originalRelations = JSON.parse(JSON.stringify(this.relations));
         this.isEditing = true;
 
         // Transform the display
@@ -42,7 +47,7 @@ class TagEditor {
         const editBtn = document.querySelector('.toolbar-btn.primary') || document.querySelector('.actions-grid .action-btn.primary');
         if (editBtn) {
             editBtn.innerHTML = '<span class="toolbar-icon">💾</span>';
-            editBtn.title = 'Save Tags';
+            editBtn.title = 'Save Changes';
             editBtn.classList.add('editing-mode');
         }
 
@@ -113,6 +118,29 @@ class TagEditor {
         });
     }
 
+    loadCurrentRelations() {
+        const relationDataEl = document.getElementById('manualRelationsData');
+        if (!relationDataEl) {
+            this.relations = [];
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(relationDataEl.textContent || '[]');
+            this.relations = Array.isArray(parsed) ? parsed.map(relation => ({
+                id: relation.id,
+                other_image_id: relation.other_image_id,
+                other_filepath: relation.other_filepath,
+                display_type: relation.display_type,
+                source: relation.source || 'manual',
+                created_at: relation.created_at || null
+            })) : [];
+        } catch (err) {
+            console.error('Failed to parse relation data:', err);
+            this.relations = [];
+        }
+    }
+
     renderEditMode() {
         const tagsList = document.querySelector('.tags-scroll');
         if (!tagsList) {
@@ -139,10 +167,19 @@ class TagEditor {
             container.classList.add('tag-editor-expanded');
         }
 
-        // Hide right sidebar completely
+        // Replace the right sidebar contents with the relations editor
         const sidebarRight = document.getElementById('sidebarRight');
         if (sidebarRight) {
-            sidebarRight.style.display = 'none';
+            sidebarRight.style.display = '';
+            sidebarRight.classList.add('editing-mode');
+
+            const rightContent = document.getElementById('sidebar-right-content');
+            if (rightContent) {
+                if (!rightContent.dataset.originalHtml) {
+                    rightContent.dataset.originalHtml = rightContent.innerHTML;
+                }
+                rightContent.innerHTML = this.renderRelationsSidebarHTML();
+            }
         }
 
         // Hide the normal tag display
@@ -246,28 +283,117 @@ class TagEditor {
         return titles[category] || category.charAt(0).toUpperCase() + category.slice(1);
     }
 
+    renderRelationsSidebarHTML() {
+        return `
+            <div class="inline-relations-editor panel" id="inlineRelationsEditor">
+                <div class="inline-relations-header">🔗 Relations</div>
+                <div class="inline-relations-body">
+                    <div class="edit-relations-help">
+                        Use local image IDs. Manual parent/child edits reject cycles and reverse parent links.
+                    </div>
+                    <div class="edit-category-tags edit-relations-list" id="relations-list">
+                        ${this.renderRelationsListHTML()}
+                    </div>
+                    <button class="add-tag-btn" id="addRelationBtn">
+                        + ADD RELATION
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    renderRelationsListHTML() {
+        if (!this.relations.length) {
+            return '<div class="edit-empty-state">No relations</div>';
+        }
+
+        return this.relations.map((relation, index) => this.renderRelationItemHTML(relation, index)).join('');
+    }
+
+    renderRelationItemHTML(relation, index) {
+        const relationId = escapeHtml(String(relation.id ?? `tmp-${index}`));
+        const filepath = escapeHtml(relation.other_filepath || '');
+        const source = escapeHtml(relation.source || 'manual');
+        const imageId = escapeHtml(String(relation.other_image_id));
+
+        return `
+            <div class="edit-tag-row edit-relation-row" data-relation-index="${index}" data-relation-id="${relationId}">
+                <button class="remove-tag-btn remove-relation-btn" data-relation-index="${index}">✖</button>
+                <div class="relation-summary">
+                    <span class="relation-target">#${imageId}</span>
+                    <span class="relation-path" title="${filepath}">${filepath}</span>
+                    <span class="relation-source">${source}</span>
+                </div>
+                <select class="relation-type-select" data-relation-index="${index}">
+                    ${this.renderRelationTypeOptions(relation.display_type)}
+                </select>
+            </div>
+        `;
+    }
+
+    renderRelationTypeOptions(selectedType) {
+        const types = [
+            ['parent', 'Parent'],
+            ['child', 'Child'],
+            ['sibling', 'Sibling']
+        ];
+
+        return types.map(([value, label]) =>
+            `<option value="${value}"${value === selectedType ? ' selected' : ''}>${label}</option>`
+        ).join('');
+    }
+
 
 
     attachEditEvents() {
         const editContainer = document.getElementById('inlineTagEditor');
-        if (!editContainer) return;
+        const relationsContainer = document.getElementById('inlineRelationsEditor');
+        if (!editContainer && !relationsContainer) return;
 
         // Add button click handlers
-        editContainer.querySelectorAll('.add-tag-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+        editContainer?.querySelectorAll('.add-tag-btn').forEach(btn => {
+            if (btn.id === 'addRelationBtn') {
+                return;
+            }
+            btn.addEventListener('click', () => {
                 const category = btn.getAttribute('data-category');
+                if (!category) {
+                    return;
+                }
                 this.showAddTagInput(category);
             });
         });
 
         // Remove button click handlers
-        editContainer.querySelectorAll('.remove-tag-btn').forEach(btn => {
+        editContainer?.querySelectorAll('.remove-tag-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
+                if (btn.classList.contains('remove-relation-btn')) {
+                    return;
+                }
                 const category = btn.getAttribute('data-category');
                 const index = parseInt(btn.getAttribute('data-index'));
                 this.removeTag(category, index);
             });
         });
+
+        relationsContainer?.querySelectorAll('.remove-relation-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.getAttribute('data-relation-index'), 10);
+                this.removeRelation(index);
+            });
+        });
+
+        relationsContainer?.querySelectorAll('.relation-type-select').forEach(select => {
+            select.addEventListener('change', () => {
+                const index = parseInt(select.getAttribute('data-relation-index'), 10);
+                this.updateRelationType(index, select.value);
+            });
+        });
+
+        const addRelationBtn = document.getElementById('addRelationBtn');
+        if (addRelationBtn) {
+            addRelationBtn.addEventListener('click', () => this.showAddRelationInput());
+        }
     }
 
     showAddTagInput(category) {
@@ -482,6 +608,176 @@ class TagEditor {
         });
     }
 
+    refreshRelations() {
+        const relationContainer = document.getElementById('relations-list');
+        if (!relationContainer) return;
+
+        relationContainer.innerHTML = this.renderRelationsListHTML();
+
+        relationContainer.querySelectorAll('.remove-relation-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const index = parseInt(btn.getAttribute('data-relation-index'), 10);
+                this.removeRelation(index);
+            });
+        });
+
+        relationContainer.querySelectorAll('.relation-type-select').forEach(select => {
+            select.addEventListener('change', () => {
+                const index = parseInt(select.getAttribute('data-relation-index'), 10);
+                this.updateRelationType(index, select.value);
+            });
+        });
+    }
+
+    showAddRelationInput() {
+        document.querySelectorAll('.add-relation-input-row').forEach(row => row.remove());
+
+        const relationContainer = document.getElementById('relations-list');
+        if (!relationContainer) return;
+
+        const inputRow = document.createElement('div');
+        inputRow.className = 'add-relation-input-row edit-tag-row edit-relation-row';
+        inputRow.innerHTML = `
+            <button class="remove-tag-btn cancel-add-relation-btn" type="button">✖</button>
+            <div class="relation-add-fields">
+                <input type="number" min="1" class="new-relation-id-input" placeholder="Target image ID">
+                <select class="new-relation-type-select">
+                    ${this.renderRelationTypeOptions('sibling')}
+                </select>
+            </div>
+        `;
+
+        relationContainer.appendChild(inputRow);
+
+        const idInput = inputRow.querySelector('.new-relation-id-input');
+        const typeSelect = inputRow.querySelector('.new-relation-type-select');
+        const cancelBtn = inputRow.querySelector('.cancel-add-relation-btn');
+
+        const commit = () => {
+            const otherImageId = parseInt(idInput.value, 10);
+            if (!Number.isInteger(otherImageId) || otherImageId <= 0) {
+                showNotification('Enter a valid target image ID', 'warning');
+                return;
+            }
+
+            this.addRelation(otherImageId, typeSelect.value);
+            inputRow.remove();
+        };
+
+        idInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                commit();
+            } else if (e.key === 'Escape') {
+                inputRow.remove();
+            }
+        });
+
+        typeSelect.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                commit();
+            }
+        });
+
+        cancelBtn.addEventListener('click', () => inputRow.remove());
+        idInput.focus();
+    }
+
+    addRelation(otherImageId, displayType) {
+        const currentImageId = this.getCurrentImageId();
+        if (!currentImageId) {
+            showNotification('Current image ID is unavailable', 'error');
+            return;
+        }
+
+        if (otherImageId === currentImageId) {
+            showNotification('An image cannot relate to itself', 'warning');
+            return;
+        }
+
+        if (this.relations.some(relation => relation.other_image_id === otherImageId)) {
+            showNotification('A relation to that image already exists', 'warning');
+            return;
+        }
+
+        this.relations.push({
+            id: `tmp-${this.nextTempRelationId++}`,
+            other_image_id: otherImageId,
+            other_filepath: '(will resolve on save)',
+            display_type: displayType,
+            source: 'manual',
+            created_at: null
+        });
+        this.refreshRelations();
+        showNotification('Relation staged', 'info');
+    }
+
+    removeRelation(index) {
+        const relation = this.relations[index];
+        if (!relation) {
+            return;
+        }
+
+        this.relations.splice(index, 1);
+        this.refreshRelations();
+        showNotification('Relation removed', 'info');
+    }
+
+    updateRelationType(index, displayType) {
+        if (!this.relations[index]) {
+            return;
+        }
+
+        this.relations[index].display_type = displayType;
+        showNotification('Relation updated', 'info');
+    }
+
+    getCurrentImageId() {
+        const imageId = parseInt(document.getElementById('imageId')?.value || '', 10);
+        return Number.isInteger(imageId) && imageId > 0 ? imageId : null;
+    }
+
+    getRelationChanges() {
+        const originalById = new Map(this.originalRelations.filter(relation => relation.id != null).map(relation => [String(relation.id), relation]));
+        const currentById = new Map(this.relations.filter(relation => relation.id != null && !String(relation.id).startsWith('tmp-')).map(relation => [String(relation.id), relation]));
+
+        const deletions = this.originalRelations
+            .filter(relation => relation.id != null)
+            .filter(relation => !currentById.has(String(relation.id)))
+            .map(relation => ({ relation_id: relation.id }));
+
+        const updates = this.relations
+            .filter(relation => relation.id != null && !String(relation.id).startsWith('tmp-'))
+            .filter(relation => {
+                const original = originalById.get(String(relation.id));
+                return original && original.display_type !== relation.display_type;
+            })
+            .map(relation => ({
+                relation_id: relation.id,
+                other_image_id: relation.other_image_id,
+                display_type: relation.display_type
+            }));
+
+        const creations = this.relations
+            .filter(relation => String(relation.id).startsWith('tmp-'))
+            .map(relation => ({
+                other_image_id: relation.other_image_id,
+                display_type: relation.display_type
+            }));
+
+        return { deletions, updates, creations };
+    }
+
+    hasTagChanges() {
+        return JSON.stringify(this.tags) !== JSON.stringify(this.originalTags);
+    }
+
+    hasRelationChanges() {
+        const { deletions, updates, creations } = this.getRelationChanges();
+        return deletions.length > 0 || updates.length > 0 || creations.length > 0;
+    }
+
     renderViewMode() {
         const editContainer = document.getElementById('inlineTagEditor');
         if (editContainer) {
@@ -524,13 +820,19 @@ class TagEditor {
         const sidebarRight = document.getElementById('sidebarRight');
         if (sidebarRight) {
             sidebarRight.style.display = '';
+            sidebarRight.classList.remove('editing-mode');
+        }
+
+        const rightContent = document.getElementById('sidebar-right-content');
+        if (rightContent && rightContent.dataset.originalHtml) {
+            rightContent.innerHTML = rightContent.dataset.originalHtml;
         }
 
         // Reset button
         const editBtn = document.querySelector('.toolbar-btn.primary') || document.querySelector('.actions-grid .action-btn.primary');
         if (editBtn) {
             editBtn.innerHTML = '<span class="toolbar-icon">📝</span>';
-            editBtn.title = 'Edit Tags';
+            editBtn.title = 'Edit Tags and Relations';
             editBtn.classList.remove('editing-mode');
         }
 
@@ -550,11 +852,23 @@ class TagEditor {
         this.hideSuggestions();
     }
 
-    saveTags() {
+    async saveTags() {
         const filepath = document.getElementById('imageFilepath')?.value;
+        const imageId = this.getCurrentImageId();
         if (!filepath) {
             console.error('No filepath found');
             showNotification('Error: No filepath', 'error');
+            return;
+        }
+        if (!imageId) {
+            console.error('No image ID found');
+            showNotification('Error: No image ID', 'error');
+            return;
+        }
+
+        if (!this.hasTagChanges() && !this.hasRelationChanges()) {
+            showNotification('No changes to save', 'info');
+            this.renderViewMode();
             return;
         }
 
@@ -574,47 +888,95 @@ class TagEditor {
             tags_meta: this.tags.meta.join(' ')
         };
 
-        fetch('/api/edit_tags', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                filepath: filepath,
-                categorized_tags: categorizedTags
-            })
-        })
-            .then(res => {
-                const contentType = res.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    console.error('Response is not JSON, got:', contentType);
-                    return res.text().then(text => {
-                        console.error('Response body:', text.substring(0, 500));
-                        throw new Error('Server returned non-JSON response');
-                    });
+        try {
+            if (this.hasTagChanges()) {
+                const tagResponse = await fetch('/api/edit_tags', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filepath: filepath,
+                        categorized_tags: categorizedTags
+                    })
+                });
+                const tagData = await this.parseJsonResponse(tagResponse);
+                if (tagData.status !== 'success' && tagData.success !== true) {
+                    throw new Error(tagData.error || 'Tag save failed');
                 }
-                return res.json();
-            })
-            .then(data => {
-                if (data.status === 'success') {
-                    showNotification('Tags saved!', 'success');
-                    this.renderViewMode();
-                    setTimeout(() => location.reload(), 500);
-                } else {
-                    throw new Error(data.error || 'Save failed');
-                }
-            })
-            .catch(err => {
-                console.error('Save error:', err);
-                showNotification('Failed to save: ' + err.message, 'error');
-                if (editBtn) {
-                    editBtn.innerHTML = '<span class="toolbar-icon">💾</span>';
-                    editBtn.title = 'Save Tags';
-                    editBtn.disabled = false;
-                }
+            }
+
+            if (this.hasRelationChanges()) {
+                await this.saveRelationChanges(imageId);
+            }
+
+            showNotification('Changes saved!', 'success');
+            this.renderViewMode();
+            setTimeout(() => location.reload(), 500);
+        } catch (err) {
+            console.error('Save error:', err);
+            showNotification('Failed to save: ' + err.message, 'error');
+            if (editBtn) {
+                editBtn.innerHTML = '<span class="toolbar-icon">💾</span>';
+                editBtn.title = 'Save Changes';
+                editBtn.disabled = false;
+            }
+        }
+    }
+
+    async saveRelationChanges(imageId) {
+        const { deletions, updates, creations } = this.getRelationChanges();
+
+        for (const relation of deletions) {
+            const response = await fetch(`/api/image-relations/${relation.relation_id}`, {
+                method: 'DELETE'
             });
+            await this.parseJsonResponse(response);
+        }
+
+        for (const relation of updates) {
+            const response = await fetch(`/api/image-relations/${relation.relation_id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_id: imageId,
+                    other_image_id: relation.other_image_id,
+                    display_type: relation.display_type
+                })
+            });
+            await this.parseJsonResponse(response);
+        }
+
+        for (const relation of creations) {
+            const response = await fetch('/api/image-relations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image_id: imageId,
+                    other_image_id: relation.other_image_id,
+                    display_type: relation.display_type
+                })
+            });
+            await this.parseJsonResponse(response);
+        }
+    }
+
+    async parseJsonResponse(response) {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Response is not JSON:', text.substring(0, 500));
+            throw new Error('Server returned non-JSON response');
+        }
+
+        const data = await response.json();
+        if (!response.ok || data.success === false) {
+            throw new Error(data.error || `Request failed with ${response.status}`);
+        }
+        return data;
     }
 
     cancelEdit() {
         this.tags = JSON.parse(JSON.stringify(this.originalTags));
+        this.relations = JSON.parse(JSON.stringify(this.originalRelations));
         this.renderViewMode();
         showNotification('Changes cancelled', 'info');
     }
@@ -732,4 +1094,3 @@ window.saveTags = saveTags;
 function saveTags() {
     window.tagEditor.saveTags();
 }
-

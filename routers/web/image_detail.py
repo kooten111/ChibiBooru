@@ -22,6 +22,7 @@ def register_routes(blueprint):
         
         # Use the merged tags function to include high-confidence local tagger predictions
         from repositories.data_access import get_image_details_with_merged_tags
+        from repositories import relations_repository
         from services import upscaler_service
         
         data = get_image_details_with_merged_tags(lookup_path)
@@ -84,7 +85,8 @@ def register_routes(blueprint):
             implied_tag_names=tag_data['implied_tag_names'],  # Tags implied by implication rules
             similar_sidebar_sources=sidebar_sources,
             similar_sidebar_show_chips=sidebar_show_chips,
-            information_panel_default_collapsed=information_panel_default_collapsed
+            information_panel_default_collapsed=information_panel_default_collapsed,
+            image_relations=relations_repository.get_editable_relations_for_image(data['id']) if data.get('id') else [],
         )
         
         # Add cache-busting headers for dynamic content

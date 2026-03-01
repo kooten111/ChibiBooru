@@ -7,7 +7,7 @@ import config
 from utils import api_handler
 from utils.file_utils import normalize_image_path
 from utils.request_helpers import require_json_body
-from utils.validation import validate_string
+from utils.validation import validate_string, validate_positive_integer, validate_enum
 import asyncio
 
 
@@ -202,3 +202,112 @@ async def get_image_similar(filepath):
         'parent_child_images': parent_child_images,
         'similar_images': similar_images
     })))
+
+
+@api_blueprint.route('/image/<path:filepath>/relations')
+@api_handler()
+async def get_image_relations(filepath):
+    """Get editable relations for a specific image."""
+    from repositories.data_access import get_image_details
+    from repositories import relations_repository
+
+    lookup_path = normalize_image_path(filepath)
+    data = await asyncio.to_thread(get_image_details, lookup_path)
+    if not data or not data.get('id'):
+        raise FileNotFoundError("Image not found")
+
+    relations = await asyncio.to_thread(
+        relations_repository.get_editable_relations_for_image,
+        data['id']
+    )
+    return _no_cache(await make_response(jsonify({
+        'image_id': data['id'],
+        'relations': relations,
+    })))
+
+
+@api_blueprint.route('/image-relations', methods=['POST'])
+@api_handler()
+async def create_image_relation():
+    """Create a manual image relation."""
+    data = await require_json_body(request)
+    image_id = validate_positive_integer(data.get('image_id'), 'image_id')
+    other_image_id = validate_positive_integer(data.get('other_image_id'), 'other_image_id')
+    display_type = validate_enum(data.get('display_type'), 'display_type', ['parent', 'child', 'sibling'])
+
+    from repositories import relations_repository
+    from core.cache_manager import invalidate_image_cache
+
+    created = await asyncio.to_thread(
+        relations_repository.create_manual_relation,
+        image_id,
+        other_image_id,
+        display_type,
+    )
+
+    invalidate_image_cache(created['filepath_a'])
+    invalidate_image_cache(created['filepath_b'])
+
+    return {
+        'status': 'success',
+        'message': 'Relation created',
+    }
+
+
+@api_blueprint.route('/image-relations/<int:relation_id>', methods=['PUT'])
+@api_handler()
+async def update_image_relation(relation_id):
+    """Update an existing relation as a manual edit."""
+    data = await require_json_body(request)
+    image_id = validate_positive_integer(data.get('image_id'), 'image_id')
+    other_image_id = validate_positive_integer(data.get('other_image_id'), 'other_image_id')
+    display_type = validate_enum(data.get('display_type'), 'display_type', ['parent', 'child', 'sibling'])
+
+    from repositories import relations_repository
+    from core.cache_manager import invalidate_image_cache
+
+    before = await asyncio.to_thread(
+        relations_repository.get_relation_for_image,
+        relation_id,
+        image_id,
+    )
+    if not before:
+        raise FileNotFoundError("Relation not found")
+
+    updated = await asyncio.to_thread(
+        relations_repository.update_manual_relation,
+        relation_id,
+        image_id,
+        other_image_id,
+        display_type,
+    )
+
+    invalidate_image_cache(before['filepath_a'])
+    invalidate_image_cache(before['filepath_b'])
+    invalidate_image_cache(updated['filepath_a'])
+    invalidate_image_cache(updated['filepath_b'])
+
+    return {
+        'status': 'success',
+        'message': 'Relation updated',
+    }
+
+
+@api_blueprint.route('/image-relations/<int:relation_id>', methods=['DELETE'])
+@api_handler()
+async def delete_image_relation(relation_id):
+    """Delete a relation by ID."""
+    from repositories import relations_repository
+    from core.cache_manager import invalidate_image_cache
+
+    deleted = await asyncio.to_thread(relations_repository.delete_relation_by_id, relation_id)
+    if not deleted:
+        raise FileNotFoundError("Relation not found")
+
+    invalidate_image_cache(deleted['filepath_a'])
+    invalidate_image_cache(deleted['filepath_b'])
+
+    return {
+        'status': 'success',
+        'message': 'Relation removed',
+    }
