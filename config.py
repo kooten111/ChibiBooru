@@ -72,6 +72,10 @@ INGEST_DIRECTORY = _get_setting('INGEST_DIRECTORY', "./ingest")
 TAGS_FILE = _get_setting('TAGS_FILE', "./tags.json")
 METADATA_DIR = _get_setting('METADATA_DIR', "./metadata")
 DATABASE_PATH = _get_setting('DATABASE_PATH', "./data/booru.db")
+DUPLICATE_REVIEW_CALIBRATION_LOG = _get_setting(
+    'DUPLICATE_REVIEW_CALIBRATION_LOG',
+    "./data/duplicate_review_calibration.jsonl",
+)
 
 # ==================== API KEYS ====================
 
@@ -223,6 +227,12 @@ enable_local = _get_setting('ENABLE_LOCAL_TAGGER', True)
 ENABLE_LOCAL_TAGGER = enable_local if isinstance(enable_local, bool) else str(enable_local).lower() in ('true', '1', 'yes')
 enable_dedup = _get_setting('ENABLE_DEDUPLICATION', True)
 ENABLE_DEDUPLICATION = enable_dedup if isinstance(enable_dedup, bool) else str(enable_dedup).lower() in ('true', '1', 'yes')
+enable_duplicate_review_calibration = _get_setting('ENABLE_DUPLICATE_REVIEW_CALIBRATION', False)
+ENABLE_DUPLICATE_REVIEW_CALIBRATION = (
+    enable_duplicate_review_calibration
+    if isinstance(enable_duplicate_review_calibration, bool)
+    else str(enable_duplicate_review_calibration).lower() in ('true', '1', 'yes')
+)
 
 # Local tagger behavior
 # If True, runs local tagger on ALL images (even when online sources are found)

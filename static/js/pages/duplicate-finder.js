@@ -32,11 +32,17 @@ let isLoading    = false;
 let isDraggingSlider = false;
 let isComparing  = false;
 let scanTaskId   = null;
+let suggestTaskId = null;
 let commitTaskId = null;
 let pollTimer    = null;
+let suggestPollTimer = null;
 let commitPollTimer = null;
 let phashBits    = 256;         // default for hash_size=16; updated from server
 let scanThreshold = 64;         // scan-time max distance; updated from server
+let suggestionLower = 0.10;
+let suggestionUpper = 0.20;
+let queueMode = 'distance';
+let suggestionCacheReady = false;
 
 // DOM refs
 let $content, $actionBar, $keyboardHints;
@@ -44,6 +50,9 @@ let $progressText, $progressFill, $pendingBadge;
 let $thresholdSlider, $thresholdValue;
 let $reviewOverlay, $reviewList;
 let $rescanBtn;
+let $suggestCacheBtn;
+let $suggestionLower, $suggestionUpper;
+let $queueMode;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,6 +76,19 @@ function confidenceClass(c) {
     if (c >= 85) return 'high';
     if (c >= 60) return 'medium';
     return 'low';
+}
+
+function suggestionClass(label) {
+    switch (label) {
+        case 'likely_duplicate': return 'duplicate';
+        case 'likely_variation': return 'variation';
+        case 'uncertain': return 'uncertain';
+        default: return 'unavailable';
+    }
+}
+
+function formatSignal(value) {
+    return typeof value === 'number' ? value.toFixed(3) : '—';
 }
 
 function actionLabel(action, detail) {
@@ -106,8 +128,20 @@ async function triggerScan(threshold = 15) {
     return api(`/api/duplicate-review/scan?threshold=${threshold}`, { method: 'POST' });
 }
 
+async function triggerSuggestionPrecompute() {
+    return api('/api/duplicate-review/precompute-suggestions', { method: 'POST' });
+}
+
 async function fetchQueue(threshold, offset = 0, limit = PAGE_SIZE) {
-    return api(`/api/duplicate-review/queue?threshold=${threshold}&offset=${offset}&limit=${limit}`);
+    const params = new URLSearchParams({
+        threshold,
+        offset,
+        limit,
+        suggestion_lower: suggestionLower,
+        suggestion_upper: suggestionUpper,
+        queue_mode: queueMode
+    });
+    return api(`/api/duplicate-review/queue?${params.toString()}`);
 }
 
 async function pollTaskStatus(taskId) {
@@ -132,6 +166,13 @@ function setRescanEnabled(enabled) {
     }
 }
 
+function setSuggestCacheEnabled(enabled) {
+    if ($suggestCacheBtn) {
+        $suggestCacheBtn.disabled = !enabled;
+        $suggestCacheBtn.title = enabled ? 'Precompute duplicate suggestion scores' : 'Suggestion cache build in progress…';
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Boot: check cache → scan or load
 // ---------------------------------------------------------------------------
@@ -143,6 +184,13 @@ async function boot() {
         // Adapt slider to server's hash size / scan threshold
         if (stats.phash_bits) phashBits = stats.phash_bits;
         if (stats.scan_threshold) scanThreshold = stats.scan_threshold;
+        suggestionCacheReady = Boolean(stats.suggestion_cache_ready);
+        if (stats.suggestion_thresholds) {
+            suggestionLower = stats.suggestion_thresholds.lower ?? suggestionLower;
+            suggestionUpper = stats.suggestion_thresholds.upper ?? suggestionUpper;
+            syncSuggestionInputs();
+        }
+        updateSuggestCacheButton();
         {
             const maxThreshold = scanThreshold || Math.min(Math.round(phashBits / 4), 64);
             $thresholdSlider.max = maxThreshold;
@@ -196,6 +244,20 @@ async function startScan() {
     }
 }
 
+async function startSuggestionPrecompute() {
+    try {
+        showLoadingSpinner('Starting suggestion cache build…');
+        setSuggestCacheEnabled(false);
+        const resp = await triggerSuggestionPrecompute();
+        suggestTaskId = resp.task_id;
+        showNotification('Duplicate suggestion cache build started.', 'info');
+        startSuggestPolling();
+    } catch (err) {
+        setSuggestCacheEnabled(true);
+        renderError(`Suggestion cache build failed: ${err.message}`);
+    }
+}
+
 function startPolling() {
     stopPolling();
     pollTimer = setInterval(pollProgress, POLL_MS);
@@ -203,6 +265,15 @@ function startPolling() {
 
 function stopPolling() {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+
+function startSuggestPolling() {
+    stopSuggestPolling();
+    suggestPollTimer = setInterval(pollSuggestProgress, POLL_MS);
+}
+
+function stopSuggestPolling() {
+    if (suggestPollTimer) { clearInterval(suggestPollTimer); suggestPollTimer = null; }
 }
 
 async function pollProgress() {
@@ -233,6 +304,36 @@ async function pollProgress() {
     }
 }
 
+async function pollSuggestProgress() {
+    if (!suggestTaskId) { stopSuggestPolling(); return; }
+    try {
+        const s = await pollTaskStatus(suggestTaskId);
+        if (s.status === 'running' || s.status === 'pending') {
+            const pct = s.total ? Math.round(s.progress / s.total * 100) : 0;
+            showLoadingSpinner(s.message || `Scoring duplicate pairs… ${pct}%`, pct);
+        } else if (s.status === 'completed') {
+            stopSuggestPolling();
+            suggestTaskId = null;
+            setSuggestCacheEnabled(true);
+            suggestionCacheReady = true;
+            updateSuggestCacheButton();
+            const r = s.result || {};
+            showNotification(`Suggestion cache complete — ${r.pair_count ?? 0} pairs scored in ${r.elapsed_seconds ?? '?'}s`, 'success');
+            await loadPage(0);
+        } else {
+            stopSuggestPolling();
+            suggestTaskId = null;
+            setSuggestCacheEnabled(true);
+            renderError(s.error || s.message || 'Suggestion cache build failed');
+        }
+    } catch (err) {
+        stopSuggestPolling();
+        suggestTaskId = null;
+        setSuggestCacheEnabled(true);
+        renderError(`Suggestion cache poll error: ${err.message}`);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Page loading
 // ---------------------------------------------------------------------------
@@ -245,12 +346,25 @@ async function loadPage(offset) {
         const data = await fetchQueue(threshold, offset, PAGE_SIZE);
         if (data.phash_bits) phashBits = data.phash_bits;
         if (data.scan_threshold) scanThreshold = data.scan_threshold;
+        suggestionCacheReady = data.suggestion_cache_ready !== false;
+        if (data.suggestion_thresholds) {
+            suggestionLower = data.suggestion_thresholds.lower ?? suggestionLower;
+            suggestionUpper = data.suggestion_thresholds.upper ?? suggestionUpper;
+            syncSuggestionInputs();
+        }
+        if (data.queue_mode) {
+            queueMode = data.queue_mode;
+            syncQueueModeInput();
+        }
         pairs = data.pairs;
         totalPairs = data.total;
         pageOffset = offset;
         currentIndex = 0;
+        updateSuggestCacheButton();
 
-        if (pairs.length > 0) {
+        if (!suggestionCacheReady && queueMode !== 'distance') {
+            renderSuggestionCachePrompt();
+        } else if (pairs.length > 0) {
             $actionBar.style.display = '';
             $keyboardHints.style.display = '';
             renderPair();
@@ -296,6 +410,22 @@ function renderError(msg) {
     document.getElementById('btnRetry')?.addEventListener('click', boot);
 }
 
+function renderSuggestionCachePrompt() {
+    $actionBar.style.display = 'none';
+    $keyboardHints.style.display = 'none';
+    $content.innerHTML = `
+        <div class="dup-state-message">
+            <div class="icon">🧠</div>
+            <h2>Suggestion cache required</h2>
+            <p>${queueMode === 'likely_duplicates'
+                ? 'Likely Duplicates Only needs the duplicate suggestion cache.'
+                : 'Duplicate First needs the duplicate suggestion cache.'}
+               Build it in the background to rank all current pairs with progress.</p>
+            <button class="dup-scan-btn" id="btnBuildSuggestionCache">Build Suggestion Cache</button>
+        </div>`;
+    document.getElementById('btnBuildSuggestionCache')?.addEventListener('click', startSuggestionPrecompute);
+}
+
 function renderPair() {
     if (pairs.length === 0) { renderEmpty(); return; }
 
@@ -330,6 +460,8 @@ function renderPair() {
     const pixB = (b.width || 0) * (b.height || 0);
     const key = pairKey(a.id, b.id);
     const staged = stagedActions.get(key);
+    const suggestion = pair.suggestion || {};
+    const suggestionMetrics = suggestion.metrics || {};
 
     const modeClass = `mode-${compareMode}`;
     let stageClassA = '', stageClassB = '', badgeA = '', badgeB = '';
@@ -387,6 +519,23 @@ function renderPair() {
                      style="width: ${pair.confidence}%"></div>
             </div>
             <span class="dup-confidence-text">${pair.distance === 0 ? 'Identical' : pair.confidence + '% match'} · distance ${pair.distance}</span>
+        </div>
+
+        <div class="dup-suggestion-card ${suggestionClass(suggestion.label)}">
+            <div class="dup-suggestion-header">
+                <span class="dup-suggestion-badge">${suggestion.text || 'No suggestion'}</span>
+                <span class="dup-suggestion-signal">signal ${formatSignal(suggestion.signal)}</span>
+            </div>
+            <div class="dup-suggestion-meta">
+                bounds ${suggestionLower.toFixed(2)} / ${suggestionUpper.toFixed(2)}
+                · visual ${formatSignal(suggestionMetrics.visual_signal)}
+                · meta+ ${formatSignal(suggestionMetrics.metadata_adjustment)}
+                · px ${formatSignal(suggestionMetrics.pixel_ratio)}
+                · file ${formatSignal(suggestionMetrics.filesize_ratio)}
+                · changed ${formatSignal(suggestionMetrics.changed_ratio)}
+                · blob ${formatSignal(suggestionMetrics.largest_blob_ratio)}
+                · peak ${formatSignal(suggestionMetrics.peak_blob_contrast)}
+            </div>
         </div>
     `;
 
@@ -633,7 +782,8 @@ async function commitAll() {
             image_id_a: pair.image_a.id,
             image_id_b: pair.image_b.id,
             action,
-            detail: detail || undefined
+            detail: detail || undefined,
+            suggestion: pair.suggestion || null
         });
     }
 
@@ -698,8 +848,15 @@ async function pollCommitProgress() {
             stopCommitPolling();
             commitTaskId = null;
             const result = s.result || {};
-            const msg = `Done: ${result.success_count} succeeded` +
-                        (result.error_count > 0 ? `, ${result.error_count} failed` : '');
+            const calibration = result.calibration || {};
+            let msg = `Done: ${result.success_count} succeeded` +
+                      (result.error_count > 0 ? `, ${result.error_count} failed` : '');
+            if (calibration.logged) {
+                msg += ` · calibration ${calibration.matches || 0} match, ${calibration.uncertain || 0} uncertain, ${calibration.mismatches || 0} mismatch`;
+            }
+            if (result.calibration_log_path) {
+                console.info('Duplicate review calibration log:', result.calibration_log_path);
+            }
 
             if (result.error_count > 0) {
                 showNotification(msg, 'warning', 6000);
@@ -792,6 +949,20 @@ function closeRelatedMenu() {
     if (menu) menu.classList.remove('open');
 }
 
+function syncSuggestionInputs() {
+    if ($suggestionLower) $suggestionLower.value = suggestionLower.toFixed(2);
+    if ($suggestionUpper) $suggestionUpper.value = suggestionUpper.toFixed(2);
+}
+
+function syncQueueModeInput() {
+    if ($queueMode) $queueMode.value = queueMode;
+}
+
+function updateSuggestCacheButton() {
+    if (!$suggestCacheBtn) return;
+    $suggestCacheBtn.style.display = queueMode === 'distance' && suggestionCacheReady ? 'none' : '';
+}
+
 // ---------------------------------------------------------------------------
 // Init
 // ---------------------------------------------------------------------------
@@ -807,11 +978,19 @@ function init() {
     $reviewOverlay  = document.getElementById('reviewOverlay');
     $reviewList     = document.getElementById('reviewList');
     $rescanBtn      = document.getElementById('btnRescanToolbar');
+    $suggestCacheBtn = document.getElementById('btnSuggestCacheToolbar');
+    $suggestionLower = document.getElementById('suggestionLower');
+    $suggestionUpper = document.getElementById('suggestionUpper');
+    $queueMode = document.getElementById('queueMode');
 
     // Re-scan button (hidden until cache exists)
     if ($rescanBtn) {
         $rescanBtn.style.display = 'none';
         $rescanBtn.addEventListener('click', startScan);
+    }
+    if ($suggestCacheBtn) {
+        $suggestCacheBtn.style.display = 'none';
+        $suggestCacheBtn.addEventListener('click', startSuggestionPrecompute);
     }
 
     // Mode buttons
@@ -825,6 +1004,26 @@ function init() {
         $thresholdValue.textContent = $thresholdSlider.value;
         clearTimeout(thresholdDebounce);
         thresholdDebounce = setTimeout(() => loadPage(0), 400);
+    });
+
+    let suggestionDebounce;
+    [$suggestionLower, $suggestionUpper].forEach(input => {
+        input?.addEventListener('input', () => {
+            clearTimeout(suggestionDebounce);
+            suggestionDebounce = setTimeout(() => {
+                const nextLower = parseFloat($suggestionLower.value);
+                const nextUpper = parseFloat($suggestionUpper.value);
+                if (!Number.isNaN(nextLower)) suggestionLower = nextLower;
+                if (!Number.isNaN(nextUpper)) suggestionUpper = nextUpper;
+                loadPage(0);
+            }, 300);
+        });
+    });
+
+    $queueMode?.addEventListener('change', () => {
+        queueMode = $queueMode.value;
+        updateSuggestCacheButton();
+        loadPage(0);
     });
 
     // Action buttons

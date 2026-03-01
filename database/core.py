@@ -519,6 +519,32 @@ def initialize_database():
         """)
 
         # ===================================================================
+        # Pre-computed Duplicate Pair Suggestion Scores
+        # ===================================================================
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS duplicate_pair_suggestions (
+            image_id_a INTEGER NOT NULL,
+            image_id_b INTEGER NOT NULL,
+            signal REAL NOT NULL,
+            visual_signal REAL NOT NULL,
+            metadata_adjustment REAL NOT NULL,
+            mean_abs_diff REAL NOT NULL,
+            changed_ratio REAL NOT NULL,
+            largest_blob_ratio REAL NOT NULL,
+            blob_count INTEGER NOT NULL,
+            peak_blob_contrast REAL NOT NULL,
+            mask_mismatch REAL NOT NULL,
+            pixel_ratio REAL NOT NULL,
+            filesize_ratio REAL NOT NULL,
+            tag_gap_ratio REAL NOT NULL,
+            computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (image_id_a, image_id_b),
+            FOREIGN KEY (image_id_a) REFERENCES images(id) ON DELETE CASCADE,
+            FOREIGN KEY (image_id_b) REFERENCES images(id) ON DELETE CASCADE
+        )
+        """)
+
+        # ===================================================================
         # Similarity Cache Table
         # ===================================================================
         # Pre-computed similarity results for fast sidebar lookups
@@ -586,6 +612,8 @@ def initialize_database():
         cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_pairs_threshold ON duplicate_pairs(threshold, distance)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_pairs_image_a ON duplicate_pairs(image_id_a)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_pairs_image_b ON duplicate_pairs(image_id_b)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_suggestions_signal ON duplicate_pair_suggestions(signal)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dup_suggestions_computed_at ON duplicate_pair_suggestions(computed_at)")
 
         # Similarity cache indexes
         cur.execute("CREATE INDEX IF NOT EXISTS idx_similar_lookup ON similar_images_cache(source_image_id, similarity_type, rank)")

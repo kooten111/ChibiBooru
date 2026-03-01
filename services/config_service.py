@@ -375,6 +375,12 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'Enable MD5-based duplicate detection',
         'editable': True,
     },
+    'ENABLE_DUPLICATE_REVIEW_CALIBRATION': {
+        'category': 'Feature Flags',
+        'type': 'bool',
+        'description': 'Log duplicate review calibration samples to JSONL for analysis',
+        'editable': True,
+    },
     'APPLY_IMPLICATIONS_ON_INGEST': {
         'category': 'Feature Flags',
         'type': 'bool',

@@ -41,6 +41,17 @@ async def duplicate_review_scan():
     )
 
 
+@api_blueprint.route('/duplicate-review/precompute-suggestions', methods=['POST'])
+@api_handler()
+async def duplicate_review_precompute_suggestions():
+    """Trigger a background suggestion-cache build for duplicate review."""
+    return await start_background_task(
+        duplicate_review_service.run_duplicate_suggestion_task,
+        message="Duplicate suggestion cache build started",
+        task_id_prefix="dup_suggest",
+    )
+
+
 @api_blueprint.route('/duplicate-review/queue')
 @api_handler()
 async def get_duplicate_review_queue():
@@ -52,12 +63,18 @@ async def get_duplicate_review_queue():
     threshold = request.args.get('threshold', 5, type=int)
     offset = request.args.get('offset', 0, type=int)
     limit = request.args.get('limit', 50, type=int)
+    suggestion_lower = request.args.get('suggestion_lower', None, type=float)
+    suggestion_upper = request.args.get('suggestion_upper', None, type=float)
+    queue_mode = request.args.get('queue_mode', 'distance', type=str)
 
     result = await asyncio.to_thread(
         duplicate_review_service.get_duplicate_queue,
         threshold=threshold,
         offset=offset,
         limit=limit,
+        suggestion_lower=suggestion_lower,
+        suggestion_upper=suggestion_upper,
+        queue_mode=queue_mode,
     )
     return result
 
