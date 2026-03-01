@@ -321,9 +321,22 @@ def get_duplicate_queue(
     Read from duplicate_pairs cache, filter by threshold, exclude
     already-reviewed pairs, enrich with metadata, and paginate.
 
+    Filtering is done at the SQL level via NOT EXISTS so that LIMIT/OFFSET
+    paginate correctly over only the unreviewed pairs.
+
     Returns dict with 'pairs', 'total', 'offset', 'limit'.
     """
-    reviewed = relations_repository.get_all_reviewed_pairs()
+    # Subquery that matches any relation between the two images.
+    # duplicate_pairs always stores (min_id, max_id).  image_relations
+    # normalises sibling/non_duplicate the same way, but parent_child
+    # preserves direction — so we check both orderings.
+    _NOT_REVIEWED = """
+        NOT EXISTS (
+            SELECT 1 FROM image_relations ir
+            WHERE (ir.image_id_a = dp.image_id_a AND ir.image_id_b = dp.image_id_b)
+               OR (ir.image_id_a = dp.image_id_b AND ir.image_id_b = dp.image_id_a)
+        )
+    """
 
     with get_db_connection() as conn:
         cur = conn.cursor()
@@ -336,38 +349,27 @@ def get_duplicate_queue(
         if not scan_threshold:
             scan_threshold = max(config.PHASH_BITS // 4, 1)
 
-        # Total unreviewed count at this threshold
+        # Accurate unreviewed count at this threshold
         cur.execute(
-            "SELECT COUNT(*) as cnt FROM duplicate_pairs WHERE distance <= ?",
+            f"SELECT COUNT(*) as cnt FROM duplicate_pairs dp"
+            f" WHERE dp.distance <= ? AND {_NOT_REVIEWED}",
             (threshold,),
         )
-        raw_total = cur.fetchone()['cnt']
+        total_unreviewed = cur.fetchone()['cnt']
 
-        # Fetch a chunk — over-fetch to compensate for reviewed-pair filtering
-        fetch_limit = limit + len(reviewed) + 100
+        # Fetch the requested page — filtering + pagination handled by SQL
         cur.execute(
-            """SELECT image_id_a, image_id_b, distance
-               FROM duplicate_pairs
-               WHERE distance <= ?
-               ORDER BY distance ASC
-               LIMIT ? OFFSET ?""",
-            (threshold, fetch_limit, max(0, offset - len(reviewed))),
+            f"""SELECT dp.image_id_a, dp.image_id_b, dp.distance
+                FROM duplicate_pairs dp
+                WHERE dp.distance <= ? AND {_NOT_REVIEWED}
+                ORDER BY dp.distance ASC
+                LIMIT ? OFFSET ?""",
+            (threshold, limit, offset),
         )
         rows = cur.fetchall()
 
-    # Filter out reviewed pairs and defend against any reversed duplicates
     pairs = []
-    skipped = 0
-    seen = set()
     for row in rows:
-        pk = (min(row['image_id_a'], row['image_id_b']),
-              max(row['image_id_a'], row['image_id_b']))
-        if pk in reviewed or pk in seen:
-            skipped += 1
-            continue
-        seen.add(pk)
-        if len(pairs) >= limit:
-            break
         distance = row['distance']
         # Scale confidence against scan_threshold (not full PHASH_BITS)
         # so the 0-100% range spans the distances we actually store.
@@ -378,10 +380,6 @@ def get_duplicate_queue(
             'distance': distance,
             'confidence': confidence,
         })
-
-    total_unreviewed = raw_total - len(reviewed)  # approximate
-    if total_unreviewed < 0:
-        total_unreviewed = 0
 
     return {
         'pairs': pairs,
