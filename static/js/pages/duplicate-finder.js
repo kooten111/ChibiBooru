@@ -17,6 +17,7 @@ import { showNotification } from '../utils/notifications.js';
 // ---------------------------------------------------------------------------
 const PAGE_SIZE = 50;
 const POLL_MS  = 1000;
+const LOW_CONFIDENCE_THRESHOLD = 60;
 
 // ---------------------------------------------------------------------------
 // State
@@ -51,6 +52,7 @@ let $thresholdSlider, $thresholdValue;
 let $reviewOverlay, $reviewList;
 let $rescanBtn;
 let $suggestCacheBtn;
+let $bulkSiblingBtn;
 let $suggestionLower, $suggestionUpper;
 let $queueMode;
 
@@ -108,6 +110,14 @@ function actionBadgeClass(action) {
     if (action.startsWith('delete')) return 'delete';
     if (action === 'non_duplicate') return 'non-dup';
     return 'related';
+}
+
+function isLowConfidence(pair) {
+    return Number(pair?.confidence ?? 0) < LOW_CONFIDENCE_THRESHOLD;
+}
+
+function isVariationSuggestion(pair) {
+    return pair?.suggestion?.label === 'likely_variation';
 }
 
 // ---------------------------------------------------------------------------
@@ -169,7 +179,18 @@ function setRescanEnabled(enabled) {
 function setSuggestCacheEnabled(enabled) {
     if ($suggestCacheBtn) {
         $suggestCacheBtn.disabled = !enabled;
-        $suggestCacheBtn.title = enabled ? 'Precompute duplicate suggestion scores' : 'Suggestion cache build in progress…';
+        $suggestCacheBtn.title = enabled
+            ? (suggestionCacheReady ? 'Rebuild duplicate suggestion scores' : 'Precompute duplicate suggestion scores')
+            : 'Suggestion cache build in progress…';
+    }
+}
+
+function setBulkSiblingEnabled(enabled) {
+    if ($bulkSiblingBtn) {
+        $bulkSiblingBtn.disabled = !enabled;
+        $bulkSiblingBtn.title = enabled
+            ? `Stage all current 'Suggest variation' pairs as siblings, except low-confidence matches (< ${LOW_CONFIDENCE_THRESHOLD}%)`
+            : 'Bulk stage in progress…';
     }
 }
 
@@ -630,6 +651,77 @@ function preloadPair(index) {
     [p.image_a, p.image_b].forEach(img => { new Image().src = `/static/${img.path}`; });
 }
 
+async function stageSuggestedVariationsAsSiblings() {
+    if (isLoading) return;
+
+    const threshold = parseInt($thresholdSlider.value, 10);
+    const originalPageOffset = pageOffset;
+    const originalIndex = currentIndex;
+    const counts = {
+        staged: 0,
+        lowConfidence: 0,
+        alreadyStaged: 0
+    };
+
+    isLoading = true;
+    setBulkSiblingEnabled(false);
+    showLoadingSpinner('Scanning queue for suggested sibling pairs…');
+
+    try {
+        for (let offset = 0; ; offset += PAGE_SIZE) {
+            const data = await fetchQueue(threshold, offset, PAGE_SIZE);
+            const pagePairs = data.pairs || [];
+            if (pagePairs.length === 0) break;
+
+            for (const pair of pagePairs) {
+                const key = pairKey(pair.image_a.id, pair.image_b.id);
+                if (stagedActions.has(key)) {
+                    counts.alreadyStaged += 1;
+                    continue;
+                }
+                if (!isVariationSuggestion(pair)) continue;
+                if (isLowConfidence(pair)) {
+                    counts.lowConfidence += 1;
+                    continue;
+                }
+
+                stagedActions.set(key, {
+                    action: 'related',
+                    detail: 'sibling',
+                    pair
+                });
+                counts.staged += 1;
+            }
+
+            if (pagePairs.length < PAGE_SIZE) break;
+        }
+
+        updateProgress();
+        await loadPage(originalPageOffset);
+        currentIndex = Math.min(originalIndex, Math.max(0, pairs.length - 1));
+        if (pairs.length > 0) renderPair();
+
+        if (counts.staged > 0) {
+            showNotification(
+                `Staged ${counts.staged} suggested variation pair(s) as siblings. Skipped ${counts.lowConfidence} low-confidence pair(s).`,
+                'success',
+                5000
+            );
+        } else {
+            showNotification(
+                `No eligible suggested variation pairs found. Skipped ${counts.lowConfidence} low-confidence pair(s).`,
+                'info',
+                5000
+            );
+        }
+    } catch (err) {
+        renderError(`Bulk stage failed: ${err.message}`);
+    } finally {
+        isLoading = false;
+        setBulkSiblingEnabled(true);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Navigation
 // ---------------------------------------------------------------------------
@@ -960,7 +1052,9 @@ function syncQueueModeInput() {
 
 function updateSuggestCacheButton() {
     if (!$suggestCacheBtn) return;
-    $suggestCacheBtn.style.display = queueMode === 'distance' && suggestionCacheReady ? 'none' : '';
+    $suggestCacheBtn.style.display = '';
+    $suggestCacheBtn.textContent = suggestionCacheReady ? '◎ Rebuild Suggestions' : '◎ Suggest Cache';
+    setSuggestCacheEnabled(!suggestTaskId);
 }
 
 // ---------------------------------------------------------------------------
@@ -979,6 +1073,7 @@ function init() {
     $reviewList     = document.getElementById('reviewList');
     $rescanBtn      = document.getElementById('btnRescanToolbar');
     $suggestCacheBtn = document.getElementById('btnSuggestCacheToolbar');
+    $bulkSiblingBtn = document.getElementById('btnBulkSiblingToolbar');
     $suggestionLower = document.getElementById('suggestionLower');
     $suggestionUpper = document.getElementById('suggestionUpper');
     $queueMode = document.getElementById('queueMode');
@@ -991,6 +1086,10 @@ function init() {
     if ($suggestCacheBtn) {
         $suggestCacheBtn.style.display = 'none';
         $suggestCacheBtn.addEventListener('click', startSuggestionPrecompute);
+    }
+    if ($bulkSiblingBtn) {
+        setBulkSiblingEnabled(true);
+        $bulkSiblingBtn.addEventListener('click', stageSuggestedVariationsAsSiblings);
     }
 
     // Mode buttons
