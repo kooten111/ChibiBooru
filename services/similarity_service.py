@@ -974,7 +974,12 @@ def get_hash_coverage_stats() -> Dict:
 
 def _get_family_filepaths(filepath: str) -> set:
     """
-    Get filepaths of all images in the same parent/child family chain.
+    Get filepaths of directly related images that should be excluded from similarity.
+
+    Canonical source is the image_relations table, which includes manual
+    sibling/parent/child links created via duplicate review. We also keep the
+    legacy metadata-based lookup as a fallback/union so older records without
+    backfilled relations are still excluded.
     
     Args:
         filepath: Path to the reference image (relative, without 'images/' prefix)
@@ -987,9 +992,9 @@ def _get_family_filepaths(filepath: str) -> set:
     with get_db_connection() as conn:
         cursor = conn.cursor()
         
-        # Get the reference image's post_id and parent_id
+        # Get the reference image's local id plus legacy metadata fields.
         cursor.execute("""
-            SELECT post_id, parent_id
+            SELECT id, post_id, parent_id
             FROM images
             WHERE filepath = ?
         """, (filepath,))
@@ -997,11 +1002,23 @@ def _get_family_filepaths(filepath: str) -> set:
         
         if not ref_row:
             return family
+
+        image_id = ref_row['id']
+        if image_id:
+            try:
+                from repositories import relations_repository
+                related = relations_repository.get_related_images_from_relations(image_id)
+                for img in related:
+                    related_path = img.get('path')
+                    if related_path:
+                        family.add(related_path[7:] if related_path.startswith('images/') else related_path)
+            except Exception as e:
+                print(f"[Similarity] Error getting relations-backed family for {filepath}: {e}")
         
         post_id = ref_row['post_id']
         parent_id = ref_row['parent_id']
         
-        # Get children (images where parent_id matches our post_id)
+        # Legacy metadata fallback: direct children.
         if post_id:
             cursor.execute("""
                 SELECT filepath FROM images WHERE parent_id = ?
@@ -1009,7 +1026,7 @@ def _get_family_filepaths(filepath: str) -> set:
             for row in cursor.fetchall():
                 family.add(row['filepath'])
         
-        # Get parent (image whose post_id matches our parent_id)
+        # Legacy metadata fallback: direct parent plus siblings with same parent.
         if parent_id:
             cursor.execute("""
                 SELECT filepath FROM images WHERE post_id = ?

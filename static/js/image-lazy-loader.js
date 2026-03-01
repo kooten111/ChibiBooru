@@ -7,7 +7,17 @@
 (function () {
     'use strict';
 
-    const currentFilepath = window.location.pathname.replace('/view/', '');
+    function getCurrentFilepath() {
+        const rawPath = window.location.pathname.replace('/view/', '');
+        try {
+            return decodeURIComponent(rawPath);
+        } catch (error) {
+            console.warn('Failed to decode current filepath from URL, using raw path:', error);
+            return rawPath;
+        }
+    }
+
+    const currentFilepath = getCurrentFilepath();
 
     /**
      * URL-encode a path while preserving forward slashes

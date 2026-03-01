@@ -1,4 +1,4 @@
-from quart import request, jsonify, send_file
+from quart import request, jsonify, send_file, make_response
 from . import api_blueprint
 from services import image_service, tag_service
 from services.switch_source_db import switch_metadata_source_db, merge_all_sources
@@ -9,6 +9,12 @@ from utils.file_utils import normalize_image_path
 from utils.request_helpers import require_json_body
 from utils.validation import validate_string
 import asyncio
+
+
+def _no_cache(response):
+    """Mark a response as uncacheable so browsers always fetch fresh data."""
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    return response
 
 @api_blueprint.route('/images')
 @api_handler()
@@ -129,7 +135,7 @@ async def get_image_deltas(filepath):
     """Get tag deltas for a specific image (lazy-loaded)."""
     lookup_path = normalize_image_path(filepath)
     tag_deltas = await asyncio.to_thread(models.get_image_deltas, lookup_path)
-    return jsonify(tag_deltas or [])
+    return _no_cache(await make_response(jsonify(tag_deltas or [])))
 
 @api_blueprint.route('/image/<path:filepath>/pools')
 @api_handler()
@@ -139,9 +145,9 @@ async def get_image_pools(filepath):
     lookup_path = normalize_image_path(filepath)
     data = await asyncio.to_thread(get_image_details, lookup_path)
     if not data or not data.get('id'):
-        return jsonify([])
+        return _no_cache(await make_response(jsonify([])))
     pools = await asyncio.to_thread(models.get_pools_for_image, data['id'])
-    return jsonify(pools or [])
+    return _no_cache(await make_response(jsonify(pools or [])))
 
 @api_blueprint.route('/image/<path:filepath>/similar')
 @api_handler()
@@ -157,7 +163,7 @@ async def get_image_similar(filepath):
     # Get image data for family filtering
     data = await asyncio.to_thread(get_image_details_with_merged_tags, lookup_path)
     if not data:
-        return jsonify({'parent_child_images': [], 'similar_images': []})
+        return _no_cache(await make_response(jsonify({'parent_child_images': [], 'similar_images': []})))
     
     image_id = data.get('id')
     
@@ -172,11 +178,7 @@ async def get_image_similar(filepath):
         img['match_type'] = img['type']  # 'parent', 'child', or 'sibling'
         img['thumb'] = get_thumbnail_path(img['path'])
         
-        # Normalize path to include 'images/' prefix for consistency
-        p = img['path']
-        if not p.startswith('images/'):
-            p = f"images/{p}"
-        parent_child_paths.add(p)
+        parent_child_paths.add(normalize_image_path(img['path']))
     
     # Get similar images - tag-based results
     similar_images = await asyncio.to_thread(
@@ -188,14 +190,15 @@ async def get_image_similar(filepath):
     # Filter out self-match and family
     similar_images = [
         img for img in similar_images
-        if normalize_image_path(img['path']) != lookup_path and img['path'] not in parent_child_paths
+        if normalize_image_path(img['path']) != lookup_path
+        and normalize_image_path(img['path']) not in parent_child_paths
     ]
     
     # Tag-only results - ensure correct labeling
     for img in similar_images:
         img['primary_source'] = 'tag'
     
-    return jsonify({
+    return _no_cache(await make_response(jsonify({
         'parent_child_images': parent_child_images,
         'similar_images': similar_images
-    })
+    })))
