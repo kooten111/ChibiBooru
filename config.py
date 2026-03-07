@@ -383,6 +383,25 @@ SIMILAR_SIDEBAR_SHOW_CHIPS = _show_chips if isinstance(_show_chips, bool) else s
 _ip_visible = _get_setting('INFORMATION_PANEL_DEFAULT_VISIBLE', False)
 INFORMATION_PANEL_DEFAULT_VISIBLE = _ip_visible if isinstance(_ip_visible, bool) else str(_ip_visible).lower() in ('true', '1', 'yes')
 
+# Image page visibility controls
+# Default policy:
+# - Hide raw metadata button and similar sidebar by default
+# - Keep other optional toolbar controls visible by default
+_show_copy_tags = _get_setting('IMAGE_TOOLBAR_SHOW_COPY_TAGS', True)
+IMAGE_TOOLBAR_SHOW_COPY_TAGS = _show_copy_tags if isinstance(_show_copy_tags, bool) else str(_show_copy_tags).lower() in ('true', '1', 'yes')
+
+_show_tag_similar = _get_setting('IMAGE_TOOLBAR_SHOW_TAG_SIMILAR', True)
+IMAGE_TOOLBAR_SHOW_TAG_SIMILAR = _show_tag_similar if isinstance(_show_tag_similar, bool) else str(_show_tag_similar).lower() in ('true', '1', 'yes')
+
+_show_visual_similar = _get_setting('IMAGE_TOOLBAR_SHOW_VISUAL_SIMILAR', True)
+IMAGE_TOOLBAR_SHOW_VISUAL_SIMILAR = _show_visual_similar if isinstance(_show_visual_similar, bool) else str(_show_visual_similar).lower() in ('true', '1', 'yes')
+
+_show_raw_data = _get_setting('IMAGE_TOOLBAR_SHOW_RAW_DATA', False)
+IMAGE_TOOLBAR_SHOW_RAW_DATA = _show_raw_data if isinstance(_show_raw_data, bool) else str(_show_raw_data).lower() in ('true', '1', 'yes')
+
+_show_pools = _get_setting('IMAGE_PAGE_SHOW_POOLS', True)
+IMAGE_PAGE_SHOW_POOLS = _show_pools if isinstance(_show_pools, bool) else str(_show_pools).lower() in ('true', '1', 'yes')
+
 # ==================== FILE TYPES ====================
 
 SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif')

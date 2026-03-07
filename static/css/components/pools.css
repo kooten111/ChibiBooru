@@ -183,6 +183,30 @@
     background: rgba(255, 107, 107, 0.5);
 }
 
+/* Image page sidebar: make pool chips more compact and better centered */
+.image-page .pools-section .pools-list-container {
+    gap: 8px;
+}
+
+.image-page .pools-section .pool-list-item {
+    padding: 7px 12px;
+    min-height: 38px;
+    margin-bottom: 0;
+    border-radius: 12px;
+}
+
+.image-page .pools-section .pool-list-item a {
+    display: flex;
+    align-items: center;
+    line-height: 1.2;
+}
+
+.image-page .pools-section .pool-list-item button {
+    margin-left: 8px;
+    padding: 4px 8px;
+    line-height: 1.2;
+}
+
 .loading-spinner {
     text-align: center;
     padding: var(--spacing-lg);
@@ -239,6 +263,64 @@
     color: #fff;
 }
 
+#addToPoolModal .modal-content {
+    width: min(92vw, 640px);
+    max-width: 640px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.pool-search-group {
+    margin-bottom: var(--spacing-sm);
+}
+
+#poolSearchModal {
+    width: 100%;
+    padding: 10px;
+}
+
+.pool-create-section {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-md);
+    border-top: var(--border-width) solid var(--primary-blue-light);
+}
+
+.pool-create-section h4 {
+    margin: 0 0 var(--spacing-md) 0;
+    color: var(--text-secondary);
+    font-size: var(--font-size-lg);
+}
+
+.pool-create-form {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.pool-create-form label {
+    display: block;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-muted);
+}
+
+.pool-create-form input,
+.pool-create-form textarea {
+    width: 100%;
+}
+
+.pool-create-form textarea {
+    resize: vertical;
+    min-height: 72px;
+}
+
+.pool-create-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.pool-modal-actions {
+    margin-top: var(--spacing-lg);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .pools-browser-header {
@@ -265,5 +347,19 @@
     .pool-detail-header {
         flex-direction: column;
         gap: 15px;
+    }
+
+    #addToPoolModal .modal-content {
+        width: 94vw;
+        max-height: 92vh;
+        padding: var(--spacing-lg);
+    }
+
+    .pool-create-actions {
+        justify-content: stretch;
+    }
+
+    .pool-create-actions .btn-primary {
+        width: 100%;
     }
 }

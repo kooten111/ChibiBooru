@@ -289,6 +289,11 @@ body.image-page {
     background: var(--favourite-pink-bg);
     border-color: var(--favourite-pink);
 }
+.image-page .toolbar-btn.success {
+    color: var(--success);
+    background: rgba(34, 197, 94, 0.15);
+    border-color: var(--success);
+}
 .image-page .toolbar-icon {
     font-size: 16px;
     line-height: 1;

@@ -1,6 +1,9 @@
 // static/js/pool-manager.js
 import { showSuccess, showError, showInfo } from './utils/notifications.js';
 
+const POOL_NAME_MAX_LENGTH = 200;
+const POOL_DESCRIPTION_MAX_LENGTH = 1000;
+
 document.addEventListener('DOMContentLoaded', () => {
     loadPoolsForImage();
 });
@@ -8,8 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
 async function loadPoolsForImage() {
     const filepath = document.getElementById('imageFilepath').value;
     const poolsList = document.getElementById('poolsList');
-    const poolsPanel = document.querySelector('.pool-management.panel');
     const poolsContent = document.getElementById('pools-content');
+    const poolCountBadge = document.getElementById('poolCountBadge');
 
     if (!filepath || !poolsList) {
         // Safe check for server-side hidden section
@@ -20,52 +23,51 @@ async function loadPoolsForImage() {
         const response = await fetch(`/api/pools/for_image?filepath=${encodeURIComponent(filepath)}`);
         const data = await response.json();
 
-        if (response.ok && data.pools) {
-            if (data.pools.length === 0) {
-                // Hide the entire pools section when not in any pools
-                if (poolsContent) {
-                    poolsContent.style.display = 'none';
-                }
-                if (poolsPanel) {
-                    poolsPanel.style.display = 'none';
-                }
-            } else {
-                // Show the section and panel, then populate with pools
-                if (poolsContent) {
-                    poolsContent.style.display = 'contents';
-                }
-                if (poolsPanel) {
-                    poolsPanel.style.display = 'block';
-                }
-
-                // Clear and populate pool list
-                poolsList.innerHTML = '';
-                data.pools.forEach(pool => {
-                    const item = createPoolListItem(pool);
-                    poolsList.appendChild(item);
-                });
-            }
-        } else {
-            // On error, show the panel with error message
+        if (response.ok && Array.isArray(data.pools)) {
             if (poolsContent) {
-                poolsContent.style.display = 'contents';
+                poolsContent.style.display = 'block';
             }
-            if (poolsPanel) {
-                poolsPanel.style.display = 'block';
+
+            if (poolCountBadge) {
+                poolCountBadge.textContent = data.pools.length > 0 ? `(${data.pools.length})` : '(0)';
+            }
+
+            if (data.pools.length === 0) {
+                showEmptyImagePools(poolsList);
+                return;
+            }
+
+            // Clear and populate pool list
+            poolsList.innerHTML = '';
+            data.pools.forEach(pool => {
+                const item = createPoolListItem(pool);
+                poolsList.appendChild(item);
+            });
+        } else {
+            // On error, keep the panel visible and show error
+            if (poolsContent) {
+                poolsContent.style.display = 'block';
+            }
+            if (poolCountBadge) {
+                poolCountBadge.textContent = '';
             }
             showPoolError(poolsList);
         }
     } catch (error) {
         console.error('Error loading pools:', error);
-        // On error, show the panel with error message
+        // On error, keep the panel visible and show error
         if (poolsContent) {
-            poolsContent.style.display = 'contents';
+            poolsContent.style.display = 'block';
         }
-        if (poolsPanel) {
-            poolsPanel.style.display = 'block';
+        if (poolCountBadge) {
+            poolCountBadge.textContent = '';
         }
         showPoolError(poolsList);
     }
+}
+
+function showEmptyImagePools(container) {
+    container.innerHTML = '<div class="pool-empty-message">Not in any pools yet.</div>';
 }
 
 function createPoolListItem(pool) {
@@ -106,30 +108,80 @@ async function showAddToPoolModal() {
         modal.appendChild(clone);
 
         document.body.appendChild(modal);
+
+        initializeAddToPoolModal(modal);
     }
 
     // Show modal
-    modal.style.display = 'block';
+    modal.classList.add('active');
 
     // Load all pools
     await loadAllPools();
 
-    // Setup search
     const searchInput = document.getElementById('poolSearchModal');
+    if (searchInput) {
+        searchInput.focus();
+    }
+}
+
+function initializeAddToPoolModal(modal) {
+    if (modal.dataset.initialized === 'true') {
+        return;
+    }
+
+    const searchInput = modal.querySelector('#poolSearchModal');
     if (searchInput) {
         searchInput.addEventListener('input', filterPoolList);
     }
+
+    const createForm = modal.querySelector('#createPoolForm');
+    if (createForm) {
+        createForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const nameInput = modal.querySelector('#createPoolName');
+            const descriptionInput = modal.querySelector('#createPoolDescription');
+            const name = nameInput ? nameInput.value.trim() : '';
+            const description = descriptionInput ? descriptionInput.value.trim() : '';
+
+            if (!name) {
+                showInfo('Pool name is required.');
+                if (nameInput) {
+                    nameInput.focus();
+                }
+                return;
+            }
+
+            if (name.length > POOL_NAME_MAX_LENGTH) {
+                showInfo(`Pool name must be ${POOL_NAME_MAX_LENGTH} characters or less.`);
+                return;
+            }
+
+            if (description.length > POOL_DESCRIPTION_MAX_LENGTH) {
+                showInfo(`Description must be ${POOL_DESCRIPTION_MAX_LENGTH} characters or less.`);
+                return;
+            }
+
+            await createPoolAndAddCurrentImage(name, description);
+        });
+    }
+
+    modal.dataset.initialized = 'true';
 }
 
 async function loadAllPools() {
     const poolsList = document.getElementById('poolSelectorList');
     const filepath = document.getElementById('imageFilepath').value;
 
+    if (!poolsList || !filepath) {
+        return;
+    }
+
     try {
         // Get pools this image is in
         const poolsResponse = await fetch('/api/pools/for_image?filepath=' + encodeURIComponent(filepath));
         const poolsData = await poolsResponse.json();
-        const imagePools = new Set(poolsData.pools.map(p => p.id));
+        const imagePools = new Set((poolsData.pools || []).map(p => p.id));
 
         // Get all available pools
         const allPoolsResponse = await fetch('/api/pools/all');
@@ -203,6 +255,10 @@ function createPoolSelectorItem(pool) {
 
 function filterPoolList() {
     const searchInput = document.getElementById('poolSearchModal');
+    if (!searchInput) {
+        return;
+    }
+
     const query = searchInput.value.toLowerCase().trim();
     const items = document.querySelectorAll('.pool-selector-item');
 
@@ -214,6 +270,84 @@ function filterPoolList() {
             item.style.display = 'none';
         }
     });
+}
+
+function setCreatePoolFormLoading(loading) {
+    const nameInput = document.getElementById('createPoolName');
+    const descriptionInput = document.getElementById('createPoolDescription');
+    const submitBtn = document.getElementById('createPoolSubmit');
+
+    if (nameInput) {
+        nameInput.disabled = loading;
+    }
+    if (descriptionInput) {
+        descriptionInput.disabled = loading;
+    }
+    if (submitBtn) {
+        submitBtn.disabled = loading;
+        submitBtn.textContent = loading ? 'Creating...' : 'Create + Add';
+    }
+}
+
+function resetCreatePoolForm() {
+    const createForm = document.getElementById('createPoolForm');
+    if (createForm) {
+        createForm.reset();
+    }
+}
+
+async function createPoolAndAddCurrentImage(name, description) {
+    const filepathInput = document.getElementById('imageFilepath');
+    const filepath = filepathInput ? filepathInput.value : '';
+
+    if (!filepath) {
+        showError('Image path is missing.');
+        return;
+    }
+
+    setCreatePoolFormLoading(true);
+
+    try {
+        const createResponse = await fetch('/api/pools/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, description: description })
+        });
+
+        const createResult = await createResponse.json();
+        if (!createResponse.ok) {
+            showError(createResult.error || 'Failed to create pool.');
+            return;
+        }
+
+        const poolId = createResult.pool_id;
+        if (!poolId) {
+            showError('Pool was created but no pool id was returned.');
+            return;
+        }
+
+        const addResponse = await fetch(`/api/pools/${poolId}/add_image`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filepath: filepath })
+        });
+
+        const addResult = await addResponse.json();
+        if (!addResponse.ok) {
+            showError(addResult.error || 'Pool created, but failed to add image.');
+            return;
+        }
+
+        await loadAllPools();
+        await loadPoolsForImage();
+        resetCreatePoolForm();
+        showSuccess(`Pool "${name}" created and image added.`);
+    } catch (error) {
+        console.error('Error creating pool from modal:', error);
+        showError('An error occurred while creating the pool.');
+    } finally {
+        setCreatePoolFormLoading(false);
+    }
 }
 
 async function togglePoolMembership(poolId, _poolName, currentlyInPool) {
@@ -273,8 +407,17 @@ async function removeImageFromPool(poolId, poolName) {
 function closeAddToPoolModal() {
     const modal = document.getElementById('addToPoolModal');
     if (modal) {
-        modal.style.display = 'none';
+        modal.classList.remove('active');
     }
+
+    const searchInput = document.getElementById('poolSearchModal');
+    if (searchInput) {
+        searchInput.value = '';
+        filterPoolList();
+    }
+
+    resetCreatePoolForm();
+    setCreatePoolFormLoading(false);
 }
 
 // Expose functions globally for use by other scripts
@@ -285,7 +428,18 @@ window.loadPoolsForImage = loadPoolsForImage;
 // Close modal on outside click
 window.addEventListener('click', (event) => {
     const modal = document.getElementById('addToPoolModal');
-    if (modal && event.target === modal) {
+    if (modal && modal.classList.contains('active') && event.target === modal) {
+        closeAddToPoolModal();
+    }
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') {
+        return;
+    }
+
+    const modal = document.getElementById('addToPoolModal');
+    if (modal && modal.classList.contains('active')) {
         closeAddToPoolModal();
     }
 });

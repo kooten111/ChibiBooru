@@ -19,6 +19,12 @@
 
     const currentFilepath = getCurrentFilepath();
 
+    function isFeatureEnabled(dataAttributeName, defaultValue = true) {
+        const rawValue = document.body?.dataset?.[dataAttributeName];
+        if (rawValue === undefined) return defaultValue;
+        return String(rawValue).toLowerCase() === 'true';
+    }
+
     /**
      * URL-encode a path while preserving forward slashes
      */
@@ -110,6 +116,10 @@
      * Load and populate image pools
      */
     async function loadPools() {
+        if (!isFeatureEnabled('showPoolsControls', true)) {
+            return;
+        }
+
         try {
             const response = await fetch(`/api/image/${encodePathForUrl(currentFilepath)}/pools`);
             if (!response.ok) return;

@@ -12,6 +12,15 @@ from utils.file_utils import normalize_image_path
 from utils.decorators import login_required
 
 
+def _as_bool(value, default=False):
+    """Normalize bool-like config values from YAML/env sources."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in ('true', '1', 'yes')
+
+
 def register_routes(blueprint):
     """Register image detail routes on the given blueprint."""
     
@@ -52,15 +61,38 @@ def register_routes(blueprint):
         from services.config_service import load_config
         config_yml = load_config()
         sidebar_sources = str(config_yml.get('SIMILAR_SIDEBAR_SOURCES', 'both')).lower()
-        sidebar_show_chips = config_yml.get('SIMILAR_SIDEBAR_SHOW_CHIPS', True)
-        if isinstance(sidebar_show_chips, str):
-            sidebar_show_chips = sidebar_show_chips.lower() in ('true', '1', 'yes')
+        sidebar_show_chips = _as_bool(
+            config_yml.get('SIMILAR_SIDEBAR_SHOW_CHIPS', True),
+            getattr(config, 'SIMILAR_SIDEBAR_SHOW_CHIPS', True),
+        )
+
+        show_copy_tags_button = _as_bool(
+            config_yml.get('IMAGE_TOOLBAR_SHOW_COPY_TAGS', getattr(config, 'IMAGE_TOOLBAR_SHOW_COPY_TAGS', True)),
+            getattr(config, 'IMAGE_TOOLBAR_SHOW_COPY_TAGS', True),
+        )
+        show_tag_similar_button = _as_bool(
+            config_yml.get('IMAGE_TOOLBAR_SHOW_TAG_SIMILAR', getattr(config, 'IMAGE_TOOLBAR_SHOW_TAG_SIMILAR', True)),
+            getattr(config, 'IMAGE_TOOLBAR_SHOW_TAG_SIMILAR', True),
+        )
+        show_visual_similar_button = _as_bool(
+            config_yml.get('IMAGE_TOOLBAR_SHOW_VISUAL_SIMILAR', getattr(config, 'IMAGE_TOOLBAR_SHOW_VISUAL_SIMILAR', True)),
+            getattr(config, 'IMAGE_TOOLBAR_SHOW_VISUAL_SIMILAR', True),
+        )
+        show_raw_data_button = _as_bool(
+            config_yml.get('IMAGE_TOOLBAR_SHOW_RAW_DATA', getattr(config, 'IMAGE_TOOLBAR_SHOW_RAW_DATA', False)),
+            getattr(config, 'IMAGE_TOOLBAR_SHOW_RAW_DATA', False),
+        )
+        show_pools_controls = _as_bool(
+            config_yml.get('IMAGE_PAGE_SHOW_POOLS', getattr(config, 'IMAGE_PAGE_SHOW_POOLS', True)),
+            getattr(config, 'IMAGE_PAGE_SHOW_POOLS', True),
+        )
 
         # Information panel default: collapsed unless INFORMATION_PANEL_DEFAULT_VISIBLE is True
-        ip_visible = config_yml.get('INFORMATION_PANEL_DEFAULT_VISIBLE', getattr(config, 'INFORMATION_PANEL_DEFAULT_VISIBLE', False))
-        information_panel_default_collapsed = not (
-            ip_visible if isinstance(ip_visible, bool) else str(ip_visible).lower() in ('true', '1', 'yes')
+        ip_visible = _as_bool(
+            config_yml.get('INFORMATION_PANEL_DEFAULT_VISIBLE', getattr(config, 'INFORMATION_PANEL_DEFAULT_VISIBLE', False)),
+            getattr(config, 'INFORMATION_PANEL_DEFAULT_VISIBLE', False),
         )
+        information_panel_default_collapsed = not ip_visible
 
         html = await render_template(
             'image.html',
@@ -85,6 +117,11 @@ def register_routes(blueprint):
             implied_tag_names=tag_data['implied_tag_names'],  # Tags implied by implication rules
             similar_sidebar_sources=sidebar_sources,
             similar_sidebar_show_chips=sidebar_show_chips,
+            show_copy_tags_button=show_copy_tags_button,
+            show_tag_similar_button=show_tag_similar_button,
+            show_visual_similar_button=show_visual_similar_button,
+            show_raw_data_button=show_raw_data_button,
+            show_pools_controls=show_pools_controls,
             information_panel_default_collapsed=information_panel_default_collapsed,
             image_relations=relations_repository.get_editable_relations_for_image(data['id']) if data.get('id') else [],
         )

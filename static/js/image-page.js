@@ -45,21 +45,32 @@ function copyImageTags(button) {
 
     // Helper to show success feedback
     function showSuccess() {
-        const icon = button.querySelector('.utility-icon');
-        const text = button.querySelector('.utility-text');
-        if (icon && text) {
-            const originalIcon = icon.textContent;
-            const originalText = text.textContent;
+        const utilityIcon = button.querySelector('.utility-icon');
+        const utilityText = button.querySelector('.utility-text');
+        const toolbarIcon = button.querySelector('.toolbar-icon');
 
-            icon.textContent = '✓';
-            text.textContent = `Copied ${tags.length} tags!`;
+        if (utilityIcon && utilityText) {
+            const originalIcon = utilityIcon.textContent;
+            const originalText = utilityText.textContent;
+
+            utilityIcon.textContent = '✓';
+            utilityText.textContent = `Copied ${tags.length} tags!`;
             button.classList.add('success');
 
             setTimeout(() => {
-                icon.textContent = originalIcon;
-                text.textContent = originalText;
+                utilityIcon.textContent = originalIcon;
+                utilityText.textContent = originalText;
                 button.classList.remove('success');
             }, 2000);
+        } else if (toolbarIcon) {
+            const originalIcon = toolbarIcon.textContent;
+            toolbarIcon.textContent = '✓';
+            button.classList.add('success');
+
+            setTimeout(() => {
+                toolbarIcon.textContent = originalIcon;
+                button.classList.remove('success');
+            }, 1200);
         }
         showNotification(`Copied ${tags.length} tags to clipboard!`, 'success');
     }

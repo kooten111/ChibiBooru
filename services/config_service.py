@@ -361,6 +361,36 @@ SETTING_METADATA: Dict[str, Dict[str, Any]] = {
         'description': 'On image page: Information panel expanded by default (uncheck = collapsed by default)',
         'editable': True,
     },
+    'IMAGE_TOOLBAR_SHOW_COPY_TAGS': {
+        'category': 'UI',
+        'type': 'bool',
+        'description': 'Show Copy Tags button on image page toolbar',
+        'editable': True,
+    },
+    'IMAGE_TOOLBAR_SHOW_TAG_SIMILAR': {
+        'category': 'UI',
+        'type': 'bool',
+        'description': 'Show tag-based Similar button on image page toolbar only (does not affect right Similar sidebar)',
+        'editable': True,
+    },
+    'IMAGE_TOOLBAR_SHOW_VISUAL_SIMILAR': {
+        'category': 'UI',
+        'type': 'bool',
+        'description': 'Show visual Similar button on image page toolbar only (does not affect right Similar sidebar)',
+        'editable': True,
+    },
+    'IMAGE_TOOLBAR_SHOW_RAW_DATA': {
+        'category': 'UI',
+        'type': 'bool',
+        'description': 'Show Raw Data button on image page toolbar',
+        'editable': True,
+    },
+    'IMAGE_PAGE_SHOW_POOLS': {
+        'category': 'UI',
+        'type': 'bool',
+        'description': 'Show pools controls on image page (Add to Pool button and Pools section)',
+        'editable': True,
+    },
 
     # Feature Flags
     'ENABLE_SAUCENAO': {
