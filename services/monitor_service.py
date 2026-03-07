@@ -34,6 +34,16 @@ monitor_status = {
 
 LOG_FILE = "monitor.logs"
 
+
+def _is_within_dir(path, base_dir):
+    """Return True if path is located inside base_dir."""
+    try:
+        abs_path = os.path.abspath(path)
+        abs_base = os.path.abspath(base_dir)
+        return os.path.commonpath([abs_path, abs_base]) == abs_base
+    except Exception:
+        return False
+
 def check_external_monitor():
     """Check if the external monitor process is running via PID file."""
     try:
@@ -236,12 +246,17 @@ class ImageFileHandler(FileSystemEventHandler):
             # Determine if this is from ingest folder
             abs_filepath = os.path.abspath(filepath)
             abs_ingest = os.path.abspath(config.INGEST_DIRECTORY)
-            is_from_ingest = self.watch_ingest and abs_filepath.startswith(abs_ingest)
+            image_dir = os.path.abspath(config.IMAGE_DIRECTORY)
+            is_from_ingest = self.watch_ingest and _is_within_dir(abs_filepath, abs_ingest)
             filename = os.path.basename(filepath)
 
             if not is_from_ingest:
-                # Check if already in DB for static/images files
-                rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+                # Only derive DB filepath if this event came from the configured image root.
+                if not _is_within_dir(abs_filepath, image_dir):
+                    logger.debug(f"Watchdog ignoring {filename} outside image directory: {abs_filepath}")
+                    return
+
+                rel_path = os.path.relpath(abs_filepath, image_dir).replace('\\', '/')
                 if rel_path in models.get_all_filepaths():
                     return
 
@@ -324,12 +339,14 @@ def find_unprocessed_images():
     duplicates_removed = 0
     skipped_in_progress = 0
 
-    # Check static/images directory
-    for root, _, files in os.walk("static/images"):
+    image_dir = os.path.abspath(config.IMAGE_DIRECTORY)
+
+    # Check configured image directory
+    for root, _, files in os.walk(image_dir):
         for file in files:
             if file.lower().endswith(config.SUPPORTED_MEDIA_EXTENSIONS):
                 filepath = os.path.join(root, file)
-                rel_path = os.path.relpath(filepath, "static/images").replace('\\', '/')
+                rel_path = os.path.relpath(filepath, image_dir).replace('\\', '/')
                 
                 if rel_path not in db_filepaths:
                     # Filepath not in DB - but check if MD5 already exists (duplicate file)
@@ -514,6 +531,7 @@ def start_monitor():
         return False
 
     monitor_status["running"] = True
+    monitor_status["interval_seconds"] = max(1, int(getattr(config, 'MONITOR_INTERVAL', 300)))
     
     # Initialize ThreadPoolExecutor (changed from ProcessPoolExecutor)
     try:
@@ -537,7 +555,8 @@ def start_monitor():
         try:
             event_handler = ImageFileHandler(watch_ingest=True)
             observer = Observer()
-            observer.schedule(event_handler, "static/images", recursive=True)
+            observer.schedule(event_handler, config.IMAGE_DIRECTORY, recursive=True)
+            add_log(f"Watching image folder: {config.IMAGE_DIRECTORY}")
 
             # Also watch ingest folder
             if os.path.exists(config.INGEST_DIRECTORY):

@@ -300,7 +300,7 @@ def process_image_file(filepath, move_from_ingest=True):
                     existing_filepath = row['filepath']
             
             # Check that we're not deleting the actual canonical file
-            if existing_filepath and os.path.abspath(filepath) != os.path.abspath(os.path.join("static/images", existing_filepath)):
+            if existing_filepath and os.path.abspath(filepath) != os.path.abspath(os.path.join(config.IMAGE_DIRECTORY, existing_filepath)):
                 msg = f"[Processing] Duplicate detected (concurrent): {filename} (same as {os.path.basename(existing_filepath) if existing_filepath else 'existing file'})"
                 logger.info(msg)
                 
@@ -332,7 +332,7 @@ def process_image_file(filepath, move_from_ingest=True):
 
             # If this is the canonical file already stored in the DB, do not delete it.
             if existing_filepath:
-                canonical_path = os.path.abspath(os.path.join("static/images", existing_filepath))
+                canonical_path = os.path.abspath(os.path.join(config.IMAGE_DIRECTORY, existing_filepath))
                 if os.path.abspath(filepath) == canonical_path:
                     msg = f"[Processing] Duplicate check hit canonical file, skipping deletion: {filename}"
                     logger.info(msg)
@@ -590,7 +590,7 @@ def process_image_file(filepath, move_from_ingest=True):
                         logger.error(msg)
                         return False, msg, "error"
         
-        db_path = os.path.relpath(file_dest, "static/images").replace('\\', '/')
+        db_path = os.path.relpath(file_dest, config.IMAGE_DIRECTORY).replace('\\', '/')
         
         # ========== STAGE 5: DATABASE COMMIT ==========
         # Prepare metadata
