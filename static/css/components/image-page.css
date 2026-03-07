@@ -956,7 +956,9 @@ body:is(.ui-hidden, .focus-mode) .header-container {
 body:is(.ui-hidden, .focus-mode) .sidebar-left,
 body:is(.ui-hidden, .focus-mode) .sidebar-right,
 body:is(.ui-hidden, .focus-mode) .actions-bar,
-body:is(.ui-hidden, .focus-mode) .image-nav-btn {
+body:is(.ui-hidden, .focus-mode) .image-nav-btn,
+body:is(.ui-hidden, .focus-mode) .family-filmstrip,
+body:is(.ui-hidden, .focus-mode) .filmstrip-preview {
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--transition-smooth);
@@ -1310,6 +1312,12 @@ body:is(.ui-hidden, .focus-mode)::after {
 
 .image-page .image-view-wrapper:hover .image-nav-btn {
     opacity: 1;
+}
+
+body:is(.ui-hidden, .focus-mode) .image-page .image-view-wrapper:hover .image-nav-btn,
+body:is(.ui-hidden, .focus-mode) .image-page .image-nav-btn {
+    opacity: 0;
+    pointer-events: none;
 }
 
 .image-page .image-nav-btn:hover {
