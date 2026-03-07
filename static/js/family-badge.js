@@ -150,12 +150,27 @@ class FamilyBadge {
         this.preview.className = 'filmstrip-preview';
         this.preview.innerHTML = `<img src="${img.src}" alt="Preview">`;
 
-        // Position above the thumbnail
+        // Prefer showing preview below the thumbnail; fallback above if needed.
         const rect = thumbElement.getBoundingClientRect();
         this.preview.style.left = `${rect.left + rect.width / 2}px`;
-        this.preview.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+        this.preview.style.bottom = 'auto';
 
+        const offset = 8;
+        const viewportMargin = 8;
+        const preferredTop = rect.bottom + offset;
+
+        // Append first so we can measure preview height for viewport fitting.
         document.body.appendChild(this.preview);
+
+        const previewRect = this.preview.getBoundingClientRect();
+        const wouldOverflowBottom = preferredTop + previewRect.height > (window.innerHeight - viewportMargin);
+
+        if (wouldOverflowBottom) {
+            const fallbackTop = rect.top - previewRect.height - offset;
+            this.preview.style.top = `${Math.max(viewportMargin, fallbackTop)}px`;
+        } else {
+            this.preview.style.top = `${preferredTop}px`;
+        }
 
         requestAnimationFrame(() => {
             this.preview.classList.add('visible');

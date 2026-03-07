@@ -6,11 +6,11 @@
 /* ── Layout shell ── */
 .family-filmstrip {
     position: absolute;
-    bottom: 14px;
+    top: 14px;
     right: 14px;
-    z-index: 20;
+    z-index: var(--z-dropdown);
     display: flex;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 6px;
     transition: opacity var(--transition-smooth), transform var(--transition-smooth);
     flex-shrink: 0;
